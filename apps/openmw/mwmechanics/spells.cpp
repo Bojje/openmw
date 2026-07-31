@@ -23,6 +23,7 @@ namespace MWMechanics
     Spells::Spells(const Spells& spells)
         : mSpellList(spells.mSpellList)
         , mSpells(spells.mSpells)
+        , mSpellSet(spells.mSpellSet)
         , mSelectedSpell(spells.mSelectedSpell)
         , mUsedPowers(spells.mUsedPowers)
     {
@@ -33,6 +34,7 @@ namespace MWMechanics
     Spells::Spells(Spells&& spells)
         : mSpellList(std::move(spells.mSpellList))
         , mSpells(std::move(spells.mSpells))
+        , mSpellSet(std::move(spells.mSpellSet))
         , mSelectedSpell(std::move(spells.mSelectedSpell))
         , mUsedPowers(std::move(spells.mUsedPowers))
     {
@@ -57,7 +59,7 @@ namespace MWMechanics
 
     bool Spells::hasSpell(const ESM::Spell* spell) const
     {
-        return std::find(mSpells.begin(), mSpells.end(), spell) != mSpells.end();
+        return mSpellSet.count(spell) != 0;
     }
 
     void Spells::add(const ESM::Spell* spell, bool modifyBase)
@@ -75,7 +77,7 @@ namespace MWMechanics
 
     void Spells::addSpell(const ESM::Spell* spell)
     {
-        if (!hasSpell(spell))
+        if (mSpellSet.insert(spell).second)
             mSpells.emplace_back(spell);
     }
 
@@ -95,14 +97,18 @@ namespace MWMechanics
 
     void Spells::removeSpell(const ESM::Spell* spell)
     {
-        const auto it = std::find(mSpells.begin(), mSpells.end(), spell);
-        if (it != mSpells.end())
-            mSpells.erase(it);
+        if (mSpellSet.erase(spell))
+        {
+            const auto it = std::find(mSpells.begin(), mSpells.end(), spell);
+            if (it != mSpells.end())
+                mSpells.erase(it);
+        }
     }
 
     void Spells::removeAllSpells()
     {
         mSpells.clear();
+        mSpellSet.clear();
     }
 
     void Spells::clear(bool modifyBase)
@@ -147,6 +153,7 @@ namespace MWMechanics
             const ESM::Spell* spell = *iter;
             if (filter(spell))
             {
+                mSpellSet.erase(spell);
                 iter = mSpells.erase(iter);
                 purged.push_back(spell->mId);
             }
