@@ -5,6 +5,7 @@
 #include "windowbase.hpp"
 #include <components/esm/refid.hpp>
 #include <components/esm3/loadclas.hpp>
+#include <unordered_map>
 
 namespace ESM
 {
@@ -93,7 +94,7 @@ namespace MWGui
         std::map<ESM::RefId, Widgets::MWAttributePtr> mAttributeWidgets;
 
         std::vector<ESM::RefId> mMajorSkills, mMinorSkills, mMiscSkills;
-        std::map<ESM::RefId, MWMechanics::SkillValue> mSkillValues;
+        std::unordered_map<ESM::RefId, MWMechanics::SkillValue> mSkillValues;
         std::map<ESM::RefId, MyGUI::TextBox*> mSkillWidgetMap;
         ESM::RefId mRaceId, mBirthSignId;
         std::string mName;

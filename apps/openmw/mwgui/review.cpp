@@ -429,7 +429,7 @@ namespace MWGui
         if (!mRaceId.empty())
             race = MWBase::Environment::get().getESMStore()->get<ESM::Race>().find(mRaceId);
 
-        std::map<ESM::RefId, MWMechanics::AttributeValue> attributes;
+        std::unordered_map<ESM::RefId, MWMechanics::AttributeValue> attributes;
         for (const auto& [key, value] : mAttributeWidgets)
             attributes[key] = value->getAttributeValue();
 
