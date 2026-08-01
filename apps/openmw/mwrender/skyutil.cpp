@@ -144,7 +144,7 @@ namespace MWRender
 
         float dt = MWBase::Environment::get().getFrameDuration();
 
-        float lastRatio = mLastRatio[osg::observer_ptr<osg::Camera>(camera)];
+        float lastRatio = mLastRatio[camera];
 
         float change = dt * 10;
 
@@ -153,7 +153,7 @@ namespace MWRender
         else
             visibleRatio = std::max(visibleRatio, lastRatio - change);
 
-        mLastRatio[osg::observer_ptr<osg::Camera>(camera)] = visibleRatio;
+        mLastRatio[camera] = visibleRatio;
 
         return visibleRatio;
     }
