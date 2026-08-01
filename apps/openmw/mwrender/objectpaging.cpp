@@ -510,10 +510,10 @@ namespace MWRender
             };
         }
 
-        std::map<ESM::RefNum, PagedCellRef> collectESM3References(
+        std::unordered_map<ESM::RefNum, PagedCellRef> collectESM3References(
             float size, const osg::Vec2i& startCell, const MWWorld::ESMStore& store)
         {
-            std::map<ESM::RefNum, PagedCellRef> refs;
+            std::unordered_map<ESM::RefNum, PagedCellRef> refs;
             ESM::ReadersCache readers;
             for (int cellX = startCell.x(); cellX < startCell.x() + size; ++cellX)
             {
@@ -581,10 +581,10 @@ namespace MWRender
             return refs;
         }
 
-        std::map<ESM::RefNum, PagedCellRef> collectESM4References(
+        std::unordered_map<ESM::RefNum, PagedCellRef> collectESM4References(
             float size, const osg::Vec2i& startCell, ESM::RefId worldspace)
         {
-            std::map<ESM::RefNum, PagedCellRef> refs;
+            std::unordered_map<ESM::RefNum, PagedCellRef> refs;
             const auto& store = MWBase::Environment::get().getWorld()->getStore();
             for (int cellX = startCell.x(); cellX < startCell.x() + size; ++cellX)
             {
@@ -629,7 +629,7 @@ namespace MWRender
         const MWBase::World& world = *MWBase::Environment::get().getWorld();
         const MWWorld::ESMStore& store = world.getStore();
 
-        std::map<ESM::RefNum, PagedCellRef> refs;
+        std::unordered_map<ESM::RefNum, PagedCellRef> refs;
 
         if (mWorldspace == ESM::Cell::sDefaultWorldspaceId)
         {
