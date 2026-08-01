@@ -1023,7 +1023,7 @@ namespace MWMechanics
 
                 // Play a drowning sound
                 MWBase::SoundManager* sndmgr = MWBase::Environment::get().getSoundManager();
-                auto soundDrown = ESM::RefId::stringRefId("drown");
+                static const auto soundDrown = ESM::RefId::stringRefId("drown");
                 if (!sndmgr->getSoundPlaying(ptr, soundDrown))
                     sndmgr->playSound3D(ptr, soundDrown, 1.0f, 1.0f);
 

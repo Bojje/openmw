@@ -140,12 +140,15 @@ namespace MWMechanics
         {
             MWBase::SoundManager* sndMgr = MWBase::Environment::get().getSoundManager();
             const ESM::RefId skill = shield->getClass().getEquipmentSkill(*shield);
+            static const auto sLightArmorHit = ESM::RefId::stringRefId("Light Armor Hit");
+            static const auto sMediumArmorHit = ESM::RefId::stringRefId("Medium Armor Hit");
+            static const auto sHeavyArmorHit = ESM::RefId::stringRefId("Heavy Armor Hit");
             if (skill == ESM::Skill::LightArmor)
-                sndMgr->playSound3D(blocker, ESM::RefId::stringRefId("Light Armor Hit"), 1.0f, 1.0f);
+                sndMgr->playSound3D(blocker, sLightArmorHit, 1.0f, 1.0f);
             else if (skill == ESM::Skill::MediumArmor)
-                sndMgr->playSound3D(blocker, ESM::RefId::stringRefId("Medium Armor Hit"), 1.0f, 1.0f);
+                sndMgr->playSound3D(blocker, sMediumArmorHit, 1.0f, 1.0f);
             else if (skill == ESM::Skill::HeavyArmor)
-                sndMgr->playSound3D(blocker, ESM::RefId::stringRefId("Heavy Armor Hit"), 1.0f, 1.0f);
+                sndMgr->playSound3D(blocker, sHeavyArmorHit, 1.0f, 1.0f);
 
             // Reduce shield durability by incoming damage
             int shieldhealth = shield->getClass().getItemHealth(*shield);
@@ -284,8 +287,9 @@ namespace MWMechanics
                 static const float fCombatKODamageMult = gmst.find("fCombatKODamageMult")->mValue.getFloat();
                 damage *= fCombatKODamageMult;
                 if (!knockedDown)
+                    static const auto sCriticalDamage = ESM::RefId::stringRefId("critical damage");
                     MWBase::Environment::get().getSoundManager()->playSound3D(
-                        victim, ESM::RefId::stringRefId("critical damage"), 1.0f, 1.0f);
+                        victim, sCriticalDamage, 1.0f, 1.0f);
             }
         }
 
@@ -407,8 +411,9 @@ namespace MWMechanics
             health.setCurrent(health.getCurrent() - x);
             attackerStats.setHealth(health);
 
+            static const auto sHealthDamage = ESM::RefId::stringRefId("Health Damage");
             MWBase::Environment::get().getSoundManager()->playSound3D(
-                attacker, ESM::RefId::stringRefId("Health Damage"), 1.0f, 1.0f);
+                attacker, sHealthDamage, 1.0f, 1.0f);
         }
     }
 
@@ -798,7 +803,8 @@ namespace MWMechanics
             return false;
 
         if (complain)
-            MWBase::Environment::get().getDialogueManager()->say(target, ESM::RefId::stringRefId("hit"));
+            static const auto sHit = ESM::RefId::stringRefId("hit");
+            MWBase::Environment::get().getDialogueManager()->say(target, sHit);
         return true;
     }
 
