@@ -487,6 +487,13 @@ namespace MWPhysics
         if (actor.mMovement.length2() == 0) // no AI nor player attempted to move, current position is assumed correct
             return;
 
+        // NPC positions are determined by AI pathfinding and scripts, which may intentionally place
+        // them at positions where their collision shape overlaps with nearby objects such as furniture.
+        // Attempting to push NPCs out of these overlaps displaces them from their intended positions.
+        // The collision tracing in move() still prevents NPCs from walking through solid geometry.
+        if (!actor.mIsPlayer)
+            return;
+
         auto tempPosition = actor.mPosition;
 
         if (actor.mStuckFrames >= 10)
