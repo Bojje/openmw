@@ -82,6 +82,9 @@ namespace MWMechanics
 
         MWWorld::TimeStamp mTimeOfDeath;
 
+        // When player-initiated combat hostility began. Used to expire hostility after fCorpseClearDelay hours.
+        MWWorld::TimeStamp mAggressionTime;
+
     private:
         std::multimap<ESM::RefId, ESM::RefNum> mSummonedCreatures; // <Effect, Actor>
 
@@ -281,6 +284,9 @@ namespace MWMechanics
         void setDeathAnimation(signed char index);
 
         MWWorld::TimeStamp getTimeOfDeath() const;
+
+        MWWorld::TimeStamp getAggressionTime() const;
+        void setAggressionTime(MWWorld::TimeStamp time);
 
         float getSideMovementAngle() const { return mSideMovementAngle; }
         void setSideMovementAngle(float angle) { mSideMovementAngle = angle; }

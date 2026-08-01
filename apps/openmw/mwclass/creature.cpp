@@ -384,6 +384,10 @@ namespace MWClass
             if (!statsAttacker.getHitAttemptActor().isSet()
                 && (statsAttacker.getAiSequence().isInCombat(ptr) || attacker == MWMechanics::getPlayer()))
                 statsAttacker.setHitAttemptActor(ptr.getCellRef().getRefNum());
+
+            // Record when the player attacked this actor, for hostility expiry
+            if (attacker == MWMechanics::getPlayer())
+                stats.setAggressionTime(MWBase::Environment::get().getWorld()->getTimeStamp());
         }
 
         if (!object.empty())

@@ -86,6 +86,7 @@ namespace ESM
         int32_t mDrawState;
         int8_t mDeathAnimation;
         TimeStamp mTimeOfDeath;
+        TimeStamp mAggressionTime; // When player-initiated combat hostility began
         int32_t mLevel;
         bool mMissingACDT;
 

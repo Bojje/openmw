@@ -542,6 +542,7 @@ namespace MWMechanics
         state.mLevel = mLevel;
         state.mDeathAnimation = mDeathAnimation;
         state.mTimeOfDeath = mTimeOfDeath.toEsm();
+        state.mAggressionTime = mAggressionTime.toEsm();
         // state.mHitAttemptActorId = mHitAttemptActorId;
 
         mSpells.writeState(state.mSpells);
@@ -594,6 +595,7 @@ namespace MWMechanics
         mLevel = state.mLevel;
         mDeathAnimation = state.mDeathAnimation;
         mTimeOfDeath = MWWorld::TimeStamp(state.mTimeOfDeath);
+        mAggressionTime = MWWorld::TimeStamp(state.mAggressionTime);
         // mHitAttemptActor = state.mHitAttemptActor;
 
         mSpells.readState(state.mSpells, this);
@@ -649,6 +651,16 @@ namespace MWMechanics
     MWWorld::TimeStamp CreatureStats::getTimeOfDeath() const
     {
         return mTimeOfDeath;
+    }
+
+    MWWorld::TimeStamp CreatureStats::getAggressionTime() const
+    {
+        return mAggressionTime;
+    }
+
+    void CreatureStats::setAggressionTime(MWWorld::TimeStamp time)
+    {
+        mAggressionTime = time;
     }
 
     std::multimap<ESM::RefId, ESM::RefNum>& CreatureStats::getSummonedCreatureMap()

@@ -647,13 +647,18 @@ namespace MWMechanics
             if (creatureStats1.getAiSequence().isInCombat(ally))
                 continue;
 
-            ESM::RefNum allyHitNum = ally.getClass().getCreatureStats(ally).getHitAttemptActor();
+            const auto& allyStats = ally.getClass().getCreatureStats(ally);
+            ESM::RefNum allyHitNum = allyStats.getHitAttemptActor();
             if (allyHitNum.isSet() && actor2.getCellRef().getRefNum() == allyHitNum)
             {
                 mechanicsManager->startCombat(actor1, actor2, &cachedAllies.getActorsSidingWith(actor2));
                 // Also set the same hit attempt actor. Otherwise, if fighting the player, they may stop combat
                 // if the player gets out of reach, while the ally would continue combat with the player
                 creatureStats1.setHitAttemptActor(allyHitNum);
+                // Propagate aggression time so allies also lose hostility when it expires
+                MWWorld::TimeStamp allyAggressionTime = allyStats.getAggressionTime();
+                if (allyAggressionTime.getDay() != 0 || allyAggressionTime.getHour() != 0)
+                    creatureStats1.setAggressionTime(allyAggressionTime);
                 return;
             }
 
@@ -1574,6 +1579,33 @@ namespace MWMechanics
                     ESM::RefNum playerHitNum = playerStats.getHitAttemptActor();
                     if (playerHitNum.isSet() && playerHitNum == actor.getPtr().getCellRef().getRefNum())
                         playerStats.setHitAttemptActor({});
+                }
+
+                // Expire player-initiated combat hostility after fCorpseClearDelay hours have passed.
+                // In vanilla Morrowind, resting for ~72 hours clears NPC aggression from player attacks.
+                if (!isPlayer
+                    && (actorStats.getAggressionTime().getDay() != 0
+                        || actorStats.getAggressionTime().getHour() != 0))
+                {
+                    static const float fCorpseClearDelay
+                        = MWBase::Environment::get().getESMStore()->get<ESM::GameSetting>()
+                              .find("fCorpseClearDelay")
+                              ->mValue.getFloat();
+                    if (actorStats.getAggressionTime() + fCorpseClearDelay
+                        <= MWBase::Environment::get().getWorld()->getTimeStamp())
+                    {
+                        actorStats.setAggressionTime(MWWorld::TimeStamp());
+                        actorStats.setAttacked(false);
+                        actorStats.setHitAttemptActor({});
+                        auto& playerStats = player.getClass().getCreatureStats(player);
+                        if (playerStats.getHitAttemptActor() == actor.getPtr().getCellRef().getRefNum())
+                            playerStats.setHitAttemptActor({});
+                        if (actorStats.getAiSequence().isInCombat(player))
+                        {
+                            std::vector<MWWorld::Ptr> playerTarget{ player };
+                            actorStats.getAiSequence().stopCombat(playerTarget);
+                        }
+                    }
                 }
 
                 const Misc::TimerStatus engageCombatTimerStatus = actor.updateEngageCombatTimer(duration);
