@@ -59,7 +59,7 @@ namespace MWRender
     {
         using PtrAnimationMap = std::unordered_map<const MWWorld::LiveCellRefBase*, osg::ref_ptr<Animation>>;
 
-        typedef std::map<const MWWorld::CellStore*, osg::ref_ptr<osg::Group>> CellMap;
+        typedef std::unordered_map<const MWWorld::CellStore*, osg::ref_ptr<osg::Group>> CellMap;
         CellMap mCellSceneNodes;
         PtrAnimationMap mObjects;
         osg::ref_ptr<osg::Group> mRootNode;

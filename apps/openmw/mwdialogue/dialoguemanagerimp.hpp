@@ -7,6 +7,7 @@
 #include <optional>
 #include <set>
 #include <unordered_map>
+#include <unordered_set>
 
 #include <components/compiler/streamerrorhandler.hpp>
 #include <components/esm3/loadinfo.hpp>
@@ -34,13 +35,13 @@ namespace MWDialogue
             const ESM::DialInfo* mInfo;
         };
 
-        std::set<ESM::RefId> mKnownTopics; // Those are the topics the player knows.
+        std::unordered_set<ESM::RefId> mKnownTopics; // Those are the topics the player knows.
 
         // Modified faction reactions. <Faction1, <Faction2, Difference> >
-        typedef std::map<ESM::RefId, std::map<ESM::RefId, int>> ModFactionReactionMap;
+        typedef std::unordered_map<ESM::RefId, std::unordered_map<ESM::RefId, int>> ModFactionReactionMap;
         ModFactionReactionMap mChangedFactionReaction;
 
-        std::map<ESM::RefId, ActorKnownTopicInfo> mActorKnownTopics;
+        std::unordered_map<ESM::RefId, ActorKnownTopicInfo> mActorKnownTopics;
 
         Translation::Storage& mTranslationDataStorage;
         mutable bool mKeywordSearchInitialized{ false };

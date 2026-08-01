@@ -167,7 +167,7 @@ namespace MWMechanics
         GreetingState getGreetingState(const MWWorld::Ptr& ptr) const;
 
     private:
-        std::map<ESM::RefId, int> mDeathCount;
+        std::unordered_map<ESM::RefId, int> mDeathCount;
         std::list<Actor> mActors;
         std::unordered_map<const MWWorld::LiveCellRefBase*, std::list<Actor>::iterator> mIndex;
         // We should add a delay between summoned creature death and its corpse despawning
