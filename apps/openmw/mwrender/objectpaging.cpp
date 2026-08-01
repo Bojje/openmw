@@ -2,6 +2,7 @@
 
 #include <type_traits>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include <osg/LOD>
@@ -521,6 +522,10 @@ namespace MWRender
                     const ESM::Cell* cell = store.get<ESM::Cell>().searchStatic(cellX, cellY);
                     if (!cell)
                         continue;
+                    std::unordered_set<ESM::RefNum> movedRefNums;
+                    for (const auto& moved : cell->mMovedRefs)
+                        movedRefNums.insert(moved.mRefNum);
+
                     for (size_t i = 0; i < cell->mContextList.size(); ++i)
                     {
                         try
@@ -538,8 +543,7 @@ namespace MWRender
                                 if (moved)
                                     continue;
 
-                                if (std::find(cell->mMovedRefs.begin(), cell->mMovedRefs.end(), ref.mRefNum)
-                                    != cell->mMovedRefs.end())
+                                if (movedRefNums.count(ref.mRefNum))
                                     continue;
 
                                 int type = store.findStatic(ref.mRefID);
