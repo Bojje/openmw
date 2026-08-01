@@ -58,6 +58,7 @@ namespace MWMechanics
         int mSCCId = 0;
         size_t mSCCIndex = 0;
         std::vector<size_t> mSCCStack;
+        std::vector<bool> mOnStack;
         std::vector<std::pair<size_t, size_t>> mSCCPoint; // first is index, second is lowlink
 
         // v is the pathgrid point index (some call them vertices)
@@ -67,6 +68,7 @@ namespace MWMechanics
             mSCCPoint[v].second = mSCCIndex; // lowlink
             mSCCIndex++;
             mSCCStack.push_back(v);
+            mOnStack[v] = true;
             size_t w;
 
             for (const auto& edge : mGraph[v].edges)
@@ -77,7 +79,7 @@ namespace MWMechanics
                     recursiveStrongConnect(w); // recurse
                     mSCCPoint[v].second = std::min(mSCCPoint[v].second, mSCCPoint[w].second);
                 }
-                else if (std::find(mSCCStack.begin(), mSCCStack.end(), w) != mSCCStack.end())
+                else if (mOnStack[w])
                     mSCCPoint[v].second = std::min(mSCCPoint[v].second, mSCCPoint[w].first);
             }
 
@@ -87,6 +89,7 @@ namespace MWMechanics
                 {
                     w = mSCCStack.back();
                     mSCCStack.pop_back();
+                    mOnStack[w] = false;
                     mGraph[w].componentId = mSCCId;
                 } while (w != v);
                 mSCCId++;
@@ -126,6 +129,7 @@ namespace MWMechanics
             size_t pointsSize = graph.mPathgrid->mPoints.size();
             mSCCPoint.resize(pointsSize, std::pair<size_t, size_t>(NoIndex, NoIndex));
             mSCCStack.reserve(pointsSize);
+            mOnStack.resize(pointsSize, false);
 
             for (size_t v = 0; v < pointsSize; ++v)
             {
