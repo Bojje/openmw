@@ -643,7 +643,7 @@ namespace MWRender
         if (activeGrid && !refs.empty())
         {
             std::lock_guard<std::mutex> lock(mRefTrackerMutex);
-            const std::set<ESM::RefNum>& blacklist = getRefTracker().mBlacklist;
+            const std::unordered_set<ESM::RefNum>& blacklist = getRefTracker().mBlacklist;
             if (blacklist.size() < refs.size())
             {
                 for (ESM::RefNum ref : blacklist)
