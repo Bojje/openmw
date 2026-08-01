@@ -1,7 +1,7 @@
 #ifndef MWGUI_SPELLICONS_H
 #define MWGUI_SPELLICONS_H
 
-#include <map>
+#include <unordered_map>
 
 #include <components/esm/refid.hpp>
 
@@ -20,7 +20,7 @@ namespace MWGui
         void updateWidgets(MyGUI::Widget* parent, bool adjustSize);
 
     private:
-        std::map<ESM::RefId, MyGUI::ImageBox*> mWidgetMap;
+        std::unordered_map<ESM::RefId, MyGUI::ImageBox*> mWidgetMap;
     };
 
 }
