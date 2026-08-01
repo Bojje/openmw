@@ -111,7 +111,8 @@ namespace MWWorld
         MWWorld::ESMStore& mStore;
         ESM::ReadersCache& mReaders;
         mutable std::unordered_map<ESM::RefId, CellStore> mCells;
-        mutable std::map<std::string, CellStore*, Misc::StringUtils::CiComp> mInteriors;
+        mutable std::unordered_map<std::string, CellStore*, Misc::StringUtils::CiHash, Misc::StringUtils::CiEqual>
+            mInteriors;
         mutable std::map<ESM::ExteriorCellLocation, CellStore*> mExteriors;
         ESM::Cell mDraftCell;
         std::vector<std::pair<ESM::RefId, CellStore*>> mIdCache;
