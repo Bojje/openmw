@@ -1563,24 +1563,26 @@ namespace MWMechanics
 
                 // If dead or no longer in combat, no longer store any actors who attempted to hit us. Also remove for
                 // the player.
+                auto& actorStats = actor.getPtr().getClass().getCreatureStats(actor.getPtr());
                 if (!isPlayer
-                    && (actor.getPtr().getClass().getCreatureStats(actor.getPtr()).isDead()
-                        || !actor.getPtr().getClass().getCreatureStats(actor.getPtr()).getAiSequence().isInCombat()
+                    && (actorStats.isDead()
+                        || !actorStats.getAiSequence().isInCombat()
                         || !inProcessingRange))
                 {
-                    actor.getPtr().getClass().getCreatureStats(actor.getPtr()).setHitAttemptActor({});
-                    ESM::RefNum playerHitNum = player.getClass().getCreatureStats(player).getHitAttemptActor();
+                    actorStats.setHitAttemptActor({});
+                    auto& playerStats = player.getClass().getCreatureStats(player);
+                    ESM::RefNum playerHitNum = playerStats.getHitAttemptActor();
                     if (playerHitNum.isSet() && playerHitNum == actor.getPtr().getCellRef().getRefNum())
-                        player.getClass().getCreatureStats(player).setHitAttemptActor({});
+                        playerStats.setHitAttemptActor({});
                 }
 
                 const Misc::TimerStatus engageCombatTimerStatus = actor.updateEngageCombatTimer(duration);
 
                 // For dead actors we need to update looping spell particles
-                if (actor.getPtr().getClass().getCreatureStats(actor.getPtr()).isDead())
+                if (actorStats.isDead())
                 {
                     // They can be added during the death animation
-                    if (!actor.getPtr().getClass().getCreatureStats(actor.getPtr()).isDeathAnimationFinished())
+                    if (!actorStats.isDeathAnimationFinished())
                         adjustMagicEffects(actor.getPtr(), duration);
                     ctrl.updateContinuousVfx();
                 }
