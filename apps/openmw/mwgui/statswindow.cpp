@@ -152,9 +152,7 @@ namespace MWGui
         MyGUI::ProgressBar* pt;
         getWidget(pt, name);
 
-        std::stringstream out;
-        out << val << "/" << max;
-        setText(tname, out.str());
+        setText(tname, std::to_string(val) + "/" + std::to_string(max));
 
         pt->setProgressRange(std::max(0, max));
         pt->setProgressPosition(std::max(0, val));
@@ -226,9 +224,7 @@ namespace MWGui
     {
         if (id == "level")
         {
-            std::ostringstream text;
-            text << value;
-            setText("LevelText", text.str());
+            setText("LevelText", std::to_string(value));
         }
     }
 

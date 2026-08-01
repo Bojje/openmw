@@ -1,8 +1,7 @@
 #include "npcstats.hpp"
 
+#include <array>
 #include <cassert>
-#include <iomanip>
-#include <sstream>
 
 #include <components/esm3/loadclas.hpp>
 #include <components/esm3/loadfact.hpp>
@@ -257,11 +256,14 @@ int MWMechanics::NpcStats::getLevelupAttributeMultiplier(ESM::Attribute::Attribu
         return 1;
     int num = std::min(10, it->second);
 
-    // iLevelUp01Mult - iLevelUp10Mult
-    std::stringstream gmst;
-    gmst << "iLevelUp" << std::setfill('0') << std::setw(2) << num << "Mult";
-
-    return MWBase::Environment::get().getESMStore()->get<ESM::GameSetting>().find(gmst.str())->mValue.getInteger();
+    static const std::array<ESM::RefId, 10> gmstIds = {
+        ESM::RefId::stringRefId("iLevelUp01Mult"), ESM::RefId::stringRefId("iLevelUp02Mult"),
+        ESM::RefId::stringRefId("iLevelUp03Mult"), ESM::RefId::stringRefId("iLevelUp04Mult"),
+        ESM::RefId::stringRefId("iLevelUp05Mult"), ESM::RefId::stringRefId("iLevelUp06Mult"),
+        ESM::RefId::stringRefId("iLevelUp07Mult"), ESM::RefId::stringRefId("iLevelUp08Mult"),
+        ESM::RefId::stringRefId("iLevelUp09Mult"), ESM::RefId::stringRefId("iLevelUp10Mult"),
+    };
+    return MWBase::Environment::get().getESMStore()->get<ESM::GameSetting>().find(gmstIds[num - 1])->mValue.getInteger();
 }
 
 int MWMechanics::NpcStats::getSkillIncreasesForAttribute(ESM::Attribute::AttributeID attribute) const
