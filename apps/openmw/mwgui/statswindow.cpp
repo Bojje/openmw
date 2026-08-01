@@ -385,7 +385,7 @@ namespace MWGui
         }
     }
 
-    void StatsWindow::setExpelled(const std::set<ESM::RefId>& expelled)
+    void StatsWindow::setExpelled(const std::unordered_set<ESM::RefId>& expelled)
     {
         if (mExpelled != expelled)
         {
@@ -582,7 +582,7 @@ namespace MWGui
         {
             MWWorld::Ptr playerPtr = MWMechanics::getPlayer();
             const MWMechanics::NpcStats& playerStats = playerPtr.getClass().getNpcStats(playerPtr);
-            const std::set<ESM::RefId>& expelled = playerStats.getExpelled();
+            const auto& expelled = playerStats.getExpelled();
 
             bool firstFaction = true;
             for (const auto& [factionId, factionRank] : mFactions)

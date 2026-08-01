@@ -82,7 +82,7 @@ void MWMechanics::NpcStats::setSkill(ESM::RefId id, const MWMechanics::SkillValu
     it->second = value;
 }
 
-const std::map<ESM::RefId, int>& MWMechanics::NpcStats::getFactionRanks() const
+const std::unordered_map<ESM::RefId, int>& MWMechanics::NpcStats::getFactionRanks() const
 {
     return mFactionRank;
 }

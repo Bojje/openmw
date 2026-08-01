@@ -8,6 +8,8 @@
 #include <map>
 #include <set>
 #include <string>
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace ESM
@@ -24,7 +26,7 @@ namespace MWMechanics
     {
         int mDisposition;
         int mCrimeDispositionModifier;
-        std::map<ESM::RefId, SkillValue> mSkills; // SkillValue.mProgress used by the player only
+        std::unordered_map<ESM::RefId, SkillValue> mSkills; // SkillValue.mProgress used by the player only
 
         int mReputation;
         int mCrimeId;
@@ -34,15 +36,15 @@ namespace MWMechanics
         int mWerewolfKills;
         /// Used only for the player and for NPC's with ranks, modified by scripts; other NPCs have maximum one faction
         /// defined in their NPC record
-        std::map<ESM::RefId, int> mFactionRank;
-        std::set<ESM::RefId> mExpelled;
-        std::map<ESM::RefId, int> mFactionReputation;
+        std::unordered_map<ESM::RefId, int> mFactionRank;
+        std::unordered_set<ESM::RefId> mExpelled;
+        std::unordered_map<ESM::RefId, int> mFactionReputation;
         int mLevelProgress; // 0-10
-        std::map<ESM::RefId, int>
+        std::unordered_map<ESM::RefId, int>
             mSkillIncreases; // number of skill increases for each attribute (resets after leveling up)
         std::vector<int> mSpecIncreases; // number of skill increases for each specialization (accumulates throughout
                                          // the entire game)
-        std::set<ESM::RefId> mUsedIds;
+        std::unordered_set<ESM::RefId> mUsedIds;
         // ---------------------------------------------------------------------------
 
         /// Countdown to getting damage while underwater
@@ -71,14 +73,14 @@ namespace MWMechanics
         void setSkill(ESM::RefId id, const SkillValue& value);
 
         int getFactionRank(const ESM::RefId& faction) const;
-        const std::map<ESM::RefId, int>& getFactionRanks() const;
+        const std::unordered_map<ESM::RefId, int>& getFactionRanks() const;
 
         /// Join this faction, setting the initial rank to 0.
         void joinFaction(const ESM::RefId& faction);
         /// Sets the rank in this faction to a specified value, if such a rank exists.
         void setFactionRank(const ESM::RefId& faction, int value);
 
-        const std::set<ESM::RefId>& getExpelled() const { return mExpelled; }
+        const std::unordered_set<ESM::RefId>& getExpelled() const { return mExpelled; }
         bool getExpelled(const ESM::RefId& factionID) const;
         void expell(const ESM::RefId& factionID, bool printMessage);
         void clearExpelled(const ESM::RefId& factionID);
@@ -139,7 +141,7 @@ namespace MWMechanics
         void readState(const ESM::CreatureStats& state);
         void readState(const ESM::NpcStats& state);
 
-        const std::map<ESM::RefId, SkillValue>& getSkills() const { return mSkills; }
+        const std::unordered_map<ESM::RefId, SkillValue>& getSkills() const { return mSkills; }
     };
 }
 

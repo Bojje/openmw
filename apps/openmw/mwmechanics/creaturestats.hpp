@@ -5,6 +5,7 @@
 #include <set>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
 
 #include "activespells.hpp"
 #include "aisequence.hpp"
@@ -38,7 +39,7 @@ namespace MWMechanics
     ///
     class CreatureStats
     {
-        std::map<ESM::RefId, AttributeValue> mAttributes;
+        std::unordered_map<ESM::RefId, AttributeValue> mAttributes;
         DynamicStat<float> mDynamic[3]; // health, magicka, fatigue
         DrawState mDrawState = DrawState::Nothing;
         Spells mSpells;
@@ -287,7 +288,7 @@ namespace MWMechanics
         bool wasTeleported() const { return mTeleported; }
         void setTeleported(bool v) { mTeleported = v; }
 
-        const std::map<ESM::RefId, AttributeValue>& getAttributes() const { return mAttributes; }
+        const std::unordered_map<ESM::RefId, AttributeValue>& getAttributes() const { return mAttributes; }
 
         void updateAwareness(float duration);
         int getAwarenessRoll();
