@@ -746,7 +746,32 @@ namespace SceneUtil
 
         if (!mLightList.empty())
         {
-            cv->pushStateSet(mLightManager->getLightListStateSet(mLightList, mLastFrameNumber, viewMatrix));
+            if (!mCachedStateSet)
+            {
+                mCachedStateSet = new osg::StateSet;
+                mCachedLightData = mLightManager->generateLightBufferUniform();
+                mCachedLightCount = new osg::Uniform("PointLightCount", 0);
+                mCachedStateSet->addUniform(mCachedLightData);
+                mCachedStateSet->addUniform(mCachedLightCount);
+            }
+
+            for (size_t i = 0; i < mLightList.size(); ++i)
+            {
+                auto* light = mLightList[i]->mLightSource->getLight(mLastFrameNumber);
+                osg::Matrixf lightMat;
+                configurePosition(lightMat, light->getPosition() * (*viewMatrix));
+                configureAmbient(lightMat, light->getAmbient());
+                configureDiffuse(lightMat, light->getDiffuse());
+                configureSpecular(lightMat, light->getSpecular());
+                configureAttenuation(lightMat, light->getConstantAttenuation(), light->getLinearAttenuation(),
+                    light->getQuadraticAttenuation(),
+                    mLightList[i]->mLightSource->getRadius() * mLightManager->getPointLightRadiusMultiplier());
+
+                mCachedLightData->setElement(static_cast<unsigned int>(i), lightMat);
+            }
+            mCachedLightCount->set(static_cast<int>(mLightList.size()));
+
+            cv->pushStateSet(mCachedStateSet);
             return true;
         }
         return false;
