@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <fstream>
+#include <unordered_set>
 
 #include <components/debug/debuglog.hpp>
 
@@ -746,6 +747,10 @@ namespace MWWorld
         if (cell.mContextList.empty())
             return; // this is a dynamically generated cell -> skipping.
 
+        std::unordered_set<ESM::RefNum> movedRefNums;
+        for (const auto& moved : cell.mMovedRefs)
+            movedRefNums.insert(moved.mRefNum);
+
         // Load references from all plugins that do something with this cell.
         for (size_t i = 0; i < cell.mContextList.size(); i++)
         {
@@ -769,12 +774,8 @@ namespace MWWorld
                         continue;
 
                     // Don't list reference if it was moved to a different cell.
-                    ESM::MovedCellRefTracker::const_iterator iter
-                        = std::find(cell.mMovedRefs.begin(), cell.mMovedRefs.end(), ref.mRefNum);
-                    if (iter != cell.mMovedRefs.end())
-                    {
+                    if (movedRefNums.count(ref.mRefNum))
                         continue;
-                    }
 
                     mIds.push_back(std::move(ref.mRefID));
                 }
@@ -830,6 +831,10 @@ namespace MWWorld
         if (cell.mContextList.empty())
             return; // this is a dynamically generated cell -> skipping.
 
+        std::unordered_set<ESM::RefNum> movedRefNums;
+        for (const auto& moved : cell.mMovedRefs)
+            movedRefNums.insert(moved.mRefNum);
+
         // Load references from all plugins that do something with this cell.
         for (size_t i = 0; i < cell.mContextList.size(); i++)
         {
@@ -852,12 +857,8 @@ namespace MWWorld
                         continue;
 
                     // Don't load reference if it was moved to a different cell.
-                    ESM::MovedCellRefTracker::const_iterator iter
-                        = std::find(cell.mMovedRefs.begin(), cell.mMovedRefs.end(), ref.mRefNum);
-                    if (iter != cell.mMovedRefs.end())
-                    {
+                    if (movedRefNums.count(ref.mRefNum))
                         continue;
-                    }
 
                     loadRef(ref, deleted, refNumToID);
                 }

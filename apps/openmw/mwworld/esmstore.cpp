@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <fstream>
 #include <tuple>
+#include <unordered_set>
 
 #include <components/debug/debuglog.hpp>
 
@@ -40,6 +41,10 @@ namespace
         std::set<ESM::RefId>& keyIDs, ESM::ReadersCache& readers)
     {
         // TODO: we have many similar copies of this code.
+        std::unordered_set<ESM::RefNum> movedRefNums;
+        for (const auto& moved : cell.mMovedRefs)
+            movedRefNums.insert(moved.mRefNum);
+
         for (size_t i = 0; i < cell.mContextList.size(); i++)
         {
             const std::size_t index = static_cast<std::size_t>(cell.mContextList[i].index);
@@ -51,8 +56,7 @@ namespace
             {
                 if (deleted)
                     refs.emplace_back(ref.mRefNum, deletedRefID);
-                else if (std::find(cell.mMovedRefs.begin(), cell.mMovedRefs.end(), ref.mRefNum)
-                    == cell.mMovedRefs.end())
+                else if (movedRefNums.count(ref.mRefNum) == 0)
                 {
                     if (!ref.mKey.empty())
                         keyIDs.insert(std::move(ref.mKey));
