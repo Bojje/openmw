@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <fstream>
+#include <unordered_map>
 #include <unordered_set>
 
 #include <components/debug/debuglog.hpp>
@@ -826,7 +827,7 @@ namespace MWWorld
         std::sort(mIds.begin(), mIds.end());
     }
 
-    void CellStore::loadRefs(const ESM::Cell& cell, std::map<ESM::RefNum, ESM::RefId>& refNumToID)
+    void CellStore::loadRefs(const ESM::Cell& cell, std::unordered_map<ESM::RefNum, ESM::RefId>& refNumToID)
     {
         if (cell.mContextList.empty())
             return; // this is a dynamically generated cell -> skipping.
@@ -879,7 +880,7 @@ namespace MWWorld
         }
     }
 
-    void CellStore::loadRefs(const ESM4::Cell& cell, std::map<ESM::RefNum, ESM::RefId>& refNumToID)
+    void CellStore::loadRefs(const ESM4::Cell& cell, std::unordered_map<ESM::RefNum, ESM::RefId>& refNumToID)
     {
         visitCell4References(cell, mStore, mReaders, [&](const ESM4::Reference& ref) { loadRef(ref); });
         visitCell4ActorReferences(cell, mStore, mReaders, [&](const ESM4::ActorCharacter& ref) { loadRef(ref); });
@@ -887,7 +888,7 @@ namespace MWWorld
 
     void CellStore::loadRefs()
     {
-        std::map<ESM::RefNum, ESM::RefId> refNumToID; // used to detect refID modifications
+        std::unordered_map<ESM::RefNum, ESM::RefId> refNumToID;
 
         ESM::visit([&](auto&& cell) { loadRefs(cell, refNumToID); }, mCellVariant);
 
@@ -945,7 +946,7 @@ namespace MWWorld
         });
     }
 
-    void CellStore::loadRef(ESM::CellRef& ref, bool deleted, std::map<ESM::RefNum, ESM::RefId>& refNumToID)
+    void CellStore::loadRef(ESM::CellRef& ref, bool deleted, std::unordered_map<ESM::RefNum, ESM::RefId>& refNumToID)
     {
         const MWWorld::ESMStore& store = mStore;
 
