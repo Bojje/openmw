@@ -675,7 +675,8 @@ namespace MWDialogue
         state.mKnownTopics.reserve(mKnownTopics.size());
         std::copy(mKnownTopics.begin(), mKnownTopics.end(), std::back_inserter(state.mKnownTopics));
 
-        state.mChangedFactionReaction = mChangedFactionReaction;
+        for (const auto& [faction, reactions] : mChangedFactionReaction)
+            state.mChangedFactionReaction[faction].insert(reactions.begin(), reactions.end());
 
         writer.startRecord(ESM::REC_DIAS);
         state.save(writer);
@@ -695,7 +696,9 @@ namespace MWDialogue
                 if (store.get<ESM::Dialogue>().search(knownTopic))
                     mKnownTopics.insert(knownTopic);
 
-            mChangedFactionReaction = state.mChangedFactionReaction;
+            mChangedFactionReaction.clear();
+            for (const auto& [faction, reactions] : state.mChangedFactionReaction)
+                mChangedFactionReaction[faction].insert(reactions.begin(), reactions.end());
         }
     }
 
@@ -742,7 +745,7 @@ namespace MWDialogue
         return 0;
     }
 
-    const std::map<ESM::RefId, int>* DialogueManager::getFactionReactionOverrides(const ESM::RefId& faction) const
+    const std::unordered_map<ESM::RefId, int>* DialogueManager::getFactionReactionOverrides(const ESM::RefId& faction) const
     {
         // Make sure the faction exists
         MWBase::Environment::get().getESMStore()->get<ESM::Faction>().find(faction);

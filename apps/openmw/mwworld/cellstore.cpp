@@ -540,8 +540,8 @@ namespace MWWorld
     struct MergeVisitor
     {
         MergeVisitor(std::vector<LiveCellRefBase*>& mergeTo,
-            const std::map<LiveCellRefBase*, MWWorld::CellStore*>& movedHere,
-            const std::map<LiveCellRefBase*, MWWorld::CellStore*>& movedToAnotherCell)
+            const std::unordered_map<LiveCellRefBase*, MWWorld::CellStore*>& movedHere,
+            const std::unordered_map<LiveCellRefBase*, MWWorld::CellStore*>& movedToAnotherCell)
             : mMergeTo(mergeTo)
             , mMovedHere(movedHere)
             , mMovedToAnotherCell(movedToAnotherCell)
@@ -565,8 +565,8 @@ namespace MWWorld
     private:
         std::vector<LiveCellRefBase*>& mMergeTo;
 
-        const std::map<LiveCellRefBase*, MWWorld::CellStore*>& mMovedHere;
-        const std::map<LiveCellRefBase*, MWWorld::CellStore*>& mMovedToAnotherCell;
+        const std::unordered_map<LiveCellRefBase*, MWWorld::CellStore*>& mMovedHere;
+        const std::unordered_map<LiveCellRefBase*, MWWorld::CellStore*>& mMovedToAnotherCell;
     };
 
     void CellStore::requestMergedRefsUpdate()

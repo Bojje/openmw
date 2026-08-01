@@ -5,6 +5,7 @@
 #include <map>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 #include <cstdint>
@@ -116,7 +117,7 @@ namespace MWBase
         virtual int getFactionReaction(const ESM::RefId& faction1, const ESM::RefId& faction2) const = 0;
 
         /// @return all faction's opinion overrides
-        virtual const std::map<ESM::RefId, int>* getFactionReactionOverrides(const ESM::RefId& faction) const = 0;
+        virtual const std::unordered_map<ESM::RefId, int>* getFactionReactionOverrides(const ESM::RefId& faction) const = 0;
 
         /// Removes the last added topic response for the given actor from the journal
         virtual void clearInfoActor(const MWWorld::Ptr& actor) const = 0;
