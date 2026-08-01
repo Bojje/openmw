@@ -558,12 +558,11 @@ namespace SceneUtil
     {
         osg::Camera* camera = cv->getCurrentCamera();
 
-        osg::observer_ptr<osg::Camera> camPtr(camera);
-        auto it = mLightsInViewSpace.find(camPtr);
+        auto it = mLightsInViewSpace.find(camera);
 
         if (it == mLightsInViewSpace.end())
         {
-            it = mLightsInViewSpace.insert(std::make_pair(camPtr, LightSourceViewBoundCollection())).first;
+            it = mLightsInViewSpace.emplace(camera, LightSourceViewBoundCollection()).first;
 
             for (const auto& transform : mLights)
             {

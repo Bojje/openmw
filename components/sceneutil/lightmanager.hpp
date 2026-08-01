@@ -261,7 +261,7 @@ namespace SceneUtil
         std::vector<LightSourceTransform> mLights;
 
         using LightSourceViewBoundCollection = std::vector<LightSourceViewBound>;
-        std::map<osg::observer_ptr<osg::Camera>, LightSourceViewBoundCollection> mLightsInViewSpace;
+        std::unordered_map<osg::Camera*, LightSourceViewBoundCollection> mLightsInViewSpace;
 
         size_t mLightingMask;
 
