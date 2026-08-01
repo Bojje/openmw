@@ -117,10 +117,11 @@ namespace MWGui
                 const ESM::MagicEffect& effect = *store.get<ESM::MagicEffect>().find(effectId);
                 const ESM::RefId arg = source.getSkillOrAttribute();
 
-                if (mWidgetMap.find(effectId) == mWidgetMap.end())
-                    mWidgetMap[effectId] = createIcon(*parent, effect.mName, effect.mIcon.getOriginal(), size);
+                auto [it, inserted] = mWidgetMap.try_emplace(effectId);
+                if (inserted)
+                    it->second = createIcon(*parent, effect.mName, effect.mIcon.getOriginal(), size);
 
-                MyGUI::ImageBox& widget = *mWidgetMap[effectId];
+                MyGUI::ImageBox& widget = *it->second;
                 if (activeEffects.emplace(effectId).second)
                 {
                     widget.setPosition(horizontalOffset, verticalOffset);
