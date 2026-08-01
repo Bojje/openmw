@@ -337,21 +337,20 @@ namespace MWGui
         const MWMechanics::NpcStats& playerStats = player.getClass().getNpcStats(player);
         const auto& store = MWBase::Environment::get().getESMStore();
 
-        std::stringstream detail;
-        bool first = true;
+        std::string detailText;
         for (const auto& attribute : store->get<ESM::Attribute>())
         {
             int mult = playerStats.getLevelupAttributeMultiplier(attribute.mId);
             mult = std::min(mult, static_cast<int>(100 - playerStats.getAttribute(attribute.mId).getBase()));
             if (mult > 1)
             {
-                if (!first)
-                    detail << '\n';
-                detail << attribute.mName << " x" << MyGUI::utility::toString(mult);
-                first = false;
+                if (!detailText.empty())
+                    detailText += '\n';
+                detailText += attribute.mName;
+                detailText += " x";
+                detailText += MyGUI::utility::toString(mult);
             }
         }
-        std::string detailText = detail.str();
 
         // level progress
         MyGUI::Widget* levelWidget;
