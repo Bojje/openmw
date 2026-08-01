@@ -357,7 +357,7 @@ namespace MWGui
         MyGUI::Widget* levelWidget;
         for (int i = 0; i < 2; ++i)
         {
-            int max = store->get<ESM::GameSetting>().find("iLevelUpTotal")->mValue.getInteger();
+            static const int max = store->get<ESM::GameSetting>().find("iLevelUpTotal")->mValue.getInteger();
             getWidget(levelWidget, i == 0 ? "Level_str" : "LevelText");
 
             levelWidget->setUserString(
