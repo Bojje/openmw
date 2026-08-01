@@ -1507,6 +1507,7 @@ namespace MWMechanics
 
     void Actors::update(float duration, bool paused)
     {
+        CreatureStats::advanceFrame();
         if (!paused)
         {
             const float updateEquippedLightInterval = 1.0f;

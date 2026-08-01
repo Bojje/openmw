@@ -87,6 +87,10 @@ namespace MWMechanics
         float mAwarenessTimer = 0.f;
         int mAwarenessRoll = -1;
 
+        mutable float mCachedMaxSpeed = 0.f;
+        mutable unsigned int mCachedSpeedFrame = 0;
+        static unsigned int sCurrentFrame;
+
     protected:
         std::string mAttackType;
         int mLevel = 0;
@@ -287,6 +291,11 @@ namespace MWMechanics
 
         void updateAwareness(float duration);
         int getAwarenessRoll();
+
+        static void advanceFrame() { ++sCurrentFrame; }
+        bool hasValidSpeedCache() const { return mCachedSpeedFrame == sCurrentFrame; }
+        float getCachedMaxSpeed() const { return mCachedMaxSpeed; }
+        void setCachedMaxSpeed(float speed) const { mCachedMaxSpeed = speed; mCachedSpeedFrame = sCurrentFrame; }
     };
 }
 

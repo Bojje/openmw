@@ -506,6 +506,9 @@ namespace MWClass
         if (stats.isParalyzed() || stats.getKnockedDown() || stats.isDead())
             return 0.f;
 
+        if (stats.hasValidSpeedCache())
+            return stats.getCachedMaxSpeed();
+
         const GMST& gmst = getGmst();
 
         const MWBase::World* world = MWBase::Environment::get().getWorld();
@@ -533,6 +536,7 @@ namespace MWClass
         else
             moveSpeed = getWalkSpeed(ptr);
 
+        stats.setCachedMaxSpeed(moveSpeed);
         return moveSpeed;
     }
 

@@ -18,6 +18,8 @@
 
 namespace MWMechanics
 {
+    unsigned int CreatureStats::sCurrentFrame = 0;
+
     CreatureStats::CreatureStats()
     {
         for (const ESM::Attribute& attribute : MWBase::Environment::get().getESMStore()->get<ESM::Attribute>())
