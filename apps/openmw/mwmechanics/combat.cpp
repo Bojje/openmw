@@ -287,9 +287,11 @@ namespace MWMechanics
                 static const float fCombatKODamageMult = gmst.find("fCombatKODamageMult")->mValue.getFloat();
                 damage *= fCombatKODamageMult;
                 if (!knockedDown)
+                {
                     static const auto sCriticalDamage = ESM::RefId::stringRefId("critical damage");
                     MWBase::Environment::get().getSoundManager()->playSound3D(
                         victim, sCriticalDamage, 1.0f, 1.0f);
+                }
             }
         }
 
@@ -803,8 +805,10 @@ namespace MWMechanics
             return false;
 
         if (complain)
+        {
             static const auto sHit = ESM::RefId::stringRefId("hit");
             MWBase::Environment::get().getDialogueManager()->say(target, sHit);
+        }
         return true;
     }
 
