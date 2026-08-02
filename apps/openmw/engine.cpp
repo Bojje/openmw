@@ -980,9 +980,22 @@ void OMW::Engine::prepareEngine()
     mStereoManager->disableStereoForNode(guiRoot);
     rootNode->addChild(guiRoot);
 
+    // Whichever backend was selected draws the interface, the way Quake II put Draw_Pic inside the
+    // refresh interface. Null here means the OSG platform; the Vulkan renderer failing to come up
+    // therefore leaves the interface on OSG rather than leaving it with no platform at all.
+    Vk::Renderer* vkGuiRenderer = nullptr;
+    std::filesystem::path vkShaderDir;
+#ifdef OPENMW_USE_VULKAN
+    if (mVkRenderingManager)
+    {
+        vkGuiRenderer = &mVkRenderingManager->renderer();
+        vkShaderDir = mResDir / "shaders" / "vulkan";
+    }
+#endif
+
     mWindowManager = std::make_unique<MWGui::WindowManager>(mWindow, mViewer, guiRoot, mResourceSystem.get(),
         mWorkQueue.get(), mCfgMgr.getLogPath(), mScriptConsoleMode, mTranslationDataStorage, mEncoding, mExportFonts,
-        Version::getOpenmwVersionDescription(), mCfgMgr);
+        Version::getOpenmwVersionDescription(), mCfgMgr, vkGuiRenderer, vkShaderDir);
     mEnvironment.setWindowManager(*mWindowManager);
 
     mInputManager = std::make_unique<MWInput::InputManager>(mWindow, mViewer, mScreenCaptureHandler, keybinderUser,

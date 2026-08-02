@@ -87,6 +87,10 @@ namespace MWRender
 
         void resize(uint32_t width, uint32_t height);
 
+        /// The backend itself, for the parts of the engine that draw through it rather than through
+        /// this manager -- the user interface being the one that exists. Never null once constructed.
+        Vk::Renderer& renderer() { return *mRenderer; }
+
     private:
         struct CellMeshes
         {

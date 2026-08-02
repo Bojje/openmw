@@ -42,6 +42,12 @@
 #include <components/myguiplatform/myguirendermanager.hpp>
 #include <components/myguiplatform/scalinglayer.hpp>
 
+#ifdef OPENMW_USE_VULKAN
+#include <components/files/conversion.hpp>
+#include <components/vkmyguiplatform/vkmyguiadditivelayer.hpp>
+#include <components/vkmyguiplatform/vkmyguiplatform.hpp>
+#endif
+
 #include <components/vfs/manager.hpp>
 
 #include <components/widgets/tags.hpp>
@@ -150,7 +156,8 @@ namespace MWGui
     WindowManager::WindowManager(SDL_Window* window, osgViewer::Viewer* viewer, osg::Group* guiRoot,
         Resource::ResourceSystem* resourceSystem, SceneUtil::WorkQueue* workQueue, const std::filesystem::path& logpath,
         bool consoleOnlyScripts, Translation::Storage& translationDataStorage, ToUTF8::FromType encoding,
-        bool exportFonts, const std::string& versionDescription, Files::ConfigurationManager& cfgMgr)
+        bool exportFonts, const std::string& versionDescription, Files::ConfigurationManager& cfgMgr,
+        Vk::Renderer* vkRenderer, const std::filesystem::path& vkShaderDir)
         : mOldUpdateMask(0)
         , mOldCullMask(0)
         , mStore(nullptr)
@@ -211,8 +218,26 @@ namespace MWGui
 
         mScalingFactor = Settings::gui().mScalingFactor * (dw / w);
         constexpr VFS::Path::NormalizedView resourcePath("mygui");
-        mGuiPlatform = std::make_unique<MyGUIPlatform::Platform>(viewer, guiRoot, resourceSystem->getImageManager(),
-            resourceSystem->getVFS(), mScalingFactor, resourcePath, logpath / "MyGUI.log");
+
+#ifdef OPENMW_USE_VULKAN
+        if (vkRenderer)
+        {
+            mVkGuiPlatform = std::make_unique<VkMyGUIPlatform::Platform>(*vkRenderer,
+                resourceSystem->getImageManager(), resourceSystem->getVFS(), mScalingFactor, resourcePath,
+                logpath / "MyGUI.log");
+            if (!mVkGuiPlatform->loadShaders(Files::pathToUnicodeString(vkShaderDir)))
+                Log(Debug::Warning) << "Vulkan interface shaders not found in " << vkShaderDir
+                                    << "; the interface will not be drawn";
+        }
+#else
+        (void)vkRenderer;
+        (void)vkShaderDir;
+#endif
+
+        if (!usingVulkanGui())
+            mGuiPlatform = std::make_unique<MyGUIPlatform::Platform>(viewer, guiRoot,
+                resourceSystem->getImageManager(), resourceSystem->getVFS(), mScalingFactor, resourcePath,
+                logpath / "MyGUI.log");
 
         mGui = std::make_unique<MyGUI::Gui>();
         mGui->initialise({});
@@ -235,7 +260,16 @@ namespace MWGui
         MyGUI::FactoryManager::getInstance().registerFactory<MWGui::Window>("Widget");
         MyGUI::FactoryManager::getInstance().registerFactory<VideoWidget>("Widget");
         MyGUI::FactoryManager::getInstance().registerFactory<BackgroundImage>("Widget");
-        MyGUI::FactoryManager::getInstance().registerFactory<MyGUIPlatform::AdditiveLayer>("Layer");
+        // Both classes register under the name "AdditiveLayer", which is what the layout XML asks
+        // for, and only one platform exists at a time so they never collide. Registering the OSG one
+        // against a Vulkan render manager would be worse than a blend mode being wrong: it
+        // static_casts the render manager singleton to the OSG type on every render.
+#ifdef OPENMW_USE_VULKAN
+        if (usingVulkanGui())
+            MyGUI::FactoryManager::getInstance().registerFactory<VkMyGUIPlatform::AdditiveLayer>("Layer");
+        else
+#endif
+            MyGUI::FactoryManager::getInstance().registerFactory<MyGUIPlatform::AdditiveLayer>("Layer");
         MyGUI::FactoryManager::getInstance().registerFactory<MyGUIPlatform::ScalingLayer>("Layer");
         BookPage::registerMyGUIComponents();
         PostProcessorHud::registerMyGUIComponents();
@@ -304,7 +338,10 @@ namespace MWGui
         mVideoWrapper = std::make_unique<SDLUtil::VideoWrapper>(window, viewer);
         mVideoWrapper->setGammaContrast(Settings::video().mGamma, Settings::video().mContrast);
 
-        mGuiPlatform->getRenderManagerPtr()->enableShaders(mResourceSystem->getSceneManager()->getShaderManager());
+        // The Vulkan platform has no equivalent: it builds its two pipelines from gui.vert.spv and
+        // gui.frag.spv at construction and has nothing to be handed an osg::Program for.
+        if (!usingVulkanGui())
+            mGuiPlatform->getRenderManagerPtr()->enableShaders(mResourceSystem->getSceneManager()->getShaderManager());
 
         mStatsWatcher = std::make_unique<StatsWatcher>();
     }
@@ -592,7 +629,12 @@ namespace MWGui
 
             mGui->shutdown();
 
-            mGuiPlatform->shutdown();
+#ifdef OPENMW_USE_VULKAN
+            if (mVkGuiPlatform)
+                mVkGuiPlatform->shutdown();
+#endif
+            if (mGuiPlatform)
+                mGuiPlatform->shutdown();
         }
         catch (const MyGUI::Exception& e)
         {
@@ -1334,7 +1376,9 @@ namespace MWGui
 
         Settings::Manager::resetPendingChanges(filter);
 
-        mGuiPlatform->getRenderManagerPtr()->setViewSize(x, y);
+        // setViewSize is a MyGUI::RenderManager virtual, so this reaches whichever platform is live
+        // without having to know which one that is.
+        MyGUI::RenderManager::getInstance().setViewSize(x, y);
 
         // scaled size
         const MyGUI::IntSize& viewSize = MyGUI::RenderManager::getInstance().getViewSize();

@@ -47,6 +47,16 @@ namespace MyGUI
     class ImageBox;
 }
 
+namespace Vk
+{
+    class Renderer;
+}
+
+namespace VkMyGUIPlatform
+{
+    class Platform;
+}
+
 namespace MWWorld
 {
     class Cell;
@@ -127,11 +137,16 @@ namespace MWGui
         typedef std::pair<std::string, int> Faction;
         typedef std::vector<Faction> FactionList;
 
+        /// \a vkRenderer selects the backend the interface is drawn with, and is the whole of the
+        /// renderer choice as far as this class is concerned: null means the OSG platform, non-null
+        /// means the Vulkan one. \a vkShaderDir is where that platform finds gui.vert.spv and
+        /// gui.frag.spv, and is ignored when \a vkRenderer is null.
         WindowManager(SDL_Window* window, osgViewer::Viewer* viewer, osg::Group* guiRoot,
             Resource::ResourceSystem* resourceSystem, SceneUtil::WorkQueue* workQueue,
             const std::filesystem::path& logpath, bool consoleOnlyScripts, Translation::Storage& translationDataStorage,
             ToUTF8::FromType encoding, bool exportFonts, const std::string& versionDescription,
-            Files::ConfigurationManager& cfgMgr);
+            Files::ConfigurationManager& cfgMgr, Vk::Renderer* vkRenderer = nullptr,
+            const std::filesystem::path& vkShaderDir = {});
         virtual ~WindowManager();
 
         /// Set the ESMStore to use for retrieving of GUI-related strings.
@@ -419,8 +434,28 @@ namespace MWGui
         Resource::ResourceSystem* mResourceSystem;
         osg::ref_ptr<SceneUtil::WorkQueue> mWorkQueue;
 
+        // Exactly one of these is ever non-null. MyGUI's render manager is a singleton held for the
+        // whole session, so the two platforms are alternatives rather than things that coexist.
+        // Both must stay declared ahead of mGui: members are destroyed in reverse declaration order
+        // and MyGUI::Gui has to go first, since tearing down widgets destroys textures through the
+        // render manager.
         std::unique_ptr<MyGUIPlatform::Platform> mGuiPlatform;
+#ifdef OPENMW_USE_VULKAN
+        std::unique_ptr<VkMyGUIPlatform::Platform> mVkGuiPlatform;
+#endif
         osgViewer::Viewer* mViewer;
+
+        /// Whether the interface is being drawn by the Vulkan platform rather than the OSG one.
+        /// A method rather than a stored flag so a build without Vulkan folds it to a constant
+        /// instead of carrying a bool that can never be true.
+        bool usingVulkanGui() const
+        {
+#ifdef OPENMW_USE_VULKAN
+            return mVkGuiPlatform != nullptr;
+#else
+            return false;
+#endif
+        }
 
         std::unique_ptr<Gui::FontLoader> mFontLoader;
         std::unique_ptr<StatsWatcher> mStatsWatcher;
