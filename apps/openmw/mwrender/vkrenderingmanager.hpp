@@ -1,4 +1,4 @@
-#ifndef OPENMW_MWRENDER_VKRENDERINGMANAGER_H
+﻿#ifndef OPENMW_MWRENDER_VKRENDERINGMANAGER_H
 #define OPENMW_MWRENDER_VKRENDERINGMANAGER_H
 
 #ifdef OPENMW_USE_VULKAN
@@ -138,14 +138,60 @@ namespace MWRender
         // renderer's texture table.
         std::vector<size_t> mMeshTextures;
 
-        // Pushes the current mTextures views into the renderer's sampler array. Cheap to call when
-        // nothing changed; does nothing unless mTextures has grown.
+        // Rebuilds the renderer's sampler array from the textures the currently loaded cells actually
+        // reference, and frees the ones none of them do.
+        //
+        // The array cannot simply mirror mTextures. mTextures only ever grew, and the sampler array
+        // is capped at Vk::maxSceneTextures, so a long enough walk silently pushed later textures
+        // past the end of it -- where they resolve to the white fallback. That is worse than a
+        // missing texture: alpha-tested foliage sampling white alpha stops being cut out, so every
+        // leaf billboard goes back to casting a solid rectangular shadow and undoes trap 13.
+        //
+        // Bounding it by *live* content instead of by history is what makes the cap unreachable: a
+        // 3x3 exterior grid references a couple of hundred textures no matter how far the player has
+        // walked.
         void syncTexturesToRenderer();
+
+        // Every texture index the loaded cells reference, via their instances' meshes and their
+        // terrain chunks. Recomputed whenever the cell set changes rather than tracked incrementally,
+        // because the cell set is tiny and a refcount that drifts would fail silently and rarely.
+        std::vector<bool> collectLiveTextures() const;
+
+        // "This mesh or terrain chunk has no usable texture." Lives in the header rather than the
+        // .cpp because textureSlot below is inline and has to see it.
+        static constexpr size_t sNoTexture = static_cast<size_t>(-1);
+
+        // Storage index in mTextures to sampler array slot. Slot 0 is the white fallback, which is
+        // also where the sNoTexture sentinel and any evicted texture land.
+        uint32_t textureSlot(size_t textureIndex) const
+        {
+            if (textureIndex == sNoTexture || textureIndex >= mTextureSlots.size())
+                return 0u;
+            return mTextureSlots[textureIndex];
+        }
 
         std::unordered_map<std::string, size_t> mTextureCache;
         std::vector<std::unique_ptr<Vk::Texture>> mTextures;
-        // How many of mTextures the renderer's descriptor array has been told about.
-        size_t mTexturesUploaded = 0;
+        // Parallel to mTextures. An evicted slot keeps its name so getOrLoadTexture can reload into
+        // the same index, which is what lets mMeshTextures and the terrain chunks keep holding plain
+        // indices across an eviction instead of needing to be rewritten.
+        std::vector<std::string> mTextureNames;
+        // Maps an index in mTextures to its slot in the renderer's sampler array, or 0 -- the white
+        // fallback -- when the texture is not currently live. Meshes are submitted with the slot, not
+        // the storage index; the two were the same thing before eviction existed and conflating them
+        // again is the way this breaks.
+        std::vector<uint32_t> mTextureSlots;
+        // Exactly what was last handed to the renderer, so a sync that changes nothing can return
+        // without a device idle. Compared by value rather than by length: the live set can change
+        // without changing size when one cell's texture replaces another's.
+        std::vector<VkImageView> mUploadedTextureViews;
+
+        // How many textures may stay resident before unreferenced ones are actually freed. Eviction
+        // is deliberately lazy: the cell grid churns as the player walks and a texture dropped on one
+        // crossing is usually wanted on the next, so freeing eagerly trades VRAM for repeated
+        // blocking staging uploads on the load path. Well above what a 3x3 exterior grid needs
+        // (~230), so in practice this only fires after a long walk across varied regions.
+        static constexpr size_t sTextureResidencyLimit = 1024;
 
         std::unordered_map<const MWWorld::CellStore*, CellMeshes> mCellMeshes;
         std::unordered_map<const MWWorld::CellStore*, CellTerrain> mCellTerrain;

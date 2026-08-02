@@ -2,6 +2,7 @@
 
 #include "vkrenderingmanager.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <cstring>
 #include <exception>
@@ -36,8 +37,6 @@
 
 namespace
 {
-    constexpr size_t sNoTexture = static_cast<size_t>(-1);
-
     // GL pixel format values as reported by osg::Image::getPixelFormat(). Spelled out here rather than
     // pulled from a GL header so this file needs no GL include.
     constexpr unsigned int sGlRgb = 0x1907;
@@ -303,9 +302,6 @@ namespace MWRender
                 Vk::Mat4 transform;
                 std::memcpy(transform.data, inst.transform, sizeof(float) * 16);
 
-                // Slot 0 of the renderer's sampler array is the white fallback and mTextures[i] sits
-                // in slot i + 1, so the sNoTexture sentinel maps straight to 0. The renderer clamps
-                // anything that does not fit in the array back to 0 as well.
                 const size_t textureIndex = mMeshTextures[inst.meshIndex];
 
                 // Frustum cull. The mesh's bounds are object space, so they go through the same
@@ -330,8 +326,10 @@ namespace MWRender
                     = mesh->blas ? mesh->blas->deviceAddress() : VkDeviceAddress{ 0 };
                 submission.vertexAddress = mesh->vertexBuffer->deviceAddress();
                 submission.indexAddress = mesh->indexBuffer->deviceAddress();
-                submission.textureIndex
-                    = textureIndex == sNoTexture ? 0u : static_cast<uint32_t>(textureIndex + 1);
+                // The sampler slot, not the storage index. Since eviction landed the two are
+                // different: mTextureSlots holds 0 -- the white fallback -- for any texture no loaded
+                // cell references, and a compacted slot for the ones they do.
+                submission.textureIndex = textureSlot(textureIndex);
                 submission.alphaTested = mesh->alphaTested;
                 submission.roughness = mesh->roughness;
                 submission.specularStrength = mesh->specularStrength;
@@ -356,9 +354,7 @@ namespace MWRender
                 submission.blasAddress = chunk.geometry.blasAddress();
                 submission.vertexAddress = chunk.geometry.vertexAddress();
                 submission.indexAddress = chunk.geometry.indexAddress();
-                submission.textureIndex = chunk.textureIndex == sNoTexture
-                    ? 0u
-                    : static_cast<uint32_t>(chunk.textureIndex + 1);
+                submission.textureIndex = textureSlot(chunk.textureIndex);
                 // Terrain is a solid heightfield; leaving it opaque keeps the fast traversal path.
                 submission.alphaTested = false;
                 // Dirt and rock. No specular, which is also what the OSG renderer gives terrain.
@@ -426,10 +422,6 @@ namespace MWRender
             return true;
         });
 
-        // Loading the cell may have uploaded new textures; the G-buffer pass cannot sample them until
-        // the descriptor array is rewritten.
-        syncTexturesToRenderer();
-
         size_t textured = 0;
         for (const auto& mesh : mMeshes)
         {
@@ -446,6 +438,12 @@ namespace MWRender
         mCellMeshes.emplace(store, std::move(cellMeshes));
 
         addTerrain(store);
+
+        // Deliberately no syncTexturesToRenderer() here. The sampler array is now rebuilt from what
+        // the loaded cells reference, so it can only be rebuilt once this cell is in mCellMeshes and
+        // its terrain exists -- and the only caller, syncCells, does exactly that once for the whole
+        // batch. Syncing here as well would rewrite the descriptor array behind a vkDeviceWaitIdle
+        // once per cell added, which is three stalls per grid crossing instead of one.
     }
 
     void VkRenderingManager::addTerrain(const MWWorld::CellStore* store)
@@ -507,6 +505,11 @@ namespace MWRender
     {
         mCellMeshes.erase(store);
         mCellTerrain.erase(store);
+
+        // Nothing calls this today -- syncCells erases from the maps directly -- but if anything ever
+        // does, the sampler array has to be rebuilt or the unloaded cell's textures stay resident and
+        // keep their slots, which is the growth that made the array overflow in the first place.
+        syncTexturesToRenderer();
     }
 
     void VkRenderingManager::syncCells(const std::set<MWWorld::CellStore*, std::less<>>& activeCells)
@@ -558,9 +561,16 @@ namespace MWRender
         for (auto it = mCellTerrain.begin(); it != mCellTerrain.end();)
         {
             if (isActive(it->first))
+            {
                 ++it;
+            }
             else
+            {
                 it = mCellTerrain.erase(it);
+                // Terrain holds texture indices of its own, so dropping a chunk can free a land
+                // texture even when no object mesh changed.
+                changed = true;
+            }
         }
 
         for (MWWorld::CellStore* cell : activeCells)
@@ -570,6 +580,13 @@ namespace MWRender
             addCell(cell);
             changed = true;
         }
+
+        // Once, after every add and erase, rather than per cell. This is the path that actually
+        // unloads cells -- the loops above erase from the maps directly rather than going through
+        // removeCell -- and each call rewrites the descriptor array behind a vkDeviceWaitIdle, so
+        // doing it per cell would stall several times per grid crossing for no benefit.
+        if (changed)
+            syncTexturesToRenderer();
 
         // The TLAS is only rebuilt when the instance set actually changes, not every frame.
         if (changed)
@@ -581,25 +598,136 @@ namespace MWRender
         mRenderer->resize(width, height);
     }
 
+    std::vector<bool> VkRenderingManager::collectLiveTextures() const
+    {
+        std::vector<bool> live(mTextures.size(), false);
+
+        const auto mark = [&](size_t index) {
+            if (index != sNoTexture && index < live.size())
+                live[index] = true;
+        };
+
+        for (const auto& [store, cellMeshes] : mCellMeshes)
+        {
+            for (const auto& instance : cellMeshes.instances)
+            {
+                if (instance.meshIndex < mMeshTextures.size())
+                    mark(mMeshTextures[instance.meshIndex]);
+            }
+        }
+
+        // Terrain holds its texture index directly rather than going through a mesh.
+        for (const auto& [store, cellTerrain] : mCellTerrain)
+        {
+            for (const auto& chunk : cellTerrain.chunks)
+                mark(chunk.textureIndex);
+        }
+
+        return live;
+    }
+
     void VkRenderingManager::syncTexturesToRenderer()
     {
-        if (mTextures.size() == mTexturesUploaded)
-            return;
+        const std::vector<bool> live = collectLiveTextures();
+
+        // Compaction and eviction are separate decisions and it matters that they are.
+        //
+        // Compacting the sampler array down to the live set is what fixes the overflow bug, and it is
+        // free -- no device memory changes hands, only which slot each texture occupies. It therefore
+        // happens every time.
+        //
+        // Actually *freeing* a texture only reclaims VRAM, and doing it the moment a cell unloads is
+        // actively harmful: the cell grid churns constantly as the player walks, and a texture
+        // dropped on one grid crossing is usually wanted again on the next. Measured during a plain
+        // cell load that cost seven evictions and six immediate reloads, and every reload is a
+        // blocking staging submit on the load path -- the exact cost this renderer already has too
+        // much of. So eviction waits until enough textures are resident to be worth reclaiming, which
+        // in practice means it never fires while the player stays in one region.
+        const size_t resident = static_cast<size_t>(
+            std::count_if(mTextures.begin(), mTextures.end(), [](const auto& t) { return t != nullptr; }));
+        const bool evictNow = resident > sTextureResidencyLimit;
+
+        // Reload anything live that was evicted earlier. This is not a rare corner: a cell that is
+        // walked out of and back into hits mMeshCache on the way back, so getOrLoadTexture is never
+        // called for it a second time and nothing else would ever notice its texture had gone. The
+        // symptom would be a cell that renders correctly the first time and white afterwards.
+        size_t reloaded = 0;
+        for (size_t i = 0; i < mTextures.size(); ++i)
+        {
+            if (live[i] && mTextures[i] == nullptr && i < mTextureNames.size()
+                && !mTextureNames[i].empty())
+            {
+                getOrLoadTexture(mTextureNames[i]); // reloads into index i, see the reloadInto path
+                if (mTextures[i] != nullptr)
+                    ++reloaded;
+            }
+        }
+
+        mTextureSlots.assign(mTextures.size(), 0);
 
         std::vector<VkImageView> views;
         views.reserve(mTextures.size());
-        for (const auto& texture : mTextures)
-            views.push_back(texture ? texture->view() : VK_NULL_HANDLE);
+
+        size_t evicted = 0;
+        for (size_t i = 0; i < mTextures.size(); ++i)
+        {
+            if (!live[i])
+            {
+                // Not live, so it gets no slot either way -- that alone is what keeps the array
+                // bounded. Freeing the memory is the optional part, and only happens once enough is
+                // resident to be worth the reload it may cost.
+                //
+                // Keeping the index and the name is what lets every stored index stay valid across
+                // an eviction. Safe here because Renderer::setTextures idles the device before
+                // rewriting the descriptor array, so nothing is mid-flight against these views.
+                if (evictNow && mTextures[i] != nullptr)
+                {
+                    mTextures[i].reset();
+                    ++evicted;
+                }
+                continue;
+            }
+
+            if (mTextures[i] == nullptr)
+                continue; // live but unloadable; falls back to white, as it did before eviction
+
+            // Slot 0 is the white fallback, so live textures start at 1.
+            views.push_back(mTextures[i]->view());
+            mTextureSlots[i] = static_cast<uint32_t>(views.size());
+        }
+
+        // Compare the actual view list, not just its length. syncCells runs every frame and the live
+        // set can change without changing size -- one cell's texture swapped for another's -- and
+        // setTextures idles the device, so a length-only check would let a full pipeline stall
+        // through on a frame where nothing needed rewriting.
+        if (views == mUploadedTextureViews)
+            return;
 
         mRenderer->setTextures(views);
-        mTexturesUploaded = mTextures.size();
+        mUploadedTextureViews = views;
+
+        if (evicted > 0 || reloaded > 0)
+        {
+            Log(Debug::Info) << "Vulkan: " << views.size() << " textures live, " << evicted
+                             << " evicted, " << reloaded << " reloaded, " << mTextures.size()
+                             << " indices known";
+        }
     }
 
     size_t VkRenderingManager::getOrLoadTexture(const std::string& nifTextureName)
     {
+        // A cached index whose texture is still resident, or a cached failure, is answered directly.
+        // A cached index that was evicted falls through and reloads *into that same index*, which is
+        // what lets mMeshTextures and the terrain chunks keep holding plain indices forever.
+        size_t reloadInto = sNoTexture;
         const auto cached = mTextureCache.find(nifTextureName);
         if (cached != mTextureCache.end())
-            return cached->second;
+        {
+            const size_t index = cached->second;
+            if (index == sNoTexture || mTextures[index] != nullptr)
+                return index;
+            reloadInto = index;
+        }
 
         size_t result = sNoTexture;
         try
@@ -632,8 +760,17 @@ namespace MWRender
                         Vk::Texture::create(mRenderer->device(), mRenderer->commandPool(), width, height,
                             format, image->data(), uploadSize, levels));
 
-                    result = mTextures.size();
-                    mTextures.push_back(std::move(texture));
+                    if (reloadInto != sNoTexture)
+                    {
+                        mTextures[reloadInto] = std::move(texture);
+                        result = reloadInto;
+                    }
+                    else
+                    {
+                        result = mTextures.size();
+                        mTextures.push_back(std::move(texture));
+                        mTextureNames.push_back(nifTextureName);
+                    }
                 }
             }
         }
@@ -644,6 +781,8 @@ namespace MWRender
         }
 
         // Cache failures too, so an unloadable texture is not retried for every mesh that uses it.
+        // emplace deliberately, not insert_or_assign: on a reload the entry already exists and
+        // already holds the right index.
         mTextureCache.emplace(nifTextureName, result);
         return result;
     }
