@@ -374,6 +374,21 @@ namespace Vk
         // up to maxFramesInFlight submissions may still be reading those buffers and BLASes.
         void waitIdle();
 
+        // Reads the swapchain image the last frame presented back into \a rgba, eight bits per
+        // channel, row major, top row first, alpha forced opaque. Returns false before the first
+        // frame has been presented.
+        //
+        // This exists because screen capture is not a reliable way to see what this renderer drew.
+        // A window whose swapchain the compositor has put on a hardware overlay plane reads back as
+        // solid black through BitBlt and through PrintWindow alike -- the capture succeeds and the
+        // pixels are simply not the window's. A whole debugging session was spent on a renderer that
+        // was working perfectly and only looked dead. Reading the image out of the swapchain does not
+        // go past the compositor at all, so it cannot be lied to in that way.
+        //
+        // Blocks: it waits for the device, records a one-time copy and waits for that too. Meant for
+        // a screenshot key, not for anything per frame.
+        bool captureLastFrame(std::vector<uint8_t>& rgba, uint32_t& width, uint32_t& height);
+
     private:
         void createSurface();
         void createGBuffer();
@@ -516,6 +531,9 @@ namespace Vk
         std::vector<MeshDrawCommand> mDrawCommands;
         uint32_t mCurrentFrame = 0;
         uint32_t mCurrentImageIndex = 0;
+        // Whether the image at mCurrentImageIndex holds a frame that was actually presented, which
+        // is what captureLastFrame reads. Cleared on resize, since that destroys the images.
+        bool mFramePresented = false;
         bool mRayTracingEnabled = false;
         bool mTlasDirty = false;
     };

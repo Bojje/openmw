@@ -48,10 +48,12 @@ namespace MWInput
     class InputManager final : public MWBase::InputManager
     {
     public:
+        /// \a extraScreenshot is called alongside the OSG capture on the screenshot key. See
+        /// ActionManager.
         InputManager(SDL_Window* window, osg::ref_ptr<osgViewer::Viewer> viewer,
             osg::ref_ptr<osgViewer::ScreenCaptureHandler> screenCaptureHandler, const std::filesystem::path& userFile,
             bool userFileExists, const std::filesystem::path& userControllerBindingsFile,
-            const std::filesystem::path& controllerBindingsFile, bool grab);
+            const std::filesystem::path& controllerBindingsFile, bool grab, std::function<void()> extraScreenshot = {});
 
         ~InputManager() final;
 

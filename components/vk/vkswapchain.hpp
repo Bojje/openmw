@@ -27,6 +27,7 @@ namespace Vk
         const std::vector<VkImageView>& imageViews() const { return mImageViews; }
         VkImageView depthImageView() const { return mDepthImageView; }
         uint32_t imageCount() const { return static_cast<uint32_t>(mImages.size()); }
+        const std::vector<VkImage>& images() const { return mImages; }
         VkSwapchainKHR handle() const { return mSwapchain; }
 
     private:

@@ -91,6 +91,17 @@ namespace MWRender
         /// this manager -- the user interface being the one that exists. Never null once constructed.
         Vk::Renderer& renderer() { return *mRenderer; }
 
+        /// Writes what this renderer last presented into \a screenshotPath as \a format, and returns
+        /// the file it wrote or an empty path if there was nothing to write.
+        ///
+        /// The OSG side gets its screenshot from osgViewer, which reads the GL framebuffer. This is
+        /// the equivalent for the Vulkan side and it exists for the same reason plus one more:
+        /// grabbing the screen is not a dependable way to see this renderer's output, because a
+        /// window the compositor has put on an overlay plane captures as solid black. See
+        /// Vk::Renderer::captureLastFrame.
+        std::filesystem::path writeScreenshot(
+            const std::filesystem::path& screenshotPath, const std::string& format);
+
     private:
         struct CellMeshes
         {

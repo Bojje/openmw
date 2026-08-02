@@ -21,6 +21,7 @@
 #include <components/resource/imagemanager.hpp>
 #include <components/resource/niffilemanager.hpp>
 #include <components/resource/resourcesystem.hpp>
+#include <components/sceneutil/screencapture.hpp>
 #include <components/vfs/manager.hpp>
 #include <components/vfs/pathutil.hpp>
 #include <components/vk/vkbuffer.hpp>
@@ -589,6 +590,31 @@ namespace MWRender
     void VkRenderingManager::resize(uint32_t width, uint32_t height)
     {
         mRenderer->resize(width, height);
+    }
+
+    std::filesystem::path VkRenderingManager::writeScreenshot(
+        const std::filesystem::path& screenshotPath, const std::string& format)
+    {
+        std::vector<uint8_t> pixels;
+        uint32_t width = 0;
+        uint32_t height = 0;
+        if (!mRenderer->captureLastFrame(pixels, width, height))
+        {
+            Log(Debug::Warning) << "Vulkan: nothing has been presented yet, no screenshot written";
+            return {};
+        }
+
+        osg::ref_ptr<osg::Image> image = new osg::Image;
+        image->allocateImage(static_cast<int>(width), static_cast<int>(height), 1, GL_RGBA, GL_UNSIGNED_BYTE);
+
+        // Vulkan hands back the top row first and osg::Image is bottom row first, so the rows are
+        // reversed on the way in. Getting this wrong produces a vertically mirrored screenshot, which
+        // is easy to miss on a scene without text in it and then reads as a projection bug.
+        const size_t rowBytes = static_cast<size_t>(width) * 4;
+        for (uint32_t y = 0; y < height; ++y)
+            std::memcpy(image->data(0, static_cast<int>(height - 1 - y)), pixels.data() + rowBytes * y, rowBytes);
+
+        return SceneUtil::writeScreenshotToFile(screenshotPath, format, *image);
     }
 
     std::vector<bool> VkRenderingManager::collectLiveTextures() const

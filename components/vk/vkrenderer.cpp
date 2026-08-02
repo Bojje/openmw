@@ -12,6 +12,7 @@
 
 #include <components/debug/debuglog.hpp>
 
+#include "vkbuffer.hpp"
 #include "vkcommands.hpp"
 #include "vkdevice.hpp"
 #include "vkinstance.hpp"
@@ -1751,6 +1752,10 @@ namespace Vk
             VK_CHECK(result);
         }
 
+        // Only after a successful present is the image at mCurrentImageIndex worth reading back, and
+        // a resize destroys the swapchain, so this is cleared there rather than being set once.
+        mFramePresented = true;
+
         mCurrentFrame = (mCurrentFrame + 1) % maxFramesInFlight;
     }
 
@@ -1993,6 +1998,9 @@ namespace Vk
     {
         vkDeviceWaitIdle(mDevice->handle());
 
+        // The swapchain images do not survive this, so nothing is readable until the next present.
+        mFramePresented = false;
+
         if (mGBufferFramebuffer != VK_NULL_HANDLE)
         {
             vkDestroyFramebuffer(mDevice->handle(), mGBufferFramebuffer, nullptr);
@@ -2075,6 +2083,82 @@ namespace Vk
     void Renderer::waitIdle()
     {
         vkDeviceWaitIdle(mDevice->handle());
+    }
+
+    bool Renderer::captureLastFrame(std::vector<uint8_t>& rgba, uint32_t& width, uint32_t& height)
+    {
+        if (!mSwapchain || !mFramePresented)
+            return false;
+
+        const std::vector<VkImage>& images = mSwapchain->images();
+        if (mCurrentImageIndex >= images.size())
+            return false;
+
+        const VkExtent2D extent = mSwapchain->extent();
+        if (extent.width == 0 || extent.height == 0)
+            return false;
+
+        // Nothing may still be writing the image being read, and the caller is a screenshot key, so
+        // the blunt instrument is the right one.
+        vkDeviceWaitIdle(mDevice->handle());
+
+        const VkDeviceSize byteCount = VkDeviceSize(extent.width) * extent.height * 4;
+        Buffer readback(*mDevice, byteCount, VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+        VkCommandBuffer cmd = mCommandPool->beginSingleTime();
+
+        // The image is in PRESENT_SRC because it was presented, and it has to be handed back in that
+        // layout: the next acquire of this index expects to find it there.
+        transitionImageLayout(cmd, images[mCurrentImageIndex], VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT);
+
+        VkBufferImageCopy region = {};
+        region.bufferOffset = 0;
+        region.bufferRowLength = 0;
+        region.bufferImageHeight = 0;
+        region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        region.imageSubresource.mipLevel = 0;
+        region.imageSubresource.baseArrayLayer = 0;
+        region.imageSubresource.layerCount = 1;
+        region.imageOffset = { 0, 0, 0 };
+        region.imageExtent = { extent.width, extent.height, 1 };
+        vkCmdCopyImageToBuffer(
+            cmd, images[mCurrentImageIndex], VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, readback.handle(), 1, &region);
+
+        transitionImageLayout(cmd, images[mCurrentImageIndex], VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_IMAGE_ASPECT_COLOR_BIT);
+
+        mCommandPool->endSingleTime(cmd, mDevice->graphicsQueue());
+
+        const uint8_t* mapped = static_cast<const uint8_t*>(readback.map());
+        if (mapped == nullptr)
+            return false;
+
+        // chooseSurfaceFormat asks for B8G8R8A8_SRGB and warns if it cannot have it, so the channel
+        // order is known rather than assumed -- but assert the assumption rather than swizzling
+        // blind, because a fallback format would otherwise produce a red and blue swapped screenshot
+        // that reads as a shader bug.
+        const bool swapRedBlue
+            = mSwapchain->format() == VK_FORMAT_B8G8R8A8_SRGB || mSwapchain->format() == VK_FORMAT_B8G8R8A8_UNORM;
+
+        rgba.resize(static_cast<size_t>(byteCount));
+        for (size_t i = 0; i < rgba.size(); i += 4)
+        {
+            rgba[i + 0] = swapRedBlue ? mapped[i + 2] : mapped[i + 0];
+            rgba[i + 1] = mapped[i + 1];
+            rgba[i + 2] = swapRedBlue ? mapped[i + 0] : mapped[i + 2];
+            // The swapchain has no meaningful alpha -- the composite pass writes 1.0 -- but a
+            // screenshot with a zero alpha channel opens as fully transparent in most viewers, which
+            // looks exactly like a renderer that drew nothing.
+            rgba[i + 3] = 0xff;
+        }
+
+        readback.unmap();
+
+        width = extent.width;
+        height = extent.height;
+        return true;
     }
 
     void Renderer::updateScene(const SceneData& sceneData)
