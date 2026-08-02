@@ -128,6 +128,13 @@ namespace Vk
         // Morrowind-era NIFs (nifosg::Loader::applyDrawableProperties).
         float roughness = 1.0f;
         float specularStrength = 0.0f;
+        // Whether this instance survives frustum culling.
+        //
+        // It gates the *raster* pass only. The TLAS deliberately ignores it: an object behind the
+        // camera still casts a shadow into view, and a reflection ray can hit anything at all. Culling
+        // the acceleration structure would make shadows pop in and out as the camera turns, which is a
+        // far worse artifact than the draw call it saves.
+        bool visible = true;
     };
 
     struct MeshDrawCommand
@@ -144,6 +151,7 @@ namespace Vk
         bool alphaTested;
         float roughness;
         float specularStrength;
+        bool visible;
     };
 
     // Layout of the G-buffer pipeline's push constant block. This must match the block declared in

@@ -250,6 +250,12 @@ namespace MWRender
 
         mRenderer->updateScene(scene);
 
+        // One frustum per frame, from the same matrix the vertex shader uses, so what is culled and
+        // what is drawn cannot disagree.
+        const Vk::Frustum frustum = Vk::extractFrustum(viewProjection);
+        size_t drawn = 0;
+        size_t culled = 0;
+
         for (const auto& [store, cellMeshes] : mCellMeshes)
         {
             for (const auto& inst : cellMeshes.instances)
@@ -262,6 +268,19 @@ namespace MWRender
                 // in slot i + 1, so the sNoTexture sentinel maps straight to 0. The renderer clamps
                 // anything that does not fit in the array back to 0 as well.
                 const size_t textureIndex = mMeshTextures[inst.meshIndex];
+
+                // Frustum cull. The mesh's bounds are object space, so they go through the same
+                // instance transform the geometry does. This gates rasterization only -- the
+                // submission still enters the TLAS, because an object behind the camera casts a
+                // shadow into view and a reflection ray can hit anything.
+                float worldMin[3];
+                float worldMax[3];
+                Vk::transformBounds(transform, mesh->boundsMin, mesh->boundsMax, worldMin, worldMax);
+                const bool visible = Vk::boxInFrustum(frustum, worldMin, worldMax);
+                if (visible)
+                    ++drawn;
+                else
+                    ++culled;
 
                 Vk::MeshSubmission submission;
                 submission.vertexBuffer = mesh->vertexBuffer->handle();
@@ -277,6 +296,7 @@ namespace MWRender
                 submission.alphaTested = mesh->alphaTested;
                 submission.roughness = mesh->roughness;
                 submission.specularStrength = mesh->specularStrength;
+                submission.visible = visible;
 
                 mRenderer->submitMesh(submission);
             }
@@ -308,6 +328,15 @@ namespace MWRender
 
                 mRenderer->submitMesh(submission);
             }
+        }
+
+        // Logged once, not per frame: the point is to confirm the cull is actually doing something
+        // and to catch the failure mode where a wrong frustum culls everything or nothing.
+        if (!mLoggedCullRatio && drawn + culled > 0)
+        {
+            mLoggedCullRatio = true;
+            Log(Debug::Info) << "Vulkan: frustum culling drew " << drawn << " of " << (drawn + culled)
+                             << " object instances";
         }
 
         mRenderer->render();

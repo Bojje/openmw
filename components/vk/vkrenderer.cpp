@@ -1486,6 +1486,10 @@ namespace Vk
 
                 for (const auto& drawCmd : mDrawCommands)
                 {
+                    // Raster only. buildTlas deliberately does not check this -- see MeshSubmission.
+                    if (!drawCmd.visible)
+                        continue;
+
                     GBufferPushConstants pushData = {};
                     pushData.model = drawCmd.transform;
                     // Pack the upper-left 3x3 of the normal matrix into the shader's mat3, which lays
@@ -1683,7 +1687,7 @@ namespace Vk
         mDrawCommands.push_back({ submission.vertexBuffer, submission.indexBuffer, submission.indexCount,
             submission.transform, normalMatrix, submission.blasAddress, submission.vertexAddress,
             submission.indexAddress, slot, submission.alphaTested, submission.roughness,
-            submission.specularStrength });
+            submission.specularStrength, submission.visible });
     }
 
     void Renderer::uploadGeometryTable(const std::vector<GeometryRecord>& records)

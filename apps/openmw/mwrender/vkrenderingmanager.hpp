@@ -153,6 +153,7 @@ namespace MWRender
         // Previous frame's projection * view, handed to the shaders for temporal reprojection.
         Vk::Mat4 mPrevViewProjection;
         uint32_t mFrameIndex = 0;
+        bool mLoggedCullRatio = false;
     };
 }
 
