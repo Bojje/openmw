@@ -1,6 +1,8 @@
 #ifndef OPENMW_MWRENDER_SKYUTIL_H
 #define OPENMW_MWRENDER_SKYUTIL_H
 
+#include <unordered_map>
+
 #include <osg/Material>
 #include <osg/Matrixf>
 #include <osg/Texture2D>
@@ -144,7 +146,7 @@ namespace MWRender
         osg::ref_ptr<osg::OcclusionQueryNode> mOcclusionQueryVisiblePixels;
         osg::ref_ptr<osg::OcclusionQueryNode> mOcclusionQueryTotalPixels;
 
-        std::map<osg::observer_ptr<osg::Camera>, float> mLastRatio;
+        std::unordered_map<osg::Camera*, float> mLastRatio;
     };
 
     class AtmosphereUpdater : public SceneUtil::StateSetUpdater

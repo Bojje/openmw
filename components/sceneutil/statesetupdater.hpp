@@ -4,7 +4,7 @@
 #include <components/sceneutil/nodecallback.hpp>
 
 #include <array>
-#include <map>
+#include <utility>
 
 namespace osgUtil
 {
@@ -66,7 +66,9 @@ namespace SceneUtil
         osg::StateSet* getCvDependentStateset(osgUtil::CullVisitor* cv);
 
         std::array<osg::ref_ptr<osg::StateSet>, 2> mStateSetsUpdate;
-        std::map<osgUtil::CullVisitor*, osg::ref_ptr<osg::StateSet>> mStateSetsCull;
+        static constexpr size_t sMaxCullVisitors = 4;
+        std::array<std::pair<osgUtil::CullVisitor*, osg::ref_ptr<osg::StateSet>>, sMaxCullVisitors> mStateSetsCull{};
+        size_t mStateSetsCullCount{ 0 };
     };
 
     /// @brief A variant of the StateSetController that can be made up of multiple controllers all controlling the same

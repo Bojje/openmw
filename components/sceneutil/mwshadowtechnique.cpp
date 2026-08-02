@@ -26,6 +26,7 @@
 #include <osg/Depth>
 #include <osg/ClipControl>
 
+#include <set>
 #include <sstream>
 #include <vector>
 
@@ -2218,10 +2219,10 @@ struct ConvexHull
         // Gather connected vertices
         VertexSet unprocessedConnectedVertices = std::move(extremeVertices);
 
-        VertexSet connectedVertices;
+        std::set<osg::Vec3d> connectedVertices;
         const auto containsVertex = [&](const auto& vert)
         {
-            return std::find(connectedVertices.begin(), connectedVertices.end(), vert) != connectedVertices.end();
+            return connectedVertices.count(vert) != 0;
         };
 
         while (!unprocessedConnectedVertices.empty())
@@ -2229,7 +2230,7 @@ struct ConvexHull
             osg::Vec3d vertex = unprocessedConnectedVertices.back();
             unprocessedConnectedVertices.pop_back();
 
-            connectedVertices.emplace_back(vertex);
+            connectedVertices.insert(vertex);
             for (const Edge& edge : _edges)
             {
                 osg::Vec3d otherEnd;

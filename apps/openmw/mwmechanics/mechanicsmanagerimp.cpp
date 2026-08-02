@@ -86,7 +86,7 @@ namespace
         bool isFactionOwned = false;
         if (!faction.empty() && ptr.getClass().isNpc())
         {
-            const std::map<ESM::RefId, int>& factions = ptr.getClass().getNpcStats(ptr).getFactionRanks();
+            const auto& factions = ptr.getClass().getNpcStats(ptr).getFactionRanks();
             auto found = factions.find(faction);
             if (found == factions.end() || found->second < cellref.getFactionRank())
                 isFactionOwned = true;
@@ -1470,7 +1470,7 @@ namespace MWMechanics
             {
                 const ESM::RefId& factionID = victim.getClass().getPrimaryFaction(victim);
 
-                const std::map<ESM::RefId, int>& playerRanks = player.getClass().getNpcStats(player).getFactionRanks();
+                const auto& playerRanks = player.getClass().getNpcStats(player).getFactionRanks();
                 if (playerRanks.find(factionID) != playerRanks.end())
                 {
                     player.getClass().getNpcStats(player).expell(factionID, true);
@@ -1478,7 +1478,7 @@ namespace MWMechanics
             }
             else if (!factionId.empty())
             {
-                const std::map<ESM::RefId, int>& playerRanks = player.getClass().getNpcStats(player).getFactionRanks();
+                const auto& playerRanks = player.getClass().getNpcStats(player).getFactionRanks();
                 if (playerRanks.find(factionId) != playerRanks.end())
                 {
                     player.getClass().getNpcStats(player).expell(factionId, true);

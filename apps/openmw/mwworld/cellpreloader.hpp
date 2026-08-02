@@ -8,6 +8,7 @@
 #include <osg/ref_ptr>
 
 #include <map>
+#include <unordered_map>
 #include <span>
 
 namespace osg
@@ -117,7 +118,7 @@ namespace MWWorld
             double mTimeStamp;
             osg::ref_ptr<SceneUtil::WorkItem> mWorkItem;
         };
-        typedef std::map<const MWWorld::CellStore*, PreloadEntry> PreloadMap;
+        typedef std::unordered_map<const MWWorld::CellStore*, PreloadEntry> PreloadMap;
 
         // Cells that are currently being preloaded, or have already finished preloading
         PreloadMap mPreloadCells;

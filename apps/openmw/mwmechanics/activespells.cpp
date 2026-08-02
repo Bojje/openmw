@@ -252,6 +252,7 @@ namespace MWMechanics
                         Log(Debug::Error) << "Dropping non-existent active effect: " << spellIt->mSourceSpellId;
                     auto params = *spellIt;
                     spellIt = mSpells.erase(spellIt);
+                    mSourceSpellIdsDirty = true;
                     for (const auto& effect : params.mEffects)
                         onMagicEffectRemoved(ptr, params, effect);
                     applyPurges(ptr, &spellIt);
@@ -283,7 +284,10 @@ namespace MWMechanics
             if (removedSpell)
                 continue;
             if (spellIt->mEffects.empty())
+            {
                 spellIt = mSpells.erase(spellIt);
+                mSourceSpellIdsDirty = true;
+            }
             else
                 ++spellIt;
         }
@@ -453,6 +457,7 @@ namespace MWMechanics
             {
                 auto params = *spellIt;
                 spellIt = mSpells.erase(spellIt);
+                mSourceSpellIdsDirty = true;
                 for (const auto& effect : params.mEffects)
                     onMagicEffectRemoved(ptr, params, effect);
                 applyPurges(ptr, &spellIt);
@@ -466,9 +471,10 @@ namespace MWMechanics
 
     bool ActiveSpells::initParams(const MWWorld::Ptr& ptr, const ActiveSpellParams& params, UpdateContext& context)
     {
-        mSpells.emplace_back(params);
-        if (mSpells.back().getActiveSpellId().empty())
-            mSpells.back().setActiveSpellId(MWBase::Environment::get().getESMStore()->generateId());
+        auto& added = mSpells.emplace_back(params);
+        if (added.getActiveSpellId().empty())
+            added.setActiveSpellId(MWBase::Environment::get().getESMStore()->generateId());
+        mSourceSpellIdsDirty = true;
         auto it = mSpells.end();
         --it;
         // We instantly apply the effect with a duration of 0 so continuous effects can be purged before truly applying
@@ -523,9 +529,14 @@ namespace MWMechanics
 
     bool ActiveSpells::isSpellActive(const ESM::RefId& id) const
     {
-        return std::find_if(mSpells.begin(), mSpells.end(), [&](const auto& spell) {
-            return spell.mSourceSpellId == id;
-        }) != mSpells.end();
+        if (mSourceSpellIdsDirty)
+        {
+            mActiveSourceSpellIds.clear();
+            for (const auto& spell : mSpells)
+                mActiveSourceSpellIds.insert(spell.mSourceSpellId);
+            mSourceSpellIdsDirty = false;
+        }
+        return mActiveSourceSpellIds.count(id) != 0;
     }
 
     bool ActiveSpells::isEnchantmentActive(const ESM::RefId& id) const
@@ -591,6 +602,7 @@ namespace MWMechanics
                             {
                                 auto params = *spellIt;
                                 spellIt = mSpells.erase(spellIt);
+                                mSourceSpellIdsDirty = true;
                                 if (isCurrentSpell)
                                 {
                                     *currentSpell = spellIt;
@@ -687,6 +699,7 @@ namespace MWMechanics
 
     void ActiveSpells::readState(const ESM::ActiveSpells& state)
     {
+        mSourceSpellIdsDirty = true;
         for (const ESM::ActiveSpells::ActiveSpellParams& spell : state.mSpells)
         {
             mSpells.emplace_back(ActiveSpellParams{ spell });

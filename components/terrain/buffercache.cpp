@@ -181,9 +181,9 @@ namespace Terrain
     osg::ref_ptr<osg::Vec2Array> BufferCache::getUVBuffer(unsigned int numVerts)
     {
         std::lock_guard<std::mutex> lock(mUvBufferMutex);
-        if (mUvBufferMap.find(numVerts) != mUvBufferMap.end())
+        if (auto it = mUvBufferMap.find(numVerts); it != mUvBufferMap.end())
         {
-            return mUvBufferMap[numVerts];
+            return it->second;
         }
 
         int vertexCount = numVerts * numVerts;
@@ -213,9 +213,9 @@ namespace Terrain
         std::pair<int, int> id = std::make_pair(numVerts, flags);
         std::lock_guard<std::mutex> lock(mIndexBufferMutex);
 
-        if (mIndexBufferMap.find(id) != mIndexBufferMap.end())
+        if (auto it = mIndexBufferMap.find(id); it != mIndexBufferMap.end())
         {
-            return mIndexBufferMap[id];
+            return it->second;
         }
 
         osg::ref_ptr<osg::DrawElements> buffer;

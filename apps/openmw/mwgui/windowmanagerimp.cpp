@@ -1409,9 +1409,9 @@ namespace MWGui
         if (mGuiModes.empty() || mGuiModes.back() != mode)
         {
             // If this mode already exists somewhere in the stack, just bring it to the front.
-            if (std::find(mGuiModes.begin(), mGuiModes.end(), mode) != mGuiModes.end())
+            if (auto it = std::find(mGuiModes.begin(), mGuiModes.end(), mode); it != mGuiModes.end())
             {
-                mGuiModes.erase(std::find(mGuiModes.begin(), mGuiModes.end(), mode));
+                mGuiModes.erase(it);
             }
 
             if (!mGuiModes.empty())

@@ -8,6 +8,7 @@
 #include <limits>
 #include <map>
 #include <sstream>
+#include <unordered_map>
 #include <stdexcept>
 
 #include "controller.hpp"
@@ -48,7 +49,7 @@ namespace Nif
     using CreateRecord = std::unique_ptr<Record> (*)();
 
     /// These are all the record types we know how to read.
-    static std::map<std::string, CreateRecord> makeFactory()
+    static std::unordered_map<std::string, CreateRecord> makeFactory()
     {
         return {
             // 4.0.0.2 refers to Bethesda variant of NetImmerse 4.0.0.2 file format
@@ -522,7 +523,7 @@ namespace Nif
     }
 
     /// Make the factory map used for parsing the file
-    static const std::map<std::string, CreateRecord> factories = makeFactory();
+    static const std::unordered_map<std::string, CreateRecord> factories = makeFactory();
 
     std::string Reader::versionToString(std::uint32_t version)
     {

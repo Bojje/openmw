@@ -5,6 +5,7 @@
 #include <list>
 #include <queue>
 #include <string>
+#include <unordered_set>
 #include <variant>
 #include <vector>
 
@@ -119,6 +120,8 @@ namespace MWMechanics
         struct UpdateContext;
 
         std::list<ActiveSpellParams> mSpells;
+        mutable std::unordered_set<ESM::RefId> mActiveSourceSpellIds;
+        mutable bool mSourceSpellIdsDirty{ true };
         std::vector<ActiveSpellParams> mQueue;
         std::queue<Predicate> mPurges;
         bool mIterating;

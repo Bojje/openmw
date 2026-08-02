@@ -26,8 +26,8 @@ namespace MWMechanics
         ESM::RefId mWeakestSpell;
     };
 
-    std::vector<ESM::RefId> autoCalcNpcSpells(const std::map<ESM::RefId, SkillValue>& actorSkills,
-        const std::map<ESM::RefId, AttributeValue>& actorAttributes, const ESM::Race* race)
+    std::vector<ESM::RefId> autoCalcNpcSpells(const std::unordered_map<ESM::RefId, SkillValue>& actorSkills,
+        const std::unordered_map<ESM::RefId, AttributeValue>& actorAttributes, const ESM::Race* race)
     {
         const MWWorld::Store<ESM::GameSetting>& gmst
             = MWBase::Environment::get().getESMStore()->get<ESM::GameSetting>();
@@ -136,8 +136,8 @@ namespace MWMechanics
         return selectedSpells;
     }
 
-    std::vector<ESM::RefId> autoCalcPlayerSpells(const std::map<ESM::RefId, SkillValue>& actorSkills,
-        const std::map<ESM::RefId, AttributeValue>& actorAttributes, const ESM::Race* race)
+    std::vector<ESM::RefId> autoCalcPlayerSpells(const std::unordered_map<ESM::RefId, SkillValue>& actorSkills,
+        const std::unordered_map<ESM::RefId, AttributeValue>& actorAttributes, const ESM::Race* race)
     {
         const MWWorld::ESMStore& esmStore = *MWBase::Environment::get().getESMStore();
 
@@ -215,8 +215,8 @@ namespace MWMechanics
         return selectedSpells;
     }
 
-    bool attrSkillCheck(const ESM::Spell* spell, const std::map<ESM::RefId, SkillValue>& actorSkills,
-        const std::map<ESM::RefId, AttributeValue>& actorAttributes)
+    bool attrSkillCheck(const ESM::Spell* spell, const std::unordered_map<ESM::RefId, SkillValue>& actorSkills,
+        const std::unordered_map<ESM::RefId, AttributeValue>& actorAttributes)
     {
         for (const auto& spellEffect : spell->mEffects.mList)
         {
@@ -246,7 +246,7 @@ namespace MWMechanics
         return true;
     }
 
-    void calcWeakestSchool(const ESM::Spell* spell, const std::map<ESM::RefId, SkillValue>& actorSkills,
+    void calcWeakestSchool(const ESM::Spell* spell, const std::unordered_map<ESM::RefId, SkillValue>& actorSkills,
         ESM::RefId& effectiveSchool, float& skillTerm)
     {
         // Morrowind for some reason uses a formula slightly different from magicka cost calculation
@@ -298,8 +298,8 @@ namespace MWMechanics
         }
     }
 
-    float calcAutoCastChance(const ESM::Spell* spell, const std::map<ESM::RefId, SkillValue>& actorSkills,
-        const std::map<ESM::RefId, AttributeValue>& actorAttributes, ESM::RefId effectiveSchool)
+    float calcAutoCastChance(const ESM::Spell* spell, const std::unordered_map<ESM::RefId, SkillValue>& actorSkills,
+        const std::unordered_map<ESM::RefId, AttributeValue>& actorAttributes, ESM::RefId effectiveSchool)
     {
         if (spell->mData.mType != ESM::Spell::ST_Spell)
             return 100.f;

@@ -3,6 +3,8 @@
 
 #include <algorithm>
 #include <fstream>
+#include <unordered_map>
+#include <unordered_set>
 
 #include <components/debug/debuglog.hpp>
 
@@ -538,8 +540,8 @@ namespace MWWorld
     struct MergeVisitor
     {
         MergeVisitor(std::vector<LiveCellRefBase*>& mergeTo,
-            const std::map<LiveCellRefBase*, MWWorld::CellStore*>& movedHere,
-            const std::map<LiveCellRefBase*, MWWorld::CellStore*>& movedToAnotherCell)
+            const std::unordered_map<LiveCellRefBase*, MWWorld::CellStore*>& movedHere,
+            const std::unordered_map<LiveCellRefBase*, MWWorld::CellStore*>& movedToAnotherCell)
             : mMergeTo(mergeTo)
             , mMovedHere(movedHere)
             , mMovedToAnotherCell(movedToAnotherCell)
@@ -563,8 +565,8 @@ namespace MWWorld
     private:
         std::vector<LiveCellRefBase*>& mMergeTo;
 
-        const std::map<LiveCellRefBase*, MWWorld::CellStore*>& mMovedHere;
-        const std::map<LiveCellRefBase*, MWWorld::CellStore*>& mMovedToAnotherCell;
+        const std::unordered_map<LiveCellRefBase*, MWWorld::CellStore*>& mMovedHere;
+        const std::unordered_map<LiveCellRefBase*, MWWorld::CellStore*>& mMovedToAnotherCell;
     };
 
     void CellStore::requestMergedRefsUpdate()
@@ -746,6 +748,10 @@ namespace MWWorld
         if (cell.mContextList.empty())
             return; // this is a dynamically generated cell -> skipping.
 
+        std::unordered_set<ESM::RefNum> movedRefNums;
+        for (const auto& moved : cell.mMovedRefs)
+            movedRefNums.insert(moved.mRefNum);
+
         // Load references from all plugins that do something with this cell.
         for (size_t i = 0; i < cell.mContextList.size(); i++)
         {
@@ -769,12 +775,8 @@ namespace MWWorld
                         continue;
 
                     // Don't list reference if it was moved to a different cell.
-                    ESM::MovedCellRefTracker::const_iterator iter
-                        = std::find(cell.mMovedRefs.begin(), cell.mMovedRefs.end(), ref.mRefNum);
-                    if (iter != cell.mMovedRefs.end())
-                    {
+                    if (movedRefNums.count(ref.mRefNum))
                         continue;
-                    }
 
                     mIds.push_back(std::move(ref.mRefID));
                 }
@@ -825,10 +827,14 @@ namespace MWWorld
         std::sort(mIds.begin(), mIds.end());
     }
 
-    void CellStore::loadRefs(const ESM::Cell& cell, std::map<ESM::RefNum, ESM::RefId>& refNumToID)
+    void CellStore::loadRefs(const ESM::Cell& cell, std::unordered_map<ESM::RefNum, ESM::RefId>& refNumToID)
     {
         if (cell.mContextList.empty())
             return; // this is a dynamically generated cell -> skipping.
+
+        std::unordered_set<ESM::RefNum> movedRefNums;
+        for (const auto& moved : cell.mMovedRefs)
+            movedRefNums.insert(moved.mRefNum);
 
         // Load references from all plugins that do something with this cell.
         for (size_t i = 0; i < cell.mContextList.size(); i++)
@@ -852,12 +858,8 @@ namespace MWWorld
                         continue;
 
                     // Don't load reference if it was moved to a different cell.
-                    ESM::MovedCellRefTracker::const_iterator iter
-                        = std::find(cell.mMovedRefs.begin(), cell.mMovedRefs.end(), ref.mRefNum);
-                    if (iter != cell.mMovedRefs.end())
-                    {
+                    if (movedRefNums.count(ref.mRefNum))
                         continue;
-                    }
 
                     loadRef(ref, deleted, refNumToID);
                 }
@@ -878,7 +880,7 @@ namespace MWWorld
         }
     }
 
-    void CellStore::loadRefs(const ESM4::Cell& cell, std::map<ESM::RefNum, ESM::RefId>& refNumToID)
+    void CellStore::loadRefs(const ESM4::Cell& cell, std::unordered_map<ESM::RefNum, ESM::RefId>& refNumToID)
     {
         visitCell4References(cell, mStore, mReaders, [&](const ESM4::Reference& ref) { loadRef(ref); });
         visitCell4ActorReferences(cell, mStore, mReaders, [&](const ESM4::ActorCharacter& ref) { loadRef(ref); });
@@ -886,7 +888,7 @@ namespace MWWorld
 
     void CellStore::loadRefs()
     {
-        std::map<ESM::RefNum, ESM::RefId> refNumToID; // used to detect refID modifications
+        std::unordered_map<ESM::RefNum, ESM::RefId> refNumToID;
 
         ESM::visit([&](auto&& cell) { loadRefs(cell, refNumToID); }, mCellVariant);
 
@@ -944,7 +946,7 @@ namespace MWWorld
         });
     }
 
-    void CellStore::loadRef(ESM::CellRef& ref, bool deleted, std::map<ESM::RefNum, ESM::RefId>& refNumToID)
+    void CellStore::loadRef(ESM::CellRef& ref, bool deleted, std::unordered_map<ESM::RefNum, ESM::RefId>& refNumToID)
     {
         const MWWorld::ESMStore& store = mStore;
 

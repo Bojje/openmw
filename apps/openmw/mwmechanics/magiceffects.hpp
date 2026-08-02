@@ -1,9 +1,10 @@
 #ifndef GAME_MWMECHANICS_MAGICEFFECTS_H
 #define GAME_MWMECHANICS_MAGICEFFECTS_H
 
-#include <map>
+#include <functional>
 #include <optional>
 #include <string>
+#include <unordered_map>
 
 #include <components/esm/refid.hpp>
 
@@ -39,7 +40,21 @@ namespace MWMechanics
 
     bool operator<(const EffectKey& left, const EffectKey& right);
     bool operator==(const EffectKey& left, const EffectKey& right);
+}
 
+template <>
+struct std::hash<MWMechanics::EffectKey>
+{
+    std::size_t operator()(const MWMechanics::EffectKey& key) const noexcept
+    {
+        std::size_t h = std::hash<ESM::RefId>{}(key.mId);
+        h ^= std::hash<ESM::RefId>{}(key.mArg) + 0x9e3779b9 + (h << 6) + (h >> 2);
+        return h;
+    }
+};
+
+namespace MWMechanics
+{
     struct EffectParam
     {
     private:
@@ -89,7 +104,7 @@ namespace MWMechanics
     class MagicEffects
     {
     public:
-        typedef std::map<EffectKey, EffectParam> Collection;
+        typedef std::unordered_map<EffectKey, EffectParam> Collection;
 
     private:
         Collection mCollection;

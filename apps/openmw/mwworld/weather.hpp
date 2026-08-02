@@ -6,6 +6,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 #include <osg/Vec4f>
@@ -418,7 +419,7 @@ namespace MWWorld
         int mCurrentWeather;
         int mNextWeather;
         int mQueuedWeather;
-        std::map<ESM::RefId, RegionWeather> mRegions;
+        std::unordered_map<ESM::RefId, RegionWeather> mRegions;
         MWRender::WeatherResult mResult;
 
         MWBase::Sound* mAmbientSound{ nullptr };

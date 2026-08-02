@@ -152,9 +152,7 @@ namespace MWGui
         MyGUI::ProgressBar* pt;
         getWidget(pt, name);
 
-        std::stringstream out;
-        out << val << "/" << max;
-        setText(tname, out.str());
+        setText(tname, std::to_string(val) + "/" + std::to_string(max));
 
         pt->setProgressRange(std::max(0, max));
         pt->setProgressPosition(std::max(0, val));
@@ -226,9 +224,7 @@ namespace MWGui
     {
         if (id == "level")
         {
-            std::ostringstream text;
-            text << value;
-            setText("LevelText", text.str());
+            setText("LevelText", std::to_string(value));
         }
     }
 
@@ -337,27 +333,26 @@ namespace MWGui
         const MWMechanics::NpcStats& playerStats = player.getClass().getNpcStats(player);
         const auto& store = MWBase::Environment::get().getESMStore();
 
-        std::stringstream detail;
-        bool first = true;
+        std::string detailText;
         for (const auto& attribute : store->get<ESM::Attribute>())
         {
             int mult = playerStats.getLevelupAttributeMultiplier(attribute.mId);
             mult = std::min(mult, static_cast<int>(100 - playerStats.getAttribute(attribute.mId).getBase()));
             if (mult > 1)
             {
-                if (!first)
-                    detail << '\n';
-                detail << attribute.mName << " x" << MyGUI::utility::toString(mult);
-                first = false;
+                if (!detailText.empty())
+                    detailText += '\n';
+                detailText += attribute.mName;
+                detailText += " x";
+                detailText += MyGUI::utility::toString(mult);
             }
         }
-        std::string detailText = detail.str();
 
         // level progress
         MyGUI::Widget* levelWidget;
         for (int i = 0; i < 2; ++i)
         {
-            int max = store->get<ESM::GameSetting>().find("iLevelUpTotal")->mValue.getInteger();
+            static const int max = store->get<ESM::GameSetting>().find("iLevelUpTotal")->mValue.getInteger();
             getWidget(levelWidget, i == 0 ? "Level_str" : "LevelText");
 
             levelWidget->setUserString(
@@ -390,7 +385,7 @@ namespace MWGui
         }
     }
 
-    void StatsWindow::setExpelled(const std::set<ESM::RefId>& expelled)
+    void StatsWindow::setExpelled(const std::unordered_set<ESM::RefId>& expelled)
     {
         if (mExpelled != expelled)
         {
@@ -587,7 +582,7 @@ namespace MWGui
         {
             MWWorld::Ptr playerPtr = MWMechanics::getPlayer();
             const MWMechanics::NpcStats& playerStats = playerPtr.getClass().getNpcStats(playerPtr);
-            const std::set<ESM::RefId>& expelled = playerStats.getExpelled();
+            const auto& expelled = playerStats.getExpelled();
 
             bool firstFaction = true;
             for (const auto& [factionId, factionRank] : mFactions)

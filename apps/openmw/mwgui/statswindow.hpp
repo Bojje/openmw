@@ -5,13 +5,15 @@
 #include "windowpinnablebase.hpp"
 #include <components/esm/attr.hpp>
 #include <components/esm/refid.hpp>
+#include <unordered_map>
+#include <unordered_set>
 
 namespace MWGui
 {
     class StatsWindow : public WindowPinnableBase, public NoDrop, public StatsListener
     {
     public:
-        typedef std::map<ESM::RefId, int> FactionList;
+        typedef std::unordered_map<ESM::RefId, int> FactionList;
 
         /// It would be nice to measure these, but for now they're hardcoded.
         static int getIdealHeight() { return 750; }
@@ -65,7 +67,7 @@ namespace MWGui
         MyGUI::Widget* addItem(const std::string& text, MyGUI::IntCoord& coord1, MyGUI::IntCoord& coord2);
 
         void setFactions(const FactionList& factions);
-        void setExpelled(const std::set<ESM::RefId>& expelled);
+        void setExpelled(const std::unordered_set<ESM::RefId>& expelled);
         void setBirthSign(const ESM::RefId& signId);
 
         void onWindowResize(MyGUI::Window* window);
@@ -85,7 +87,7 @@ namespace MWGui
         ESM::RefId mBirthSignId;
         int mReputation, mBounty;
         std::vector<MyGUI::Widget*> mSkillWidgets; //< Skills and other information
-        std::set<ESM::RefId> mExpelled;
+        std::unordered_set<ESM::RefId> mExpelled;
 
         bool mChanged;
         const int mMinFullWidth;

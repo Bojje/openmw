@@ -6,6 +6,8 @@
 #include <components/terrain/quadtreeworld.hpp>
 
 #include <mutex>
+#include <unordered_map>
+#include <unordered_set>
 
 namespace Resource
 {
@@ -59,8 +61,8 @@ namespace MWRender
         std::mutex mRefTrackerMutex;
         struct RefTracker
         {
-            std::set<ESM::RefNum> mDisabled;
-            std::set<ESM::RefNum> mBlacklist;
+            std::unordered_set<ESM::RefNum> mDisabled;
+            std::unordered_set<ESM::RefNum> mBlacklist;
             bool operator==(const RefTracker& other) const
             {
                 return mDisabled == other.mDisabled && mBlacklist == other.mBlacklist;
@@ -74,7 +76,7 @@ namespace MWRender
         RefTracker& getWritableRefTracker() { return mRefTrackerLocked ? mRefTrackerNew : mRefTracker; }
 
         std::mutex mSizeCacheMutex;
-        typedef std::map<ESM::RefNum, float> SizeCache;
+        typedef std::unordered_map<ESM::RefNum, float> SizeCache;
         SizeCache mSizeCache;
 
         std::mutex mLODNameCacheMutex;

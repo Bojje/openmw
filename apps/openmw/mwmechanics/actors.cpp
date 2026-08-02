@@ -647,13 +647,18 @@ namespace MWMechanics
             if (creatureStats1.getAiSequence().isInCombat(ally))
                 continue;
 
-            ESM::RefNum allyHitNum = ally.getClass().getCreatureStats(ally).getHitAttemptActor();
+            const auto& allyStats = ally.getClass().getCreatureStats(ally);
+            ESM::RefNum allyHitNum = allyStats.getHitAttemptActor();
             if (allyHitNum.isSet() && actor2.getCellRef().getRefNum() == allyHitNum)
             {
                 mechanicsManager->startCombat(actor1, actor2, &cachedAllies.getActorsSidingWith(actor2));
                 // Also set the same hit attempt actor. Otherwise, if fighting the player, they may stop combat
                 // if the player gets out of reach, while the ally would continue combat with the player
                 creatureStats1.setHitAttemptActor(allyHitNum);
+                // Propagate aggression time so allies also lose hostility when it expires
+                MWWorld::TimeStamp allyAggressionTime = allyStats.getAggressionTime();
+                if (allyAggressionTime.getDay() != 0 || allyAggressionTime.getHour() != 0)
+                    creatureStats1.setAggressionTime(allyAggressionTime);
                 return;
             }
 
@@ -1024,7 +1029,7 @@ namespace MWMechanics
 
                 // Play a drowning sound
                 MWBase::SoundManager* sndmgr = MWBase::Environment::get().getSoundManager();
-                auto soundDrown = ESM::RefId::stringRefId("drown");
+                static const auto soundDrown = ESM::RefId::stringRefId("drown");
                 if (!sndmgr->getSoundPlaying(ptr, soundDrown))
                     sndmgr->playSound3D(ptr, soundDrown, 1.0f, 1.0f);
 
@@ -1508,6 +1513,7 @@ namespace MWMechanics
 
     void Actors::update(float duration, bool paused)
     {
+        CreatureStats::advanceFrame();
         if (!paused)
         {
             const float updateEquippedLightInterval = 1.0f;
@@ -1563,24 +1569,53 @@ namespace MWMechanics
 
                 // If dead or no longer in combat, no longer store any actors who attempted to hit us. Also remove for
                 // the player.
+                auto& actorStats = actor.getPtr().getClass().getCreatureStats(actor.getPtr());
                 if (!isPlayer
-                    && (actor.getPtr().getClass().getCreatureStats(actor.getPtr()).isDead()
-                        || !actor.getPtr().getClass().getCreatureStats(actor.getPtr()).getAiSequence().isInCombat()
+                    && (actorStats.isDead()
+                        || !actorStats.getAiSequence().isInCombat()
                         || !inProcessingRange))
                 {
-                    actor.getPtr().getClass().getCreatureStats(actor.getPtr()).setHitAttemptActor({});
-                    ESM::RefNum playerHitNum = player.getClass().getCreatureStats(player).getHitAttemptActor();
+                    actorStats.setHitAttemptActor({});
+                    auto& playerStats = player.getClass().getCreatureStats(player);
+                    ESM::RefNum playerHitNum = playerStats.getHitAttemptActor();
                     if (playerHitNum.isSet() && playerHitNum == actor.getPtr().getCellRef().getRefNum())
-                        player.getClass().getCreatureStats(player).setHitAttemptActor({});
+                        playerStats.setHitAttemptActor({});
+                }
+
+                // Expire player-initiated combat hostility after fCorpseClearDelay hours have passed.
+                // In vanilla Morrowind, resting for ~72 hours clears NPC aggression from player attacks.
+                if (!isPlayer
+                    && (actorStats.getAggressionTime().getDay() != 0
+                        || actorStats.getAggressionTime().getHour() != 0))
+                {
+                    static const float fCorpseClearDelay
+                        = MWBase::Environment::get().getESMStore()->get<ESM::GameSetting>()
+                              .find("fCorpseClearDelay")
+                              ->mValue.getFloat();
+                    if (actorStats.getAggressionTime() + fCorpseClearDelay
+                        <= MWBase::Environment::get().getWorld()->getTimeStamp())
+                    {
+                        actorStats.setAggressionTime(MWWorld::TimeStamp());
+                        actorStats.setAttacked(false);
+                        actorStats.setHitAttemptActor({});
+                        auto& playerStats = player.getClass().getCreatureStats(player);
+                        if (playerStats.getHitAttemptActor() == actor.getPtr().getCellRef().getRefNum())
+                            playerStats.setHitAttemptActor({});
+                        if (actorStats.getAiSequence().isInCombat(player))
+                        {
+                            std::vector<MWWorld::Ptr> playerTarget{ player };
+                            actorStats.getAiSequence().stopCombat(playerTarget);
+                        }
+                    }
                 }
 
                 const Misc::TimerStatus engageCombatTimerStatus = actor.updateEngageCombatTimer(duration);
 
                 // For dead actors we need to update looping spell particles
-                if (actor.getPtr().getClass().getCreatureStats(actor.getPtr()).isDead())
+                if (actorStats.isDead())
                 {
                     // They can be added during the death animation
-                    if (!actor.getPtr().getClass().getCreatureStats(actor.getPtr()).isDeathAnimationFinished())
+                    if (!actorStats.isDeathAnimationFinished())
                         adjustMagicEffects(actor.getPtr(), duration);
                     ctrl.updateContinuousVfx();
                 }

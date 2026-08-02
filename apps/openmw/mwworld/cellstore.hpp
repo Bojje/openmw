@@ -9,6 +9,7 @@
 #include <string_view>
 #include <tuple>
 #include <typeinfo>
+#include <unordered_map>
 #include <vector>
 
 #include "cell.hpp"
@@ -379,7 +380,7 @@ namespace MWWorld
             return static_cast<const CellRefList<T>&>(*mCellRefLists[getTypeIndex<T>()]);
         }
 
-        typedef std::map<LiveCellRefBase*, MWWorld::CellStore*> MovedRefTracker;
+        typedef std::unordered_map<LiveCellRefBase*, MWWorld::CellStore*> MovedRefTracker;
         // References owned by a different cell that have been moved here.
         // <reference, cell the reference originally came from>
         MovedRefTracker mMovedHere;
@@ -417,14 +418,14 @@ namespace MWWorld
         void listRefs(const ESM4::Cell& cell);
         void listRefs();
 
-        void loadRefs(const ESM::Cell& cell, std::map<ESM::RefNum, ESM::RefId>& refNumToID);
-        void loadRefs(const ESM4::Cell& cell, std::map<ESM::RefNum, ESM::RefId>& refNumToID);
+        void loadRefs(const ESM::Cell& cell, std::unordered_map<ESM::RefNum, ESM::RefId>& refNumToID);
+        void loadRefs(const ESM4::Cell& cell, std::unordered_map<ESM::RefNum, ESM::RefId>& refNumToID);
 
         void loadRefs();
 
         void loadRef(const ESM4::Reference& ref);
         void loadRef(const ESM4::ActorCharacter& ref);
-        void loadRef(ESM::CellRef& ref, bool deleted, std::map<ESM::RefNum, ESM::RefId>& refNumToID);
+        void loadRef(ESM::CellRef& ref, bool deleted, std::unordered_map<ESM::RefNum, ESM::RefId>& refNumToID);
         ///< Make case-adjustments to \a ref and insert it into the respective container.
         ///
         /// Invalid \a ref objects are silently dropped.

@@ -360,11 +360,11 @@ namespace Shader
         size_t lineEnd = source.find_first_of('\n', endPos);
         // If lineEnd = npos, this is the last line, so no need to check
         std::string linkStatement = source.substr(endPos, lineEnd - endPos);
-        std::regex linkRegex(R"r(\s*"([^"]+)"\s*)r" // Find any quoted string as the link name -> match[1]
-                             R"r((if\s+)r" // Begin optional condition -> match[2]
-                             R"r((!)?\s*)r" // Optional ! -> match[3]
-                             R"r(([_a-zA-Z0-9]+)?)r" // The condition -> match[4]
-                             R"r()?\s*)r" // End optional condition -> match[2]
+        static const std::regex linkRegex(R"r(\s*"([^"]+)"\s*)r" // Find any quoted string as the link name -> match[1]
+                                          R"r((if\s+)r" // Begin optional condition -> match[2]
+                                          R"r((!)?\s*)r" // Optional ! -> match[3]
+                                          R"r(([_a-zA-Z0-9]+)?)r" // The condition -> match[4]
+                                          R"r()?\s*)r" // End optional condition -> match[2]
         );
         std::smatch linkMatch;
         bool hasCondition = false;
