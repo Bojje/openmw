@@ -237,6 +237,18 @@ namespace MWRender
         // Morrowind's low-poly object meshes, where adjacent faces differ by 60 degrees or more.
         scene.denoiseParams = { 1.0f / 16.0f, 0.01f, 0.9f, 32.0f };
 
+        // The sun's angular radius, which is what makes the shadow term stochastic and is therefore
+        // the first real consumer of the accumulator above.
+        //
+        // Deliberately far larger than the real sun's ~0.27 degrees. Two reasons: at Morrowind's
+        // scale the true figure reads as almost perfectly hard, and the renderer has no ambient
+        // occlusion and no GI bounce, so a wider penumbra also stands in for contact softening that
+        // nothing else supplies. Tune by eye; setting it to zero restores the previous hard shadow
+        // exactly, which is what makes the old behaviour a usable reference for this one.
+        constexpr float sSunAngularRadiusDegrees = 0.75f;
+        constexpr float sDegToRad = 3.14159265358979f / 180.0f;
+        scene.sunParams = { std::cos(sSunAngularRadiusDegrees * sDegToRad), 0.0f, 0.0f, 0.0f };
+
         // The shaders reconstruct the direction *towards* the light as -sunDirection, so this has to be
         // the direction the light travels. World::getSunLightPosition() is the opposite convention -- it
         // points towards the sun -- and the caller negates it. Getting this backwards leaves every

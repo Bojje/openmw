@@ -22,6 +22,7 @@ layout(set = 0, binding = 4) uniform SceneUBO {
     vec4 fogParams; // x = fog start, y = fog end, both world units
     mat4 prevViewFromCurView;
     vec4 denoiseParams;
+    vec4 sunParams;
     uint frameIndex;
     uint lightCount;
     uint scenePad0;

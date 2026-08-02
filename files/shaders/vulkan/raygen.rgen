@@ -41,6 +41,7 @@ layout(set = 0, binding = 5) uniform SceneUBO {
     vec4 fogParams;
     mat4 prevViewFromCurView;
     vec4 denoiseParams; // x = alphaMin, y = depth tolerance, z = normal dot, w = max history
+    vec4 sunParams;     // x = cos of the sun's angular radius
     uint frameIndex;
     uint lightCount;
     uint scenePad0;
@@ -77,6 +78,39 @@ uint packNormal(vec3 n) {
     vec2 e = n.z >= 0.0 ? n.xy : octWrap(n.xy);
     ivec2 q = ivec2(round(clamp(e, -1.0, 1.0) * 32767.0));
     return (uint(q.x) & 0xFFFFu) | ((uint(q.y) & 0xFFFFu) << 16);
+}
+
+// Cheap integer avalanche hash. Good enough to decorrelate a two-dimensional jitter and far cheaper
+// than a blue noise texture lookup, which would need another descriptor and another image.
+uint hashUint(uint x) {
+    x ^= x >> 16;
+    x *= 0x7feb352du;
+    x ^= x >> 15;
+    x *= 0x846ca68bu;
+    x ^= x >> 16;
+    return x;
+}
+
+// Uniformly distributed direction within a cone of half-angle acos(cosThetaMax) around dir.
+//
+// Note this is uniform over solid angle, not over the projected disc: the sun is a spherical cap
+// source, and sampling its disc uniformly would bias the result towards the rim. At the angles
+// involved the difference is tiny, but it costs nothing to be right.
+//
+// At cosThetaMax == 1.0 this returns dir exactly -- cosTheta is 1, sinTheta is 0 -- so a zero-radius
+// sun reproduces the previous hard shadow bit for bit rather than approximately.
+vec3 sampleCone(vec3 dir, float cosThetaMax, vec2 xi) {
+    float cosTheta = mix(cosThetaMax, 1.0, xi.x);
+    float sinTheta = sqrt(max(0.0, 1.0 - cosTheta * cosTheta));
+    float phi = 6.28318530718 * xi.y;
+
+    // Any vector not parallel to dir will do for the basis; the world is Z-up, so Z is the usual
+    // pick and X covers the degenerate case of a sun directly overhead.
+    vec3 up = abs(dir.z) < 0.999 ? vec3(0.0, 0.0, 1.0) : vec3(1.0, 0.0, 0.0);
+    vec3 tangent = normalize(cross(up, dir));
+    vec3 bitangent = cross(dir, tangent);
+
+    return normalize(dir * cosTheta + tangent * (sinTheta * cos(phi)) + bitangent * (sinTheta * sin(phi)));
 }
 
 vec3 unpackNormal(uint bits) {
@@ -120,6 +154,28 @@ void main() {
 
     // Direction towards the light. Matches composite.frag, which uses L = normalize(-sunDirection).
     vec3 sunDir = normalize(-camera.sunDirection.xyz);
+
+    // Give the sun its angular radius instead of treating it as a delta light. This is the whole
+    // reason the accumulator above exists: one jittered sample per pixel per frame is pure noise on
+    // its own, and only becomes a penumbra once it is averaged over a history.
+    //
+    // It costs no extra ray, no extra bandwidth, no payload change and no G-buffer channel -- the
+    // shadow ray was already being traced, and this only perturbs its direction.
+    //
+    // The sequence must vary with BOTH pixel and frame. A per-pixel-only sequence gives every pixel
+    // a fixed offset that never changes, so every frame draws the identical sample and the
+    // accumulator averages sixteen copies of the same wrong answer -- it would look like a slightly
+    // displaced hard shadow rather than a soft one, and it would look stable, which is worse because
+    // it reads as correct.
+    if (camera.sunParams.x < 1.0) {
+        uint seed = hashUint(uint(pixelCoord.x) * 73856093u
+            ^ uint(pixelCoord.y) * 19349663u
+            ^ camera.frameIndex * 83492791u);
+        uint seed2 = hashUint(seed);
+        vec2 xi = vec2(float(seed & 0x00FFFFFFu), float(seed2 & 0x00FFFFFFu)) / 16777216.0;
+        sunDir = sampleCone(sunDir, camera.sunParams.x, xi);
+    }
+
     float shadowFactor = 1.0;
 
     // Shadow ray. No gl_RayFlagsOpaqueEXT: it would force every geometry opaque and suppress

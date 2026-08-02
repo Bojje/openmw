@@ -96,6 +96,16 @@ namespace Vk
         //   w = maximum history length in frames. Zero means "discard all history this frame", which
         //       is how a TLAS rebuild invalidates the accumulator -- see Renderer::updateScene.
         Vec4 denoiseParams;
+        // x = cosine of the sun's angular radius, which is what turns the shadow term from a delta
+        // light into an area light: the shadow ray is jittered within that cone, so a surface partly
+        // occluded across the sun's disc resolves to a partial value instead of stepping straight
+        // from lit to unlit. Exactly 1.0 reproduces the old hard shadow bit for bit, which is what
+        // makes the pre-existing behaviour the ground truth for this change.
+        //
+        // Everything past x is spare. The sun's true angular radius is about 0.27 degrees; the value
+        // actually used is larger, because it is standing in for the softening that a real sky
+        // radiance model and an ambient occlusion term would otherwise provide.
+        Vec4 sunParams;
         // Frames rendered so far, for jittered sampling sequences and for deciding how much history a
         // temporal accumulator may trust. Wraps; only ever used modulo something small.
         uint32_t frameIndex = 0;
@@ -110,8 +120,9 @@ namespace Vk
     // agreement, so pin the offsets that would silently shift if a field were inserted or resized.
     static_assert(offsetof(SceneData, prevViewFromCurView) == 352, "SceneData layout drifted");
     static_assert(offsetof(SceneData, denoiseParams) == 416, "denoiseParams must be 16-byte aligned");
-    static_assert(offsetof(SceneData, frameIndex) == 432, "SceneData layout drifted");
-    static_assert(sizeof(SceneData) == 448, "SceneData layout drifted");
+    static_assert(offsetof(SceneData, sunParams) == 432, "sunParams must be 16-byte aligned");
+    static_assert(offsetof(SceneData, frameIndex) == 448, "SceneData layout drifted");
+    static_assert(sizeof(SceneData) == 464, "SceneData layout drifted");
 
     // Mirrors MWRender::VkPointLight. 64 bytes, std430-compatible, so the collector's vector memcpys
     // straight into the buffer. Declared here rather than shared with the apps layer because
