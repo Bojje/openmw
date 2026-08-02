@@ -19,6 +19,8 @@
 #include <components/vk/vkgeometry.hpp>
 #include <components/vk/vkmath.hpp>
 
+#include "vklightcollector.hpp"
+
 struct SDL_Window;
 
 namespace Vk
@@ -67,6 +69,9 @@ namespace MWRender
             osg::Vec4f fogColour;
             float fogStart = 0.0f;
             float fogEnd = 0.0f;
+            /// Point lights affecting the visible scene, already collected and gamma-decoded. Empty
+            /// when the light manager is unavailable.
+            const std::vector<VkPointLight>* pointLights = nullptr;
         };
 
         void render(Camera& camera, const FrameLighting& lighting);

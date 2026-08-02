@@ -77,6 +77,15 @@
 #include "mwrender/vismask.hpp"
 
 #ifdef OPENMW_USE_VULKAN
+#include <components/sceneutil/lightmanager.hpp>
+
+#include "mwrender/camera.hpp"
+#include "mwrender/renderingmanager.hpp"
+#include "mwrender/vklightcollector.hpp"
+#include "mwrender/vkrenderingmanager.hpp"
+#endif
+
+#ifdef OPENMW_USE_VULKAN
 #include "mwrender/camera.hpp"
 #include "mwrender/vkrenderingmanager.hpp"
 #endif
@@ -396,6 +405,20 @@ bool OMW::Engine::frame(unsigned frameNumber, float frametime)
                     lighting.fogColour = mWorld->getFogColour();
                     lighting.fogStart = mWorld->getFogStart();
                     lighting.fogEnd = mWorld->getFogEnd();
+
+                    // Collected here rather than inside the renderer because the light manager fills
+                    // its list during the update traversal and clears it at the start of the next
+                    // frame, so this is the only window in which it is valid -- and the frame number
+                    // has to be the traversal's, since SceneUtil::Light is double buffered on frame % 2.
+                    if (SceneUtil::LightManager* lightManager
+                        = mWorld->getRenderingManager()->getLightRoot())
+                    {
+                        if (!mVkLightCollector)
+                            mVkLightCollector = std::make_unique<MWRender::VkLightCollector>(lightManager);
+
+                        lighting.pointLights = &mVkLightCollector->collect(frameNumber,
+                            lightManager->getPointLightFadeEnd(), camera->getPosition());
+                    }
 
                     mVkRenderingManager->render(*camera, lighting);
                 }

@@ -20,7 +20,26 @@ layout(set = 0, binding = 4) uniform SceneUBO {
     vec4 skyColor;
     vec4 fogColor;
     vec4 fogParams; // x = fog start, y = fog end, both world units
+    mat4 prevViewProjection;
+    uint frameIndex;
+    uint lightCount;
+    uint scenePad0;
+    uint scenePad1;
 } scene;
+
+// Mirrors Vk::PointLight. 64 bytes, std430; the layout is pinned by static_asserts on the C++ side.
+struct PointLight {
+    vec3 position;   // world space
+    float radius;
+    vec3 diffuse;
+    float attenuationConstant;
+    vec3 ambient;
+    float attenuationLinear;
+    vec3 specular;
+    float attenuationQuadratic;
+};
+
+layout(set = 0, binding = 6, std430) readonly buffer Lights { PointLight lights[]; } pointLights;
 
 layout(push_constant) uniform PushConstants {
     vec4 sunDirection;
@@ -141,7 +160,42 @@ void main() {
     float spec = NdotL > 0.0 ? pow(max(dot(N, H), 0.0), shininess) : 0.0;
     vec3 specular = sunCol * spec * specularStrength * shadow;
 
-    vec3 color = ambient + diffuse + specular + reflectionColor;
+    // Point lights. Morrowind's interiors are built almost entirely from these, and without them an
+    // interior is just a directional sun shining through solid walls.
+    //
+    // The attenuation reproduces SceneUtil::configureLight plus calcAttenuation from
+    // files/shaders/lib/light/util.glsl: the coefficients come from the light itself (Morrowind's
+    // stock fallbacks give constant 0, linear 3/radius, quadratic 0) and there is a smooth cutoff over
+    // the outer 25% of the radius. Physical inverse-square would make every torch wrong.
+    //
+    // The ambient term is not an oversight: upstream adds light.ambient * attenuation with no NdotL,
+    // which is why a torch-lit room reads soft rather than spotlit. World-placed lights carry zero
+    // ambient, but a light carried in inventory carries white, so it has to be per light.
+    vec3 pointDiffuse = vec3(0.0);
+    vec3 pointAmbient = vec3(0.0);
+    for (uint i = 0u; i < scene.lightCount; ++i)
+    {
+        PointLight light = pointLights.lights[i];
+        vec3 toLight = light.position - worldPos;
+        float dist = length(toLight);
+        if (dist > light.radius)
+            continue;
+
+        float atten = 1.0 / max(light.attenuationConstant + light.attenuationLinear * dist
+                + light.attenuationQuadratic * dist * dist, 1e-4);
+
+        // fade(x) = 1 - (1 - x^2)^2 over the outer quarter of the radius, matching util.glsl.
+        float edge = clamp((dist / light.radius - 0.75) / 0.25, 0.0, 1.0);
+        float oneMinusSq = 1.0 - edge * edge;
+        atten *= 1.0 - (1.0 - oneMinusSq * oneMinusSq);
+
+        vec3 lightDir = toLight / max(dist, 1e-4);
+        pointDiffuse += light.diffuse * max(dot(N, lightDir), 0.0) * atten;
+        pointAmbient += light.ambient * atten;
+    }
+
+    vec3 color = ambient + diffuse + specular + reflectionColor
+        + albedo * (pointDiffuse + pointAmbient);
 
     // Tone map only. The swapchain image is a _SRGB format (see Swapchain::chooseSurfaceFormat), so the
     // hardware applies the sRGB transfer function on write. Encoding here as well double-encodes: a

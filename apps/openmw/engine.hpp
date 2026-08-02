@@ -116,6 +116,7 @@ namespace MWDialogue
 namespace MWRender
 {
     class VkRenderingManager;
+    class VkLightCollector;
 }
 
 namespace L10n
@@ -167,6 +168,8 @@ namespace OMW
 #ifdef OPENMW_USE_VULKAN
         SDL_Window* mVkWindow = nullptr;
         std::unique_ptr<MWRender::VkRenderingManager> mVkRenderingManager;
+        // Created lazily: the light manager it binds to does not exist until the world is up.
+        std::unique_ptr<MWRender::VkLightCollector> mVkLightCollector;
         int mVkWidth = 0;
         int mVkHeight = 0;
 #endif

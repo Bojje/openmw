@@ -232,6 +232,22 @@ namespace MWRender
         // Distances, not colours -- decoding these would be meaningless.
         scene.fogParams = { lighting.fogStart, lighting.fogEnd, 0.0f, 0.0f };
 
+        // Before updateScene: it is what stamps the light count into the scene data.
+        // VkPointLight and Vk::PointLight are the same 64-byte layout, pinned by static_asserts on
+        // both sides, so this reinterpret is safe -- components cannot depend on apps, which is why
+        // the struct is declared twice rather than shared.
+        if (lighting.pointLights != nullptr && !lighting.pointLights->empty())
+        {
+            static_assert(sizeof(VkPointLight) == sizeof(Vk::PointLight),
+                "the light structs must agree or the buffer upload reinterprets garbage");
+            mRenderer->updateLights(reinterpret_cast<const Vk::PointLight*>(lighting.pointLights->data()),
+                static_cast<uint32_t>(lighting.pointLights->size()));
+        }
+        else
+        {
+            mRenderer->updateLights(nullptr, 0);
+        }
+
         mRenderer->updateScene(scene);
 
         for (const auto& [store, cellMeshes] : mCellMeshes)

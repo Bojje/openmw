@@ -77,6 +77,8 @@ namespace Vk
         createDescriptorSetLayouts();
         createDescriptorPool();
         createUniformBuffers();
+        // Before createDescriptorSets: the composite set binds these at binding 6.
+        createLightBuffers();
         createDescriptorSets();
         createGBufferPipeline();
         createCompositePipeline();
@@ -608,7 +610,7 @@ namespace Vk
 
         // Composite layout: G-buffer textures + RT output + scene UBO
         {
-            std::array<VkDescriptorSetLayoutBinding, 6> bindings = {};
+            std::array<VkDescriptorSetLayoutBinding, 7> bindings = {};
 
             // Albedo
             bindings[0].binding = 0;
@@ -645,6 +647,13 @@ namespace Vk
             bindings[5].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
             bindings[5].descriptorCount = 1;
             bindings[5].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+            // Point lights for this frame. Morrowind's interiors are built almost entirely out of
+            // these, so without them an interior is a directional sun shining through solid walls.
+            bindings[6].binding = 6;
+            bindings[6].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+            bindings[6].descriptorCount = 1;
+            bindings[6].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
             VkDescriptorSetLayoutCreateInfo layoutInfo = {};
             layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -743,6 +752,20 @@ namespace Vk
             // The RT sets carry a second copy of the sampler array (binding 7) for the hit shaders,
             // plus the geometry table.
             poolSizes.push_back({ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, maxFramesInFlight });
+        }
+
+        // The composite sets each hold a point light buffer, whether or not ray tracing is available.
+        {
+            auto found = std::find_if(poolSizes.begin(), poolSizes.end(),
+                [](const VkDescriptorPoolSize& s) { return s.type == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; });
+            if (found != poolSizes.end())
+                found->descriptorCount += maxFramesInFlight;
+            else
+                poolSizes.push_back({ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, maxFramesInFlight });
+        }
+
+        if (mDevice->rayTracingSupported())
+        {
             for (VkDescriptorPoolSize& size : poolSizes)
             {
                 if (size.type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
@@ -844,15 +867,29 @@ namespace Vk
                 bufferInfo.offset = 0;
                 bufferInfo.range = sizeof(SceneData);
 
-                VkWriteDescriptorSet write = {};
-                write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-                write.dstSet = mCompositeDescriptorSets[i];
-                write.dstBinding = 4;
-                write.descriptorCount = 1;
-                write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-                write.pBufferInfo = &bufferInfo;
+                VkDescriptorBufferInfo lightInfo = {};
+                lightInfo.buffer = mLightBuffers[i];
+                lightInfo.offset = 0;
+                lightInfo.range = VK_WHOLE_SIZE;
 
-                vkUpdateDescriptorSets(mDevice->handle(), 1, &write, 0, nullptr);
+                std::array<VkWriteDescriptorSet, 2> writes = {};
+
+                writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                writes[0].dstSet = mCompositeDescriptorSets[i];
+                writes[0].dstBinding = 4;
+                writes[0].descriptorCount = 1;
+                writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+                writes[0].pBufferInfo = &bufferInfo;
+
+                writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                writes[1].dstSet = mCompositeDescriptorSets[i];
+                writes[1].dstBinding = 6;
+                writes[1].descriptorCount = 1;
+                writes[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+                writes[1].pBufferInfo = &lightInfo;
+
+                vkUpdateDescriptorSets(
+                    mDevice->handle(), static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
             }
         }
     }
@@ -1573,6 +1610,34 @@ namespace Vk
             writeCompositeDescriptor(3, mGBuffer.albedoView);
     }
 
+    void Renderer::createLightBuffers()
+    {
+        const VkDeviceSize size = sizeof(PointLight) * maxPointLights;
+        for (uint32_t i = 0; i < maxFramesInFlight; i++)
+        {
+            createBufferLocal(*mDevice, size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                mLightBuffers[i], mLightMemory[i]);
+            VK_CHECK(vmaMapMemory(mDevice->allocator(), mLightMemory[i], &mLightMapped[i]));
+        }
+    }
+
+    void Renderer::updateLights(const PointLight* lights, uint32_t count)
+    {
+        const uint32_t usable = std::min(count, maxPointLights);
+        if (count > usable && !mLightOverflowWarned)
+        {
+            mLightOverflowWarned = true;
+            Log(Debug::Warning) << "Vulkan: " << count << " point lights exceed the " << maxPointLights
+                                << " the composite pass can hold; the rest are dropped";
+        }
+
+        if (usable > 0 && lights != nullptr && mLightMapped[mCurrentFrame] != nullptr)
+            std::memcpy(mLightMapped[mCurrentFrame], lights, sizeof(PointLight) * usable);
+
+        mLightCount = usable;
+    }
+
     void Renderer::waitIdle()
     {
         vkDeviceWaitIdle(mDevice->handle());
@@ -1581,7 +1646,10 @@ namespace Vk
     void Renderer::updateScene(const SceneData& sceneData)
     {
         mCurrentScene = sceneData;
-        std::memcpy(mUniformMapped[mCurrentFrame], &sceneData, sizeof(SceneData));
+        // Filled in here rather than by the caller: the count belongs to the light buffer this frame,
+        // which updateLights owns, and making callers keep the two in step would be a trap.
+        mCurrentScene.lightCount = mLightCount;
+        std::memcpy(mUniformMapped[mCurrentFrame], &mCurrentScene, sizeof(SceneData));
     }
 
     void Renderer::submitMesh(const MeshSubmission& submission)
@@ -1757,6 +1825,17 @@ namespace Vk
 
         for (uint32_t i = 0; i < maxFramesInFlight; i++)
         {
+            if (mLightMapped[i])
+            {
+                vmaUnmapMemory(mDevice->allocator(), mLightMemory[i]);
+                mLightMapped[i] = nullptr;
+            }
+            if (mLightBuffers[i] != VK_NULL_HANDLE)
+            {
+                vmaDestroyBuffer(mDevice->allocator(), mLightBuffers[i], mLightMemory[i]);
+                mLightBuffers[i] = VK_NULL_HANDLE;
+                mLightMemory[i] = VK_NULL_HANDLE;
+            }
             if (mUniformMapped[i])
             {
                 vmaUnmapMemory(mDevice->allocator(), mUniformMemory[i]);

@@ -39,6 +39,11 @@ namespace Vk
     // fallback texture. Slot 0 is permanently that fallback, so scene texture i lives in slot i + 1.
     constexpr uint32_t maxSceneTextures = 512;
 
+    // Point lights visible to the composite pass in one frame. Morrowind interiors are dense with
+    // torches and candles but the active cell set is small, so this is generous; the collector already
+    // culls by distance. A fixed-size per-frame buffer avoids reallocating every frame.
+    constexpr uint32_t maxPointLights = 256;
+
     struct SceneData
     {
         Mat4 view;
@@ -72,10 +77,31 @@ namespace Vk
         // Frames rendered so far, for jittered sampling sequences and for deciding how much history a
         // temporal accumulator may trust. Wraps; only ever used modulo something small.
         uint32_t frameIndex = 0;
+        // How many entries of the point light buffer are live this frame.
+        uint32_t lightCount = 0;
         uint32_t scenePad0 = 0;
         uint32_t scenePad1 = 0;
-        uint32_t scenePad2 = 0;
     };
+
+    // Mirrors MWRender::VkPointLight. 64 bytes, std430-compatible, so the collector's vector memcpys
+    // straight into the buffer. Declared here rather than shared with the apps layer because
+    // components must not depend on apps; the static_asserts below are the contract.
+    struct PointLight
+    {
+        float position[3];
+        float radius;
+        float diffuse[3];
+        float attenuationConstant;
+        float ambient[3];
+        float attenuationLinear;
+        float specular[3];
+        float attenuationQuadratic;
+    };
+
+    static_assert(sizeof(PointLight) == 64, "PointLight must match the std430 layout in composite.frag");
+    static_assert(offsetof(PointLight, diffuse) == 16, "PointLight layout drifted from the shader");
+    static_assert(offsetof(PointLight, ambient) == 32, "PointLight layout drifted from the shader");
+    static_assert(offsetof(PointLight, specular) == 48, "PointLight layout drifted from the shader");
 
     // What a caller hands to submitMesh. Grouped into a struct rather than passed as a parameter list
     // because the ray tracing path needs the buffer device addresses and the alpha-test flag in
@@ -195,6 +221,12 @@ namespace Vk
         bool loadShadersAndCreatePipelines(const std::string& shaderDir);
 
         void updateScene(const SceneData& sceneData);
+
+        // Uploads this frame's point lights. Must be called before updateScene, because it is what
+        // sets the light count the scene data carries. Anything past maxPointLights is dropped, with
+        // a single warning rather than a crash.
+        void updateLights(const PointLight* lights, uint32_t count);
+
         void submitMesh(const MeshSubmission& submission);
 
         // Rewrites the G-buffer sampler array. views[i] is placed in slot i + 1; slot 0 and any slot
@@ -288,6 +320,17 @@ namespace Vk
         std::array<VkBuffer, maxFramesInFlight> mUniformBuffers = {};
         std::array<VmaAllocation, maxFramesInFlight> mUniformMemory = {};
         std::array<void*, maxFramesInFlight> mUniformMapped = {};
+
+        // One point light buffer per frame in flight, persistently mapped. Per-frame rather than
+        // shared because the CPU rewrites it every frame while the previous frame's submission may
+        // still be reading it.
+        std::array<VkBuffer, maxFramesInFlight> mLightBuffers = {};
+        std::array<VmaAllocation, maxFramesInFlight> mLightMemory = {};
+        std::array<void*, maxFramesInFlight> mLightMapped = {};
+        uint32_t mLightCount = 0;
+        bool mLightOverflowWarned = false;
+
+        void createLightBuffers();
 
         VkSampler mGBufferSampler = VK_NULL_HANDLE;
         // Separate from mGBufferSampler: scene textures want filtering and wrapping, whereas the
