@@ -577,6 +577,24 @@ void OMW::Engine::setSkipMenu(bool skipMenu, bool newGame)
     mNewGame = newGame;
 }
 
+void OMW::Engine::selectRendererBackend()
+{
+    const std::string& requested = Settings::video().mRenderer;
+
+    mUseVulkanRenderer = false;
+    if (requested == "vulkan")
+    {
+#ifdef OPENMW_USE_VULKAN
+        mUseVulkanRenderer = true;
+#else
+        Log(Debug::Warning) << "[Video] renderer is set to vulkan, but this build was configured "
+                               "without OPENMW_USE_VULKAN. Falling back to opengl.";
+#endif
+    }
+
+    Log(Debug::Info) << "Renderer backend: " << (mUseVulkanRenderer ? "vulkan" : "opengl");
+}
+
 void OMW::Engine::createWindow()
 {
     const int screen = Settings::video().mScreen;
@@ -785,6 +803,14 @@ void OMW::Engine::createWindow()
         0, 0, graphicsWindow->getTraits()->width, graphicsWindow->getTraits()->height);
 
 #ifdef OPENMW_USE_VULKAN
+    if (mUseVulkanRenderer)
+        createVulkanRenderer();
+#endif
+}
+
+#ifdef OPENMW_USE_VULKAN
+void OMW::Engine::createVulkanRenderer()
+{
     Log(Debug::Info) << "Attempting to create Vulkan window";
     try
     {
@@ -824,8 +850,8 @@ void OMW::Engine::createWindow()
             mVkWindow = nullptr;
         }
     }
-#endif
 }
+#endif
 
 void OMW::Engine::setWindowIcon()
 {
@@ -854,6 +880,8 @@ void OMW::Engine::setWindowIcon()
 
 void OMW::Engine::prepareEngine()
 {
+    selectRendererBackend();
+
     mStateManager = std::make_unique<MWState::StateManager>(mCfgMgr.getUserDataPath() / "saves", mContentFiles);
     mEnvironment.setStateManager(*mStateManager);
 

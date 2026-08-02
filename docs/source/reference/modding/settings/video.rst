@@ -2,6 +2,20 @@ Video Settings
 ##############
 
 .. omw-setting::
+   :title: renderer
+   :type: string
+   :range: opengl, vulkan
+   :default: opengl
+
+   This setting determines which rendering backend draws the game.
+
+   ``opengl`` is the OpenSceneGraph renderer OpenMW has always used.
+
+   ``vulkan`` is the ray traced Vulkan backend. It only exists in builds configured with
+   ``-DOPENMW_USE_VULKAN=ON``; in any other build, asking for it logs a warning and falls
+   back to ``opengl``. It is incomplete and is not yet a replacement for ``opengl``.
+
+.. omw-setting::
    :title: resolution x
    :type: int
    :range: > 0

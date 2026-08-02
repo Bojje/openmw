@@ -20,6 +20,12 @@ namespace Settings
     {
         using WithIndex::WithIndex;
 
+        // Which backend draws the game. Declared unconditionally, including in builds configured
+        // without OPENMW_USE_VULKAN: the settings machinery throws at startup if a default in
+        // settings-default.cfg has no SettingValue behind it, so this cannot be compiled out.
+        // Asking for a backend the build does not have falls back with a warning instead.
+        SettingValue<std::string> mRenderer{ mIndex, "Video", "renderer",
+            makeEnumSanitizerString({ "opengl", "vulkan" }) };
         SettingValue<int> mResolutionX{ mIndex, "Video", "resolution x", makeMaxSanitizerInt(1) };
         SettingValue<int> mResolutionY{ mIndex, "Video", "resolution y", makeMaxSanitizerInt(1) };
         SettingValue<WindowMode> mWindowMode{ mIndex, "Video", "window mode" };

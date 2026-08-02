@@ -165,6 +165,11 @@ namespace OMW
 
         std::unique_ptr<Stereo::Manager> mStereoManager;
 
+        // Which backend the player asked for, resolved once from [Video] renderer against what this
+        // build actually has. Not inside the #ifdef below, so a build without Vulkan can still say
+        // so rather than silently ignoring the setting.
+        bool mUseVulkanRenderer = false;
+
 #ifdef OPENMW_USE_VULKAN
         SDL_Window* mVkWindow = nullptr;
         std::unique_ptr<MWRender::VkRenderingManager> mVkRenderingManager;
@@ -214,6 +219,14 @@ namespace OMW
 
         void createWindow();
         void setWindowIcon();
+
+        // Resolves [Video] renderer into mUseVulkanRenderer. Separate from createWindow so the
+        // choice is made, logged and final before anything backend specific is built.
+        void selectRendererBackend();
+
+#ifdef OPENMW_USE_VULKAN
+        void createVulkanRenderer();
+#endif
 
     public:
         Engine(Files::ConfigurationManager& configurationManager);
