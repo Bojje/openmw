@@ -8,6 +8,7 @@ layout(set = 0, binding = 2) uniform sampler2D gbufferDepth;
 layout(set = 0, binding = 3) uniform sampler2D rtOutput;
 
 layout(set = 0, binding = 5) uniform sampler2D gbufferMaterial;
+layout(set = 0, binding = 7) uniform sampler2D rtAo;
 
 layout(set = 0, binding = 4) uniform SceneUBO {
     mat4 view;
@@ -117,20 +118,25 @@ void main() {
 
     float NdotL = max(dot(N, L), 0.0);
 
-    // The ray traced term is strictly 0 or 1: the shadow ray either hits (payload keeps its pre-trace
-    // zero) or misses (shadow.rmiss writes w = 1). No penumbra, no partial occlusion.
+    // Used raw. This is now a soft, temporally accumulated estimate of the fraction of the sun's disc
+    // that is visible, not the binary hit/miss it used to be, and there is no longer a floor under it.
     //
-    // It is not used raw. A shadowed surface in the real world is still lit by light that bounced off
-    // everything around it, and this renderer computes no bounce at all -- there is no GI and no
-    // ambient occlusion, so a raw binary shadow drops straight to a flat ambient term and crushes to
-    // black. Vanilla Morrowind sidesteps this by having no sun shadows whatsoever, which is why the
-    // OSG renderer's shaded sides read as merely darker rather than absent.
+    // The floor that used to be here (sShadowFloor, 0.35) existed because a fully shadowed surface had
+    // no occlusion term of any kind: the shadow dropped straight to a flat ambient and crushed to
+    // black. It was documented as a placeholder for ray traced ambient occlusion plus a GI bounce,
+    // to be deleted rather than tuned once either existed. AO now exists, so it is deleted. Do not
+    // reintroduce it -- if shadowed surfaces look too dark, the honest fixes are the AO radius, the
+    // ambient term, or the missing GI bounce, in that order.
+    float shadow = rtSample.r;
+
+    // Ray traced ambient occlusion: the cosine-weighted fraction of the hemisphere that is not
+    // blocked within aoRayLength, accumulated across frames by the same denoiser as the shadow.
     //
-    // The floor stands in for that missing bounce. It is a placeholder for ray traced ambient
-    // occlusion plus a single GI bounce, and should be deleted the moment either exists -- at which
-    // point the shadow term can go back to being used raw.
-    const float sShadowFloor = 0.35;
-    float shadow = mix(sShadowFloor, 1.0, rtSample.r);
+    // It modulates the ambient and the point lights, and deliberately NOT the sun. The sun already
+    // has an exact visibility term from its own shadow ray, and multiplying that by AO as well would
+    // double-count the same occluder -- the classic mistake that makes AO read as dirt smeared over
+    // everything rather than as contact shading.
+    float ao = texture(rtAo, fragTexCoord).r;
 
     float roughness = materialSample.r;
 
@@ -166,12 +172,13 @@ void main() {
     //
     // Applied as a hemisphere rather than uniformly: full ambient on upward-facing surfaces, dimmed on
     // downward-facing ones. A uniform fill gives every shadowed surface the same value, which reads as
-    // dead flat -- this at least gives unlit geometry shape. It stands in for the sky occlusion an
-    // ambient occlusion or GI term would compute properly. The world is Z-up.
-    // Deliberately shallow. A strong hemisphere gradient looks right in a renderer that also has
-    // occlusion, but here it just compounds with the shadow term and buries downward-facing surfaces.
+    // dead flat -- this at least gives unlit geometry shape. The world is Z-up.
+    //
+    // It used to stand in for the sky occlusion a proper AO term would compute, and it no longer has
+    // to: the hemisphere lerp now only expresses which way a surface faces, and `ao` expresses what
+    // is actually in front of it. It stays deliberately shallow so the two do not compound.
     float hemisphere = mix(0.7, 1.0, N.z * 0.5 + 0.5);
-    vec3 ambient = albedo * push.ambientColor.rgb * hemisphere;
+    vec3 ambient = albedo * push.ambientColor.rgb * hemisphere * ao;
     // Energy conservation: light reflected specularly is light that did not scatter diffusely. Without
     // the (1 - fresnel) the reflection was pure additive gain on top of an already full-strength
     // diffuse term, which is the other half of why surfaces looked like they had a glowing film on top.
@@ -221,8 +228,13 @@ void main() {
         pointAmbient += light.ambient * atten;
     }
 
+    // The point lights' *ambient* contribution is occluded, their diffuse is not. Upstream adds
+    // light.ambient with no NdotL, which makes it a crude local fill -- exactly the kind of
+    // omnidirectional term AO is a correction for. The diffuse half already has a direction and an
+    // NdotL, and these lights cast no shadow ray, so occluding it with a hemisphere-average term
+    // would darken the lit side of a torch-lit wall for no defensible reason.
     vec3 color = ambient + diffuse + specular + reflectionColor
-        + albedo * (pointDiffuse + pointAmbient);
+        + albedo * (pointDiffuse + pointAmbient * ao);
 
     // Tone map only. The swapchain image is a _SRGB format (see Swapchain::chooseSurfaceFormat), so the
     // hardware applies the sRGB transfer function on write. Encoding here as well double-encodes: a

@@ -20,6 +20,11 @@ layout(set = 0, binding = 10, rgba16f) uniform writeonly image2D historyOut;
 layout(set = 0, binding = 11, rg32ui)  uniform readonly  uimage2D geomIn;
 layout(set = 0, binding = 12, rg32ui)  uniform writeonly uimage2D geomOut;
 
+// Ambient occlusion. Its own image because outputImage has no free channel: .r is sun visibility and
+// .gba is reflected radiance. r32f rather than a packed format because r16f and b10g11r11 both need
+// shaderStorageImageExtendedFormats, which this device does not enable.
+layout(set = 0, binding = 13, r32f) uniform writeonly image2D aoImage;
+
 // Read from the scene UBO rather than push constants: two mat4 plus a vec4 is 144 bytes, over the
 // 128-byte maxPushConstantsSize that Vulkan guarantees on all implementations.
 //
@@ -55,6 +60,16 @@ const float rayBias = 2.0;
 const float rayTMin = 1.0;
 const float sunRayLength = 100000.0;
 const float reflectionRayLength = 20000.0;
+
+// How far an ambient occlusion ray looks for an occluder, in world units. A unit is roughly 1.4 cm,
+// so this is about 2.8 m: far enough to darken the join between a wall and a floor, a doorway recess
+// and the underside of a rock, and short enough that an open field stays open. Occlusion beyond this
+// distance is what a GI bounce would express, not what AO should.
+//
+// This is the single most visually sensitive constant in the AO path. Too short and it degenerates
+// into a thin contact line; too long and every interior turns uniformly grey, because in a corridor
+// almost every hemisphere direction eventually hits something.
+const float aoRayLength = 200.0;
 
 layout(location = 0) rayPayloadEXT vec4 payload;
 
@@ -113,6 +128,25 @@ vec3 sampleCone(vec3 dir, float cosThetaMax, vec2 xi) {
     return normalize(dir * cosTheta + tangent * (sinTheta * cos(phi)) + bitangent * (sinTheta * sin(phi)));
 }
 
+// Cosine-weighted direction in the hemisphere about n, via Malley's method: a uniform point on the
+// disc lifted to the hemisphere. Cosine weighting is not a refinement here, it is what makes the
+// estimator correct -- the ambient term this modulates is a cosine-weighted integral over the
+// hemisphere, so sampling uniformly would need an explicit NdotL weight per sample and would spend
+// most of its samples near the horizon where that weight is almost zero.
+vec3 sampleCosineHemisphere(vec3 n, vec2 xi) {
+    float r = sqrt(xi.x);
+    float phi = 6.28318530718 * xi.y;
+    float x = r * cos(phi);
+    float y = r * sin(phi);
+    float z = sqrt(max(0.0, 1.0 - xi.x));
+
+    vec3 up = abs(n.z) < 0.999 ? vec3(0.0, 0.0, 1.0) : vec3(1.0, 0.0, 0.0);
+    vec3 tangent = normalize(cross(up, n));
+    vec3 bitangent = cross(n, tangent);
+
+    return normalize(tangent * x + bitangent * y + n * z);
+}
+
 vec3 unpackNormal(uint bits) {
     // Sign-extend the two 16-bit halves by hand rather than relying on a shift of a converted int.
     int qx = int(bits & 0xFFFFu);
@@ -143,6 +177,10 @@ void main() {
         // stored view-space Z of 0.0, which fails the depth test against any real surface.
         imageStore(historyOut, pixelCoord, vec4(0.0));
         imageStore(geomOut, pixelCoord, uvec4(0u));
+        // Nothing occludes the sky. Writing 1.0 rather than leaving it stale matters for the same
+        // ping-pong reason the history images do -- and because composite.frag samples this at every
+        // pixel, so a stale value would tint the horizon.
+        imageStore(aoImage, pixelCoord, vec4(1.0));
         return;
     }
 
@@ -167,14 +205,19 @@ void main() {
     // accumulator averages sixteen copies of the same wrong answer -- it would look like a slightly
     // displaced hard shadow rather than a soft one, and it would look stable, which is worse because
     // it reads as correct.
-    if (camera.sunParams.x < 1.0) {
-        uint seed = hashUint(uint(pixelCoord.x) * 73856093u
-            ^ uint(pixelCoord.y) * 19349663u
-            ^ camera.frameIndex * 83492791u);
-        uint seed2 = hashUint(seed);
-        vec2 xi = vec2(float(seed & 0x00FFFFFFu), float(seed2 & 0x00FFFFFFu)) / 16777216.0;
-        sunDir = sampleCone(sunDir, camera.sunParams.x, xi);
-    }
+    // One decorrelated stream per pixel per frame, shared by the sun jitter and the AO direction.
+    // Both must move every frame or the accumulator averages repeated copies of one sample.
+    uint seed = hashUint(uint(pixelCoord.x) * 73856093u
+        ^ uint(pixelCoord.y) * 19349663u
+        ^ camera.frameIndex * 83492791u);
+    uint seedB = hashUint(seed);
+    uint seedC = hashUint(seedB);
+    uint seedD = hashUint(seedC);
+    vec2 sunXi = vec2(float(seed  & 0x00FFFFFFu), float(seedB & 0x00FFFFFFu)) / 16777216.0;
+    vec2 aoXi  = vec2(float(seedC & 0x00FFFFFFu), float(seedD & 0x00FFFFFFu)) / 16777216.0;
+
+    if (camera.sunParams.x < 1.0)
+        sunDir = sampleCone(sunDir, camera.sunParams.x, sunXi);
 
     float shadowFactor = 1.0;
 
@@ -197,6 +240,29 @@ void main() {
         sunRayLength,
         0);
     shadowFactor = payload.w;
+
+    // Ambient occlusion. Same payload contract and the same ray flags as the shadow ray -- a hit
+    // leaves the pre-trace vec4(0.0) alone and a miss has shadow.rmiss write w = 1 -- so this needs
+    // no new miss shader, no new hit group, and no change to the shader binding table. It is the
+    // second and last ray this shader traces per pixel for vanilla content, since the reflection ray
+    // is gated off wherever specular strength is zero.
+    //
+    // Deliberately a short ray with a bounded length rather than an unbounded visibility query:
+    // occlusion past aoRayLength is what a GI bounce expresses, and treating it as occlusion instead
+    // is what makes naive AO turn interiors into uniform grey.
+    payload = vec4(0.0);
+    vec3 aoDir = sampleCosineHemisphere(N, aoXi);
+    traceRayEXT(topLevelAS,
+        gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT,
+        0xFF,
+        0, 0,
+        1,
+        worldPos + N * rayBias,
+        rayTMin,
+        aoDir,
+        aoRayLength,
+        0);
+    float rawAo = payload.w;
 
     // Reflection ray, but only where it can affect the image.
     //
@@ -250,6 +316,7 @@ void main() {
 
     float historyMean = 0.0;
     float historyMoment = 0.0;
+    float historyAo = 0.0;
     float historyAge = 0.0;
 
     if (prevClip.w > 0.0) {
@@ -304,6 +371,7 @@ void main() {
                 vec4 tapHistory = imageLoad(historyIn, tap);
                 historyMean += weights[i] * tapHistory.r;
                 historyMoment += weights[i] * tapHistory.g;
+                historyAo += weights[i] * tapHistory.b;
                 historyAge += weights[i] * tapHistory.a;
                 totalWeight += weights[i];
             }
@@ -313,10 +381,12 @@ void main() {
             if (totalWeight > 0.05) {
                 historyMean /= totalWeight;
                 historyMoment /= totalWeight;
+                historyAo /= totalWeight;
                 historyAge /= totalWeight;
             } else {
                 historyMean = 0.0;
                 historyMoment = 0.0;
+                historyAo = 0.0;
                 historyAge = 0.0;
             }
         }
@@ -337,8 +407,13 @@ void main() {
     // Second moment, for the variance estimate a spatial pass will need. Nothing reads it yet; it is
     // in the layout from the start because retrofitting it means rewriting the history format.
     float moment = mix(historyMoment, rawVisibility * rawVisibility, alpha);
+    // AO rides the same reprojection, the same rejection tests and the same blend weight as the sun
+    // visibility. That is the entire reason the accumulator was built before any stochastic term:
+    // adding a second noisy signal costs one channel and one mix, not a second denoiser.
+    float ao = mix(historyAo, rawAo, alpha);
 
-    imageStore(historyOut, pixelCoord, vec4(mean, moment, 1.0, min(age + 1.0, maxHistory)));
+    imageStore(historyOut, pixelCoord, vec4(mean, moment, ao, min(age + 1.0, maxHistory)));
+    imageStore(aoImage, pixelCoord, vec4(ao, 0.0, 0.0, 0.0));
     imageStore(geomOut, pixelCoord, uvec4(floatBitsToUint(viewPos.z), packNormal(N), 0u, 0u));
 
     // Store the accumulated visibility, plus the raw reflected radiance. composite.frag owns the

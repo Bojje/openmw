@@ -262,6 +262,20 @@ namespace Vk
         VkImageView view = VK_NULL_HANDLE;
     };
 
+    // Ray traced ambient occlusion, written by raygen and sampled by the composite pass.
+    //
+    // A separate single-channel target rather than a channel of the existing RT output, which has
+    // none free: that image is .r = sun visibility, .gba = reflected radiance. DENOISER-PLAN.md §1
+    // proposes repacking the pair into R16G16_SFLOAT plus B10G11R11_UFLOAT_PACK32 to save bandwidth,
+    // and that is still the right end state -- but **neither of those is a mandatory storage image
+    // format**. Both require `shaderStorageImageExtendedFormats`, which this device does not enable,
+    // so taking that route means a device feature query plus a fallback path for the case where it is
+    // absent. R32_SFLOAT is mandatory everywhere and costs 4 B/px, which at 1280x800 is 4 MB. The
+    // plan's own budget puts the whole denoiser at "noise in comparison" to the ray tracing pass, so
+    // this buys correctness now and defers an optimisation that cannot be measured until there is a
+    // Steam Deck to measure it on.
+    constexpr VkFormat rtAoFormat = VK_FORMAT_R32_SFLOAT;
+
     // The accumulated signal. R16G16B16A16_SFLOAT rather than an 8-bit format, which looks tempting
     // for a mask in [0, 1] and is wrong: an exponential accumulator moves the stored value by
     // alpha * delta, so at 8 bits and alpha = 1/32 convergence stalls entirely whenever the change is
@@ -379,6 +393,9 @@ namespace Vk
 
         GBufferAttachments mGBuffer;
         RtOutputImage mRtOutput;
+        // Ambient occlusion. Created, destroyed, cleared and transitioned in lockstep with mRtOutput,
+        // so anything done to one must be done to the other.
+        RtOutputImage mRtAo;
 
         // Temporal accumulator history. Read and write are separate images rather than one
         // read-modify-write target because they have to be: pixel A reads the history at pixel B's

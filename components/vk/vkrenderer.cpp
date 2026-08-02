@@ -94,6 +94,7 @@ namespace Vk
             mRayTracingEnabled = true;
 
             writeCompositeDescriptor(3, mRtOutput.view);
+            writeCompositeDescriptor(7, mRtAo.view);
         }
     }
 
@@ -656,7 +657,15 @@ namespace Vk
 
         // Composite layout: G-buffer textures + RT output + scene UBO
         {
-            std::array<VkDescriptorSetLayoutBinding, 7> bindings = {};
+            std::array<VkDescriptorSetLayoutBinding, 8> bindings = {};
+
+            // Ray traced ambient occlusion. This is what replaces the sShadowFloor placeholder: the
+            // floor existed only because a fully shadowed surface had no occlusion term of any kind
+            // and crushed to black.
+            bindings[7].binding = 7;
+            bindings[7].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            bindings[7].descriptorCount = 1;
+            bindings[7].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
             // Albedo
             bindings[0].binding = 0;
@@ -712,7 +721,14 @@ namespace Vk
         // RT layout: TLAS + storage image + G-buffer samplers
         if (mDevice->rayTracingSupported())
         {
-            std::array<VkDescriptorSetLayoutBinding, 13> bindings = {};
+            std::array<VkDescriptorSetLayoutBinding, 14> bindings = {};
+
+            // Ambient occlusion output. Its own target because the RT output has no free channel --
+            // .r is sun visibility and .gba is reflected radiance. See rtAoFormat.
+            bindings[13].binding = 13;
+            bindings[13].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+            bindings[13].descriptorCount = 1;
+            bindings[13].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
 
             // Temporal accumulator history, bindings 9-12. Read and write are four separate bindings
             // pointing at four separate images, not two read-write ones -- see the comment on
@@ -812,10 +828,11 @@ namespace Vk
             // maxSceneTextures-element sampler array, so the array has to be counted that many times.
             { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                 16 + maxFramesInFlight * 4 + maxSceneTextures * maxFramesInFlight },
-            // Per RT set: the ray tracing output, plus the four denoise history bindings. Plus slack.
-            // This count is exact rather than generous, so adding a storage image anywhere without
-            // raising it fails vkAllocateDescriptorSets with VK_ERROR_OUT_OF_POOL_MEMORY at startup.
-            { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, maxFramesInFlight * 5 + 2 },
+            // Per RT set: the ray tracing output, the ambient occlusion output, and the four denoise
+            // history bindings. Plus slack. This count is exact rather than generous, so adding a
+            // storage image anywhere without raising it fails vkAllocateDescriptorSets with
+            // VK_ERROR_OUT_OF_POOL_MEMORY at startup.
+            { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, maxFramesInFlight * 6 + 2 },
         };
 
         uint32_t maxSets = maxFramesInFlight * 2 + 4;
@@ -932,6 +949,10 @@ namespace Vk
             writeCompositeDescriptor(2, mGBuffer.depthView);
             writeCompositeDescriptor(3, mGBuffer.albedoView);
             writeCompositeDescriptor(5, mGBuffer.materialView);
+            // Placeholder, as binding 3 is: every element of the layout must be written before the set
+            // is used, whether or not ray tracing is available. The real view is bound below when it
+            // is, and without ray tracing the shader's AO sample is never used.
+            writeCompositeDescriptor(7, mGBuffer.albedoView);
 
             // Bind the scene UBO to each per-frame composite descriptor set
             for (uint32_t i = 0; i < maxFramesInFlight; i++)
@@ -1037,6 +1058,11 @@ namespace Vk
             mRtOutput.image, mRtOutput.memory);
         mRtOutput.view = createImageView(mRtOutput.image, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_ASPECT_COLOR_BIT);
 
+        createImage(extent.width, extent.height, rtAoFormat,
+            VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+            mRtAo.image, mRtAo.memory);
+        mRtAo.view = createImageView(mRtAo.image, rtAoFormat, VK_IMAGE_ASPECT_COLOR_BIT);
+
         VkCommandBuffer cmd = mCommandPool->beginSingleTime();
 
         // Clear rather than just transitioning. composite.frag samples this image unconditionally, but
@@ -1058,18 +1084,40 @@ namespace Vk
 
         transitionImageLayout(cmd, mRtOutput.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT);
+
+        // Same treatment for the ambient occlusion target, and for the same reason: the composite
+        // pass samples it unconditionally but the RT pass is skipped whenever there is no TLAS.
+        // Cleared to 1.0 -- fully unoccluded -- so a frame without ray tracing looks like the
+        // renderer did before AO existed rather than like everything is in shadow.
+        transitionImageLayout(cmd, mRtAo.image, VK_IMAGE_LAYOUT_UNDEFINED,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT);
+
+        VkClearColorValue aoClear = {};
+        aoClear.float32[0] = 1.0f;
+        vkCmdClearColorImage(cmd, mRtAo.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &aoClear, 1, &range);
+
+        transitionImageLayout(cmd, mRtAo.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT);
+
         mCommandPool->endSingleTime(cmd, mDevice->graphicsQueue());
     }
 
     void Renderer::destroyRtOutput()
     {
         VkDevice dev = mDevice->handle();
-        if (mRtOutput.view != VK_NULL_HANDLE) { vkDestroyImageView(dev, mRtOutput.view, nullptr); mRtOutput.view = VK_NULL_HANDLE; }
-        if (mRtOutput.image != VK_NULL_HANDLE)
+        for (RtOutputImage* target : { &mRtOutput, &mRtAo })
         {
-            vmaDestroyImage(mDevice->allocator(), mRtOutput.image, mRtOutput.memory);
-            mRtOutput.image = VK_NULL_HANDLE;
-            mRtOutput.memory = VK_NULL_HANDLE;
+            if (target->view != VK_NULL_HANDLE)
+            {
+                vkDestroyImageView(dev, target->view, nullptr);
+                target->view = VK_NULL_HANDLE;
+            }
+            if (target->image != VK_NULL_HANDLE)
+            {
+                vmaDestroyImage(mDevice->allocator(), target->image, target->memory);
+                target->image = VK_NULL_HANDLE;
+                target->memory = VK_NULL_HANDLE;
+            }
         }
     }
 
@@ -1219,7 +1267,17 @@ namespace Vk
                 makeStorageInfo(mDenoiseGeom[frame].view)         // binding 12: geometry, write
             };
 
-            std::array<VkWriteDescriptorSet, 10> writes = {};
+            const VkDescriptorImageInfo aoStorageInfo = makeStorageInfo(mRtAo.view);
+
+            std::array<VkWriteDescriptorSet, 11> writes = {};
+
+            // Binding 13: ambient occlusion output
+            writes[10].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            writes[10].dstSet = mRtDescriptorSets[frame];
+            writes[10].dstBinding = 13;
+            writes[10].descriptorCount = 1;
+            writes[10].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+            writes[10].pImageInfo = &aoStorageInfo;
 
             // Binding 1: output storage image
             writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -1742,6 +1800,9 @@ namespace Vk
             transitionImageLayout(cmd, mRtOutput.image,
                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL,
                 VK_IMAGE_ASPECT_COLOR_BIT);
+            transitionImageLayout(cmd, mRtAo.image,
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL,
+                VK_IMAGE_ASPECT_COLOR_BIT);
 
             mRtPipeline->bind(cmd);
             vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
@@ -1750,6 +1811,9 @@ namespace Vk
             mRtPipeline->traceRays(cmd, extent.width, extent.height);
 
             transitionImageLayout(cmd, mRtOutput.image,
+                VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                VK_IMAGE_ASPECT_COLOR_BIT);
+            transitionImageLayout(cmd, mRtAo.image,
                 VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                 VK_IMAGE_ASPECT_COLOR_BIT);
         }
@@ -1854,9 +1918,15 @@ namespace Vk
         writeCompositeDescriptor(5, mGBuffer.materialView);
 
         if (mRtOutput.view != VK_NULL_HANDLE)
+        {
             writeCompositeDescriptor(3, mRtOutput.view);
+            writeCompositeDescriptor(7, mRtAo.view);
+        }
         else
+        {
             writeCompositeDescriptor(3, mGBuffer.albedoView);
+            writeCompositeDescriptor(7, mGBuffer.albedoView);
+        }
     }
 
     void Renderer::createLightBuffers()
