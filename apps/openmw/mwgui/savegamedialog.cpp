@@ -34,6 +34,7 @@
 #include "../mwstate/character.hpp"
 
 #include "confirmationdialog.hpp"
+#include "guitexture.hpp"
 
 namespace MWGui
 {
@@ -523,7 +524,10 @@ namespace MWGui
         texture->setResizeNonPowerOfTwoHint(false);
         texture->setUnRefImageDataAfterApply(true);
 
-        mScreenshotTexture = std::make_unique<MyGUIPlatform::OSGTexture>(texture);
+        // Order matters: the widget must stop pointing at the old texture before it is freed, or a
+        // frame gets recorded against an image that has just been destroyed.
+        mScreenshot->setRenderItemTexture(nullptr);
+        mScreenshotTexture = createGuiTexture(texture, "savegame screenshot");
         mScreenshot->setRenderItemTexture(mScreenshotTexture.get());
     }
 

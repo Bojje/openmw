@@ -32,6 +32,7 @@
 #include "../mwrender/localmap.hpp"
 
 #include "confirmationdialog.hpp"
+#include "guitexture.hpp"
 
 #include <numeric>
 
@@ -1334,22 +1335,37 @@ namespace MWGui
 
     void MapWindow::ensureGlobalMapLoaded()
     {
+        // The Vulkan platform holds a copy of the pixels rather than the OSG texture itself, so the
+        // explored overlay has to be rebuilt each time the map is opened or it would show whatever
+        // had been explored the first time and never move again. The base map is generated once and
+        // never changes, so it is built once as before. Under the OSG platform nothing is rebuilt --
+        // the texture is shared and updates itself.
+        const bool rebuildOverlay = usingVulkanGuiPlatform();
+
         if (!mGlobalMapTexture.get())
         {
             // The generated unexplored map and explored map RTT images are Y-up so the UVs are inverted
             // The unexplored map isn't saved so we *could* consider generating it the "right" way
             // but mixing conventions for map images could make things confusing
-            mGlobalMapTexture = std::make_unique<MyGUIPlatform::OSGTexture>(mGlobalMapRender->getBaseTexture());
+            mGlobalMapTexture = createGuiTexture(mGlobalMapRender->getBaseTexture(), "global map");
             mGlobalMapImage->setRenderItemTexture(mGlobalMapTexture.get());
             mGlobalMapImage->getSubWidgetMain()->_setUVSet(MyGUI::FloatRect(0.f, 1.f, 1.f, 0.f));
 
-            mGlobalMapOverlayTexture
-                = std::make_unique<MyGUIPlatform::OSGTexture>(mGlobalMapRender->getOverlayTexture());
+            mGlobalMapOverlayTexture = createGuiTexture(mGlobalMapRender->getOverlayTexture(), "global map overlay");
             mGlobalMapOverlay->setRenderItemTexture(mGlobalMapOverlayTexture.get());
             mGlobalMapOverlay->getSubWidgetMain()->_setUVSet(MyGUI::FloatRect(0.f, 1.f, 1.f, 0.f));
 
             // Redraw children in proper order
             mGlobalMap->getParent()->_updateChilds();
+        }
+        else if (rebuildOverlay)
+        {
+            // Order matters: the widget must stop pointing at the old texture before it is freed,
+            // or one frame is recorded against an image that has just been destroyed.
+            mGlobalMapOverlay->setRenderItemTexture(nullptr);
+            mGlobalMapOverlayTexture = createGuiTexture(mGlobalMapRender->getOverlayTexture(), "global map overlay");
+            mGlobalMapOverlay->setRenderItemTexture(mGlobalMapOverlayTexture.get());
+            mGlobalMapOverlay->getSubWidgetMain()->_setUVSet(MyGUI::FloatRect(0.f, 1.f, 1.f, 0.f));
         }
     }
 
