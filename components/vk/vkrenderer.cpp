@@ -688,7 +688,16 @@ namespace Vk
         // RT layout: TLAS + storage image + G-buffer samplers
         if (mDevice->rayTracingSupported())
         {
-            std::array<VkDescriptorSetLayoutBinding, 8> bindings = {};
+            std::array<VkDescriptorSetLayoutBinding, 9> bindings = {};
+
+            // G-buffer material. raygen needs it to decide whether a reflection ray is worth firing at
+            // all: the reflection is weighted by specular strength in composite.frag, and vanilla
+            // Morrowind content resolves to zero specular by design, so without this the renderer
+            // traces a full-resolution reflection ray per pixel and then multiplies it by nothing.
+            bindings[8].binding = 8;
+            bindings[8].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            bindings[8].descriptorCount = 1;
+            bindings[8].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
 
             // Scene UBO. The raygen shader reads its camera matrices and sun direction from here
             // rather than via push constants: two mat4 plus a vec4 is 144 bytes, which exceeds the
@@ -1055,6 +1064,8 @@ namespace Vk
             makeImageInfo(mGBuffer.depthView)
         };
 
+        const VkDescriptorImageInfo materialInfo = makeImageInfo(mGBuffer.materialView);
+
         for (uint32_t frame = 0; frame < maxFramesInFlight; ++frame)
         {
             VkDescriptorBufferInfo sceneInfo = {};
@@ -1062,7 +1073,7 @@ namespace Vk
             sceneInfo.offset = 0;
             sceneInfo.range = sizeof(SceneData);
 
-            std::array<VkWriteDescriptorSet, 5> writes = {};
+            std::array<VkWriteDescriptorSet, 6> writes = {};
 
             // Binding 1: output storage image
             writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -1090,6 +1101,15 @@ namespace Vk
             writes[4].descriptorCount = 1;
             writes[4].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
             writes[4].pBufferInfo = &sceneInfo;
+
+            // Binding 8: G-buffer material, so raygen can skip the reflection ray on surfaces with no
+            // specular response -- which is all vanilla Morrowind content.
+            writes[5].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            writes[5].dstSet = mRtDescriptorSets[frame];
+            writes[5].dstBinding = 8;
+            writes[5].descriptorCount = 1;
+            writes[5].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            writes[5].pImageInfo = &materialInfo;
 
             vkUpdateDescriptorSets(
                 mDevice->handle(), static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);

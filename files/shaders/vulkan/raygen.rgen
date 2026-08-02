@@ -6,6 +6,7 @@ layout(set = 0, binding = 1, rgba16f) uniform image2D outputImage;
 layout(set = 0, binding = 2) uniform sampler2D gbufferAlbedo;
 layout(set = 0, binding = 3) uniform sampler2D gbufferNormal;
 layout(set = 0, binding = 4) uniform sampler2D gbufferDepth;
+layout(set = 0, binding = 8) uniform sampler2D gbufferMaterial;
 
 // Read from the scene UBO rather than push constants: two mat4 plus a vec4 is 144 bytes, over the
 // 128-byte maxPushConstantsSize that Vulkan guarantees on all implementations.
@@ -76,23 +77,37 @@ void main() {
         0);
     shadowFactor = payload.w;
 
-    // Reflection ray
-    vec3 cameraPos = (camera.viewInverse * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
-    vec3 viewDir = normalize(worldPos - cameraPos);
-    vec3 reflectDir = reflect(viewDir, N);
-
+    // Reflection ray, but only where it can affect the image.
+    //
+    // composite.frag weights the reflection by the material's specular strength, and vanilla Morrowind
+    // resolves to zero specular for everything -- nifosg::Loader::applyDrawableProperties zeroes it for
+    // any NIF at or below the Morrowind version, and MeshConverter honours the same gate. Tracing a
+    // full-resolution reflection ray per pixel and then multiplying it by zero was costing roughly half
+    // the ray budget for no visible result, which matters enormously on a handheld.
+    //
+    // The green channel of the material target carries specular strength; see gbuffer.frag, where it
+    // replaced metallic because Morrowind has no metals. The threshold is deliberately just above zero
+    // rather than an exact compare: the value round-trips through an 8-bit UNORM attachment.
     payload = vec4(0.0);
-    vec3 reflOrigin = worldPos + N * rayBias;
-    traceRayEXT(topLevelAS,
-        gl_RayFlagsNoneEXT,
-        0xFF,
-        0, 0,
-        0,
-        reflOrigin,
-        rayTMin,
-        reflectDir,
-        reflectionRayLength,
-        0);
+    float specularStrength = texture(gbufferMaterial, uv).g;
+    if (specularStrength > 0.004)
+    {
+        vec3 cameraPos = (camera.viewInverse * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+        vec3 viewDir = normalize(worldPos - cameraPos);
+        vec3 reflectDir = reflect(viewDir, N);
+
+        vec3 reflOrigin = worldPos + N * rayBias;
+        traceRayEXT(topLevelAS,
+            gl_RayFlagsNoneEXT,
+            0xFF,
+            0, 0,
+            0,
+            reflOrigin,
+            rayTMin,
+            reflectDir,
+            reflectionRayLength,
+            0);
+    }
 
     // Store the raw reflected radiance. composite.frag owns the weighting and applies a Fresnel term
     // there; this used to scale by a magic 0.3 (hit) / 0.05 (miss) as well, and the two attenuations
