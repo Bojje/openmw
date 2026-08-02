@@ -113,6 +113,11 @@ namespace MWDialogue
     class Journal;
 }
 
+namespace MWRender
+{
+    class VkRenderingManager;
+}
+
 namespace L10n
 {
     class Manager;
@@ -158,6 +163,13 @@ namespace OMW
         std::vector<std::string> mGroundcoverFiles;
 
         std::unique_ptr<Stereo::Manager> mStereoManager;
+
+#ifdef OPENMW_USE_VULKAN
+        SDL_Window* mVkWindow = nullptr;
+        std::unique_ptr<MWRender::VkRenderingManager> mVkRenderingManager;
+        int mVkWidth = 0;
+        int mVkHeight = 0;
+#endif
 
         bool mSkipMenu;
         bool mUseSound;

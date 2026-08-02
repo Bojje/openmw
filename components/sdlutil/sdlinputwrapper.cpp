@@ -244,6 +244,12 @@ namespace SDLUtil
 
     void InputWrapper::handleWindowEvent(const SDL_Event& evt)
     {
+        // Other windows may share this event queue (e.g. the Vulkan renderer's window), and their
+        // focus/visibility events must not be applied to the main window -- doing so would grab or
+        // release the game's mouse and toggle its visibility state.
+        if (evt.window.windowID != SDL_GetWindowID(mSDLWindow))
+            return;
+
         switch (evt.window.event)
         {
             case SDL_WINDOWEVENT_ENTER:

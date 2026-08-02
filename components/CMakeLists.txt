@@ -522,6 +522,30 @@ add_component_dir(testing
     util
 )
 
+if (OPENMW_USE_VULKAN)
+    add_component_dir (vk
+        vkcommon
+        vkmath
+        vkinstance
+        vkdevice
+        vkswapchain
+        vkcommands
+        vksync
+        vkbuffer
+        vkdescriptors
+        vkshader
+        vkraytracing
+        vkgeometry
+        vkplatform
+        vktexture
+        vkrenderer
+        )
+
+    add_component_dir (nifvk
+        meshconverter
+        )
+endif()
+
 if (USE_QT)
     add_component_qt_dir (contentselector
         model/modelitem model/esmfile
@@ -637,6 +661,11 @@ else()
 endif()
 
 target_link_libraries(components ${BULLET_LIBRARIES})
+
+if (OPENMW_USE_VULKAN)
+    target_link_libraries(components Vulkan::Vulkan)
+    target_compile_definitions(components PUBLIC OPENMW_USE_VULKAN=1)
+endif()
 
 if (USE_QT)
     add_library(components_qt STATIC ${COMPONENT_QT_FILES})

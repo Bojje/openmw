@@ -1,7 +1,9 @@
 #include "engine.hpp"
 
+#include <algorithm>
 #include <cerrno>
 #include <chrono>
+#include <cmath>
 #include <future>
 #include <system_error>
 
@@ -73,6 +75,11 @@
 #include "mwworld/worldimp.hpp"
 
 #include "mwrender/vismask.hpp"
+
+#ifdef OPENMW_USE_VULKAN
+#include "mwrender/camera.hpp"
+#include "mwrender/vkrenderingmanager.hpp"
+#endif
 
 #include "mwclass/classes.hpp"
 
@@ -354,6 +361,48 @@ bool OMW::Engine::frame(unsigned frameNumber, float frametime)
 
     mViewer->renderingTraversals();
 
+#ifdef OPENMW_USE_VULKAN
+    if (mVkRenderingManager && mVkWindow)
+    {
+        try
+        {
+            int curW, curH;
+            SDL_GetWindowSize(mVkWindow, &curW, &curH);
+            if (curW != mVkWidth || curH != mVkHeight)
+            {
+                mVkWidth = curW;
+                mVkHeight = curH;
+                if (mVkWidth > 0 && mVkHeight > 0)
+                    mVkRenderingManager->resize(static_cast<uint32_t>(mVkWidth), static_cast<uint32_t>(mVkHeight));
+            }
+
+            if (mVkWidth > 0 && mVkHeight > 0)
+            {
+                mVkRenderingManager->syncCells(mWorld->getWorldScene().getActiveCells());
+
+                MWRender::Camera* camera = mWorld->getCamera();
+                if (camera)
+                {
+                    // getSunLightPosition() points *towards* the sun; the renderer wants the direction
+                    // the light travels, so negate it. See MWLua's getCurrentSunLightDirection, which
+                    // does the same thing.
+                    const osg::Vec4f& sunPos = mWorld->getSunLightPosition();
+                    osg::Vec3f sunLightDir(-sunPos.x(), -sunPos.y(), -sunPos.z());
+
+                    mVkRenderingManager->render(*camera, sunLightDir);
+                }
+            }
+        }
+        catch (const std::exception& e)
+        {
+            Log(Debug::Error) << "Vulkan render error: " << e.what();
+            mVkRenderingManager.reset();
+            SDL_DestroyWindow(mVkWindow);
+            mVkWindow = nullptr;
+        }
+    }
+#endif
+
     mLuaWorker->finishUpdate(frameStart, frameNumber, *stats);
 
     return true;
@@ -430,6 +479,15 @@ OMW::Engine::~Engine()
     mResourceSystem.reset();
 
     mEncoder = nullptr;
+
+#ifdef OPENMW_USE_VULKAN
+    mVkRenderingManager.reset();
+    if (mVkWindow)
+    {
+        SDL_DestroyWindow(mVkWindow);
+        mVkWindow = nullptr;
+    }
+#endif
 
     if (mWindow)
     {
@@ -694,6 +752,48 @@ void OMW::Engine::createWindow()
 
     mViewer->getEventQueue()->getCurrentEventState()->setWindowRectangle(
         0, 0, graphicsWindow->getTraits()->width, graphicsWindow->getTraits()->height);
+
+#ifdef OPENMW_USE_VULKAN
+    Log(Debug::Info) << "Attempting to create Vulkan window";
+    try
+    {
+        int vkW, vkH;
+        SDL_GL_GetDrawableSize(mWindow, &vkW, &vkH);
+        // No SDL_WINDOW_VULKAN: the prebuilt SDL2 in openmw-deps is built without SDL_VIDEO_VULKAN,
+        // so that flag would make SDL_CreateWindow fail. The surface is created from the native
+        // window handle instead, see Vk::createPlatformSurface.
+        mVkWindow = SDL_CreateWindow("OpenMW Vulkan",
+            SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+            vkW, vkH,
+            SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
+        if (!mVkWindow)
+        {
+            Log(Debug::Error) << "Failed to create Vulkan window: " << SDL_GetError();
+        }
+        else
+        {
+            mVkRenderingManager = std::make_unique<MWRender::VkRenderingManager>(mVkWindow, true);
+            mVkWidth = vkW;
+            mVkHeight = vkH;
+
+            auto shaderDir = mResDir / "shaders" / "vulkan";
+            if (mVkRenderingManager->loadShaders(shaderDir))
+                Log(Debug::Info) << "Vulkan renderer created with shaders from " << shaderDir;
+            else
+                Log(Debug::Warning) << "Vulkan renderer created without shaders (not found at " << shaderDir << ")";
+        }
+    }
+    catch (const std::exception& e)
+    {
+        Log(Debug::Error) << "Vulkan initialization failed: " << e.what();
+        mVkRenderingManager.reset();
+        if (mVkWindow)
+        {
+            SDL_DestroyWindow(mVkWindow);
+            mVkWindow = nullptr;
+        }
+    }
+#endif
 }
 
 void OMW::Engine::setWindowIcon()
