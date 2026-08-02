@@ -107,19 +107,41 @@ namespace Vk
     Buffer Buffer::createWithStaging(
         Device& device, CommandPool& commandPool, VkBufferUsageFlags usage, const void* data, VkDeviceSize size)
     {
+        // Written in terms of the batched form so there is one implementation of the copy. Declaration
+        // order carries the lifetime rule: staging is declared first and so destroyed last, after the
+        // batch has submitted and waited. That holds on the exception path too, where unwinding runs
+        // the batch destructor -- which submits and blocks -- before staging goes away.
+        Buffer staging;
+        CommandBatch batch(commandPool, device.graphicsQueue());
+
+        Buffer deviceBuffer = createWithStaging(device, batch, usage, data, size, staging);
+
+        // Explicit rather than left to the destructor so a failed submit throws from here, and so the
+        // documented contract holds: the copy is complete when this function returns.
+        batch.flush();
+
+        return deviceBuffer;
+    }
+
+    Buffer Buffer::createWithStaging(Device& device, CommandBatch& batch, VkBufferUsageFlags usage,
+        const void* data, VkDeviceSize size, Buffer& stagingOut)
+    {
         Buffer staging(device, size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
         staging.copyFrom(data, size);
 
         Buffer deviceBuffer(device, size, usage | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-        VkCommandBuffer cmd = commandPool.beginSingleTime();
-
         VkBufferCopy copyRegion{};
         copyRegion.size = size;
-        vkCmdCopyBuffer(cmd, staging.handle(), deviceBuffer.handle(), 1, &copyRegion);
+        vkCmdCopyBuffer(batch.handle(), staging.handle(), deviceBuffer.handle(), 1, &copyRegion);
 
-        commandPool.endSingleTime(cmd, device.graphicsQueue());
+        // Hand ownership over before telling the batch about the memory: addPendingBytes may flush, and
+        // on the way out of that flush the staging buffer must already be somewhere the caller can see.
+        // A flush here is harmless either way -- it blocks, so the copy is done and the caller merely
+        // ends up holding the staging buffer longer than strictly necessary.
+        stagingOut = std::move(staging);
+        batch.addPendingBytes(size);
 
         return deviceBuffer;
     }

@@ -16,12 +16,17 @@ layout(set = 0, binding = 4) uniform SceneUBO {
     mat4 projInverse;
     vec4 sunDirection;
     vec4 sunColor;
+    vec4 ambientColor;
+    vec4 skyColor;
+    vec4 fogColor;
+    vec4 fogParams; // x = fog start, y = fog end, both world units
 } scene;
 
 layout(push_constant) uniform PushConstants {
     vec4 sunDirection;
     vec4 sunColor;
     vec4 cameraPosition;
+    vec4 ambientColor;
 } push;
 
 layout(location = 0) out vec4 outColor;
@@ -49,13 +54,23 @@ void main() {
     float depthSample = texture(gbufferDepth, fragTexCoord).r;
     vec4 rtSample = texture(rtOutput, fragTexCoord);
 
+    // Reconstruct the world-space view ray. Needed for the sky, and cheaper than it looks because the
+    // same inverse matrices are used for the world position below.
+    vec2 ndc = fragTexCoord * 2.0 - 1.0;
+    vec4 rayView = scene.projInverse * vec4(ndc, 1.0, 1.0);
+    vec3 rayDir = normalize((scene.viewInverse * vec4(rayView.xyz / rayView.w, 0.0)).xyz);
+
     if (depthSample >= 1.0) {
-        vec3 skyTop = vec3(0.2, 0.4, 0.8);
-        vec3 skyHorizon = vec3(0.6, 0.75, 0.9);
-        // fragTexCoord.y is 0 at the *top* of the screen in Vulkan, so it has to be flipped: using it
-        // directly put the pale horizon colour at the zenith and the deep blue along the horizon.
-        float t = 1.0 - fragTexCoord.y;
-        outColor = vec4(mix(skyHorizon, skyTop, t), 1.0);
+        // This is OpenMW's entire atmosphere model. Its sky dome is a single flat colour whose vertex
+        // alpha ramps to zero at the horizon, composited over a clear colour set to the fog colour --
+        // so the whole thing reduces to one lerp along the vertical. Both endpoints already carry the
+        // current weather and time of day, which is why this tracks sunrise and ash storms for free.
+        //
+        // Derived from the view ray rather than screen position: the old gradient used fragTexCoord.y,
+        // which welded it to the viewport, so looking up gave the same image as looking ahead. The
+        // world is Z-up.
+        float up = clamp(rayDir.z, 0.0, 1.0);
+        outColor = vec4(mix(scene.fogColor.rgb, scene.skyColor.rgb, up), 1.0);
         return;
     }
 
@@ -77,7 +92,6 @@ void main() {
 
     // Reconstruct world position from depth and inverse matrices. Needed by both the reflection
     // weighting and the specular term below, so it has to come before either.
-    vec2 ndc = fragTexCoord * 2.0 - 1.0;
     vec4 clipPos = vec4(ndc, depthSample, 1.0);
     vec4 viewPos = scene.projInverse * clipPos;
     viewPos /= viewPos.w;
@@ -103,7 +117,15 @@ void main() {
     float fresnel = (F0 + (max(1.0 - roughness, F0) - F0) * grazing) * specularStrength;
     vec3 reflectionColor = rtSample.gba * fresnel;
 
-    vec3 ambient = albedo * 0.15;
+    // Morrowind's per-cell mood colour, not a flat grey constant. This is the single biggest thing
+    // separating a Dwemer ruin from an Ashlander yurt, and a constant threw all of it away.
+    //
+    // Applied as a hemisphere rather than uniformly: full ambient on upward-facing surfaces, dimmed on
+    // downward-facing ones. A uniform fill gives every shadowed surface the same value, which reads as
+    // dead flat -- this at least gives unlit geometry shape. It stands in for the sky occlusion an
+    // ambient occlusion or GI term would compute properly. The world is Z-up.
+    float hemisphere = mix(0.45, 1.0, N.z * 0.5 + 0.5);
+    vec3 ambient = albedo * push.ambientColor.rgb * hemisphere;
     // Energy conservation: light reflected specularly is light that did not scatter diffusely. Without
     // the (1 - fresnel) the reflection was pure additive gain on top of an already full-strength
     // diffuse term, which is the other half of why surfaces looked like they had a glowing film on top.
@@ -126,6 +148,18 @@ void main() {
     // linear 0.216 -- mid grey -- leaves this shader at 0.5 and reaches the display at 0.74, which lifts
     // the whole midtone range and reads as a pale, low-contrast image.
     color = acesFilmic(color);
+
+    // Fog after the tone map, not before. OpenMW mixes toward the fog colour on the pre-transfer value
+    // and never tone maps at all, so mixing in linear beforehand would put the midpoint somewhere else
+    // entirely and distant terrain would come out too dark and too saturated. Applying it here on the
+    // display-linear result reproduces the reference curve closely, at the cost of the fog itself not
+    // being tone mapped -- which is the right trade when the goal is matching the mood.
+    //
+    // Planar distance along the view axis, and a linear ramp, because that is what OpenMW's defaults
+    // are: radial fog and exponential fog are both off in settings-default.cfg.
+    float fogRange = max(scene.fogParams.y - scene.fogParams.x, 1.0);
+    float fogValue = clamp((abs(viewPos.z) - scene.fogParams.x) / fogRange, 0.0, 1.0);
+    color = mix(color, scene.fogColor.rgb, fogValue);
 
     outColor = vec4(color, 1.0);
 }

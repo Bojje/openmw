@@ -494,6 +494,17 @@ namespace MWBase
         virtual bool useTorches() const = 0;
 
         virtual const osg::Vec4f& getSunLightPosition() const = 0;
+        /// Effective ambient and sun diffuse colour, after the cell's mood colour, the minimum
+        /// interior brightness floor and the weather system have all been applied. Gamma space.
+        virtual const osg::Vec4f& getSunLightAmbient() const = 0;
+        virtual const osg::Vec4f& getSunLightDiffuse() const = 0;
+        /// Fog colour plus its linear range in world units, and the current sky colour. Together these
+        /// are OpenMW's whole atmosphere model: the sky is a lerp from fog colour at the horizon to sky
+        /// colour at the zenith, and geometry fades to the same fog colour with distance.
+        virtual osg::Vec4f getFogColour() const = 0;
+        virtual float getFogStart() const = 0;
+        virtual float getFogEnd() const = 0;
+        virtual osg::Vec4f getSkyColour() const = 0;
         virtual float getSunVisibility() const = 0;
         virtual float getSunPercentage() const = 0;
 

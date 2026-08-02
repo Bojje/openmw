@@ -12,6 +12,7 @@
 #include <vector>
 
 #include <osg/Vec3f>
+#include <osg/Vec4f>
 
 // Vk::Geometry is held by value in CellTerrain, so unlike the other Vk types it cannot be forward
 // declared here.
@@ -50,7 +51,24 @@ namespace MWRender
 
         /// \a sunLightDir is the direction the sunlight *travels* (pointing away from the sun), which is
         /// the negation of World::getSunLightPosition(). It need not be normalised.
-        void render(Camera& camera, const osg::Vec3f& sunLightDir);
+        ///
+        /// Everything the lighting needs that comes from the world rather than the renderer. All the
+        /// colours are read back from what the OSG renderer actually uses, so they already carry the
+        /// cell's mood colour, the interior brightness floor, and the weather and time of day. They are
+        /// gamma-space, as the whole OSG lighting path is, and are decoded to linear on the way in.
+        /// The distances are world units and must not be decoded.
+        struct FrameLighting
+        {
+            osg::Vec3f sunLightDir; ///< direction the light travels, i.e. -getSunLightPosition()
+            osg::Vec4f sunDiffuse;
+            osg::Vec4f ambient;
+            osg::Vec4f skyColour;
+            osg::Vec4f fogColour;
+            float fogStart = 0.0f;
+            float fogEnd = 0.0f;
+        };
+
+        void render(Camera& camera, const FrameLighting& lighting);
         bool loadShaders(const std::filesystem::path& shaderDir);
 
         void addCell(const MWWorld::CellStore* store);

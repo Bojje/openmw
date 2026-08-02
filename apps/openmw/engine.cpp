@@ -387,9 +387,17 @@ bool OMW::Engine::frame(unsigned frameNumber, float frametime)
                     // the light travels, so negate it. See MWLua's getCurrentSunLightDirection, which
                     // does the same thing.
                     const osg::Vec4f& sunPos = mWorld->getSunLightPosition();
-                    osg::Vec3f sunLightDir(-sunPos.x(), -sunPos.y(), -sunPos.z());
 
-                    mVkRenderingManager->render(*camera, sunLightDir);
+                    MWRender::VkRenderingManager::FrameLighting lighting;
+                    lighting.sunLightDir = osg::Vec3f(-sunPos.x(), -sunPos.y(), -sunPos.z());
+                    lighting.sunDiffuse = mWorld->getSunLightDiffuse();
+                    lighting.ambient = mWorld->getSunLightAmbient();
+                    lighting.skyColour = mWorld->getSkyColour();
+                    lighting.fogColour = mWorld->getFogColour();
+                    lighting.fogStart = mWorld->getFogStart();
+                    lighting.fogEnd = mWorld->getFogEnd();
+
+                    mVkRenderingManager->render(*camera, lighting);
                 }
             }
         }

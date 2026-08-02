@@ -140,6 +140,22 @@ namespace MWRender
         void skySetMoonColour(bool red);
 
         const osg::Vec4f& getSunLightPosition() const;
+        // Read back from the light the OSG renderer actually uses, so these already carry everything
+        // configureAmbient and the weather system did to them: the cell's authored mood colour, the
+        // minimum interior brightness floor, and the time-of-day and weather sun colour. A second
+        // renderer wanting to match the mood should read these rather than recompute any of it.
+        // Both are gamma-space values, as is the whole OSG lighting path.
+        const osg::Vec4f& getSunLightAmbient() const;
+        const osg::Vec4f& getSunLightDiffuse() const;
+        /// Fog colour and the linear fog range in world units, for the current cell and weather.
+        /// Exposed because FogManager is private but a second renderer needs exactly these three
+        /// values to reproduce the same fog curve. Colour is gamma space; start and end are distances.
+        osg::Vec4f getFogColour() const;
+        float getFogStart() const;
+        float getFogEnd() const;
+        /// Sky colour for the current weather and hour. With the fog colour this is the whole
+        /// atmosphere: horizon is fog colour, zenith is this, lerped along the vertical.
+        osg::Vec4f getSkyColour() const;
         void setSunDirection(const osg::Vec3f& direction);
         void setSunColour(const osg::Vec4f& diffuse, const osg::Vec4f& specular, float sunVis);
         void setNight(bool isNight) { mNight = isNight; }

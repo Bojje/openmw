@@ -561,6 +561,36 @@ namespace MWRender
         return mSunLight->getPosition();
     }
 
+    const osg::Vec4f& RenderingManager::getSunLightAmbient() const
+    {
+        return mSunLight->getAmbient();
+    }
+
+    const osg::Vec4f& RenderingManager::getSunLightDiffuse() const
+    {
+        return mSunLight->getDiffuse();
+    }
+
+    osg::Vec4f RenderingManager::getFogColour() const
+    {
+        return mFog->getFogColor(mWater->isUnderwater(mCamera->getPosition()));
+    }
+
+    float RenderingManager::getFogStart() const
+    {
+        return mFog->getFogStart(mWater->isUnderwater(mCamera->getPosition()));
+    }
+
+    float RenderingManager::getFogEnd() const
+    {
+        return mFog->getFogEnd(mWater->isUnderwater(mCamera->getPosition()));
+    }
+
+    osg::Vec4f RenderingManager::getSkyColour() const
+    {
+        return mSky->getSkyColor();
+    }
+
     void RenderingManager::setSunDirection(const osg::Vec3f& direction)
     {
         osg::Vec3f position = -direction;

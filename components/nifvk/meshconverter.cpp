@@ -375,6 +375,15 @@ namespace NifVk
 
         std::vector<float> vertexData(numVertices * (vertexStride / sizeof(float)));
 
+        // Seeded from vertex 0 rather than from +/-infinity so that a box always encloses real geometry:
+        // with float limits, a mesh that never entered the loop would come out inverted and read as
+        // "everything is inside". numVertices is known non-zero by here.
+        for (int axis = 0; axis < 3; ++axis)
+        {
+            mesh.boundsMin[axis] = data->mVertices[0][axis];
+            mesh.boundsMax[axis] = data->mVertices[0][axis];
+        }
+
         for (uint32_t i = 0; i < numVertices; ++i)
         {
             float* dst = vertexData.data() + i * 12; // 12 floats per vertex (48 / 4)
@@ -384,6 +393,14 @@ namespace NifVk
             dst[0] = pos.x();
             dst[1] = pos.y();
             dst[2] = pos.z();
+
+            // Accumulated from dst rather than from pos so the bounds cannot drift out of the space the
+            // vertex buffer is actually in, should a transform ever be folded in above.
+            for (int axis = 0; axis < 3; ++axis)
+            {
+                mesh.boundsMin[axis] = std::min(mesh.boundsMin[axis], dst[axis]);
+                mesh.boundsMax[axis] = std::max(mesh.boundsMax[axis], dst[axis]);
+            }
 
             // Normal
             if (hasNormals)

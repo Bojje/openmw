@@ -581,6 +581,12 @@ namespace MWWorld
         bool useTorches() const override;
 
         const osg::Vec4f& getSunLightPosition() const override;
+        const osg::Vec4f& getSunLightAmbient() const override;
+        const osg::Vec4f& getSunLightDiffuse() const override;
+        osg::Vec4f getFogColour() const override;
+        float getFogStart() const override;
+        float getFogEnd() const override;
+        osg::Vec4f getSkyColour() const override;
         float getSunVisibility() const override;
         float getSunPercentage() const override;
 

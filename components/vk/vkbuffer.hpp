@@ -10,6 +10,7 @@ VK_DEFINE_HANDLE(VmaAllocation)
 namespace Vk
 {
     class Device;
+    class CommandBatch;
     class CommandPool;
 
     class Buffer
@@ -28,8 +29,21 @@ namespace Vk
         void unmap();
         void copyFrom(const void* data, VkDeviceSize size);
 
+        // Self-contained form: allocates a staging buffer, copies through it and blocks until the GPU
+        // has finished, so the staging buffer is gone by the time this returns.
         static Buffer createWithStaging(Device& device, CommandPool& commandPool, VkBufferUsageFlags usage,
             const void* data, VkDeviceSize size);
+
+        // Batched form: records the staging copy into \a batch instead of submitting on its own, so a
+        // caller filling several buffers pays for one submit rather than one per buffer.
+        //
+        // The copy has NOT happened when this returns. The GPU only reads the staging buffer when the
+        // batch is submitted, so \a stagingOut receives it and the caller must keep it alive until
+        // batch.flush() -- or the batch's destructor -- has returned. Destroying it earlier is a
+        // use-after-free that shows up as randomly corrupted buffer contents. The staging buffer is an
+        // out parameter rather than an internal detail precisely so that obligation cannot be missed.
+        static Buffer createWithStaging(Device& device, CommandBatch& batch, VkBufferUsageFlags usage,
+            const void* data, VkDeviceSize size, Buffer& stagingOut);
 
         VkBuffer handle() const { return mBuffer; }
         VkDeviceSize size() const { return mSize; }

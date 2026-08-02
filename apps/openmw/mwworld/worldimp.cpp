@@ -3094,6 +3094,36 @@ namespace MWWorld
         return mRendering->getSunLightPosition();
     }
 
+    const osg::Vec4f& World::getSunLightAmbient() const
+    {
+        return mRendering->getSunLightAmbient();
+    }
+
+    const osg::Vec4f& World::getSunLightDiffuse() const
+    {
+        return mRendering->getSunLightDiffuse();
+    }
+
+    osg::Vec4f World::getFogColour() const
+    {
+        return mRendering->getFogColour();
+    }
+
+    float World::getFogStart() const
+    {
+        return mRendering->getFogStart();
+    }
+
+    float World::getFogEnd() const
+    {
+        return mRendering->getFogEnd();
+    }
+
+    osg::Vec4f World::getSkyColour() const
+    {
+        return mRendering->getSkyColour();
+    }
+
     float World::getSunVisibility() const
     {
         return mWeatherManager->getSunVisibility();

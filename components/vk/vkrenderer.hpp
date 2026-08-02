@@ -47,6 +47,19 @@ namespace Vk
         Mat4 projInverse;
         Vec4 sunDirection;
         Vec4 sunColor;
+        // Effective ambient for the current cell, already decoded to linear. This is Morrowind's
+        // authored per-cell mood colour, which is most of what gives an interior its identity -- a
+        // flat grey constant here throws that away and makes every cell in the game look the same.
+        Vec4 ambientColor;
+        // Sky and fog colour for the current weather and hour, decoded to linear. OpenMW's entire
+        // atmosphere model is a lerp between these two along the vertical: the sky dome is one flat
+        // colour whose alpha ramps to zero at the horizon, over a clear colour set to the fog colour.
+        // Reusing the same fog colour for both is why its horizon reads as continuous.
+        Vec4 skyColor;
+        Vec4 fogColor;
+        // x = fog start, y = fog end, both in world units along the view axis. OpenMW's default fog is
+        // planar and linear: clamp((abs(viewZ) - start) / (end - start), 0, 1).
+        Vec4 fogParams;
     };
 
     // What a caller hands to submitMesh. Grouped into a struct rather than passed as a parameter list

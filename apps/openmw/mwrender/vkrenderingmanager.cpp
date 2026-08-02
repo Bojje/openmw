@@ -165,8 +165,26 @@ namespace MWRender
                 out.data[col * 4 + row] = m(col, row);
     }
 
-    void VkRenderingManager::render(Camera& camera, const osg::Vec3f& sunLightDir)
+    namespace
     {
+        // Morrowind's colours -- cell mood, light diffuse, weather sun -- were authored by artists
+        // looking at gamma-space compositing, and the OSG renderer still lights in gamma space. This
+        // renderer lights in linear, so they have to be decoded on the way in or every one of them is
+        // systematically too bright. Scalars such as sun visibility must NOT go through this.
+        float srgbToLinear(float c)
+        {
+            return c <= 0.04045f ? c / 12.92f : std::pow((c + 0.055f) / 1.055f, 2.4f);
+        }
+
+        Vk::Vec4 decodeColor(const osg::Vec4f& c)
+        {
+            return { srgbToLinear(c.r()), srgbToLinear(c.g()), srgbToLinear(c.b()), c.a() };
+        }
+    }
+
+    void VkRenderingManager::render(Camera& camera, const FrameLighting& lighting)
+    {
+        const osg::Vec3f& sunLightDir = lighting.sunLightDir;
         Vk::SceneData scene = {};
 
         const auto& viewMatrix = camera.getViewMatrix();
@@ -193,7 +211,16 @@ namespace MWRender
         if (lightDir.normalize() == 0.0f)
             lightDir = osg::Vec3f(0.0f, 0.0f, -1.0f);
         scene.sunDirection = { lightDir.x(), lightDir.y(), lightDir.z(), 0.0f };
-        scene.sunColor = { 1.0f, 0.95f, 0.85f, 1.0f };
+        // Both come off the light the OSG renderer uses, so they already carry the cell's authored
+        // mood colour, the minimum interior brightness floor, and the weather system's time-of-day sun
+        // colour. Reading them rather than recomputing is the whole reason a cell in a Dwemer ruin
+        // looks different from one in an Ashlander yurt.
+        scene.sunColor = decodeColor(lighting.sunDiffuse);
+        scene.ambientColor = decodeColor(lighting.ambient);
+        scene.skyColor = decodeColor(lighting.skyColour);
+        scene.fogColor = decodeColor(lighting.fogColour);
+        // Distances, not colours -- decoding these would be meaningless.
+        scene.fogParams = { lighting.fogStart, lighting.fogEnd, 0.0f, 0.0f };
 
         mRenderer->updateScene(scene);
 

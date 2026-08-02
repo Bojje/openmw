@@ -1,6 +1,7 @@
 #include "vkgeometry.hpp"
 
 #include "vkbuffer.hpp"
+#include "vkcommands.hpp"
 #include "vkdevice.hpp"
 #include "vkraytracing.hpp"
 
@@ -49,11 +50,36 @@ namespace Vk
         const VkDeviceSize vertexSize = static_cast<VkDeviceSize>(vertexCount) * sVertexStride;
         const VkDeviceSize indexSize = static_cast<VkDeviceSize>(indexCount) * sizeof(uint32_t);
 
-        auto vb = Buffer::createWithStaging(device, commandPool, vertexFlags, vertexData, vertexSize);
+        // Both staging copies go into one batch and one submit; separately they were two submits and
+        // two full pipeline stalls per mesh, and a cell load uploads thousands of meshes.
+        //
+        // Declaration order is the lifetime rule, not tidiness. The GPU reads these staging buffers when
+        // the batch is submitted, not when the copy is recorded, so they are declared ahead of the batch
+        // and therefore destroyed after it -- including while unwinding, where the batch destructor
+        // submits and blocks before either staging buffer is freed.
+        Buffer vertexStaging;
+        Buffer indexStaging;
+        CommandBatch batch(commandPool, device.graphicsQueue());
+
+        auto vb = Buffer::createWithStaging(device, batch, vertexFlags, vertexData, vertexSize, vertexStaging);
         geometry.vertexBuffer = std::make_unique<Buffer>(std::move(vb));
 
-        auto ib = Buffer::createWithStaging(device, commandPool, indexFlags, indices, indexSize);
+        auto ib = Buffer::createWithStaging(device, batch, indexFlags, indices, indexSize, indexStaging);
         geometry.indexBuffer = std::make_unique<Buffer>(std::move(ib));
+
+        // No barrier is needed between the two copies: they write disjoint buffers and neither reads the
+        // other. What does need ordering is the BLAS build below, which reads the buffers these copies
+        // fill, and this flush is what provides it -- it blocks until the copies have completed, so the
+        // build (recorded into its own submit inside createBLAS) cannot start before the data is there.
+        // Submitting here rather than leaving it to the destructor at the end of the function is
+        // therefore load bearing, not tidiness.
+        //
+        // Anything that later records the BLAS build into this batch must replace this flush with an
+        // explicit vkCmdPipelineBarrier -- VK_PIPELINE_STAGE_TRANSFER_BIT / VK_ACCESS_TRANSFER_WRITE_BIT
+        // to VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR /
+        // VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR -- because within a single command buffer that
+        // ordering is not implied, and it must keep both staging buffers alive past the later submit.
+        batch.flush();
 
         geometry.vertexCount = vertexCount;
         geometry.indexCount = indexCount;

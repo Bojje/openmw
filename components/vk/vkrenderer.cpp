@@ -1077,7 +1077,8 @@ namespace Vk
         VkPushConstantRange pushConstant = {};
         pushConstant.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
         pushConstant.offset = 0;
-        pushConstant.size = sizeof(Vec4) * 3;
+        // sunDirection, sunColor, cameraPosition, ambientColor. 64 bytes, half the guaranteed limit.
+        pushConstant.size = sizeof(Vec4) * 4;
         layoutInfo.pushConstantRangeCount = 1;
         layoutInfo.pPushConstantRanges = &pushConstant;
 
@@ -1517,9 +1518,10 @@ namespace Vk
                 cameraPos.z = sceneData->viewInverse.data[14];
                 cameraPos.w = 1.0f;
 
-                std::array<Vec4, 3> compositePush = { sceneData->sunDirection, sceneData->sunColor, cameraPos };
+                std::array<Vec4, 4> compositePush
+                    = { sceneData->sunDirection, sceneData->sunColor, cameraPos, sceneData->ambientColor };
                 vkCmdPushConstants(cmd, mCompositePipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT,
-                    0, sizeof(Vec4) * 3, compositePush.data());
+                    0, sizeof(Vec4) * 4, compositePush.data());
 
                 vkCmdDraw(cmd, 3, 1, 0, 0);
             }

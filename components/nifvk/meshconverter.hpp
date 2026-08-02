@@ -36,6 +36,16 @@ namespace NifVk
         // Transform from NIF node hierarchy, column-major 4x4
         float transform[16];
 
+        // Axis-aligned bounds of the vertex buffer's contents, in the same object space as the
+        // positions themselves -- i.e. before `transform` and before the per-instance matrix. Exists so
+        // the renderer can frustum-cull instances instead of recording a draw for every one in the
+        // active cell grid; to test a box, push the eight corners through the instance matrix and
+        // re-fit, or use the standard transformed-AABB trick (centre through the matrix, extent through
+        // its absolute value). A zero extent on an axis is legitimate and common -- foliage billboards
+        // are flat -- so a culling test must use >= / <=, not a strict comparison.
+        float boundsMin[3] = { 0.0f, 0.0f, 0.0f };
+        float boundsMax[3] = { 0.0f, 0.0f, 0.0f };
+
         // Raw base texture path from the NIF's NiTexturingProperty, empty if the shape is untextured.
         // Still needs Misc::ResourceHelpers::correctTexturePath() applied before use: Morrowind NIFs
         // reference textures without the "textures/" prefix and often name a .tga that ships as .dds.

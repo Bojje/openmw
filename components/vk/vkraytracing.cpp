@@ -32,6 +32,10 @@ namespace Vk
             reinterpret_cast<PFN_vkCmdBuildAccelerationStructuresKHR>(load("vkCmdBuildAccelerationStructuresKHR"));
         sRtFunctions.vkGetAccelerationStructureBuildSizesKHR =
             reinterpret_cast<PFN_vkGetAccelerationStructureBuildSizesKHR>(load("vkGetAccelerationStructureBuildSizesKHR"));
+        sRtFunctions.vkCmdWriteAccelerationStructuresPropertiesKHR =
+            reinterpret_cast<PFN_vkCmdWriteAccelerationStructuresPropertiesKHR>(load("vkCmdWriteAccelerationStructuresPropertiesKHR"));
+        sRtFunctions.vkCmdCopyAccelerationStructureKHR =
+            reinterpret_cast<PFN_vkCmdCopyAccelerationStructureKHR>(load("vkCmdCopyAccelerationStructureKHR"));
         sRtFunctions.vkCreateRayTracingPipelinesKHR =
             reinterpret_cast<PFN_vkCreateRayTracingPipelinesKHR>(load("vkCreateRayTracingPipelinesKHR"));
         sRtFunctions.vkGetRayTracingShaderGroupHandlesKHR =
@@ -204,7 +208,13 @@ namespace Vk
         VkAccelerationStructureBuildGeometryInfoKHR buildInfo = {};
         buildInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR;
         buildInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
-        buildInfo.flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR;
+        // ALLOW_COMPACTION is what makes the compaction pass below legal. It has to be set before the
+        // size query, because the driver may need a larger structure to keep the bookkeeping a
+        // compacting copy reads. That cost is paid for the lifetime of one build and handed back with
+        // interest: this geometry is static, built once and never rebuilt, which is the case compaction
+        // was designed for.
+        buildInfo.flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR
+            | VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR;
         buildInfo.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;
         buildInfo.geometryCount = 1;
         buildInfo.pGeometries = &geometry;
@@ -241,22 +251,128 @@ namespace Vk
         rangeInfo.primitiveCount = primitiveCount;
         const VkAccelerationStructureBuildRangeInfoKHR* pRangeInfo = &rangeInfo;
 
+        VkQueryPoolCreateInfo queryPoolInfo = {};
+        queryPoolInfo.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
+        queryPoolInfo.queryType = VK_QUERY_TYPE_ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR;
+        queryPoolInfo.queryCount = 1;
+
+        VkQueryPool queryPool = VK_NULL_HANDLE;
         try
         {
-            VkCommandBuffer cmd = commandPool.beginSingleTime();
-            rtFunctions().vkCmdBuildAccelerationStructuresKHR(cmd, 1, &buildInfo, &pRangeInfo);
-            commandPool.endSingleTime(cmd, device.graphicsQueue());
+            VK_CHECK(vkCreateQueryPool(device.handle(), &queryPoolInfo, nullptr, &queryPool));
         }
         catch (...)
         {
-            // as owns its buffer and handle and unwinding runs its destructor, so only the scratch
-            // buffer needs cleaning up here.
             vmaDestroyBuffer(device.allocator(), scratchBuffer, scratchAllocation);
             throw;
         }
 
-        vmaDestroyBuffer(device.allocator(), scratchBuffer, scratchAllocation);
+        // The compacted size is produced by the build, so it cannot be read on the host until the build
+        // has finished executing. That is why this is two submits rather than one: submit one resets the
+        // query pool, builds, and writes the compacted size; endSingleTime blocks until the queue is
+        // idle, so by the time it returns the query has a result. Only then can the destination
+        // structure be sized, and the compacting copy goes in submit two. Batching the build with other
+        // work would not change that - the result still has to be waited on before it is read.
+        VkDeviceSize compactedSize = 0;
+        VkBuffer compactedBuffer = VK_NULL_HANDLE;
+        VmaAllocation compactedAllocation = VK_NULL_HANDLE;
+        VkAccelerationStructureKHR compactedStructure = VK_NULL_HANDLE;
 
+        try
+        {
+            VkCommandBuffer cmd = commandPool.beginSingleTime();
+
+            // A query pool's contents are undefined until reset, and this one is fresh, so the reset is
+            // mandatory rather than defensive.
+            vkCmdResetQueryPool(cmd, queryPool, 0, 1);
+            rtFunctions().vkCmdBuildAccelerationStructuresKHR(cmd, 1, &buildInfo, &pRangeInfo);
+
+            // The property write reads the structure the build just wrote, and acceleration structure
+            // builds in one command buffer are not implicitly ordered against each other, so the
+            // write-then-read hazard needs an explicit barrier.
+            VkMemoryBarrier barrier = {};
+            barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+            barrier.srcAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR;
+            barrier.dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR;
+            vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
+                VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR, 0, 1, &barrier, 0, nullptr, 0, nullptr);
+
+            rtFunctions().vkCmdWriteAccelerationStructuresPropertiesKHR(cmd, 1, &as.mAccelerationStructure,
+                VK_QUERY_TYPE_ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR, queryPool, 0);
+
+            commandPool.endSingleTime(cmd, device.graphicsQueue());
+
+            // The scratch buffer is only read by the build, which has now completed.
+            vmaDestroyBuffer(device.allocator(), scratchBuffer, scratchAllocation);
+            scratchBuffer = VK_NULL_HANDLE;
+
+            uint64_t queriedSize = 0;
+            // Not VK_CHECK: compaction is an optimisation. If the driver declines to report a size, or
+            // reports one that is zero or no smaller than what we already allocated, the uncompacted
+            // structure is perfectly usable and keeping it is better than failing the mesh and losing
+            // the geometry. Same for the two size cases tested below.
+            VkResult queryResult = vkGetQueryPoolResults(device.handle(), queryPool, 0, 1,
+                sizeof(queriedSize), &queriedSize, sizeof(queriedSize),
+                VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT);
+            if (queryResult == VK_SUCCESS)
+                compactedSize = static_cast<VkDeviceSize>(queriedSize);
+
+            if (compactedSize > 0 && compactedSize < sizeInfo.accelerationStructureSize)
+            {
+                compactedAllocation = createBuffer(device, compactedSize,
+                    VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+                    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 0, compactedBuffer);
+
+                VkAccelerationStructureCreateInfoKHR compactedCreateInfo = {};
+                compactedCreateInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR;
+                compactedCreateInfo.buffer = compactedBuffer;
+                compactedCreateInfo.size = compactedSize;
+                compactedCreateInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
+                VK_CHECK(rtFunctions().vkCreateAccelerationStructureKHR(device.handle(), &compactedCreateInfo, nullptr, &compactedStructure));
+
+                VkCopyAccelerationStructureInfoKHR copyInfo = {};
+                copyInfo.sType = VK_STRUCTURE_TYPE_COPY_ACCELERATION_STRUCTURE_INFO_KHR;
+                copyInfo.src = as.mAccelerationStructure;
+                copyInfo.dst = compactedStructure;
+                copyInfo.mode = VK_COPY_ACCELERATION_STRUCTURE_MODE_COMPACT_KHR;
+
+                VkCommandBuffer copyCmd = commandPool.beginSingleTime();
+                rtFunctions().vkCmdCopyAccelerationStructureKHR(copyCmd, &copyInfo);
+                commandPool.endSingleTime(copyCmd, device.graphicsQueue());
+
+                // The copy has completed, so the source is dead and can go. Doing this any earlier
+                // would free memory the copy is still reading.
+                rtFunctions().vkDestroyAccelerationStructureKHR(device.handle(), as.mAccelerationStructure, nullptr);
+                vmaDestroyBuffer(device.allocator(), as.mBuffer, as.mAllocation);
+
+                as.mAccelerationStructure = compactedStructure;
+                as.mBuffer = compactedBuffer;
+                as.mAllocation = compactedAllocation;
+                compactedStructure = VK_NULL_HANDLE;
+                compactedBuffer = VK_NULL_HANDLE;
+                compactedAllocation = VK_NULL_HANDLE;
+            }
+        }
+        catch (...)
+        {
+            // as owns whichever structure and buffer it currently holds and unwinding runs its
+            // destructor, so this only has to clean up what as never took ownership of: the scratch
+            // buffer if the build did not get far enough to release it, and a half-built compaction
+            // destination. The handles are nulled as ownership moves, so each test is accurate.
+            if (scratchBuffer != VK_NULL_HANDLE)
+                vmaDestroyBuffer(device.allocator(), scratchBuffer, scratchAllocation);
+            if (compactedStructure != VK_NULL_HANDLE)
+                rtFunctions().vkDestroyAccelerationStructureKHR(device.handle(), compactedStructure, nullptr);
+            if (compactedBuffer != VK_NULL_HANDLE)
+                vmaDestroyBuffer(device.allocator(), compactedBuffer, compactedAllocation);
+            vkDestroyQueryPool(device.handle(), queryPool, nullptr);
+            throw;
+        }
+
+        vkDestroyQueryPool(device.handle(), queryPool, nullptr);
+
+        // Taken last so it is the address of whichever structure survived, compacted or not: a
+        // compacting copy produces a new structure at a new address.
         VkAccelerationStructureDeviceAddressInfoKHR addressInfo = {};
         addressInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR;
         addressInfo.accelerationStructure = as.mAccelerationStructure;
@@ -320,8 +436,14 @@ namespace Vk
         VkAccelerationStructureBuildGeometryInfoKHR buildInfo = {};
         buildInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR;
         buildInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
-        buildInfo.flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR
-            | VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR;
+        // VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR used to be set here and was never used:
+        // nothing in the tree ever built with VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR, so every
+        // TLAS was a full rebuild. The flag is not free - it makes the driver reserve extra scratch and
+        // a larger result structure to hold the data a refit would need. If moving objects are ever
+        // handled by refitting the TLAS instead of rebuilding it, MODE_UPDATE is the right mechanism and
+        // putting this flag back on the original build is the first step; it only works if the build
+        // that produced the structure being updated declared it.
+        buildInfo.flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR;
         buildInfo.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;
         buildInfo.geometryCount = 1;
         buildInfo.pGeometries = &geometry;
