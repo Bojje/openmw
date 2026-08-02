@@ -8,8 +8,26 @@ layout(set = 0, binding = 3) uniform sampler2D gbufferNormal;
 layout(set = 0, binding = 4) uniform sampler2D gbufferDepth;
 layout(set = 0, binding = 8) uniform sampler2D gbufferMaterial;
 
+// Temporal accumulator history. Read and write are separate images, and they have to be: pixel A
+// reads the history at pixel B's reprojected location, which pixel B may already have overwritten.
+// There is no ordering between raygen invocations, so a read-modify-write history is a data race.
+//
+// Storage images rather than samplers so the 2x2 gather can be done by hand: a tap that fails the
+// depth or normal test must contribute exactly zero, and a hardware bilinear fetch would have
+// blended it in before the shader could look at it.
+layout(set = 0, binding =  9, rgba16f) uniform readonly  image2D historyIn;
+layout(set = 0, binding = 10, rgba16f) uniform writeonly image2D historyOut;
+layout(set = 0, binding = 11, rg32ui)  uniform readonly  uimage2D geomIn;
+layout(set = 0, binding = 12, rg32ui)  uniform writeonly uimage2D geomOut;
+
 // Read from the scene UBO rather than push constants: two mat4 plus a vec4 is 144 bytes, over the
 // 128-byte maxPushConstantsSize that Vulkan guarantees on all implementations.
+//
+// This must declare EVERY field of Vk::SceneData up to the last one used, in order. A prefix is legal
+// GLSL and this shader got away with one for a long time, but the moment it needs a field past
+// sunColor, any omitted field shifts every subsequent offset -- and the result is read as *something*,
+// so there is no error, no validation message and no crash. Just a silently wrong matrix. Keep this
+// in step with vkrenderer.hpp and composite.frag; nothing checks the three agree.
 layout(set = 0, binding = 5) uniform SceneUBO {
     mat4 view;
     mat4 projection;
@@ -17,6 +35,16 @@ layout(set = 0, binding = 5) uniform SceneUBO {
     mat4 projInverse;
     vec4 sunDirection;
     vec4 sunColor;
+    vec4 ambientColor;
+    vec4 skyColor;
+    vec4 fogColor;
+    vec4 fogParams;
+    mat4 prevViewFromCurView;
+    vec4 denoiseParams; // x = alphaMin, y = depth tolerance, z = normal dot, w = max history
+    uint frameIndex;
+    uint lightCount;
+    uint scenePad0;
+    uint scenePad1;
 } camera;
 
 // Morrowind's world unit is roughly 1.4 cm and an exterior cell spans 8192 units, so ray epsilons have
@@ -29,29 +57,66 @@ const float reflectionRayLength = 20000.0;
 
 layout(location = 0) rayPayloadEXT vec4 payload;
 
-vec3 reconstructWorldPos(vec2 uv, float depth) {
+// View-space position for a pixel, which is where reprojection has to happen. The world position is
+// derived from this rather than the other way round: worldPos carries the camera's own magnitude --
+// up to 250,000 units -- in every component, so it is the wrong space to do arithmetic in.
+vec4 reconstructViewPos(vec2 uv, float depth) {
     vec4 clipPos = vec4(uv * 2.0 - 1.0, depth, 1.0);
     vec4 viewPos = camera.projInverse * clipPos;
-    viewPos /= viewPos.w;
-    vec4 worldPos = camera.viewInverse * viewPos;
-    return worldPos.xyz;
+    return viewPos / viewPos.w;
+}
+
+// Octahedral normal encoding, two snorm16 in one uint. Under a degree of error, which is invisible
+// next to the ~25 degree rejection threshold it feeds.
+vec2 octWrap(vec2 v) {
+    return (1.0 - abs(v.yx)) * vec2(v.x >= 0.0 ? 1.0 : -1.0, v.y >= 0.0 ? 1.0 : -1.0);
+}
+
+uint packNormal(vec3 n) {
+    n /= (abs(n.x) + abs(n.y) + abs(n.z));
+    vec2 e = n.z >= 0.0 ? n.xy : octWrap(n.xy);
+    ivec2 q = ivec2(round(clamp(e, -1.0, 1.0) * 32767.0));
+    return (uint(q.x) & 0xFFFFu) | ((uint(q.y) & 0xFFFFu) << 16);
+}
+
+vec3 unpackNormal(uint bits) {
+    // Sign-extend the two 16-bit halves by hand rather than relying on a shift of a converted int.
+    int qx = int(bits & 0xFFFFu);
+    int qy = int((bits >> 16) & 0xFFFFu);
+    if (qx > 32767) qx -= 65536;
+    if (qy > 32767) qy -= 65536;
+
+    vec2 e = vec2(qx, qy) / 32767.0;
+    vec3 n = vec3(e, 1.0 - abs(e.x) - abs(e.y));
+    float t = max(-n.z, 0.0);
+    n.xy += vec2(n.x >= 0.0 ? -t : t, n.y >= 0.0 ? -t : t);
+    return normalize(n);
 }
 
 void main() {
     ivec2 pixelCoord = ivec2(gl_LaunchIDEXT.xy);
-    ivec2 imageSize = ivec2(gl_LaunchSizeEXT.xy);
-    vec2 uv = (vec2(pixelCoord) + 0.5) / vec2(imageSize);
+    ivec2 launchSize = ivec2(gl_LaunchSizeEXT.xy);
+    vec2 uv = (vec2(pixelCoord) + 0.5) / vec2(launchSize);
 
     float depth = texture(gbufferDepth, uv).r;
     vec4 normalSample = texture(gbufferNormal, uv);
 
     if (depth >= 1.0) {
         imageStore(outputImage, pixelCoord, vec4(1.0, 0.0, 0.0, 0.0));
+        // Sky pixels still have to write both history images, and this is not optional bookkeeping.
+        // The images ping-pong, so anything left unwritten this frame still holds frame N-2's data,
+        // which a later reprojection would happily accept as if it were frame N-1's. Zeroing gives a
+        // stored view-space Z of 0.0, which fails the depth test against any real surface.
+        imageStore(historyOut, pixelCoord, vec4(0.0));
+        imageStore(geomOut, pixelCoord, uvec4(0u));
         return;
     }
 
-    vec3 worldPos = reconstructWorldPos(uv, depth);
+    vec4 viewPos = reconstructViewPos(uv, depth);
+    vec3 worldPos = (camera.viewInverse * viewPos).xyz;
     vec3 N = normalize(normalSample.rgb * 2.0 - 1.0);
+    // The camera's world position is the translation column of viewInverse, so this is free.
+    vec3 cameraPos = camera.viewInverse[3].xyz;
 
     // Direction towards the light. Matches composite.frag, which uses L = normalize(-sunDirection).
     vec3 sunDir = normalize(-camera.sunDirection.xyz);
@@ -92,7 +157,6 @@ void main() {
     float specularStrength = texture(gbufferMaterial, uv).g;
     if (specularStrength > 0.004)
     {
-        vec3 cameraPos = (camera.viewInverse * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
         vec3 viewDir = normalize(worldPos - cameraPos);
         vec3 reflectDir = reflect(viewDir, N);
 
@@ -109,13 +173,129 @@ void main() {
             0);
     }
 
-    // Store the raw reflected radiance. composite.frag owns the weighting and applies a Fresnel term
-    // there; this used to scale by a magic 0.3 (hit) / 0.05 (miss) as well, and the two attenuations
-    // multiplied out to roughly 6%, which made the reflection ray almost pure cost.
+    // --- Temporal accumulation -------------------------------------------------------------------
+    //
+    // What is accumulated is the sun visibility mask, and deliberately not radiance. composite.frag
+    // applies every colour in the scene -- sun, ambient, sky, fog, point lights -- *after* reading
+    // this image, so none of it is ever in the history and none of it can ghost. Sun colour in
+    // particular swings hard and abruptly across weather transitions, sunrise and the lightning
+    // flash; a radiance accumulator would smear a lightning flash over sixteen frames, and a
+    // visibility accumulator structurally cannot. Keep it that way.
+    //
+    // Visibility is also view-independent, and with a static TLAS a correctly reprojected sample is
+    // not merely a plausible neighbour of the right answer, it *is* the right answer. That is what
+    // affords a 32-frame history where a TAA-style accumulator tolerates 4 to 8.
+    float rawVisibility = shadowFactor;
+
+    // Reproject through view space. prevClip uses *this* frame's projection on purpose: the previous
+    // projection only changes on a resize or an FOV change, and both discard the history anyway.
+    vec4 prevViewPos = camera.prevViewFromCurView * vec4(viewPos.xyz, 1.0);
+    vec4 prevClip = camera.projection * prevViewPos;
+
+    float historyMean = 0.0;
+    float historyMoment = 0.0;
+    float historyAge = 0.0;
+
+    if (prevClip.w > 0.0) {
+        // Already Vulkan-convention: camera.projection is glToVulkanProjection-corrected on the CPU,
+        // so y is 0 at the top of the screen. composite.frag flips y for its sky gradient (that is a
+        // screen-space gradient, a different thing) -- do not copy that flip here.
+        vec2 prevUv = (prevClip.xy / prevClip.w) * 0.5 + 0.5;
+
+        if (all(greaterThanEqual(prevUv, vec2(0.0))) && all(lessThan(prevUv, vec2(1.0)))) {
+            // Depth slope term. At grazing incidence one pixel spans a large depth range, so a flat
+            // relative tolerance rejects the whole surface -- which for Morrowind means the entire
+            // ground plane, a 128-unit heightfield almost always viewed edge-on. 1/NdotV is the
+            // first-order model of that gradient and it is the cheap-but-correct version here:
+            // raygen has no derivatives to estimate dz/duv from, there being no quads in a ray
+            // tracing shader, and gathering neighbour depths would cost more than the whole test.
+            vec3 V = normalize(cameraPos - worldPos);
+            float ndotv = max(abs(dot(N, V)), 0.1);
+            float tolerance = abs(prevViewPos.z) * (camera.denoiseParams.y + 2.0 * camera.denoiseParams.y / ndotv);
+
+            // Manual 2x2 bilinear gather with per-tap validity. Rejected taps take weight 0 and the
+            // survivors are renormalised, which fixes both the correctness problem (history bleeding
+            // across a silhouette) and the degenerate case where one valid tap at 0.03 weight is
+            // swamped by three rejected ones.
+            vec2 prevPixel = prevUv * vec2(launchSize) - 0.5;
+            vec2 baseCoord = floor(prevPixel);
+            vec2 frac = prevPixel - baseCoord;
+            ivec2 base = ivec2(baseCoord);
+
+            float weights[4] = float[4](
+                (1.0 - frac.x) * (1.0 - frac.y),
+                frac.x * (1.0 - frac.y),
+                (1.0 - frac.x) * frac.y,
+                frac.x * frac.y);
+            ivec2 offsets[4] = ivec2[4](ivec2(0, 0), ivec2(1, 0), ivec2(0, 1), ivec2(1, 1));
+
+            float totalWeight = 0.0;
+            for (int i = 0; i < 4; ++i) {
+                ivec2 tap = base + offsets[i];
+                if (any(lessThan(tap, ivec2(0))) || any(greaterThanEqual(tap, launchSize)))
+                    continue;
+
+                uvec2 geom = imageLoad(geomIn, tap).xy;
+                float storedZ = uintBitsToFloat(geom.x);
+                if (abs(storedZ - prevViewPos.z) >= tolerance)
+                    continue;
+
+                // World-space normals, compared unrotated. The scene is static, so a surface's world
+                // normal is frame-invariant and there is nothing to transform.
+                if (dot(N, unpackNormal(geom.y)) <= camera.denoiseParams.z)
+                    continue;
+
+                vec4 tapHistory = imageLoad(historyIn, tap);
+                historyMean += weights[i] * tapHistory.r;
+                historyMoment += weights[i] * tapHistory.g;
+                historyAge += weights[i] * tapHistory.a;
+                totalWeight += weights[i];
+            }
+
+            // Below this the surviving taps are too marginal to renormalise meaningfully; treat it as
+            // a full rejection rather than amplifying one corner tap by 20x.
+            if (totalWeight > 0.05) {
+                historyMean /= totalWeight;
+                historyMoment /= totalWeight;
+                historyAge /= totalWeight;
+            } else {
+                historyMean = 0.0;
+                historyMoment = 0.0;
+                historyAge = 0.0;
+            }
+        }
+    }
+
+    // Bounded history with an adaptive blend weight. Age starts at 0 on a disocclusion, so the first
+    // frame is a pure copy; the weight then falls as 1/n while the estimate is genuinely improving
+    // and floors at alphaMin so the filter never stops responding to real change. Ghosting is
+    // therefore bounded by construction at 1/alphaMin frames rather than by a heuristic.
+    //
+    // A max history of 0 is how the renderer discards the history wholesale after a TLAS rebuild: it
+    // clamps age to 0, which forces a weight of 1, which is a straight copy of this frame's value.
+    float maxHistory = camera.denoiseParams.w;
+    float age = min(historyAge, maxHistory);
+    float alpha = max(1.0 / (age + 1.0), camera.denoiseParams.x);
+
+    float mean = mix(historyMean, rawVisibility, alpha);
+    // Second moment, for the variance estimate a spatial pass will need. Nothing reads it yet; it is
+    // in the layout from the start because retrofitting it means rewriting the history format.
+    float moment = mix(historyMoment, rawVisibility * rawVisibility, alpha);
+
+    imageStore(historyOut, pixelCoord, vec4(mean, moment, 1.0, min(age + 1.0, maxHistory)));
+    imageStore(geomOut, pixelCoord, uvec4(floatBitsToUint(viewPos.z), packNormal(N), 0u, 0u));
+
+    // Store the accumulated visibility, plus the raw reflected radiance. composite.frag owns the
+    // reflection's weighting and applies a Fresnel term there; this used to scale by a magic 0.3
+    // (hit) / 0.05 (miss) as well, and the two attenuations multiplied out to roughly 6%, which made
+    // the reflection ray almost pure cost.
+    //
+    // The reflection is deliberately not accumulated: it is view-dependent, so a reprojected sample
+    // is not the right answer for the current view the way a visibility sample is.
     //
     // Caveat worth knowing: closesthit.rchit returns the hit surface's albedo, not its radiance -- it
     // is not lit, not shadowed and not fogged. Reflections are therefore uniformly too bright and flat,
     // and fixing that means shading at the hit point, which needs the light set the hit shaders do not
     // have yet.
-    imageStore(outputImage, pixelCoord, vec4(shadowFactor, payload.xyz));
+    imageStore(outputImage, pixelCoord, vec4(mean, payload.xyz));
 }

@@ -202,15 +202,40 @@ namespace MWRender
         scene.viewInverse = Vk::invertMat4(scene.view);
         scene.projInverse = Vk::invertMat4(scene.projection);
 
-        // Carried across frames so a temporal pass can find where a surface was last frame. Seeded
-        // with this frame's value on the very first frame so the history is a no-op rather than
-        // garbage; mFrameIndex being 0 also tells a consumer not to trust it yet.
-        Vk::Mat4 viewProjection;
-        Vk::multiplyMat4(scene.projection.data, scene.view.data, viewProjection.data);
-        scene.prevViewProjection = mFrameIndex == 0 ? viewProjection : mPrevViewProjection;
+        // Carried across frames so the temporal accumulator can find where a surface was last frame.
+        //
+        // This is prevView * inverse(curView), not the previous frame's projection * view. The
+        // reasoning is on Vk::SceneData::prevViewFromCurView and it is specific to this world: at
+        // Morrowind's +/-250,000-unit scale, reprojecting through a previous view-projection multiplies
+        // two quantities of that magnitude together to produce one of magnitude ~50, and fp32 has no
+        // headroom for it. Composing view-to-view instead keeps every operand small -- the rotation
+        // block is a product of two rotations and the translation is a single frame of camera motion.
+        //
+        // Identity on the first frame rather than garbage. mFrameIndex == 0 is belt to the braces
+        // though; the real gate is the per-pixel history length, which the accumulator's images are
+        // cleared to zero for exactly this reason.
+        if (mFrameIndex == 0)
+            Vk::identityMat4(scene.prevViewFromCurView.data);
+        else
+            Vk::multiplyMat4(mPrevView.data, scene.viewInverse.data, scene.prevViewFromCurView.data);
         scene.frameIndex = mFrameIndex;
-        mPrevViewProjection = viewProjection;
+        mPrevView = scene.view;
         ++mFrameIndex;
+
+        // Temporal accumulator tuning. See Vk::SceneData::denoiseParams for the channel assignment.
+        //
+        // The depth tolerance is relative and the shader adds a 1/NdotV slope term on top of it,
+        // which is not a fudge factor: Morrowind's heightfield is 128 units between vertices and is
+        // almost always seen at grazing angles, where a single ground pixel spans hundreds of units of
+        // depth between its corners. A flat relative tolerance rejects the entire ground plane the
+        // moment the camera moves, which is where the accumulation matters most.
+        //
+        // The normal threshold is 0.9 -- about 25 degrees -- rather than something tighter. Terrain
+        // normals are interpolated per-vertex across those 128-unit quads and adjacent pixels
+        // routinely differ by several degrees on ground that is perfectly continuous, so a tight
+        // threshold reintroduces noise in a visible grid. 0.9 still rejects the hard creases of
+        // Morrowind's low-poly object meshes, where adjacent faces differ by 60 degrees or more.
+        scene.denoiseParams = { 1.0f / 16.0f, 0.01f, 0.9f, 32.0f };
 
         // The shaders reconstruct the direction *towards* the light as -sunDirection, so this has to be
         // the direction the light travels. World::getSunLightPosition() is the opposite convention -- it
@@ -252,6 +277,8 @@ namespace MWRender
 
         // One frustum per frame, from the same matrix the vertex shader uses, so what is culled and
         // what is drawn cannot disagree.
+        Vk::Mat4 viewProjection;
+        Vk::multiplyMat4(scene.projection.data, scene.view.data, viewProjection.data);
         const Vk::Frustum frustum = Vk::extractFrustum(viewProjection);
         size_t drawn = 0;
         size_t culled = 0;

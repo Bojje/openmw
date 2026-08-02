@@ -150,8 +150,9 @@ namespace MWRender
         std::unordered_map<const MWWorld::CellStore*, CellMeshes> mCellMeshes;
         std::unordered_map<const MWWorld::CellStore*, CellTerrain> mCellTerrain;
 
-        // Previous frame's projection * view, handed to the shaders for temporal reprojection.
-        Vk::Mat4 mPrevViewProjection;
+        // Previous frame's view matrix. Composed with this frame's viewInverse into the view-to-view
+        // transform the shaders reproject through; deliberately not a view-projection, see render().
+        Vk::Mat4 mPrevView;
         uint32_t mFrameIndex = 0;
         bool mLoggedCullRatio = false;
     };

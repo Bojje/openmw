@@ -65,15 +65,37 @@ namespace Vk
         // x = fog start, y = fog end, both in world units along the view axis. OpenMW's default fog is
         // planar and linear: clamp((abs(viewZ) - start) / (end - start), 0, 1).
         Vec4 fogParams;
-        // Last frame's projection * view, for temporal reprojection.
+        // Rigid transform from this frame's view space to last frame's view space, i.e.
+        // prevView * inverse(curView). Used for temporal reprojection.
+        //
+        // Deliberately not the more obvious prevProjection * prevView. Morrowind's world runs to
+        // +/-250,000 units and fp32 has a 24-bit mantissa, so ulp(250000) is 1/32 of a world unit.
+        // Reprojecting via a previous view-projection stacks two cancellations of that size: the
+        // world position is reconstructed through viewInverse, whose translation column is the camera
+        // position, and is then multiplied by a matrix whose translation is -R*camPos. Both operands
+        // are ~250,000 and the result's w is the distance to the surface, tens of units -- a 5000x
+        // cancellation, which comes out as a systematic reprojection smear that worsens the further
+        // east the player walks.
+        //
+        // This formulation never forms that product. Its rotation block is R_prev * transpose(R_cur),
+        // every entry at most 1, and its translation is one frame of camera motion -- tens of units.
+        // Last frame's *projection* is deliberately not carried: it only changes on a resize or an FOV
+        // change, and both of those invalidate the history anyway.
         //
         // No motion vector G-buffer target is needed for this, and that is worth understanding before
         // anyone adds one: every instance in the TLAS is static world geometry, because markTlasDirty
         // only fires on cell load and actors are not in the acceleration structure at all. With a
-        // static scene, a surface's previous screen position is just prevViewProjection * worldPos.
-        // The moment moving objects enter the TLAS that stops being true and real motion vectors
-        // become necessary.
-        Mat4 prevViewProjection;
+        // static scene the reprojection is exact rather than approximate. The moment moving objects
+        // enter the TLAS that stops being true and real motion vectors become necessary.
+        Mat4 prevViewFromCurView;
+        // Temporal accumulator tuning, read by raygen.rgen.
+        //   x = alphaMin, the floor on the exponential blend weight; 1/x is the longest the filter can
+        //       take to respond to a real change, so it bounds ghosting by construction.
+        //   y = relative depth tolerance for history rejection.
+        //   z = minimum dot(N, storedN) for history rejection.
+        //   w = maximum history length in frames. Zero means "discard all history this frame", which
+        //       is how a TLAS rebuild invalidates the accumulator -- see Renderer::updateScene.
+        Vec4 denoiseParams;
         // Frames rendered so far, for jittered sampling sequences and for deciding how much history a
         // temporal accumulator may trust. Wraps; only ever used modulo something small.
         uint32_t frameIndex = 0;
@@ -82,6 +104,14 @@ namespace Vk
         uint32_t scenePad0 = 0;
         uint32_t scenePad1 = 0;
     };
+
+    // std140 requires a vec4 to start on a 16-byte boundary, and the shader declarations in
+    // raygen.rgen and composite.frag mirror this struct field for field. Nothing validates that
+    // agreement, so pin the offsets that would silently shift if a field were inserted or resized.
+    static_assert(offsetof(SceneData, prevViewFromCurView) == 352, "SceneData layout drifted");
+    static_assert(offsetof(SceneData, denoiseParams) == 416, "denoiseParams must be 16-byte aligned");
+    static_assert(offsetof(SceneData, frameIndex) == 432, "SceneData layout drifted");
+    static_assert(sizeof(SceneData) == 448, "SceneData layout drifted");
 
     // Mirrors MWRender::VkPointLight. 64 bytes, std430-compatible, so the collector's vector memcpys
     // straight into the buffer. Declared here rather than shared with the apps layer because
@@ -212,6 +242,30 @@ namespace Vk
         VkImageView view = VK_NULL_HANDLE;
     };
 
+    // One frame's half of the temporal accumulator's ping-pong. Two of these exist per image, and the
+    // set bound on frame N reads index 1 - N and writes index N.
+    struct DenoiseTarget
+    {
+        VkImage image = VK_NULL_HANDLE;
+        VmaAllocation memory = VK_NULL_HANDLE;
+        VkImageView view = VK_NULL_HANDLE;
+    };
+
+    // The accumulated signal. R16G16B16A16_SFLOAT rather than an 8-bit format, which looks tempting
+    // for a mask in [0, 1] and is wrong: an exponential accumulator moves the stored value by
+    // alpha * delta, so at 8 bits and alpha = 1/32 convergence stalls entirely whenever the change is
+    // under about 0.06. That is a dead zone in the middle of every penumbra -- exactly where the soft
+    // shadows this exists for live. fp16 carries ~11 bits of mantissa near 1.0 and has no such floor.
+    constexpr VkFormat denoiseHistoryFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
+
+    // Packed depth and normal of whatever the accumulator last stored at each pixel, for the
+    // rejection tests. R32G32_UINT rather than a float format for two reasons: view-space Z is in
+    // world units and Morrowind's view distances overflow fp16's precision long before its range
+    // becomes the problem (fp16 resolves ~3 units at 6000, the same order as the tolerance being
+    // measured), and a _UINT image cannot be linearly filtered -- which is the point, because every
+    // history tap needs its own validity test and therefore its own unfiltered fetch.
+    constexpr VkFormat denoiseGeomFormat = VK_FORMAT_R32G32_UINT;
+
     class Renderer
     {
     public:
@@ -246,7 +300,15 @@ namespace Vk
         // Requests a TLAS rebuild on the next frame. The TLAS is only rebuilt when the instance set
         // actually changes (i.e. on cell load/unload) rather than every frame: a rebuild allocates a
         // new acceleration structure and has to idle the device to retire the old one safely.
-        void markTlasDirty() { mTlasDirty = true; }
+        // Also invalidates the temporal accumulator's history. Set here rather than in buildTlas
+        // because the ordering works out: callers mark the TLAS dirty during cell sync, which runs
+        // before updateScene, which runs before render() actually rebuilds. So the frame that first
+        // sees the new geometry is also the frame that discards the history for it.
+        void markTlasDirty()
+        {
+            mTlasDirty = true;
+            mHistoryInvalid = true;
+        }
 
         // Exposed so callers can build GPU resources (e.g. NifVk::MeshConverter) against this device.
         Device& device() { return *mDevice; }
@@ -278,6 +340,8 @@ namespace Vk
         void writeTextureArrayDescriptors();
         void createRtOutput();
         void destroyRtOutput();
+        void createDenoiseTargets();
+        void destroyDenoiseTargets();
         void createRtDescriptorSets();
         void buildTlas();
         // Uploads the per-instance GeometryRecord array the hit shaders index with
@@ -304,6 +368,17 @@ namespace Vk
 
         GBufferAttachments mGBuffer;
         RtOutputImage mRtOutput;
+
+        // Temporal accumulator history. Read and write are separate images rather than one
+        // read-modify-write target because they have to be: pixel A reads the history at pixel B's
+        // reprojected location, which pixel B may already have overwritten. There is no ordering
+        // between raygen invocations, so a single buffer is a data race with no way to fix it.
+        std::array<DenoiseTarget, maxFramesInFlight> mDenoiseHistory = {};
+        std::array<DenoiseTarget, maxFramesInFlight> mDenoiseGeom = {};
+        // Set by buildTlas, consumed by the next updateScene. A cell load changes what casts shadows,
+        // and the depth and normal rejection tests cannot see that: a newly loaded building throwing a
+        // new shadow across unchanged ground passes both tests and would keep its stale history.
+        bool mHistoryInvalid = false;
 
         VkRenderPass mGBufferRenderPass = VK_NULL_HANDLE;
         VkRenderPass mCompositeRenderPass = VK_NULL_HANDLE;

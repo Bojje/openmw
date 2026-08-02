@@ -6,6 +6,7 @@
 #include <cstring>
 #include <fstream>
 #include <stdexcept>
+#include <utility>
 
 #include <vk_mem_alloc.h>
 
@@ -87,6 +88,8 @@ namespace Vk
         {
             loadRayTracingFunctions(mDevice->handle());
             createRtOutput();
+            // Before createRtDescriptorSets, which binds their views.
+            createDenoiseTargets();
             createRtDescriptorSets();
             mRayTracingEnabled = true;
 
@@ -231,6 +234,27 @@ namespace Vk
             // Sampled by the composite fragment shader and, once it is in SHADER_READ_ONLY, potentially
             // by the hit shaders too.
             dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR;
+        }
+        else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_GENERAL)
+        {
+            // The denoise history images, on creation: cleared, then handed to raygen, which is the
+            // only thing that ever touches them and does so as a storage image in both directions.
+            barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+            srcStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+            dstStage = VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR;
+        }
+        else if (oldLayout == VK_IMAGE_LAYOUT_GENERAL && newLayout == VK_IMAGE_LAYOUT_GENERAL)
+        {
+            // Not a layout change at all -- a cross-frame memory dependency on the denoise history.
+            // Frame N's raygen reads what frame N-1's raygen wrote, and nothing else establishes that.
+            // Submission order on one queue gives execution order, not availability and visibility;
+            // beginFrame's fence retires frame N-2, not N-1; and the swapchain semaphores chain
+            // nothing about these images. So the barrier is load-bearing despite looking like a no-op.
+            barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+            barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+            srcStage = VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR;
+            dstStage = VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR;
         }
         else
         {
@@ -688,7 +712,23 @@ namespace Vk
         // RT layout: TLAS + storage image + G-buffer samplers
         if (mDevice->rayTracingSupported())
         {
-            std::array<VkDescriptorSetLayoutBinding, 9> bindings = {};
+            std::array<VkDescriptorSetLayoutBinding, 13> bindings = {};
+
+            // Temporal accumulator history, bindings 9-12. Read and write are four separate bindings
+            // pointing at four separate images, not two read-write ones -- see the comment on
+            // mDenoiseHistory for why a single buffer cannot work.
+            //
+            // Storage images rather than combined image samplers throughout: the 2x2 history gather is
+            // done by hand with four imageLoads and manually renormalised bilinear weights, because a
+            // tap that fails the depth or normal test has to contribute exactly zero. A hardware
+            // bilinear fetch would have blended it in already.
+            for (uint32_t i = 9; i <= 12; ++i)
+            {
+                bindings[i].binding = i;
+                bindings[i].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+                bindings[i].descriptorCount = 1;
+                bindings[i].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
+            }
 
             // G-buffer material. raygen needs it to decide whether a reflection ray is worth firing at
             // all: the reflection is weighted by specular strength in composite.frag, and vanilla
@@ -772,7 +812,10 @@ namespace Vk
             // maxSceneTextures-element sampler array, so the array has to be counted that many times.
             { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                 16 + maxFramesInFlight * 4 + maxSceneTextures * maxFramesInFlight },
-            { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, maxFramesInFlight + 2 },
+            // Per RT set: the ray tracing output, plus the four denoise history bindings. Plus slack.
+            // This count is exact rather than generous, so adding a storage image anywhere without
+            // raising it fails vkAllocateDescriptorSets with VK_ERROR_OUT_OF_POOL_MEMORY at startup.
+            { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, maxFramesInFlight * 5 + 2 },
         };
 
         uint32_t maxSets = maxFramesInFlight * 2 + 4;
@@ -1030,6 +1073,85 @@ namespace Vk
         }
     }
 
+    void Renderer::createDenoiseTargets()
+    {
+        VkExtent2D extent = mSwapchain->extent();
+
+        VkCommandBuffer cmd = mCommandPool->beginSingleTime();
+
+        // No SAMPLED_BIT on purpose. Nothing samples these, and offering a sampler would invite a
+        // hardware bilinear history fetch -- which silently blends rejected taps back in before the
+        // shader ever gets to test them, defeating the whole rejection stage.
+        const VkImageUsageFlags usage
+            = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+
+        for (uint32_t i = 0; i < maxFramesInFlight; ++i)
+        {
+            const std::array<std::pair<DenoiseTarget*, VkFormat>, 2> targets = {
+                std::make_pair(&mDenoiseHistory[i], denoiseHistoryFormat),
+                std::make_pair(&mDenoiseGeom[i], denoiseGeomFormat)
+            };
+
+            for (const auto& [target, format] : targets)
+            {
+                createImage(extent.width, extent.height, format, usage, target->image, target->memory);
+                target->view = createImageView(target->image, format, VK_IMAGE_ASPECT_COLOR_BIT);
+
+                // Clearing is not optional, and the failure mode is worse than the one that made the
+                // RT output's clear necessary. Uninitialised memory read as a history length either
+                // pins the blend weight at its floor over garbage forever, or -- if the bit pattern
+                // decodes to a NaN -- poisons the accumulator permanently, because a NaN multiplies
+                // into the next frame's history and never washes out.
+                //
+                // All zeros is the correct initial state for both images and needs no special case in
+                // the shader. Zero history length forces a blend weight of 1, so the first frame is a
+                // straight copy of the raw signal and the mean and second moment self-heal. Zero in
+                // the geometry image is a stored view-space Z of exactly 0.0, which fails the depth
+                // test against any real surface, so a stale tap can never be accepted.
+                transitionImageLayout(cmd, target->image, VK_IMAGE_LAYOUT_UNDEFINED,
+                    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT);
+
+                VkClearColorValue clearColor = {};
+                VkImageSubresourceRange range = {};
+                range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                range.levelCount = 1;
+                range.layerCount = 1;
+                vkCmdClearColorImage(
+                    cmd, target->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &clearColor, 1, &range);
+
+                // GENERAL for the rest of their lifetime. They are only ever touched by raygen, as
+                // storage images, in both directions.
+                transitionImageLayout(cmd, target->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                    VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_ASPECT_COLOR_BIT);
+            }
+        }
+
+        mCommandPool->endSingleTime(cmd, mDevice->graphicsQueue());
+    }
+
+    void Renderer::destroyDenoiseTargets()
+    {
+        VkDevice dev = mDevice->handle();
+
+        for (uint32_t i = 0; i < maxFramesInFlight; ++i)
+        {
+            for (DenoiseTarget* target : { &mDenoiseHistory[i], &mDenoiseGeom[i] })
+            {
+                if (target->view != VK_NULL_HANDLE)
+                {
+                    vkDestroyImageView(dev, target->view, nullptr);
+                    target->view = VK_NULL_HANDLE;
+                }
+                if (target->image != VK_NULL_HANDLE)
+                {
+                    vmaDestroyImage(mDevice->allocator(), target->image, target->memory);
+                    target->image = VK_NULL_HANDLE;
+                    target->memory = VK_NULL_HANDLE;
+                }
+            }
+        }
+    }
+
     void Renderer::createRtDescriptorSets()
     {
         if (mRtDescriptorSets[0] == VK_NULL_HANDLE)
@@ -1066,14 +1188,38 @@ namespace Vk
 
         const VkDescriptorImageInfo materialInfo = makeImageInfo(mGBuffer.materialView);
 
+        auto makeStorageInfo = [](VkImageView view) {
+            VkDescriptorImageInfo info = {};
+            info.imageView = view;
+            info.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+            return info;
+        };
+
+        // mCurrentFrame alternates 0, 1, 0, 1..., so the set bound on frame N reads exactly what the
+        // set bound on frame N-1 wrote. That is only true because there are two frames in flight. At
+        // three the parity trick breaks -- set 0 would read set 1's output, but the previous frame was
+        // set 2 -- and it breaks silently, into a denoiser that mostly works and occasionally
+        // accumulates two-frame-old history. If this ever changes, the read index must become
+        // (frame + maxFramesInFlight - 1) % maxFramesInFlight.
+        static_assert(maxFramesInFlight == 2, "denoise history ping-pong assumes two frames in flight");
+
         for (uint32_t frame = 0; frame < maxFramesInFlight; ++frame)
         {
+            const uint32_t prevFrame = 1 - frame;
+
             VkDescriptorBufferInfo sceneInfo = {};
             sceneInfo.buffer = mUniformBuffers[frame];
             sceneInfo.offset = 0;
             sceneInfo.range = sizeof(SceneData);
 
-            std::array<VkWriteDescriptorSet, 6> writes = {};
+            const std::array<VkDescriptorImageInfo, 4> denoiseInfos = {
+                makeStorageInfo(mDenoiseHistory[prevFrame].view), // binding  9: signal, read
+                makeStorageInfo(mDenoiseHistory[frame].view),     // binding 10: signal, write
+                makeStorageInfo(mDenoiseGeom[prevFrame].view),    // binding 11: geometry, read
+                makeStorageInfo(mDenoiseGeom[frame].view)         // binding 12: geometry, write
+            };
+
+            std::array<VkWriteDescriptorSet, 10> writes = {};
 
             // Binding 1: output storage image
             writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -1110,6 +1256,19 @@ namespace Vk
             writes[5].descriptorCount = 1;
             writes[5].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
             writes[5].pImageInfo = &materialInfo;
+
+            // Bindings 9-12: the temporal accumulator's history, written once here rather than per
+            // frame. Which image is read and which is written is baked into the set, so binding the
+            // right set is all the frame loop has to do.
+            for (uint32_t i = 0; i < 4; ++i)
+            {
+                writes[i + 6].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                writes[i + 6].dstSet = mRtDescriptorSets[frame];
+                writes[i + 6].dstBinding = 9 + i;
+                writes[i + 6].descriptorCount = 1;
+                writes[i + 6].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+                writes[i + 6].pImageInfo = &denoiseInfos[i];
+            }
 
             vkUpdateDescriptorSets(
                 mDevice->handle(), static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
@@ -1544,6 +1703,42 @@ namespace Vk
         // 2. Ray tracing pass (shadows + reflections)
         if (mRayTracingEnabled && mRtPipeline && mTlas)
         {
+            // The denoise history stays in GENERAL for its whole lifetime, so these are pure memory
+            // dependencies rather than layout changes -- see the GENERAL -> GENERAL branch of
+            // transitionImageLayout for why they are not free and not optional.
+            //
+            // Read side: last frame's raygen wrote the images this frame's raygen is about to read.
+            // Write side: a write-after-read against frame N-2, which today the frame fence already
+            // covers, but that is a consequence of maxFramesInFlight being 2 rather than anything
+            // this code states, and the barrier costs nothing to include.
+            {
+                std::array<VkImageMemoryBarrier, 4> denoiseBarriers = {};
+                const std::array<VkImage, 4> denoiseImages = {
+                    mDenoiseHistory[1 - mCurrentFrame].image, mDenoiseGeom[1 - mCurrentFrame].image,
+                    mDenoiseHistory[mCurrentFrame].image, mDenoiseGeom[mCurrentFrame].image
+                };
+
+                for (size_t i = 0; i < denoiseBarriers.size(); ++i)
+                {
+                    VkImageMemoryBarrier& barrier = denoiseBarriers[i];
+                    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+                    barrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+                    barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+                    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+                    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+                    barrier.image = denoiseImages[i];
+                    barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+                    barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+                    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                    barrier.subresourceRange.levelCount = 1;
+                    barrier.subresourceRange.layerCount = 1;
+                }
+
+                vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,
+                    VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR, 0, 0, nullptr, 0, nullptr,
+                    static_cast<uint32_t>(denoiseBarriers.size()), denoiseBarriers.data());
+            }
+
             transitionImageLayout(cmd, mRtOutput.image,
                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL,
                 VK_IMAGE_ASPECT_COLOR_BIT);
@@ -1630,7 +1825,10 @@ namespace Vk
         destroyGBuffer();
 
         if (mRayTracingEnabled)
+        {
             destroyRtOutput();
+            destroyDenoiseTargets();
+        }
 
         mSwapchain->recreate(width, height);
         mFrameSync->resizeImageSemaphores(static_cast<uint32_t>(mSwapchain->imageViews().size()));
@@ -1642,6 +1840,11 @@ namespace Vk
         if (mRayTracingEnabled)
         {
             createRtOutput();
+            // Recreated at the new extent and re-cleared, so the accumulator restarts from an age of
+            // zero everywhere. Do not "optimise" the clear away on the grounds that fresh VMA memory
+            // is usually zero -- a resize would then hand the accumulator a full screen of garbage
+            // history lengths, and one NaN in there never washes out.
+            createDenoiseTargets();
             createRtDescriptorSets();
         }
 
@@ -1695,6 +1898,21 @@ namespace Vk
         // Filled in here rather than by the caller: the count belongs to the light buffer this frame,
         // which updateLights owns, and making callers keep the two in step would be a trap.
         mCurrentScene.lightCount = mLightCount;
+
+        // A TLAS rebuild changes what casts shadows, which the accumulator's rejection tests cannot
+        // detect -- a newly loaded building throwing a fresh shadow across ground whose depth and
+        // normal are unchanged passes both tests and would keep its stale, now wrong, history.
+        //
+        // Zeroing the maximum history length for one frame forces the blend weight to 1 everywhere,
+        // which discards the history without touching the images. The alternative is a
+        // vkCmdClearColorImage on both, and a cell load already carries roughly 4,600 blocking
+        // submits without adding another.
+        if (mHistoryInvalid)
+        {
+            mCurrentScene.denoiseParams.w = 0.0f;
+            mHistoryInvalid = false;
+        }
+
         std::memcpy(mUniformMapped[mCurrentFrame], &mCurrentScene, sizeof(SceneData));
     }
 
@@ -1867,7 +2085,10 @@ namespace Vk
         }
 
         if (mRayTracingEnabled)
+        {
             destroyRtOutput();
+            destroyDenoiseTargets();
+        }
 
         for (uint32_t i = 0; i < maxFramesInFlight; i++)
         {
