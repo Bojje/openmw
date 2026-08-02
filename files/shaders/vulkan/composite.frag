@@ -142,6 +142,17 @@ void main() {
     // SVGF does -- so this improves what is displayed but not what converges. The *.comp glob is in
     // cmake/CompileShaders.cmake now, so taking the feedback route later costs a pipeline, not a
     // build system change.
+    // Reconstruct world and view position from depth. Hoisted above the spatial filter because the
+    // filter's depth edge-stopping needs *linear* view-space Z, and the reflection weighting and
+    // specular term below need the world position.
+    vec4 clipPos = vec4(ndc, depthSample, 1.0);
+    vec4 viewPos = scene.projInverse * clipPos;
+    viewPos /= viewPos.w;
+    vec4 worldPos4 = scene.viewInverse * viewPos;
+    vec3 worldPos = worldPos4.xyz;
+
+    vec3 V = normalize(push.cameraPosition.xyz - worldPos);
+
     float historyLength = texture(denoiseHistory, fragTexCoord).a;
 
     vec4 rtFiltered = rtSample;
@@ -182,8 +193,24 @@ void main() {
                 if (dot(centreNormal, tapNormal) <= 0.9)
                     continue;
 
-                // Relative depth, so the tolerance means the same thing at 50 units and at 5000.
-                if (abs(tapDepth - depthSample) > 0.01 * max(depthSample, 1e-5))
+                // Compared in *linear* view space, not on the raw depth buffer value.
+                //
+                // A perspective depth buffer is hyperbolic: values crowd towards 1 with distance. A
+                // relative test on the stored value therefore means something completely different
+                // at each end of the range -- a tolerance that is a fraction of a world unit up
+                // close, and hundreds of units out at the far plane. It is the same class of mistake
+                // as using an absolute epsilon at Morrowind's scale, and the temporal rejection
+                // avoids it by storing linear view Z in mDenoiseGeom rather than a depth sample.
+                //
+                // The slope term matches the temporal test for the same reason it exists there: at
+                // grazing incidence one pixel spans a large depth range, and on a heightfield viewed
+                // edge-on a flat tolerance rejects the surface the filter most needs to work on.
+                vec4 tapView = scene.projInverse * vec4(tapUv * 2.0 - 1.0, tapDepth, 1.0);
+                float tapViewZ = tapView.z / tapView.w;
+
+                float ndotv = max(abs(dot(centreNormal, V)), 0.1);
+                float tolerance = abs(viewPos.z) * (0.01 + 0.02 / ndotv);
+                if (abs(tapViewZ - viewPos.z) > tolerance)
                     continue;
 
                 // Gaussian-ish spatial falloff. sigma ~1.5 px over a 5x5 support.
@@ -230,16 +257,6 @@ void main() {
     float ao = indirectFiltered.a;
 
     float roughness = materialSample.r;
-
-    // Reconstruct world position from depth and inverse matrices. Needed by both the reflection
-    // weighting and the specular term below, so it has to come before either.
-    vec4 clipPos = vec4(ndc, depthSample, 1.0);
-    vec4 viewPos = scene.projInverse * clipPos;
-    viewPos /= viewPos.w;
-    vec4 worldPos4 = scene.viewInverse * viewPos;
-    vec3 worldPos = worldPos4.xyz;
-
-    vec3 V = normalize(push.cameraPosition.xyz - worldPos);
 
     // raygen stores raw reflected radiance; the weighting happens here and only here.
     //
