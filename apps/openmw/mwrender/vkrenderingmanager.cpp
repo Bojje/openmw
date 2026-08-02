@@ -550,16 +550,19 @@ namespace MWRender
                 const VkFormat format = toVkFormat(image->getPixelFormat());
                 const uint32_t width = static_cast<uint32_t>(image->s());
                 const uint32_t height = static_cast<uint32_t>(image->t());
-                const VkDeviceSize uploadSize = levelZeroSizeInBytes(format, width, height);
+                // Morrowind's DDS files ship a full mip chain and osg keeps it in one contiguous
+                // allocation, so upload all of it. Only level 0 used to be uploaded, which is why
+                // distant terrain and foliage aliased so badly. getNumMipmapLevels() returns 1 for an
+                // image without mips, which is the old behaviour exactly.
+                const uint32_t levels = std::max(1u, static_cast<uint32_t>(image->getNumMipmapLevels()));
+                const VkDeviceSize uploadSize
+                    = Vk::Texture::mipChainSizeInBytes(format, width, height, levels);
 
-                // Never read more than osg actually allocated, whatever the block maths says.
-                const VkDeviceSize available = static_cast<VkDeviceSize>(image->getTotalSizeInBytes());
-
-                if (format != VK_FORMAT_UNDEFINED && uploadSize > 0 && uploadSize <= available)
+                if (format != VK_FORMAT_UNDEFINED && uploadSize > 0)
                 {
                     auto texture = std::make_unique<Vk::Texture>(
                         Vk::Texture::create(mRenderer->device(), mRenderer->commandPool(), width, height,
-                            format, image->data(), uploadSize));
+                            format, image->data(), uploadSize, levels));
 
                     result = mTextures.size();
                     mTextures.push_back(std::move(texture));

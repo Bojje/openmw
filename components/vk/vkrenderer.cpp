@@ -539,12 +539,34 @@ namespace Vk
         samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
         samplerInfo.magFilter = VK_FILTER_LINEAR;
         samplerInfo.minFilter = VK_FILTER_LINEAR;
-        // Only mip level 0 is uploaded by Vk::Texture, so there is no chain to select between.
-        samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+        // Trilinear. NEAREST between levels leaves a visible seam where the LOD flips, which on
+        // Morrowind's terrain is a moving band across the ground as the camera advances.
+        samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+        samplerInfo.mipLodBias = 0.0f;
+        samplerInfo.minLod = 0.0f;
+        // Not a fixed number: one sampler serves every texture, and Vulkan already clamps the computed
+        // LOD to the view's own level count. An unclamped sampler therefore cannot over-run a small
+        // texture, whereas any fixed maxLod would clamp a large one.
+        samplerInfo.maxLod = VK_LOD_CLAMP_NONE;
         // Morrowind's UVs routinely run outside [0, 1] and rely on wrapping.
         samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
         samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
         samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+
+        // Trilinear alone makes ground at grazing angles blurrier than it is today, which is exactly
+        // Morrowind's terrain -- the thing mip mapping was added to fix. Anisotropy is what buys that
+        // back. Gated on the feature actually being enabled: vkdevice.cpp requests samplerAnisotropy
+        // conditionally, so setting this unguarded is a validation error on a device that lacks it.
+        VkPhysicalDeviceFeatures supported = {};
+        vkGetPhysicalDeviceFeatures(mDevice->physical(), &supported);
+        if (supported.samplerAnisotropy)
+        {
+            VkPhysicalDeviceProperties props = {};
+            vkGetPhysicalDeviceProperties(mDevice->physical(), &props);
+            samplerInfo.anisotropyEnable = VK_TRUE;
+            // 8x is the usual quality knee; 16x costs measurably more for little visible gain.
+            samplerInfo.maxAnisotropy = std::min(8.0f, props.limits.maxSamplerAnisotropy);
+        }
 
         VK_CHECK(vkCreateSampler(mDevice->handle(), &samplerInfo, nullptr, &mTextureSampler));
     }
