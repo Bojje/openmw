@@ -219,8 +219,27 @@ namespace Vk
             srcStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
             dstStage = VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR;
         }
+        else if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
+        {
+            barrier.srcAccessMask = 0;
+            barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            srcStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+            dstStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        }
+        else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
+            && newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+        {
+            barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+            srcStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+            // Sampled by the composite fragment shader and, once it is in SHADER_READ_ONLY, potentially
+            // by the hit shaders too.
+            dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR;
+        }
         else
         {
+            // Deliberately conservative: an unhandled pair is a bug, but stalling everything is at
+            // least correct. Add an explicit branch above rather than leaning on this.
             barrier.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
             barrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
             srcStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
@@ -254,10 +273,15 @@ namespace Vk
     {
         VkExtent2D extent = mSwapchain->extent();
 
-        createImage(extent.width, extent.height, VK_FORMAT_R8G8B8A8_UNORM,
+        // _SRGB, not UNORM. gbuffer.frag writes *linear* albedo here, and 8 bits of linear is not
+        // enough in the shadows: sRGB codes 0-34 all collapse into linear codes 0-4, so the darkest
+        // eighth of every texture posterises and anything below sRGB 5 rounds to black. An _SRGB
+        // attachment makes the hardware encode on store and decode on sample, which costs nothing and
+        // restores the precision. Normal and material stay UNORM -- they are not colour.
+        createImage(extent.width, extent.height, VK_FORMAT_R8G8B8A8_SRGB,
             VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
             mGBuffer.albedoImage, mGBuffer.albedoMemory);
-        mGBuffer.albedoView = createImageView(mGBuffer.albedoImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
+        mGBuffer.albedoView = createImageView(mGBuffer.albedoImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT);
 
         createImage(extent.width, extent.height, VK_FORMAT_R16G16B16A16_SFLOAT,
             VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
@@ -300,8 +324,8 @@ namespace Vk
 
         std::array<VkAttachmentDescription, 4> attachments = {};
 
-        // Albedo
-        attachments[0].format = VK_FORMAT_R8G8B8A8_UNORM;
+        // Albedo. Must match createGBuffer's _SRGB choice -- see the comment there.
+        attachments[0].format = VK_FORMAT_R8G8B8A8_SRGB;
         attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
         attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
         attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -353,13 +377,37 @@ namespace Vk
         subpass.pColorAttachments = colorRefs.data();
         subpass.pDepthStencilAttachment = &depthRef;
 
-        VkSubpassDependency dependency = {};
-        dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-        dependency.dstSubpass = 0;
-        dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-        dependency.srcAccessMask = 0;
-        dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-        dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+        // There is one G-buffer shared by both frames in flight, and both the RT pass and the composite
+        // pass sample it. Two dependencies are needed, and the second one is the easy one to omit:
+        // without it Vulkan supplies an implicit EXTERNAL dependency whose dstStageMask is
+        // BOTTOM_OF_PIPE and dstAccessMask 0, which makes the attachment writes available but never
+        // visible to the shader reads that follow. It happens to work on drivers that flush
+        // conservatively at render pass end; it is not guaranteed.
+        std::array<VkSubpassDependency, 2> dependencies = {};
+
+        // Write-after-read: frame N overwrites the attachments that frame N-1's composite fragment
+        // shader and raygen shader may still be reading, so those stages must be named as the source.
+        dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
+        dependencies[0].dstSubpass = 0;
+        dependencies[0].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
+            | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT
+            | VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR;
+        dependencies[0].srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        dependencies[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
+            | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+        dependencies[0].dstAccessMask
+            = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+
+        // Read-after-write: make this frame's attachment writes visible to the RT and composite passes.
+        dependencies[1].srcSubpass = 0;
+        dependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;
+        dependencies[1].srcStageMask
+            = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+        dependencies[1].srcAccessMask
+            = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+        dependencies[1].dstStageMask
+            = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR;
+        dependencies[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
         VkRenderPassCreateInfo renderPassInfo = {};
         renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
@@ -367,8 +415,8 @@ namespace Vk
         renderPassInfo.pAttachments = attachments.data();
         renderPassInfo.subpassCount = 1;
         renderPassInfo.pSubpasses = &subpass;
-        renderPassInfo.dependencyCount = 1;
-        renderPassInfo.pDependencies = &dependency;
+        renderPassInfo.dependencyCount = static_cast<uint32_t>(dependencies.size());
+        renderPassInfo.pDependencies = dependencies.data();
 
         VK_CHECK(vkCreateRenderPass(mDevice->handle(), &renderPassInfo, nullptr, &mGBufferRenderPass));
     }
@@ -873,12 +921,30 @@ namespace Vk
         VkExtent2D extent = mSwapchain->extent();
 
         createImage(extent.width, extent.height, VK_FORMAT_R16G16B16A16_SFLOAT,
-            VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+            VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
             mRtOutput.image, mRtOutput.memory);
         mRtOutput.view = createImageView(mRtOutput.image, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_ASPECT_COLOR_BIT);
 
         VkCommandBuffer cmd = mCommandPool->beginSingleTime();
+
+        // Clear rather than just transitioning. composite.frag samples this image unconditionally, but
+        // the RT pass is skipped whenever there is no TLAS -- during startup before the first cell is
+        // loaded, and for any cell whose instances all lack a BLAS. Without the clear those frames read
+        // undefined memory as the shadow term, which shows up as a scene randomly lit or unlit.
+        // (1, 0, 0, 0) is what raygen writes for a sky pixel: fully lit, no reflection.
         transitionImageLayout(cmd, mRtOutput.image, VK_IMAGE_LAYOUT_UNDEFINED,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT);
+
+        VkClearColorValue clearColor = {};
+        clearColor.float32[0] = 1.0f;
+        VkImageSubresourceRange range = {};
+        range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        range.levelCount = 1;
+        range.layerCount = 1;
+        vkCmdClearColorImage(
+            cmd, mRtOutput.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &clearColor, 1, &range);
+
+        transitionImageLayout(cmd, mRtOutput.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT);
         mCommandPool->endSingleTime(cmd, mDevice->graphicsQueue());
     }
@@ -964,6 +1030,14 @@ namespace Vk
             vkUpdateDescriptorSets(
                 mDevice->handle(), static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
         }
+
+        // Binding 7, the hit shaders' copy of the sampler array, has to be written here rather than
+        // relying on the next setTextures(). This runs *after* createDescriptorSets(), so the RT sets
+        // did not exist when writeTextureArrayDescriptors last ran and it skipped them; and
+        // syncTexturesToRenderer early-returns when no new texture was loaded, so a cell whose textures
+        // all fail to resolve would reach vkCmdTraceRaysKHR with 512 descriptors never written. The
+        // layout does not set PARTIALLY_BOUND, so that is undefined behaviour rather than reads of black.
+        writeTextureArrayDescriptors();
     }
 
 
@@ -1288,6 +1362,13 @@ namespace Vk
             getDrawableSize(mWindow, w, h);
             resize(static_cast<uint32_t>(w), static_cast<uint32_t>(h));
         }
+        else
+        {
+            // Anything else -- device lost, surface lost, out of device memory -- must not be swallowed.
+            // Without this the loop keeps submitting into a dead device and the real error surfaces
+            // later somewhere unrelated. The acquire path already does this; present did not.
+            VK_CHECK(result);
+        }
 
         mCurrentFrame = (mCurrentFrame + 1) % maxFramesInFlight;
     }
@@ -1481,6 +1562,11 @@ namespace Vk
             writeCompositeDescriptor(3, mGBuffer.albedoView);
     }
 
+    void Renderer::waitIdle()
+    {
+        vkDeviceWaitIdle(mDevice->handle());
+    }
+
     void Renderer::updateScene(const SceneData& sceneData)
     {
         std::memcpy(mUniformMapped[mCurrentFrame], &sceneData, sizeof(SceneData));
@@ -1631,7 +1717,10 @@ namespace Vk
         VkDevice dev = mDevice->handle();
 
         mRtPipeline.reset();
-        // Owns a VkImage/VkImageView, so it has to go before the device is destroyed.
+        // Both own Vulkan handles and are declared after mDevice, so without an explicit reset here
+        // their destructors would run *after* mDevice.reset() below and call vkDestroy* on a dead
+        // VkDevice. mTlas is easy to miss because nothing else in the frame loop touches it.
+        mTlas.reset();
         mFallbackTexture.reset();
 
         if (mGeometryTableMapped != nullptr)

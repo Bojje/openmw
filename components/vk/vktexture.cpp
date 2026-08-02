@@ -127,7 +127,15 @@ namespace Vk
         barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
         barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-        vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+        // The ray tracing stages matter as much as the fragment stage here: the any-hit and closest-hit
+        // shaders sample these same textures through the RT descriptor set. Naming only the fragment
+        // stage is harmless today because endSingleTime drains the queue immediately afterwards, but it
+        // becomes a real missing dependency the moment uploads stop being synchronous.
+        VkPipelineStageFlags dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        if (device.rayTracingSupported())
+            dstStage |= VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR;
+
+        vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, dstStage,
             0, 0, nullptr, 0, nullptr, 1, &barrier);
 
         commandPool.endSingleTime(cmd, device.graphicsQueue());

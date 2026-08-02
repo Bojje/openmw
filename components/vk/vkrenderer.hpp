@@ -163,6 +163,11 @@ namespace Vk
         Device& device() { return *mDevice; }
         CommandPool& commandPool() { return *mCommandPool; }
 
+        // Blocks until the device is idle. Callers that own GPU resources referenced by submitted
+        // command buffers -- cell geometry, terrain -- must call this before destroying them, because
+        // up to maxFramesInFlight submissions may still be reading those buffers and BLASes.
+        void waitIdle();
+
     private:
         void createSurface();
         void createGBuffer();

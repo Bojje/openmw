@@ -396,6 +396,24 @@ namespace MWRender
             return false;
         };
 
+        const auto anyInactive = [&](const auto& map) {
+            for (const auto& entry : map)
+            {
+                if (!isActive(entry.first))
+                    return true;
+            }
+            return false;
+        };
+
+        // Erasing a CellTerrain runs Vk::Geometry's destructor, which destroys vertex/index buffers and
+        // a BLAS immediately. Up to maxFramesInFlight command buffers may still reference them, and the
+        // live TLAS still holds device addresses of those BLASes, so destroying them here without
+        // waiting is a use-after-free that can surface as VK_ERROR_DEVICE_LOST when crossing a cell
+        // boundary. Cell transitions are rare enough that an idle is acceptable; the scalable answer is
+        // a per-frame retirement list that frees a resource maxFramesInFlight frames after its last use.
+        if (anyInactive(mCellTerrain) || anyInactive(mCellMeshes))
+            mRenderer->waitIdle();
+
         bool changed = false;
 
         for (auto it = mCellMeshes.begin(); it != mCellMeshes.end();)

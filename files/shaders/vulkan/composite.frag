@@ -26,7 +26,15 @@ layout(push_constant) uniform PushConstants {
 
 layout(location = 0) out vec4 outColor;
 
+// Narkowicz's fit to the ACES RRT+ODT. It expects a pre-exposure of about 0.6: without it the curve
+// sits too high everywhere, and a mid-grey texture in full sun lands at display code 195 instead of
+// 127. The output is display-*linear*, not display-encoded -- its slope at the origin is 0.214, where
+// any gamma-encoded curve would be above 1 -- so the swapchain's sRGB store is still the right place
+// for the transfer function. Do not add a pow() here as well; see trap 12.
+const float sAcesPreExposure = 0.6;
+
 vec3 acesFilmic(vec3 x) {
+    x *= sAcesPreExposure;
     float a = 2.51;
     float b = 0.03;
     float c = 2.43;
@@ -65,16 +73,10 @@ void main() {
     // straight from full sun to the flat 0.15 ambient below -- a 7x jump with hard aliased edges.
     float shadow = rtSample.r;
 
-    // Attenuate the reflection by surface roughness instead of adding it flat. Morrowind surfaces are
-    // overwhelmingly rough and diffuse, so an unattenuated reflection term washes the whole scene in
-    // whatever colour the hit shader returns.
     float roughness = materialSample.r;
-    vec3 reflectionColor = rtSample.gba * (1.0 - roughness);
 
-    vec3 ambient = albedo * 0.15;
-    vec3 diffuse = albedo * sunCol * NdotL * shadow;
-
-    // Reconstruct world position from depth and inverse matrices
+    // Reconstruct world position from depth and inverse matrices. Needed by both the reflection
+    // weighting and the specular term below, so it has to come before either.
     vec2 ndc = fragTexCoord * 2.0 - 1.0;
     vec4 clipPos = vec4(ndc, depthSample, 1.0);
     vec4 viewPos = scene.projInverse * clipPos;
@@ -82,15 +84,29 @@ void main() {
     vec4 worldPos4 = scene.viewInverse * viewPos;
     vec3 worldPos = worldPos4.xyz;
 
+    vec3 V = normalize(push.cameraPosition.xyz - worldPos);
+
+    // raygen stores raw reflected radiance; the weighting happens here and only here. It used to be
+    // attenuated in both places -- a magic 0.3 there and (1 - roughness) here -- which multiplied out
+    // to about 6% and made the reflection ray nearly pure cost. Schlick with a dielectric F0 of 0.04 is
+    // still an approximation (no metals, no GGX lobe, and the ray is a perfect mirror rather than
+    // spread by roughness) but it is view-dependent and bounded, which two constants were not.
+    float fresnel = 0.04 + 0.96 * pow(1.0 - max(dot(N, V), 0.0), 5.0);
+    vec3 reflectionColor = rtSample.gba * fresnel * (1.0 - roughness);
+
+    vec3 ambient = albedo * 0.15;
+    vec3 diffuse = albedo * sunCol * NdotL * shadow;
+
     // Derive the highlight from the stored roughness instead of a fixed strength. Morrowind surfaces
     // are rough (0.8 from gbuffer.frag), and a fixed narrow highlight blows out large smooth-shaded
     // faces like boulders. Roughness drives both the exponent and the intensity, so rough surfaces get
     // a broad, weak highlight rather than a tight bright one.
     float shininess = mix(128.0, 4.0, roughness);
     float specularStrength = 0.3 * (1.0 - roughness);
-    vec3 V = normalize(push.cameraPosition.xyz - worldPos);
     vec3 H = normalize(L + V);
-    float spec = pow(max(dot(N, H), 0.0), shininess);
+    // Gated on NdotL: without it a surface facing away from the sun can still catch a highlight
+    // wherever the half-vector happens to align, which shows up as rim light on unlit faces.
+    float spec = NdotL > 0.0 ? pow(max(dot(N, H), 0.0), shininess) : 0.0;
     vec3 specular = sunCol * spec * specularStrength * shadow;
 
     vec3 color = ambient + diffuse + specular + reflectionColor;

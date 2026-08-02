@@ -94,8 +94,13 @@ void main() {
         reflectionRayLength,
         0);
 
-    vec3 reflectionColor = payload.xyz;
-    float reflectionStrength = (payload.w > 0.0) ? 0.3 : 0.05;
-
-    imageStore(outputImage, pixelCoord, vec4(shadowFactor, reflectionColor * reflectionStrength));
+    // Store the raw reflected radiance. composite.frag owns the weighting and applies a Fresnel term
+    // there; this used to scale by a magic 0.3 (hit) / 0.05 (miss) as well, and the two attenuations
+    // multiplied out to roughly 6%, which made the reflection ray almost pure cost.
+    //
+    // Caveat worth knowing: closesthit.rchit returns the hit surface's albedo, not its radiance -- it
+    // is not lit, not shadowed and not fogged. Reflections are therefore uniformly too bright and flat,
+    // and fixing that means shading at the hit point, which needs the light set the hit shaders do not
+    // have yet.
+    imageStore(outputImage, pixelCoord, vec4(shadowFactor, payload.xyz));
 }
