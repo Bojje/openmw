@@ -141,6 +141,10 @@ namespace MWGui
             MyGUI::ImageBox* mFogWidget;
             std::unique_ptr<MyGUI::ITexture> mMapTexture;
             std::unique_ptr<MyGUI::ITexture> mFogTexture;
+            // Only used by the Vulkan interface platform, which holds a copy of the fog pixels
+            // rather than the texture and so has to be told when they have changed. The OSG
+            // platform shares the texture and updates itself.
+            unsigned int mFogModifiedCount = 0;
             int mCellX;
             int mCellY;
         };

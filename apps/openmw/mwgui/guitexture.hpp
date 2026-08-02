@@ -12,6 +12,7 @@ namespace MyGUI
 
 namespace osg
 {
+    class Image;
     class Texture2D;
 }
 
@@ -37,6 +38,16 @@ namespace MWGui
     /// the returned texture -- but the name is what appears in a Vulkan validation message, so a
     /// meaningful one is worth the trouble.
     std::unique_ptr<MyGUI::ITexture> createGuiTexture(osg::Texture2D* texture, std::string_view name);
+
+    /// The same, for a surface whose CPU copy does not live on the texture -- a render-to-texture
+    /// read back separately, say. \a texture is used under the OSG platform and \a image under the
+    /// Vulkan one, and neither backend is asked to know about the other's source.
+    ///
+    /// Returns nullptr when the Vulkan platform is live and \a image has not been filled yet, which
+    /// for a readback means the render has not landed. Ask again next frame rather than treating it
+    /// as a failure.
+    std::unique_ptr<MyGUI::ITexture> createGuiTexture(
+        osg::Texture2D* texture, osg::Image* image, std::string_view name);
 }
 
 #endif

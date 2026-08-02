@@ -625,6 +625,10 @@ namespace MWGui
                     requestMapRender(&MWBase::Environment::get().getWorldModel()->getExterior(
                         ESM::ExteriorCellLocation(entry.mCellX, entry.mCellY, ESM::Cell::sDefaultWorldspaceId)));
 
+                // Still MyGUIPlatform::OSGTexture, and still a white square under the Vulkan
+                // platform. Unlike the other surfaces this one has no CPU copy to upload -- it is a
+                // render to texture with nothing reading it back. HANDOFF trap 33 records two ways
+                // of adding one that did not work, so that the next attempt starts further along.
                 osg::ref_ptr<osg::Texture2D> texture = mLocalMapRender->getMapTexture(entry.mCellX, entry.mCellY);
                 if (texture)
                 {
@@ -642,7 +646,9 @@ namespace MWGui
                 osg::ref_ptr<osg::Texture2D> tex = mLocalMapRender->getFogOfWarTexture(entry.mCellX, entry.mCellY);
                 if (tex)
                 {
-                    entry.mFogTexture = std::make_unique<MyGUIPlatform::OSGTexture>(tex);
+                    entry.mFogTexture = createGuiTexture(tex, "local map fog");
+                    if (tex->getImage())
+                        entry.mFogModifiedCount = tex->getImage()->getModifiedCount();
                     entry.mFogWidget->setRenderItemTexture(entry.mFogTexture.get());
                     // For inexplicable historical reasons the fog texture is Y-down so this UV is *not* inverted
                     entry.mFogWidget->getSubWidgetMain()->_setUVSet(MyGUI::FloatRect(0.f, 0.f, 1.f, 1.f));
@@ -656,6 +662,25 @@ namespace MWGui
                 // Newly uncovered chunk, make sure to draw door markers right away instead of waiting for a cell
                 // transition
                 mNeedDoorMarkersUpdate = true;
+            }
+            else if (entry.mFogTexture && mFogOfWarToggled && mFogOfWarEnabled && usingVulkanGuiPlatform())
+            {
+                // Fog is written on the CPU and the image is dirtied as the player uncovers it. The
+                // OSG platform shares that image and needs nothing; the Vulkan platform holds a copy
+                // and has to be handed the new one, or the fog freezes at whatever was uncovered
+                // when the widget first appeared. The image is 32x32, so re-uploading it whenever it
+                // moves is cheaper than tracking which pixels changed.
+                osg::ref_ptr<osg::Texture2D> tex = mLocalMapRender->getFogOfWarTexture(entry.mCellX, entry.mCellY);
+                osg::Image* fogImage = tex ? tex->getImage() : nullptr;
+                if (fogImage != nullptr && fogImage->getModifiedCount() != entry.mFogModifiedCount)
+                {
+                    entry.mFogModifiedCount = fogImage->getModifiedCount();
+                    entry.mFogWidget->setRenderItemTexture(nullptr);
+                    entry.mFogTexture = createGuiTexture(tex, "local map fog");
+                    entry.mFogWidget->setRenderItemTexture(entry.mFogTexture.get());
+                    entry.mFogWidget->getSubWidgetMain()->_setUVSet(MyGUI::FloatRect(0.f, 0.f, 1.f, 1.f));
+                    needRedraw = true;
+                }
             }
         }
         if (needRedraw)
