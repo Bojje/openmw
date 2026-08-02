@@ -86,16 +86,24 @@ void main() {
 
     vec3 V = normalize(push.cameraPosition.xyz - worldPos);
 
-    // raygen stores raw reflected radiance; the weighting happens here and only here. It used to be
-    // attenuated in both places -- a magic 0.3 there and (1 - roughness) here -- which multiplied out
-    // to about 6% and made the reflection ray nearly pure cost. Schlick with a dielectric F0 of 0.04 is
-    // still an approximation (no metals, no GGX lobe, and the ray is a perfect mirror rather than
-    // spread by roughness) but it is view-dependent and bounded, which two constants were not.
-    float fresnel = 0.04 + 0.96 * pow(1.0 - max(dot(N, V), 0.0), 5.0);
-    vec3 reflectionColor = rtSample.gba * fresnel * (1.0 - roughness);
+    // raygen stores raw reflected radiance; the weighting happens here and only here.
+    //
+    // Roughness-aware Schlick (Lagarde's IBL form), not plain Schlick. Plain Schlick rises to 1.0 at
+    // grazing incidence, and the ground is nearly always viewed at grazing incidence, so it laid a
+    // bright mirror sheen over every floor and made rough dirt look like wet glass. On a real rough
+    // surface microfacet shadowing suppresses that; the Smith G term would express it, but there is no
+    // GGX lobe here, so cap the response at 1 - roughness instead. At the roughness 0.8 that
+    // gbuffer.frag currently hardcodes, that is 0.04 head-on rising to 0.2 at the edge.
+    const float F0 = 0.04; // dielectric; metals would use albedo, but nothing is metallic yet
+    float grazing = pow(1.0 - max(dot(N, V), 0.0), 5.0);
+    float fresnel = F0 + (max(1.0 - roughness, F0) - F0) * grazing;
+    vec3 reflectionColor = rtSample.gba * fresnel;
 
     vec3 ambient = albedo * 0.15;
-    vec3 diffuse = albedo * sunCol * NdotL * shadow;
+    // Energy conservation: light reflected specularly is light that did not scatter diffusely. Without
+    // the (1 - fresnel) the reflection was pure additive gain on top of an already full-strength
+    // diffuse term, which is the other half of why surfaces looked like they had a glowing film on top.
+    vec3 diffuse = albedo * sunCol * NdotL * shadow * (1.0 - fresnel);
 
     // Derive the highlight from the stored roughness instead of a fixed strength. Morrowind surfaces
     // are rough (0.8 from gbuffer.frag), and a fixed narrow highlight blows out large smooth-shaded
