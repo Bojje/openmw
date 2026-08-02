@@ -413,6 +413,49 @@ void main() {
                 historyAo = 0.0;
                 historyAge = 0.0;
                 historyBounce = vec3(0.0);
+
+                // Widen the search before giving up. The 2x2 gather failing usually means the
+                // reprojection landed a pixel or two off the surface -- at a silhouette, or where the
+                // camera moved enough that the exact footprint moved off it -- not that this surface
+                // was genuinely invisible last frame. Somewhere just outside that 2x2 there is often
+                // a tap of the same surface, and taking it is far better than starting from nothing:
+                // a pixel with no history is one raw sample of the sun cone and one of the hemisphere.
+                //
+                // Same depth and normal tests as above, so this cannot accept anything the tight
+                // gather would have rejected on merit -- only things it never looked at.
+                //
+                // The seeded history is deliberately given an age of 1, not the age it inherits. The
+                // sample is a neighbour's, not this pixel's, so it has earned one frame of confidence
+                // and no more; letting it inherit a 32-frame age would lock in a value from the wrong
+                // footprint and hold it there. One frame is enough to skip the worst of the noise and
+                // let the normal accumulation take over immediately.
+                for (int radius = 2; radius <= 3 && historyAge == 0.0; ++radius) {
+                    for (int y = -radius; y <= radius && historyAge == 0.0; ++y) {
+                        for (int x = -radius; x <= radius; ++x) {
+                            // Only the ring at this radius; the inside was covered already.
+                            if (abs(x) != radius && abs(y) != radius)
+                                continue;
+
+                            ivec2 tap = base + ivec2(x, y);
+                            if (any(lessThan(tap, ivec2(0))) || any(greaterThanEqual(tap, launchSize)))
+                                continue;
+
+                            uvec2 geom = imageLoad(geomIn, tap).xy;
+                            if (abs(uintBitsToFloat(geom.x) - prevViewPos.z) >= tolerance)
+                                continue;
+                            if (dot(N, unpackNormal(geom.y)) <= camera.denoiseParams.z)
+                                continue;
+
+                            vec4 tapHistory = imageLoad(historyIn, tap);
+                            historyMean = tapHistory.r;
+                            historyMoment = tapHistory.g;
+                            historyAo = tapHistory.b;
+                            historyBounce = imageLoad(indirectIn, tap).rgb;
+                            historyAge = 1.0;
+                            break;
+                        }
+                    }
+                }
             }
         }
     }
