@@ -96,7 +96,11 @@ void main() {
     // gbuffer.frag currently hardcodes, that is 0.04 head-on rising to 0.2 at the edge.
     const float F0 = 0.04; // dielectric; metals would use albedo, but nothing is metallic yet
     float grazing = pow(1.0 - max(dot(N, V), 0.0), 5.0);
-    float fresnel = F0 + (max(1.0 - roughness, F0) - F0) * grazing;
+    // Scaled by the material's own specular strength, which is 0 for all vanilla Morrowind content.
+    // A surface that does not reflect specularly does not reflect the world either, so this gates the
+    // ray traced reflection as well as the highlight below.
+    float specularStrength = materialSample.g;
+    float fresnel = (F0 + (max(1.0 - roughness, F0) - F0) * grazing) * specularStrength;
     vec3 reflectionColor = rtSample.gba * fresnel;
 
     vec3 ambient = albedo * 0.15;
@@ -105,12 +109,10 @@ void main() {
     // diffuse term, which is the other half of why surfaces looked like they had a glowing film on top.
     vec3 diffuse = albedo * sunCol * NdotL * shadow * (1.0 - fresnel);
 
-    // Derive the highlight from the stored roughness instead of a fixed strength. Morrowind surfaces
-    // are rough (0.8 from gbuffer.frag), and a fixed narrow highlight blows out large smooth-shaded
-    // faces like boulders. Roughness drives both the exponent and the intensity, so rough surfaces get
-    // a broad, weak highlight rather than a tight bright one.
-    float shininess = mix(128.0, 4.0, roughness);
-    float specularStrength = 0.3 * (1.0 - roughness);
+    // Blinn-Phong rather than GGX on purpose: vanilla Morrowind and the OSG renderer both use
+    // Blinn-Phong, so this matches the reference. The exponent is the inverse of the roughness
+    // parametrisation MeshConverter applied to NiMaterialProperty::mGlossiness.
+    float shininess = 2.0 / max(roughness * roughness * roughness * roughness, 1e-4) - 2.0;
     vec3 H = normalize(L + V);
     // Gated on NdotL: without it a surface facing away from the sun can still catch a highlight
     // wherever the half-vector happens to align, which shows up as rim light on unlit faces.

@@ -222,6 +222,8 @@ namespace MWRender
                 submission.textureIndex
                     = textureIndex == sNoTexture ? 0u : static_cast<uint32_t>(textureIndex + 1);
                 submission.alphaTested = mesh->alphaTested;
+                submission.roughness = mesh->roughness;
+                submission.specularStrength = mesh->specularStrength;
 
                 mRenderer->submitMesh(submission);
             }
@@ -247,6 +249,9 @@ namespace MWRender
                     : static_cast<uint32_t>(chunk.textureIndex + 1);
                 // Terrain is a solid heightfield; leaving it opaque keeps the fast traversal path.
                 submission.alphaTested = false;
+                // Dirt and rock. No specular, which is also what the OSG renderer gives terrain.
+                submission.roughness = 1.0f;
+                submission.specularStrength = 0.0f;
 
                 mRenderer->submitMesh(submission);
             }

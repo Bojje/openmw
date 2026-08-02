@@ -1440,6 +1440,8 @@ namespace Vk
                         pushData.normalMatrix[col * 4 + 3] = 0.0f;
                     }
                     pushData.textureIndex = drawCmd.textureIndex;
+                pushData.roughness = drawCmd.roughness;
+                pushData.specularStrength = drawCmd.specularStrength;
 
                     vkCmdPushConstants(cmd, mGBufferPipelineLayout,
                         VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
@@ -1588,7 +1590,8 @@ namespace Vk
         const uint32_t slot = submission.textureIndex < maxSceneTextures ? submission.textureIndex : 0;
         mDrawCommands.push_back({ submission.vertexBuffer, submission.indexBuffer, submission.indexCount,
             submission.transform, normalMatrix, submission.blasAddress, submission.vertexAddress,
-            submission.indexAddress, slot, submission.alphaTested });
+            submission.indexAddress, slot, submission.alphaTested, submission.roughness,
+            submission.specularStrength });
     }
 
     void Renderer::uploadGeometryTable(const std::vector<GeometryRecord>& records)

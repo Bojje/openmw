@@ -11,6 +11,8 @@ layout(push_constant) uniform PushConstants {
     layout(offset = 0)   mat4 model;
     layout(offset = 64)  mat3 normalMatrix;
     layout(offset = 112) uint textureIndex;
+    layout(offset = 116) float roughness;
+    layout(offset = 120) float specularStrength;
 } push;
 
 layout(set = 0, binding = 0) uniform CameraUBO {
@@ -47,9 +49,12 @@ void main() {
     vec3 N = normalize(fragNormal);
     outNormal = vec4(N * 0.5 + 0.5, 1.0);
 
-    float roughness = 0.8;
-    float metallic = 0.0;
+    // Real per-material values, not constants. The green channel carries specular strength rather than
+    // metallic: Morrowind has no metals, and upstream disables specular outright for Morrowind-era NIFs
+    // (nifosg::Loader::applyDrawableProperties), so for vanilla content this is 0 and the composite
+    // pass produces neither a highlight nor a reflection. That is correct -- it is what the OSG
+    // renderer does -- and it is why the previous hardcoded 0.8 roughness put a sheen on the world.
     float ao = 1.0;
     float emission = 0.0;
-    outMaterial = vec4(roughness, metallic, ao, emission);
+    outMaterial = vec4(push.roughness, push.specularStrength, ao, emission);
 }

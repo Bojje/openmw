@@ -1,6 +1,7 @@
 #include "meshconverter.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <cstring>
 
 #include <components/debug/debuglog.hpp>
@@ -148,6 +149,47 @@ namespace
         return false;
     }
 
+    // Nearest property of the given type affecting this shape, or nullptr if there is none.
+    //
+    // Properties are inherited and the deepest one wins: nifosg's collectDrawableProperties pushes the
+    // parent chain's properties before the shape's own, and applyDrawableProperties then overwrites its
+    // working state as it walks that list, so the last -- deepest -- property of a given type is the one
+    // that survives. Searching the shape's own properties before recursing into mParents picks the same
+    // winner without having to build the list first. Same parent walk as findAlphaTested above.
+    template <class T>
+    const T* findProperty(const Nif::NiAVObject* node)
+    {
+        for (const auto& propertyPtr : node->mProperties)
+        {
+            if (propertyPtr.empty())
+                continue;
+
+            const auto* property = dynamic_cast<const T*>(propertyPtr.getPtr());
+            if (property != nullptr)
+                return property;
+        }
+
+        for (const Nif::NiNode* parent : node->mParents)
+        {
+            if (parent == nullptr)
+                continue;
+
+            const T* property = findProperty<T>(parent);
+            if (property != nullptr)
+                return property;
+        }
+
+        return nullptr;
+    }
+
+    // Rec. 709 relative luminance. Same weights the engine already uses to collapse a colour to one
+    // number, see files/shaders/compatibility/luminance/luminance.frag and the pR/pG/pB constants in
+    // apps/openmw/mwrender/renderingmanager.cpp, so the Vulkan path does not invent a second convention.
+    float luminance(const osg::Vec3f& colour)
+    {
+        return 0.2126f * colour.x() + 0.7152f * colour.y() + 0.0722f * colour.z();
+    }
+
 }
 
 namespace NifVk
@@ -162,6 +204,8 @@ namespace NifVk
     std::vector<VulkanMesh> MeshConverter::convert(const Nif::FileView& nif)
     {
         std::vector<VulkanMesh> meshes;
+
+        mNifVersion = nif.getVersion();
 
         float identity[16];
         Vk::identityMat4(identity);
@@ -248,6 +292,53 @@ namespace NifVk
         std::memcpy(mesh.transform, worldTransform, 16 * sizeof(float));
         mesh.baseTexture = findBaseTexture(geom);
         mesh.alphaTested = findAlphaTested(geom);
+
+        // Whether a specular highlight is allowed on this shape at all. Two gates, both taken from
+        // nifosg::Loader::applyDrawableProperties:
+        //
+        //  - Morrowind-era files never get one. applyDrawableProperties zeroes the specular colour and
+        //    the shininess outright for mVersion <= VER_MW, commented "While NetImmerse and Gamebryo
+        //    support specular lighting, Morrowind has its support disabled". Vanilla content does ship
+        //    non-black mSpecular in places; the OSG path throws it away and so must this one, or every
+        //    rock in the game picks up a sheen the reference renderer does not show.
+        //  - Later files can still switch it off per-shape. specEnabled starts true there and is only
+        //    ever cleared from a property, so an absent NiSpecularProperty means enabled.
+        //
+        // BSShaderPPLightingProperty and BSLightingShaderProperty also drive specEnabled upstream. They
+        // are not consulted here because the Vulkan path does not read Bethesda shader properties yet,
+        // and leaving them out only ever errs towards less specular.
+        const auto* specularProperty = findProperty<Nif::NiSpecularProperty>(geom);
+        const bool specularEnabled
+            = mNifVersion > Nif::NIFFile::VER_MW && (specularProperty == nullptr || specularProperty->mEnable);
+
+        if (const auto* material = findProperty<Nif::NiMaterialProperty>(geom))
+        {
+            // Phong exponent to linear roughness: roughness = sqrt(2 / (glossiness + 2)), the standard
+            // inversion of the Blinn-Phong normalisation term (Karis, "Physically Based Shading in
+            // Mobile", SIGGRAPH 2013). Glossiness is clamped to [0, 128] first, the same ceiling
+            // applyDrawableProperties applies before handing it to osg::Material::setShininess, because
+            // NIFs do ship exponents far above what was ever renderable. That range maps to roughness
+            // [0.124, 1.0]; the trailing clamp only guards against a garbage exponent in a broken file.
+            //
+            // Note this is deliberately *not* gated on specularEnabled even though OSG also forces
+            // shininess to 0 there. Roughness widens the diffuse lobe too, and zeroing it for every
+            // Morrowind shape would put the plastic look straight back. Suppressing the highlight is
+            // specularStrength's job below.
+            const float glossiness = std::clamp(material->mGlossiness, 0.f, 128.f);
+            mesh.roughness = std::clamp(std::sqrt(2.f / (glossiness + 2.f)), 0.05f, 1.f);
+
+            // A NiMaterialProperty has no scalar specular strength -- OSG feeds the colour straight to
+            // osg::Material::setSpecular -- so its luminance stands in for one. Most Morrowind materials
+            // store black here and would land on 0 even without the gate above.
+            if (specularEnabled)
+                mesh.specularStrength = std::clamp(luminance(material->mSpecular), 0.f, 1.f);
+
+            // mEmissive scaled by mEmissiveMult, collapsed the same way. mEmissiveMult is only read for
+            // Bethesda version 22 and above and defaults to 1, so Morrowind files pass the emissive
+            // colour through unscaled. Not clamped to 1: emissiveMult is an HDR multiplier upstream and
+            // the consumer should decide the exposure. Nothing consumes it yet.
+            mesh.emissiveStrength = std::max(luminance(material->mEmissive) * material->mEmissiveMult, 0.f);
+        }
 
         const Nif::NiGeometryData* data = geom->mData.getPtr();
 

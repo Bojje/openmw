@@ -69,6 +69,11 @@ namespace Vk
         // Whether the silhouette lives in the texture's alpha channel. Drives the any-hit shader's
         // early-out; must agree with the opacity flag the BLAS was built with.
         bool alphaTested = false;
+        // Surface response from the NIF material. Defaults are fully rough with no specular, which is
+        // what vanilla Morrowind content resolves to -- upstream disables specular outright for
+        // Morrowind-era NIFs (nifosg::Loader::applyDrawableProperties).
+        float roughness = 1.0f;
+        float specularStrength = 0.0f;
     };
 
     struct MeshDrawCommand
@@ -83,6 +88,8 @@ namespace Vk
         VkDeviceAddress indexAddress;
         uint32_t textureIndex;
         bool alphaTested;
+        float roughness;
+        float specularStrength;
     };
 
     // Layout of the G-buffer pipeline's push constant block. This must match the block declared in
@@ -90,8 +97,13 @@ namespace Vk
     //
     //     offset   0, size 64  mat4 model
     //     offset  64, size 48  mat3 normalMatrix  (std430: 3 columns, each padded out to a vec4)
-    //     offset 112, size  4  uint textureIndex
-    //     total 116 bytes, within the 128-byte maxPushConstantsSize Vulkan guarantees everywhere.
+    //     offset 112, size  4  uint  textureIndex
+    //     offset 116, size  4  float roughness
+    //     offset 120, size  4  float specularStrength
+    //     total 124 bytes, within the 128-byte maxPushConstantsSize Vulkan guarantees everywhere.
+    //
+    // Only 4 bytes of headroom remain. Anything further -- emissive, a material index -- has to go in a
+    // per-instance buffer rather than here.
     //
     // The normal matrix is stored as 12 floats rather than a Mat4 because a push-constant mat3 pads
     // each column to 16 bytes but has no fourth column; using a Mat4 here would shift textureIndex by
@@ -101,11 +113,16 @@ namespace Vk
         Mat4 model;
         float normalMatrix[12];
         uint32_t textureIndex;
+        float roughness;
+        float specularStrength;
     };
 
-    static_assert(sizeof(GBufferPushConstants) == 116, "G-buffer push constant layout mismatch");
+    static_assert(sizeof(GBufferPushConstants) == 124, "G-buffer push constant layout mismatch");
+    static_assert(sizeof(GBufferPushConstants) <= 128, "exceeds the guaranteed maxPushConstantsSize");
     static_assert(offsetof(GBufferPushConstants, normalMatrix) == 64, "normalMatrix must be at byte 64");
     static_assert(offsetof(GBufferPushConstants, textureIndex) == 112, "textureIndex must be at byte 112");
+    static_assert(offsetof(GBufferPushConstants, roughness) == 116, "roughness must be at byte 116");
+    static_assert(offsetof(GBufferPushConstants, specularStrength) == 120, "specularStrength at byte 120");
 
     struct GBufferAttachments
     {

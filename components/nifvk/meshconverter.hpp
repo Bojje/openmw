@@ -46,6 +46,24 @@ namespace NifVk
         // shader runs and can discard the cut-out texels; flagged opaque, a leaf billboard casts the
         // shadow of a solid rectangle.
         bool alphaTested = false;
+
+        // Surface response derived from the shape's NiMaterialProperty. All three are scalars because
+        // the G-buffer has one channel each to spare; the NIF stores colours, which are collapsed by
+        // luminance. A shape with no NiMaterialProperty keeps the defaults below.
+
+        // Linear roughness derived from the material's Phong glossiness. 1.0 = fully rough, which is
+        // both the NIF default (mGlossiness defaults to 0) and the right answer for the bulk of
+        // Morrowind, where nothing has a specular highlight to sharpen.
+        float roughness = 1.0f;
+
+        // How strongly the surface reflects specularly, 0 = not at all. Zero unless the file both
+        // postdates Morrowind and leaves specular switched on, so the common case is 0 -- see the
+        // derivation in processGeometry for why that gate is deliberately strict.
+        float specularStrength = 0.0f;
+
+        // Luminance of the material's emissive colour times its emissive multiplier. Not consumed by
+        // the renderer yet; gbuffer.frag still writes a constant emission.
+        float emissiveStrength = 0.0f;
     };
 
     class MeshConverter
@@ -63,6 +81,11 @@ namespace NifVk
 
         Vk::Device& mDevice;
         Vk::CommandPool& mCommandPool;
+
+        // NIF format version of the file currently being converted, set by convert(). Needed because
+        // Morrowind-era files have specular lighting disabled wholesale and the records themselves
+        // carry no hint of that -- only the file header does.
+        std::uint32_t mNifVersion = 0;
     };
 
 }

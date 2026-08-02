@@ -15,6 +15,8 @@ layout(push_constant) uniform PushConstants {
     layout(offset = 0)   mat4 model;
     layout(offset = 64)  mat3 normalMatrix;
     layout(offset = 112) uint textureIndex;
+    layout(offset = 116) float roughness;
+    layout(offset = 120) float specularStrength;
 } push;
 
 layout(set = 0, binding = 0) uniform CameraUBO {
