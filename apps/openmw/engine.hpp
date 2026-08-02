@@ -170,8 +170,13 @@ namespace OMW
         // so rather than silently ignoring the setting.
         bool mUseVulkanRenderer = false;
 
+        // The window OSG's GL context lives on. The same window as mWindow on the OpenGL path; on the
+        // Vulkan path a hidden sibling, because mWindow carries no GL pixel format there and OSG still
+        // has to run -- it owns the world, the animation and the render to texture surfaces the
+        // interface uses, and only its presentation has been taken away from it.
+        SDL_Window* mGlWindow = nullptr;
+
 #ifdef OPENMW_USE_VULKAN
-        SDL_Window* mVkWindow = nullptr;
         std::unique_ptr<MWRender::VkRenderingManager> mVkRenderingManager;
         // Created lazily: the light manager it binds to does not exist until the world is up.
         std::unique_ptr<MWRender::VkLightCollector> mVkLightCollector;

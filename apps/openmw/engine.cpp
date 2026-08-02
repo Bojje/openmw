@@ -78,15 +78,11 @@
 
 #ifdef OPENMW_USE_VULKAN
 #include <components/sceneutil/lightmanager.hpp>
+#include <components/vk/vkplatform.hpp>
 
 #include "mwrender/camera.hpp"
 #include "mwrender/renderingmanager.hpp"
 #include "mwrender/vklightcollector.hpp"
-#include "mwrender/vkrenderingmanager.hpp"
-#endif
-
-#ifdef OPENMW_USE_VULKAN
-#include "mwrender/camera.hpp"
 #include "mwrender/vkrenderingmanager.hpp"
 #endif
 
@@ -371,18 +367,26 @@ bool OMW::Engine::frame(unsigned frameNumber, float frametime)
     mViewer->renderingTraversals();
 
 #ifdef OPENMW_USE_VULKAN
-    if (mVkRenderingManager && mVkWindow)
+    if (mVkRenderingManager)
     {
         try
         {
             int curW, curH;
-            SDL_GetWindowSize(mVkWindow, &curW, &curH);
+            Vk::getDrawableSize(mWindow, curW, curH);
             if (curW != mVkWidth || curH != mVkHeight)
             {
                 mVkWidth = curW;
                 mVkHeight = curH;
                 if (mVkWidth > 0 && mVkHeight > 0)
+                {
                     mVkRenderingManager->resize(static_cast<uint32_t>(mVkWidth), static_cast<uint32_t>(mVkHeight));
+                    // Kept in step deliberately. OSG's viewport follows the main window through
+                    // SDL_WINDOWEVENT_SIZE_CHANGED, but the framebuffer it draws into belongs to the
+                    // context window, and a viewport larger than its framebuffer reads back garbage
+                    // in the render to texture targets the interface still uses.
+                    if (mGlWindow != mWindow)
+                        SDL_SetWindowSize(mGlWindow, mVkWidth, mVkHeight);
+                }
             }
 
             if (mVkWidth > 0 && mVkHeight > 0)
@@ -426,10 +430,11 @@ bool OMW::Engine::frame(unsigned frameNumber, float frametime)
         }
         catch (const std::exception& e)
         {
+            // The window is shared with the rest of the engine now, so it stays; only the renderer
+            // goes. What is left is a window nothing draws into, which is worse than it used to be
+            // and is still better than taking the game down.
             Log(Debug::Error) << "Vulkan render error: " << e.what();
             mVkRenderingManager.reset();
-            SDL_DestroyWindow(mVkWindow);
-            mVkWindow = nullptr;
         }
     }
 #endif
@@ -513,12 +518,11 @@ OMW::Engine::~Engine()
 
 #ifdef OPENMW_USE_VULKAN
     mVkRenderingManager.reset();
-    if (mVkWindow)
-    {
-        SDL_DestroyWindow(mVkWindow);
-        mVkWindow = nullptr;
-    }
 #endif
+
+    if (mGlWindow && mGlWindow != mWindow)
+        SDL_DestroyWindow(mGlWindow);
+    mGlWindow = nullptr;
 
     if (mWindow)
     {
@@ -614,7 +618,15 @@ void OMW::Engine::createWindow()
         posY = SDL_WINDOWPOS_UNDEFINED_DISPLAY(screen);
     }
 
-    Uint32 flags = SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI;
+    // The window the player looks at belongs to whichever backend was selected, which is the whole
+    // point of the setting: the two are peers, and one of them owns the window rather than one being
+    // the game and the other a preview of it. On the Vulkan path this window carries no GL pixel
+    // format -- the surface comes from the native handle -- and OSG gets its context on a hidden
+    // sibling created below, because it still has to run its traversals and its render to texture
+    // targets even though nobody looks at what it draws.
+    Uint32 flags = SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI;
+    if (!mUseVulkanRenderer)
+        flags |= SDL_WINDOW_OPENGL;
     if (windowMode == Settings::WindowMode::Fullscreen)
         flags |= SDL_WINDOW_FULLSCREEN;
     else if (windowMode == Settings::WindowMode::WindowedFullscreen)
@@ -646,6 +658,23 @@ void OMW::Engine::createWindow()
     osg::ref_ptr<SDLUtil::GraphicsWindowSDL2> graphicsWindow;
     while (!graphicsWindow || !graphicsWindow->valid())
     {
+        // Created before the visible window rather than after it, and not only for tidiness:
+        // SDL only loads the GL driver when a GL window is made, and until it has,
+        // SDL_GL_GetDrawableSize falls back to the logical window size for every window. Making
+        // this one first keeps the drawable size queries below meaning the same thing on both paths.
+        if (mUseVulkanRenderer && !mGlWindow)
+        {
+            mGlWindow = SDL_CreateWindow("OpenMW OpenGL context", SDL_WINDOWPOS_UNDEFINED_DISPLAY(screen),
+                SDL_WINDOWPOS_UNDEFINED_DISPLAY(screen), width, height,
+                SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN | SDL_WINDOW_ALLOW_HIGHDPI);
+            if (!mGlWindow)
+            {
+                std::stringstream error;
+                error << "Failed to create the OpenGL context window: " << SDL_GetError();
+                throw std::runtime_error(error.str());
+            }
+        }
+
         while (!mWindow)
         {
             mWindow = SDL_CreateWindow("OpenMW", posX, posY, width, height, flags);
@@ -683,14 +712,27 @@ void OMW::Engine::createWindow()
 
         setWindowIcon();
 
+        // The context window has to match the one the player sees, or OSG renders and reads back at
+        // a different size to the one the Vulkan swapchain and the interface are using.
+        if (mGlWindow)
+        {
+            int ww, wh;
+            SDL_GetWindowSize(mWindow, &ww, &wh);
+            SDL_SetWindowSize(mGlWindow, ww, wh);
+        }
+        else
+        {
+            mGlWindow = mWindow;
+        }
+
         osg::ref_ptr<osg::GraphicsContext::Traits> traits = new osg::GraphicsContext::Traits;
         SDL_GetWindowPosition(mWindow, &traits->x, &traits->y);
-        SDL_GL_GetDrawableSize(mWindow, &traits->width, &traits->height);
+        SDL_GL_GetDrawableSize(mGlWindow, &traits->width, &traits->height);
         traits->windowName = SDL_GetWindowTitle(mWindow);
         traits->windowDecoration = !(SDL_GetWindowFlags(mWindow) & SDL_WINDOW_BORDERLESS);
         traits->screenNum = SDL_GetWindowDisplayIndex(mWindow);
         traits->vsync = 0;
-        traits->inheritedWindowData = new SDLUtil::GraphicsWindowSDL2::WindowData(mWindow);
+        traits->inheritedWindowData = new SDLUtil::GraphicsWindowSDL2::WindowData(mGlWindow);
 
         graphicsWindow = new SDLUtil::GraphicsWindowSDL2(traits, vsync);
         if (!graphicsWindow->valid())
@@ -701,7 +743,12 @@ void OMW::Engine::createWindow()
             Log(Debug::Warning) << "Warning: Framebuffer MSAA level is only " << traits->samples << "x instead of "
                                 << antialiasing << "x. Trying " << antialiasing / 2 << "x instead.";
             graphicsWindow->closeImplementation();
+            // Both, and in this order. The sample count is only read when a GL window is created, so
+            // reusing the context window would leave the retry doing nothing at all.
+            if (mGlWindow != mWindow)
+                SDL_DestroyWindow(mGlWindow);
             SDL_DestroyWindow(mWindow);
+            mGlWindow = nullptr;
             mWindow = nullptr;
             antialiasing /= 2;
             Settings::video().mAntialiasing.set(antialiasing);
@@ -799,6 +846,13 @@ void OMW::Engine::createWindow()
     mViewer->realize();
     mGlMaxTextureImageUnits = identifyOp->getMaxTextureImageUnits();
 
+    // GraphicsWindowSDL2::realizeImplementation shows its window unconditionally, so the context
+    // window has to be put back out of sight afterwards rather than only being created hidden.
+    // Hidden is not minimised: it keeps its size, so the framebuffer and every render to texture
+    // target stay valid.
+    if (mGlWindow != mWindow)
+        SDL_HideWindow(mGlWindow);
+
     mViewer->getEventQueue()->getCurrentEventState()->setWindowRectangle(
         0, 0, graphicsWindow->getTraits()->width, graphicsWindow->getTraits()->height);
 
@@ -811,44 +865,29 @@ void OMW::Engine::createWindow()
 #ifdef OPENMW_USE_VULKAN
 void OMW::Engine::createVulkanRenderer()
 {
-    Log(Debug::Info) << "Attempting to create Vulkan window";
+    Log(Debug::Info) << "Creating the Vulkan renderer on the main window";
     try
     {
-        int vkW, vkH;
-        SDL_GL_GetDrawableSize(mWindow, &vkW, &vkH);
-        // No SDL_WINDOW_VULKAN: the prebuilt SDL2 in openmw-deps is built without SDL_VIDEO_VULKAN,
-        // so that flag would make SDL_CreateWindow fail. The surface is created from the native
-        // window handle instead, see Vk::createPlatformSurface.
-        mVkWindow = SDL_CreateWindow("OpenMW Vulkan",
-            SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-            vkW, vkH,
-            SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
-        if (!mVkWindow)
-        {
-            Log(Debug::Error) << "Failed to create Vulkan window: " << SDL_GetError();
-        }
-        else
-        {
-            mVkRenderingManager = std::make_unique<MWRender::VkRenderingManager>(mVkWindow, true);
-            mVkWidth = vkW;
-            mVkHeight = vkH;
+        // The main window carries no GL pixel format on this path, and the surface comes from its
+        // native handle rather than from SDL -- the prebuilt SDL2 in openmw-deps is built without
+        // SDL_VIDEO_VULKAN, so SDL_WINDOW_VULKAN would have made SDL_CreateWindow fail anyway. See
+        // Vk::createPlatformSurface.
+        Vk::getDrawableSize(mWindow, mVkWidth, mVkHeight);
+        mVkRenderingManager = std::make_unique<MWRender::VkRenderingManager>(mWindow, true);
 
-            auto shaderDir = mResDir / "shaders" / "vulkan";
-            if (mVkRenderingManager->loadShaders(shaderDir))
-                Log(Debug::Info) << "Vulkan renderer created with shaders from " << shaderDir;
-            else
-                Log(Debug::Warning) << "Vulkan renderer created without shaders (not found at " << shaderDir << ")";
-        }
+        auto shaderDir = mResDir / "shaders" / "vulkan";
+        if (mVkRenderingManager->loadShaders(shaderDir))
+            Log(Debug::Info) << "Vulkan renderer created with shaders from " << shaderDir;
+        else
+            Log(Debug::Warning) << "Vulkan renderer created without shaders (not found at " << shaderDir << ")";
     }
     catch (const std::exception& e)
     {
+        // Not fatal, and it must not be: the window itself is fine, the interface falls back to the
+        // OSG platform, and OSG still has its context. The player gets a black world rather than a
+        // failed launch, which is also what makes the failure diagnosable.
         Log(Debug::Error) << "Vulkan initialization failed: " << e.what();
         mVkRenderingManager.reset();
-        if (mVkWindow)
-        {
-            SDL_DestroyWindow(mVkWindow);
-            mVkWindow = nullptr;
-        }
     }
 }
 #endif
@@ -998,8 +1037,31 @@ void OMW::Engine::prepareEngine()
         Version::getOpenmwVersionDescription(), mCfgMgr, vkGuiRenderer, vkShaderDir);
     mEnvironment.setWindowManager(*mWindowManager);
 
+    // The Vulkan backend cannot be screenshotted through osgViewer, and grabbing the screen is not a
+    // dependable substitute -- see Vk::Renderer::captureLastFrame. So the screenshot key writes one
+    // from each backend that is running.
+    std::function<void()> vkScreenshot;
+#ifdef OPENMW_USE_VULKAN
+    if (mVkRenderingManager)
+    {
+        vkScreenshot = [this] {
+            try
+            {
+                const std::filesystem::path written = mVkRenderingManager->writeScreenshot(
+                    mCfgMgr.getScreenshotPath(), Settings::general().mScreenshotFormat);
+                if (!written.empty())
+                    Log(Debug::Info) << "Vulkan screenshot saved to " << written;
+            }
+            catch (const std::exception& e)
+            {
+                Log(Debug::Error) << "Vulkan screenshot failed: " << e.what();
+            }
+        };
+    }
+#endif
+
     mInputManager = std::make_unique<MWInput::InputManager>(mWindow, mViewer, mScreenCaptureHandler, keybinderUser,
-        keybinderUserExists, userGameControllerdb, gameControllerdb, mGrab);
+        keybinderUserExists, userGameControllerdb, gameControllerdb, mGrab, std::move(vkScreenshot));
     mEnvironment.setInputManager(*mInputManager);
 
     // Create sound system
