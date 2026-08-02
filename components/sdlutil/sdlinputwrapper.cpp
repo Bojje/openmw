@@ -298,6 +298,13 @@ namespace SDLUtil
                 updateMouseSettings();
                 break;
             case SDL_WINDOWEVENT_CLOSE:
+                // SDL only synthesises SDL_QUIT when the *last* window closes, so with a second
+                // window open -- the Vulkan renderer's -- closing the game window used to do
+                // nothing at all, and the game could not be quit from its title bar. The early
+                // return above means this only ever fires for the main window, and requestQuit is
+                // idempotent, so the single window case still behaves as it did.
+                if (mWindowListener)
+                    mWindowListener->windowClosed();
                 break;
             case SDL_WINDOWEVENT_SHOWN:
             case SDL_WINDOWEVENT_RESTORED:
