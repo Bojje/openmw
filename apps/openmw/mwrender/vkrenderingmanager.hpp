@@ -91,14 +91,20 @@ namespace MWRender
         /// this manager -- the user interface being the one that exists. Never null once constructed.
         Vk::Renderer& renderer() { return *mRenderer; }
 
-        /// Writes what this renderer last presented into \a screenshotPath as \a format, and returns
-        /// the file it wrote or an empty path if there was nothing to write.
+        /// Asks for the next rendered frame to be copied out. Nothing is written until
+        /// writeScreenshot is called after that frame -- the copy has to be recorded inside the
+        /// frame, because a presented swapchain image is no longer the application's to touch. See
+        /// Vk::Renderer::requestScreenshot.
+        void requestScreenshot();
+
+        /// Writes the frame requested above into \a screenshotPath as \a format, and returns the
+        /// file it wrote, or an empty path if no frame was captured. Call once per frame after
+        /// render(); it is a no-op unless a screenshot was asked for.
         ///
         /// The OSG side gets its screenshot from osgViewer, which reads the GL framebuffer. This is
         /// the equivalent for the Vulkan side and it exists for the same reason plus one more:
         /// grabbing the screen is not a dependable way to see this renderer's output, because a
-        /// window the compositor has put on an overlay plane captures as solid black. See
-        /// Vk::Renderer::captureLastFrame.
+        /// window the compositor has put on an overlay plane captures as solid black.
         std::filesystem::path writeScreenshot(
             const std::filesystem::path& screenshotPath, const std::string& format);
 

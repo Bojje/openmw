@@ -592,17 +592,19 @@ namespace MWRender
         mRenderer->resize(width, height);
     }
 
+    void VkRenderingManager::requestScreenshot()
+    {
+        mRenderer->requestScreenshot();
+    }
+
     std::filesystem::path VkRenderingManager::writeScreenshot(
         const std::filesystem::path& screenshotPath, const std::string& format)
     {
         std::vector<uint8_t> pixels;
         uint32_t width = 0;
         uint32_t height = 0;
-        if (!mRenderer->captureLastFrame(pixels, width, height))
-        {
-            Log(Debug::Warning) << "Vulkan: nothing has been presented yet, no screenshot written";
+        if (!mRenderer->takeScreenshot(pixels, width, height))
             return {};
-        }
 
         osg::ref_ptr<osg::Image> image = new osg::Image;
         image->allocateImage(static_cast<int>(width), static_cast<int>(height), 1, GL_RGBA, GL_UNSIGNED_BYTE);

@@ -264,6 +264,24 @@ namespace Vk
             srcStage = VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR;
             dstStage = VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR;
         }
+        else if (oldLayout == VK_IMAGE_LAYOUT_PRESENT_SRC_KHR && newLayout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)
+        {
+            // Taking a screenshot: the composite pass has just finished writing the swapchain image
+            // and the copy out of it reads it. Legal only between acquire and present -- see
+            // Renderer::requestScreenshot.
+            barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+            barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+            srcStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+            dstStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        }
+        else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_PRESENT_SRC_KHR)
+        {
+            // And handing it back, because endFrame presents it immediately afterwards.
+            barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+            barrier.dstAccessMask = 0;
+            srcStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+            dstStage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+        }
         else
         {
             // Deliberately conservative: an unhandled pair is a bug, but stalling everything is at
@@ -1752,10 +1770,6 @@ namespace Vk
             VK_CHECK(result);
         }
 
-        // Only after a successful present is the image at mCurrentImageIndex worth reading back, and
-        // a resize destroys the swapchain, so this is cleared there rather than being set once.
-        mFramePresented = true;
-
         mCurrentFrame = (mCurrentFrame + 1) % maxFramesInFlight;
     }
 
@@ -1989,17 +2003,30 @@ namespace Vk
             vkCmdEndRenderPass(cmd);
         }
 
+        // Inside the frame, while the image is still ours. See requestScreenshot for why it cannot
+        // be done after the present instead.
+        if (mScreenshotRequested)
+        {
+            mScreenshotRequested = false;
+            recordScreenshotCopy(cmd, extent);
+        }
+
         mDrawCommands.clear();
 
         endFrame();
+
+        if (mScreenshotPending)
+            resolveScreenshot();
     }
 
     void Renderer::resize(uint32_t width, uint32_t height)
     {
         vkDeviceWaitIdle(mDevice->handle());
 
-        // The swapchain images do not survive this, so nothing is readable until the next present.
-        mFramePresented = false;
+        // The swapchain images and the readback buffer's size both belong to the old extent.
+        mScreenshotPending = false;
+        mScreenshotBuffer.reset();
+        mScreenshotBufferSize = 0;
 
         if (mGBufferFramebuffer != VK_NULL_HANDLE)
         {
@@ -2085,33 +2112,32 @@ namespace Vk
         vkDeviceWaitIdle(mDevice->handle());
     }
 
-    bool Renderer::captureLastFrame(std::vector<uint8_t>& rgba, uint32_t& width, uint32_t& height)
+    void Renderer::recordScreenshotCopy(VkCommandBuffer cmd, VkExtent2D extent)
     {
-        if (!mSwapchain || !mFramePresented)
-            return false;
+        if (!mSwapchain || extent.width == 0 || extent.height == 0)
+            return;
 
         const std::vector<VkImage>& images = mSwapchain->images();
         if (mCurrentImageIndex >= images.size())
-            return false;
-
-        const VkExtent2D extent = mSwapchain->extent();
-        if (extent.width == 0 || extent.height == 0)
-            return false;
-
-        // Nothing may still be writing the image being read, and the caller is a screenshot key, so
-        // the blunt instrument is the right one.
-        vkDeviceWaitIdle(mDevice->handle());
+            return;
 
         const VkDeviceSize byteCount = VkDeviceSize(extent.width) * extent.height * 4;
-        Buffer readback(*mDevice, byteCount, VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+        if (!mScreenshotBuffer || mScreenshotBufferSize != byteCount)
+        {
+            // Safe to replace here rather than retiring it: the only submission that ever reads or
+            // writes this buffer is the one being recorded, and the previous screenshot's submission
+            // was waited on in resolveScreenshot before this could be reached again.
+            mScreenshotBuffer = std::make_unique<Buffer>(*mDevice, byteCount, VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+            mScreenshotBufferSize = byteCount;
+        }
 
-        VkCommandBuffer cmd = mCommandPool->beginSingleTime();
+        VkImage image = images[mCurrentImageIndex];
 
-        // The image is in PRESENT_SRC because it was presented, and it has to be handed back in that
-        // layout: the next acquire of this index expects to find it there.
-        transitionImageLayout(cmd, images[mCurrentImageIndex], VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT);
+        // The composite render pass leaves the image in PRESENT_SRC, and it has to be handed back in
+        // that layout because endFrame presents it straight afterwards.
+        transitionImageLayout(
+            cmd, image, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT);
 
         VkBufferImageCopy region = {};
         region.bufferOffset = 0;
@@ -2124,40 +2150,64 @@ namespace Vk
         region.imageOffset = { 0, 0, 0 };
         region.imageExtent = { extent.width, extent.height, 1 };
         vkCmdCopyImageToBuffer(
-            cmd, images[mCurrentImageIndex], VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, readback.handle(), 1, &region);
+            cmd, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, mScreenshotBuffer->handle(), 1, &region);
 
-        transitionImageLayout(cmd, images[mCurrentImageIndex], VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-            VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_IMAGE_ASPECT_COLOR_BIT);
+        transitionImageLayout(
+            cmd, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_IMAGE_ASPECT_COLOR_BIT);
 
-        mCommandPool->endSingleTime(cmd, mDevice->graphicsQueue());
+        mScreenshotWidth = extent.width;
+        mScreenshotHeight = extent.height;
+        mScreenshotPending = true;
+    }
 
-        const uint8_t* mapped = static_cast<const uint8_t*>(readback.map());
+    void Renderer::resolveScreenshot()
+    {
+        mScreenshotPending = false;
+
+        if (!mScreenshotBuffer)
+            return;
+
+        // The copy is part of the frame's submission, so waiting for the device to go idle is enough
+        // to know it has landed. Blunt, and this only runs when someone pressed the screenshot key.
+        vkDeviceWaitIdle(mDevice->handle());
+
+        const uint8_t* mapped = static_cast<const uint8_t*>(mScreenshotBuffer->map());
         if (mapped == nullptr)
-            return false;
+            return;
 
-        // chooseSurfaceFormat asks for B8G8R8A8_SRGB and warns if it cannot have it, so the channel
-        // order is known rather than assumed -- but assert the assumption rather than swizzling
-        // blind, because a fallback format would otherwise produce a red and blue swapped screenshot
-        // that reads as a shader bug.
+        // chooseSurfaceFormat asks for B8G8R8A8_SRGB and warns when it cannot have it, so the channel
+        // order is known rather than guessed -- but it is checked rather than swizzled blind, because
+        // on a fallback format the alternative is a screenshot with red and blue swapped, which reads
+        // as a shader bug.
         const bool swapRedBlue
             = mSwapchain->format() == VK_FORMAT_B8G8R8A8_SRGB || mSwapchain->format() == VK_FORMAT_B8G8R8A8_UNORM;
 
-        rgba.resize(static_cast<size_t>(byteCount));
-        for (size_t i = 0; i < rgba.size(); i += 4)
+        mScreenshotPixels.resize(static_cast<size_t>(mScreenshotBufferSize));
+        for (size_t i = 0; i < mScreenshotPixels.size(); i += 4)
         {
-            rgba[i + 0] = swapRedBlue ? mapped[i + 2] : mapped[i + 0];
-            rgba[i + 1] = mapped[i + 1];
-            rgba[i + 2] = swapRedBlue ? mapped[i + 0] : mapped[i + 2];
+            mScreenshotPixels[i + 0] = swapRedBlue ? mapped[i + 2] : mapped[i + 0];
+            mScreenshotPixels[i + 1] = mapped[i + 1];
+            mScreenshotPixels[i + 2] = swapRedBlue ? mapped[i + 0] : mapped[i + 2];
             // The swapchain has no meaningful alpha -- the composite pass writes 1.0 -- but a
             // screenshot with a zero alpha channel opens as fully transparent in most viewers, which
             // looks exactly like a renderer that drew nothing.
-            rgba[i + 3] = 0xff;
+            mScreenshotPixels[i + 3] = 0xff;
         }
 
-        readback.unmap();
+        mScreenshotBuffer->unmap();
+        mScreenshotReady = true;
+    }
 
-        width = extent.width;
-        height = extent.height;
+    bool Renderer::takeScreenshot(std::vector<uint8_t>& rgba, uint32_t& width, uint32_t& height)
+    {
+        if (!mScreenshotReady)
+            return false;
+
+        rgba = std::move(mScreenshotPixels);
+        mScreenshotPixels.clear();
+        width = mScreenshotWidth;
+        height = mScreenshotHeight;
+        mScreenshotReady = false;
         return true;
     }
 

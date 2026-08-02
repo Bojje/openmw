@@ -425,6 +425,13 @@ bool OMW::Engine::frame(unsigned frameNumber, float frametime)
                     }
 
                     mVkRenderingManager->render(*camera, lighting);
+
+                    // After render, because the copy is recorded inside the frame that was just
+                    // drawn. A no-op unless the screenshot key asked for one.
+                    const std::filesystem::path written = mVkRenderingManager->writeScreenshot(
+                        mCfgMgr.getScreenshotPath(), Settings::general().mScreenshotFormat);
+                    if (!written.empty())
+                        Log(Debug::Info) << "Vulkan screenshot saved to " << written;
                 }
             }
         }
@@ -1044,19 +1051,9 @@ void OMW::Engine::prepareEngine()
 #ifdef OPENMW_USE_VULKAN
     if (mVkRenderingManager)
     {
-        vkScreenshot = [this] {
-            try
-            {
-                const std::filesystem::path written = mVkRenderingManager->writeScreenshot(
-                    mCfgMgr.getScreenshotPath(), Settings::general().mScreenshotFormat);
-                if (!written.empty())
-                    Log(Debug::Info) << "Vulkan screenshot saved to " << written;
-            }
-            catch (const std::exception& e)
-            {
-                Log(Debug::Error) << "Vulkan screenshot failed: " << e.what();
-            }
-        };
+        // Only asks. The copy has to be recorded inside a frame, so the file is written by frame()
+        // once that frame has been rendered.
+        vkScreenshot = [this] { mVkRenderingManager->requestScreenshot(); };
     }
 #endif
 

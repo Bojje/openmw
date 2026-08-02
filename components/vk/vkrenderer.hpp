@@ -26,6 +26,7 @@ namespace Vk
     class Instance;
     class Device;
     class Swapchain;
+    class Buffer;
     class CommandPool;
     class FrameSync;
     class RayTracingPipeline;
@@ -374,22 +375,39 @@ namespace Vk
         // up to maxFramesInFlight submissions may still be reading those buffers and BLASes.
         void waitIdle();
 
-        // Reads the swapchain image the last frame presented back into \a rgba, eight bits per
-        // channel, row major, top row first, alpha forced opaque. Returns false before the first
-        // frame has been presented.
+        // Asks for a copy of the next frame. The copy is recorded into that frame's own command
+        // buffer, so this must be called before the render() that should be captured; takeScreenshot
+        // collects the result afterwards.
+        //
+        // Two phases rather than one call, and not for tidiness. A presented swapchain image belongs
+        // to the presentation engine: touching it without acquiring it again is illegal, and
+        // vkDeviceWaitIdle does not synchronise with presentation. Doing it the obvious way -- wait
+        // for idle, then copy out of the last presented image -- produces exactly two validation
+        // errors, WRITE_AFTER_PRESENT and "layout transition on presentable image that has not been
+        // acquired", and it was written that way first. The image is only ours between acquire and
+        // present, so the copy has to happen inside the frame.
         //
         // This exists because screen capture is not a reliable way to see what this renderer drew.
         // A window whose swapchain the compositor has put on a hardware overlay plane reads back as
         // solid black through BitBlt and through PrintWindow alike -- the capture succeeds and the
-        // pixels are simply not the window's. A whole debugging session was spent on a renderer that
-        // was working perfectly and only looked dead. Reading the image out of the swapchain does not
-        // go past the compositor at all, so it cannot be lied to in that way.
-        //
-        // Blocks: it waits for the device, records a one-time copy and waits for that too. Meant for
-        // a screenshot key, not for anything per frame.
-        bool captureLastFrame(std::vector<uint8_t>& rgba, uint32_t& width, uint32_t& height);
+        // pixels are simply not the window's. A whole debugging session went on a renderer that was
+        // working perfectly and only looked dead. Reading the image out of the swapchain does not go
+        // past the compositor at all, so it cannot be lied to in that way.
+        void requestScreenshot() { mScreenshotRequested = true; }
+
+        // Hands over the frame requested above, eight bits per channel, row major, top row first,
+        // alpha forced opaque, and clears it. False if no screenshot has been captured since the last
+        // call. Meant for a screenshot key: the capturing frame blocks on the device once.
+        bool takeScreenshot(std::vector<uint8_t>& rgba, uint32_t& width, uint32_t& height);
 
     private:
+        // Records the copy out of the swapchain image into mScreenshotBuffer, inside the frame's
+        // command buffer while the image is still ours.
+        void recordScreenshotCopy(VkCommandBuffer cmd, VkExtent2D extent);
+
+        // Reads mScreenshotBuffer back once the submission that filled it has completed.
+        void resolveScreenshot();
+
         void createSurface();
         void createGBuffer();
         void destroyGBuffer();
@@ -531,9 +549,17 @@ namespace Vk
         std::vector<MeshDrawCommand> mDrawCommands;
         uint32_t mCurrentFrame = 0;
         uint32_t mCurrentImageIndex = 0;
-        // Whether the image at mCurrentImageIndex holds a frame that was actually presented, which
-        // is what captureLastFrame reads. Cleared on resize, since that destroys the images.
-        bool mFramePresented = false;
+
+        // Screenshot state. mScreenshotRequested is set from outside and consumed by the next
+        // render(); mScreenshotPixels holds the result until someone takes it.
+        bool mScreenshotRequested = false;
+        bool mScreenshotPending = false;
+        bool mScreenshotReady = false;
+        std::unique_ptr<Buffer> mScreenshotBuffer;
+        VkDeviceSize mScreenshotBufferSize = 0;
+        std::vector<uint8_t> mScreenshotPixels;
+        uint32_t mScreenshotWidth = 0;
+        uint32_t mScreenshotHeight = 0;
         bool mRayTracingEnabled = false;
         bool mTlasDirty = false;
     };
