@@ -7,6 +7,10 @@
 
 #include "vkcommon.hpp"
 
+// Forward declared rather than including vk_mem_alloc.h, which is a 700 KB single-header library and
+// would land in every translation unit that touches a Device.
+VK_DEFINE_HANDLE(VmaAllocator)
+
 namespace Vk
 {
     class Instance;
@@ -30,6 +34,11 @@ namespace Vk
         VkQueue computeQueue() const { return mComputeQueue; }
         bool rayTracingSupported() const { return mRayTracingSupported; }
 
+        // Every buffer and image in the renderer is suballocated from this. Before it existed each
+        // resource owned a dedicated vkAllocateMemory, which meant roughly 9,000 allocation calls per
+        // cell load and thousands of live allocations that were never reused.
+        VmaAllocator allocator() const { return mAllocator; }
+
         VkPhysicalDeviceRayTracingPipelinePropertiesKHR rayTracingProperties() const;
         uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) const;
 
@@ -47,7 +56,10 @@ namespace Vk
         VkQueue mGraphicsQueue = VK_NULL_HANDLE;
         VkQueue mPresentQueue = VK_NULL_HANDLE;
         VkQueue mComputeQueue = VK_NULL_HANDLE;
+        VmaAllocator mAllocator = VK_NULL_HANDLE;
         bool mRayTracingSupported = false;
+
+        void createAllocator(Instance& instance);
 
         static const std::vector<const char*> sRequiredExtensions;
         static const std::vector<const char*> sRayTracingExtensions;

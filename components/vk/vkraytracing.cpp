@@ -4,6 +4,8 @@
 #include <cstring>
 #include <stdexcept>
 
+#include <vk_mem_alloc.h>
+
 #include "vkbuffer.hpp"
 #include "vkcommands.hpp"
 #include "vkcommon.hpp"
@@ -43,9 +45,19 @@ namespace Vk
         return sRtFunctions;
     }
 
-    static void createBuffer(const Device& device, VkDeviceSize size,
+    // Every buffer here is a VMA suballocation out of a shared block. The old path was one
+    // vkAllocateMemory per buffer, and a cell load builds ~1450 BLASes that each need an AS buffer plus
+    // a scratch buffer thrown away immediately after the build, so it burned ~2900 allocation calls
+    // against a maxMemoryAllocationCount that is commonly 4096.
+    //
+    // properties still names the memory properties the buffer must have; VMA ORs them into its own
+    // requirements. minAlignment is for the buffers whose device address has an alignment rule that
+    // VkMemoryRequirements does not express - build scratch and the shader binding table. A dedicated
+    // vkAllocateMemory satisfied those by accident because the buffer always sat at offset 0 of a
+    // fresh allocation; a suballocation lands wherever the block has room.
+    static VmaAllocation createBuffer(const Device& device, VkDeviceSize size,
         VkBufferUsageFlags usage, VkMemoryPropertyFlags properties,
-        VkBuffer& buffer, VkDeviceMemory& memory)
+        VmaAllocationCreateFlags allocFlags, VkBuffer& buffer, VkDeviceSize minAlignment = 0)
     {
         VkBufferCreateInfo bufferInfo = {};
         bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -53,23 +65,38 @@ namespace Vk
         bufferInfo.usage = usage;
         bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-        VK_CHECK(vkCreateBuffer(device.handle(), &bufferInfo, nullptr, &buffer));
+        // No VkMemoryAllocateFlagsInfo chaining for VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT: the
+        // allocator was created with VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT, so it puts
+        // VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT on every block it allocates.
+        VmaAllocationCreateInfo allocInfo = {};
+        allocInfo.usage = VMA_MEMORY_USAGE_AUTO;
+        allocInfo.requiredFlags = properties;
+        allocInfo.flags = allocFlags;
 
-        VkMemoryRequirements memRequirements;
-        vkGetBufferMemoryRequirements(device.handle(), buffer, &memRequirements);
+        VmaAllocation allocation = VK_NULL_HANDLE;
+        if (minAlignment > 0)
+            VK_CHECK(vmaCreateBufferWithAlignment(device.allocator(), &bufferInfo, &allocInfo,
+                minAlignment, &buffer, &allocation, nullptr));
+        else
+            VK_CHECK(vmaCreateBuffer(device.allocator(), &bufferInfo, &allocInfo, &buffer, &allocation, nullptr));
 
-        VkMemoryAllocateFlagsInfo allocFlagsInfo = {};
-        allocFlagsInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO;
-        allocFlagsInfo.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
+        return allocation;
+    }
 
-        VkMemoryAllocateInfo allocInfo = {};
-        allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-        allocInfo.pNext = &allocFlagsInfo;
-        allocInfo.allocationSize = memRequirements.size;
-        allocInfo.memoryTypeIndex = device.findMemoryType(memRequirements.memoryTypeBits, properties);
+    // A build scratch buffer's device address must be a multiple of
+    // minAccelerationStructureScratchOffsetAlignment, which lives in the acceleration structure
+    // properties rather than in the buffer's memory requirements.
+    static VkDeviceSize scratchAlignment(const Device& device)
+    {
+        VkPhysicalDeviceAccelerationStructurePropertiesKHR asProperties = {};
+        asProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_PROPERTIES_KHR;
 
-        VK_CHECK(vkAllocateMemory(device.handle(), &allocInfo, nullptr, &memory));
-        VK_CHECK(vkBindBufferMemory(device.handle(), buffer, memory, 0));
+        VkPhysicalDeviceProperties2 props2 = {};
+        props2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+        props2.pNext = &asProperties;
+
+        vkGetPhysicalDeviceProperties2(device.physical(), &props2);
+        return asProperties.minAccelerationStructureScratchOffsetAlignment;
     }
 
     static VkDeviceAddress getBufferDeviceAddress(VkDevice device, VkBuffer buffer)
@@ -89,15 +116,17 @@ namespace Vk
 
     AccelerationStructure::AccelerationStructure(AccelerationStructure&& other) noexcept
         : mDevice(other.mDevice)
+        , mAllocator(other.mAllocator)
         , mAccelerationStructure(other.mAccelerationStructure)
         , mBuffer(other.mBuffer)
-        , mMemory(other.mMemory)
+        , mAllocation(other.mAllocation)
         , mDeviceAddress(other.mDeviceAddress)
     {
         other.mDevice = VK_NULL_HANDLE;
+        other.mAllocator = VK_NULL_HANDLE;
         other.mAccelerationStructure = VK_NULL_HANDLE;
         other.mBuffer = VK_NULL_HANDLE;
-        other.mMemory = VK_NULL_HANDLE;
+        other.mAllocation = VK_NULL_HANDLE;
         other.mDeviceAddress = 0;
     }
 
@@ -107,14 +136,16 @@ namespace Vk
         {
             destroy();
             mDevice = other.mDevice;
+            mAllocator = other.mAllocator;
             mAccelerationStructure = other.mAccelerationStructure;
             mBuffer = other.mBuffer;
-            mMemory = other.mMemory;
+            mAllocation = other.mAllocation;
             mDeviceAddress = other.mDeviceAddress;
             other.mDevice = VK_NULL_HANDLE;
+            other.mAllocator = VK_NULL_HANDLE;
             other.mAccelerationStructure = VK_NULL_HANDLE;
             other.mBuffer = VK_NULL_HANDLE;
-            other.mMemory = VK_NULL_HANDLE;
+            other.mAllocation = VK_NULL_HANDLE;
             other.mDeviceAddress = 0;
         }
         return *this;
@@ -127,15 +158,13 @@ namespace Vk
             rtFunctions().vkDestroyAccelerationStructureKHR(mDevice, mAccelerationStructure, nullptr);
             mAccelerationStructure = VK_NULL_HANDLE;
         }
-        if (mBuffer != VK_NULL_HANDLE && mDevice != VK_NULL_HANDLE)
+        // vmaDestroyBuffer does the vkDestroyBuffer and returns the suballocation in one call, so the
+        // buffer and its allocation always go together.
+        if (mBuffer != VK_NULL_HANDLE && mAllocator != VK_NULL_HANDLE)
         {
-            vkDestroyBuffer(mDevice, mBuffer, nullptr);
+            vmaDestroyBuffer(mAllocator, mBuffer, mAllocation);
             mBuffer = VK_NULL_HANDLE;
-        }
-        if (mMemory != VK_NULL_HANDLE && mDevice != VK_NULL_HANDLE)
-        {
-            vkFreeMemory(mDevice, mMemory, nullptr);
-            mMemory = VK_NULL_HANDLE;
+            mAllocation = VK_NULL_HANDLE;
         }
     }
 
@@ -187,10 +216,11 @@ namespace Vk
 
         AccelerationStructure as;
         as.mDevice = device.handle();
+        as.mAllocator = device.allocator();
 
-        createBuffer(device, sizeInfo.accelerationStructureSize,
+        as.mAllocation = createBuffer(device, sizeInfo.accelerationStructureSize,
             VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, as.mBuffer, as.mMemory);
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 0, as.mBuffer);
 
         VkAccelerationStructureCreateInfoKHR createInfo = {};
         createInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR;
@@ -200,10 +230,9 @@ namespace Vk
         VK_CHECK(rtFunctions().vkCreateAccelerationStructureKHR(device.handle(), &createInfo, nullptr, &as.mAccelerationStructure));
 
         VkBuffer scratchBuffer = VK_NULL_HANDLE;
-        VkDeviceMemory scratchMemory = VK_NULL_HANDLE;
-        createBuffer(device, sizeInfo.buildScratchSize,
+        VmaAllocation scratchAllocation = createBuffer(device, sizeInfo.buildScratchSize,
             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, scratchBuffer, scratchMemory);
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 0, scratchBuffer, scratchAlignment(device));
 
         buildInfo.dstAccelerationStructure = as.mAccelerationStructure;
         buildInfo.scratchData.deviceAddress = getBufferDeviceAddress(device.handle(), scratchBuffer);
@@ -220,13 +249,13 @@ namespace Vk
         }
         catch (...)
         {
-            vkDestroyBuffer(device.handle(), scratchBuffer, nullptr);
-            vkFreeMemory(device.handle(), scratchMemory, nullptr);
+            // as owns its buffer and handle and unwinding runs its destructor, so only the scratch
+            // buffer needs cleaning up here.
+            vmaDestroyBuffer(device.allocator(), scratchBuffer, scratchAllocation);
             throw;
         }
 
-        vkDestroyBuffer(device.handle(), scratchBuffer, nullptr);
-        vkFreeMemory(device.handle(), scratchMemory, nullptr);
+        vmaDestroyBuffer(device.allocator(), scratchBuffer, scratchAllocation);
 
         VkAccelerationStructureDeviceAddressInfoKHR addressInfo = {};
         addressInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR;
@@ -242,25 +271,24 @@ namespace Vk
         VkDeviceSize instanceBufferSize = sizeof(VkAccelerationStructureInstanceKHR) * instances.size();
 
         VkBuffer instanceStagingBuffer = VK_NULL_HANDLE;
-        VkDeviceMemory instanceStagingMemory = VK_NULL_HANDLE;
-        createBuffer(device, instanceBufferSize,
+        VmaAllocation instanceStagingAllocation = createBuffer(device, instanceBufferSize,
             VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-            instanceStagingBuffer, instanceStagingMemory);
+            VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT, instanceStagingBuffer);
 
         void* data;
-        VK_CHECK(vkMapMemory(device.handle(), instanceStagingMemory, 0, instanceBufferSize, 0, &data));
+        VK_CHECK(vmaMapMemory(device.allocator(), instanceStagingAllocation, &data));
         std::memcpy(data, instances.data(), instanceBufferSize);
-        vkUnmapMemory(device.handle(), instanceStagingMemory);
+        vmaUnmapMemory(device.allocator(), instanceStagingAllocation);
 
         VkBuffer instanceBuffer = VK_NULL_HANDLE;
-        VkDeviceMemory instanceMemory = VK_NULL_HANDLE;
+        VmaAllocation instanceAllocation = VK_NULL_HANDLE;
         try
         {
-            createBuffer(device, instanceBufferSize,
+            instanceAllocation = createBuffer(device, instanceBufferSize,
                 VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR
                     | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, instanceBuffer, instanceMemory);
+                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 0, instanceBuffer);
 
             VkCommandBuffer copyCmd = commandPool.beginSingleTime();
             VkBufferCopy copyRegion = {};
@@ -270,17 +298,13 @@ namespace Vk
         }
         catch (...)
         {
-            vkDestroyBuffer(device.handle(), instanceStagingBuffer, nullptr);
-            vkFreeMemory(device.handle(), instanceStagingMemory, nullptr);
+            vmaDestroyBuffer(device.allocator(), instanceStagingBuffer, instanceStagingAllocation);
             if (instanceBuffer != VK_NULL_HANDLE)
-                vkDestroyBuffer(device.handle(), instanceBuffer, nullptr);
-            if (instanceMemory != VK_NULL_HANDLE)
-                vkFreeMemory(device.handle(), instanceMemory, nullptr);
+                vmaDestroyBuffer(device.allocator(), instanceBuffer, instanceAllocation);
             throw;
         }
 
-        vkDestroyBuffer(device.handle(), instanceStagingBuffer, nullptr);
-        vkFreeMemory(device.handle(), instanceStagingMemory, nullptr);
+        vmaDestroyBuffer(device.allocator(), instanceStagingBuffer, instanceStagingAllocation);
 
         VkAccelerationStructureGeometryInstancesDataKHR instancesData = {};
         instancesData.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR;
@@ -309,50 +333,54 @@ namespace Vk
 
         AccelerationStructure as;
         as.mDevice = device.handle();
-
-        createBuffer(device, sizeInfo.accelerationStructureSize,
-            VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, as.mBuffer, as.mMemory);
-
-        VkAccelerationStructureCreateInfoKHR createInfo = {};
-        createInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR;
-        createInfo.buffer = as.mBuffer;
-        createInfo.size = sizeInfo.accelerationStructureSize;
-        createInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
-        VK_CHECK(rtFunctions().vkCreateAccelerationStructureKHR(device.handle(), &createInfo, nullptr, &as.mAccelerationStructure));
+        as.mAllocator = device.allocator();
 
         VkBuffer scratchBuffer = VK_NULL_HANDLE;
-        VkDeviceMemory scratchMemory = VK_NULL_HANDLE;
-        createBuffer(device, sizeInfo.buildScratchSize,
-            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, scratchBuffer, scratchMemory);
+        VmaAllocation scratchAllocation = VK_NULL_HANDLE;
 
-        buildInfo.dstAccelerationStructure = as.mAccelerationStructure;
-        buildInfo.scratchData.deviceAddress = getBufferDeviceAddress(device.handle(), scratchBuffer);
-
-        VkAccelerationStructureBuildRangeInfoKHR rangeInfo = {};
-        rangeInfo.primitiveCount = instanceCount;
-        const VkAccelerationStructureBuildRangeInfoKHR* pRangeInfo = &rangeInfo;
-
+        // The instance buffer must live until the build has been submitted and waited on, and every
+        // step from here to that point can throw: the AS buffer allocation, the AS creation, the
+        // scratch allocation and the build itself. One catch covers them all - previously only the
+        // build was guarded, so a failure in the two steps before it leaked the instance buffer. as
+        // owns its own buffer and handle and unwinding destroys it.
         try
         {
+            as.mAllocation = createBuffer(device, sizeInfo.accelerationStructureSize,
+                VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 0, as.mBuffer);
+
+            VkAccelerationStructureCreateInfoKHR createInfo = {};
+            createInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR;
+            createInfo.buffer = as.mBuffer;
+            createInfo.size = sizeInfo.accelerationStructureSize;
+            createInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
+            VK_CHECK(rtFunctions().vkCreateAccelerationStructureKHR(device.handle(), &createInfo, nullptr, &as.mAccelerationStructure));
+
+            scratchAllocation = createBuffer(device, sizeInfo.buildScratchSize,
+                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 0, scratchBuffer, scratchAlignment(device));
+
+            buildInfo.dstAccelerationStructure = as.mAccelerationStructure;
+            buildInfo.scratchData.deviceAddress = getBufferDeviceAddress(device.handle(), scratchBuffer);
+
+            VkAccelerationStructureBuildRangeInfoKHR rangeInfo = {};
+            rangeInfo.primitiveCount = instanceCount;
+            const VkAccelerationStructureBuildRangeInfoKHR* pRangeInfo = &rangeInfo;
+
             VkCommandBuffer cmd = commandPool.beginSingleTime();
             rtFunctions().vkCmdBuildAccelerationStructuresKHR(cmd, 1, &buildInfo, &pRangeInfo);
             commandPool.endSingleTime(cmd, device.graphicsQueue());
         }
         catch (...)
         {
-            vkDestroyBuffer(device.handle(), scratchBuffer, nullptr);
-            vkFreeMemory(device.handle(), scratchMemory, nullptr);
-            vkDestroyBuffer(device.handle(), instanceBuffer, nullptr);
-            vkFreeMemory(device.handle(), instanceMemory, nullptr);
+            if (scratchBuffer != VK_NULL_HANDLE)
+                vmaDestroyBuffer(device.allocator(), scratchBuffer, scratchAllocation);
+            vmaDestroyBuffer(device.allocator(), instanceBuffer, instanceAllocation);
             throw;
         }
 
-        vkDestroyBuffer(device.handle(), scratchBuffer, nullptr);
-        vkFreeMemory(device.handle(), scratchMemory, nullptr);
-        vkDestroyBuffer(device.handle(), instanceBuffer, nullptr);
-        vkFreeMemory(device.handle(), instanceMemory, nullptr);
+        vmaDestroyBuffer(device.allocator(), scratchBuffer, scratchAllocation);
+        vmaDestroyBuffer(device.allocator(), instanceBuffer, instanceAllocation);
 
         VkAccelerationStructureDeviceAddressInfoKHR addressInfo = {};
         addressInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR;
@@ -472,9 +500,7 @@ namespace Vk
     {
         VkDevice dev = mDevice.handle();
         if (mSbtBuffer != VK_NULL_HANDLE)
-            vkDestroyBuffer(dev, mSbtBuffer, nullptr);
-        if (mSbtMemory != VK_NULL_HANDLE)
-            vkFreeMemory(dev, mSbtMemory, nullptr);
+            vmaDestroyBuffer(mDevice.allocator(), mSbtBuffer, mSbtAllocation);
         if (mPipeline != VK_NULL_HANDLE)
             vkDestroyPipeline(dev, mPipeline, nullptr);
         if (mPipelineLayout != VK_NULL_HANDLE)
@@ -506,13 +532,18 @@ namespace Vk
         VK_CHECK(rtFunctions().vkGetRayTracingShaderGroupHandlesKHR(
             mDevice.handle(), mPipeline, 0, groupCount, handles.size(), handles.data()));
 
-        createBuffer(mDevice, sbtSize,
+        // Written once, front to back, and never read back on the host - hence sequential write.
+        // baseAlignment is passed as the minimum: vkCmdTraceRaysKHR requires each region's device
+        // address to be a multiple of shaderGroupBaseAlignment, and the region addresses are this
+        // buffer's address plus offsets that are already multiples of it. A suballocation only
+        // guarantees the buffer's own VkMemoryRequirements alignment, which can be smaller.
+        mSbtAllocation = createBuffer(mDevice, sbtSize,
             VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-            mSbtBuffer, mSbtMemory);
+            VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT, mSbtBuffer, baseAlignment);
 
         void* mapped;
-        VK_CHECK(vkMapMemory(mDevice.handle(), mSbtMemory, 0, sbtSize, 0, &mapped));
+        VK_CHECK(vmaMapMemory(mDevice.allocator(), mSbtAllocation, &mapped));
         auto* sbtData = static_cast<uint8_t*>(mapped);
 
         // Raygen at offset 0
@@ -528,7 +559,7 @@ namespace Vk
         for (uint32_t i = 0; i < hitCount; i++)
             std::memcpy(hitData + i * handleSizeAligned, handles.data() + (raygenCount + missCount + i) * mHandleSize, mHandleSize);
 
-        vkUnmapMemory(mDevice.handle(), mSbtMemory);
+        vmaUnmapMemory(mDevice.allocator(), mSbtAllocation);
 
         VkDeviceAddress sbtAddress = getBufferDeviceAddress(mDevice.handle(), mSbtBuffer);
 

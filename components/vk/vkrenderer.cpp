@@ -7,6 +7,8 @@
 #include <fstream>
 #include <stdexcept>
 
+#include <vk_mem_alloc.h>
+
 #include <components/debug/debuglog.hpp>
 
 #include "vkcommands.hpp"
@@ -23,7 +25,7 @@ namespace Vk
 {
     static void createBufferLocal(const Device& device, VkDeviceSize size,
         VkBufferUsageFlags usage, VkMemoryPropertyFlags properties,
-        VkBuffer& buffer, VkDeviceMemory& memory)
+        VkBuffer& buffer, VmaAllocation& allocation)
     {
         VkBufferCreateInfo bufferInfo = {};
         bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -31,18 +33,16 @@ namespace Vk
         bufferInfo.usage = usage;
         bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-        VK_CHECK(vkCreateBuffer(device.handle(), &bufferInfo, nullptr, &buffer));
+        VmaAllocationCreateInfo allocInfo = {};
+        allocInfo.usage = VMA_MEMORY_USAGE_AUTO;
+        // Both callers keep their buffer mapped for the lifetime of the renderer and only ever write
+        // through it, never read back.
+        allocInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
+        // The caller's property flags are a floor, not a replacement for VMA's own choice: AUTO would
+        // otherwise be free to pick device-local memory that cannot be mapped.
+        allocInfo.requiredFlags = properties;
 
-        VkMemoryRequirements memRequirements;
-        vkGetBufferMemoryRequirements(device.handle(), buffer, &memRequirements);
-
-        VkMemoryAllocateInfo allocInfo = {};
-        allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-        allocInfo.allocationSize = memRequirements.size;
-        allocInfo.memoryTypeIndex = device.findMemoryType(memRequirements.memoryTypeBits, properties);
-
-        VK_CHECK(vkAllocateMemory(device.handle(), &allocInfo, nullptr, &memory));
-        VK_CHECK(vkBindBufferMemory(device.handle(), buffer, memory, 0));
+        VK_CHECK(vmaCreateBuffer(device.allocator(), &bufferInfo, &allocInfo, &buffer, &allocation, nullptr));
     }
 
     Renderer::Renderer(SDL_Window* window, bool enableValidation)
@@ -103,7 +103,7 @@ namespace Vk
     }
 
     void Renderer::createImage(uint32_t width, uint32_t height, VkFormat format,
-        VkImageUsageFlags usage, VkImage& image, VkDeviceMemory& memory)
+        VkImageUsageFlags usage, VkImage& image, VmaAllocation& allocation)
     {
         VkImageCreateInfo imageInfo = {};
         imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -118,19 +118,13 @@ namespace Vk
         imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
         imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
-        VK_CHECK(vkCreateImage(mDevice->handle(), &imageInfo, nullptr, &image));
-
-        VkMemoryRequirements memReqs;
-        vkGetImageMemoryRequirements(mDevice->handle(), image, &memReqs);
-
-        VkMemoryAllocateInfo allocInfo = {};
-        allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-        allocInfo.allocationSize = memReqs.size;
-        allocInfo.memoryTypeIndex = mDevice->findMemoryType(memReqs.memoryTypeBits,
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-        VK_CHECK(vkAllocateMemory(mDevice->handle(), &allocInfo, nullptr, &memory));
-        VK_CHECK(vkBindImageMemory(mDevice->handle(), image, memory, 0));
+        VmaAllocationCreateInfo allocInfo = {};
+        allocInfo.usage = VMA_MEMORY_USAGE_AUTO;
+        // Every caller is a full-screen render target, which does want a dedicated allocation -- but
+        // DEDICATED_MEMORY_BIT is deliberately not set. VMA already promotes allocations that are large
+        // relative to the heap's block size, so the render targets still get their own VkDeviceMemory as
+        // they did before; forcing it would only rule out the cases where VMA knows better.
+        VK_CHECK(vmaCreateImage(mDevice->allocator(), &imageInfo, &allocInfo, &image, &allocation, nullptr));
     }
 
     VkImageView Renderer::createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags)
@@ -303,11 +297,18 @@ namespace Vk
     void Renderer::destroyGBuffer()
     {
         VkDevice dev = mDevice->handle();
+        VmaAllocator allocator = mDevice->allocator();
 
-        auto destroyAttachment = [dev](VkImage& img, VkDeviceMemory& mem, VkImageView& view) {
+        // vmaDestroyImage destroys the VkImage as well as freeing the allocation, so there is no
+        // separate vkDestroyImage here.
+        auto destroyAttachment = [dev, allocator](VkImage& img, VmaAllocation& alloc, VkImageView& view) {
             if (view != VK_NULL_HANDLE) { vkDestroyImageView(dev, view, nullptr); view = VK_NULL_HANDLE; }
-            if (img != VK_NULL_HANDLE) { vkDestroyImage(dev, img, nullptr); img = VK_NULL_HANDLE; }
-            if (mem != VK_NULL_HANDLE) { vkFreeMemory(dev, mem, nullptr); mem = VK_NULL_HANDLE; }
+            if (img != VK_NULL_HANDLE)
+            {
+                vmaDestroyImage(allocator, img, alloc);
+                img = VK_NULL_HANDLE;
+                alloc = VK_NULL_HANDLE;
+            }
         };
 
         destroyAttachment(mGBuffer.albedoImage, mGBuffer.albedoMemory, mGBuffer.albedoView);
@@ -772,7 +773,7 @@ namespace Vk
                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                 mUniformBuffers[i], mUniformMemory[i]);
 
-            VK_CHECK(vkMapMemory(mDevice->handle(), mUniformMemory[i], 0, bufferSize, 0, &mUniformMapped[i]));
+            VK_CHECK(vmaMapMemory(mDevice->allocator(), mUniformMemory[i], &mUniformMapped[i]));
         }
     }
 
@@ -953,8 +954,12 @@ namespace Vk
     {
         VkDevice dev = mDevice->handle();
         if (mRtOutput.view != VK_NULL_HANDLE) { vkDestroyImageView(dev, mRtOutput.view, nullptr); mRtOutput.view = VK_NULL_HANDLE; }
-        if (mRtOutput.image != VK_NULL_HANDLE) { vkDestroyImage(dev, mRtOutput.image, nullptr); mRtOutput.image = VK_NULL_HANDLE; }
-        if (mRtOutput.memory != VK_NULL_HANDLE) { vkFreeMemory(dev, mRtOutput.memory, nullptr); mRtOutput.memory = VK_NULL_HANDLE; }
+        if (mRtOutput.image != VK_NULL_HANDLE)
+        {
+            vmaDestroyImage(mDevice->allocator(), mRtOutput.image, mRtOutput.memory);
+            mRtOutput.image = VK_NULL_HANDLE;
+            mRtOutput.memory = VK_NULL_HANDLE;
+        }
     }
 
     void Renderer::createRtDescriptorSets()
@@ -1500,8 +1505,10 @@ namespace Vk
                 vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mCompositePipelineLayout,
                     0, 1, &mCompositeDescriptorSets[mCurrentFrame], 0, nullptr);
 
-                // Push sun direction, sun color, and camera position
-                const SceneData* sceneData = static_cast<const SceneData*>(mUniformMapped[mCurrentFrame]);
+                // Push sun direction, sun color, and camera position. Read from the CPU-side copy, not
+                // back out of the mapped uniform buffer: that memory is written sequentially and may be
+                // write-combined, where host reads are uncached and far slower than they look.
+                const SceneData* sceneData = &mCurrentScene;
                 Vec4 cameraPos;
                 cameraPos.x = sceneData->viewInverse.data[12];
                 cameraPos.y = sceneData->viewInverse.data[13];
@@ -1569,6 +1576,7 @@ namespace Vk
 
     void Renderer::updateScene(const SceneData& sceneData)
     {
+        mCurrentScene = sceneData;
         std::memcpy(mUniformMapped[mCurrentFrame], &sceneData, sizeof(SceneData));
     }
 
@@ -1592,11 +1600,16 @@ namespace Vk
         if (needed > mGeometryTableCapacity)
         {
             if (mGeometryTableMapped != nullptr)
-                vkUnmapMemory(mDevice->handle(), mGeometryTableMemory);
+            {
+                vmaUnmapMemory(mDevice->allocator(), mGeometryTableMemory);
+                mGeometryTableMapped = nullptr;
+            }
             if (mGeometryTableBuffer != VK_NULL_HANDLE)
-                vkDestroyBuffer(mDevice->handle(), mGeometryTableBuffer, nullptr);
-            if (mGeometryTableMemory != VK_NULL_HANDLE)
-                vkFreeMemory(mDevice->handle(), mGeometryTableMemory, nullptr);
+            {
+                vmaDestroyBuffer(mDevice->allocator(), mGeometryTableBuffer, mGeometryTableMemory);
+                mGeometryTableBuffer = VK_NULL_HANDLE;
+                mGeometryTableMemory = VK_NULL_HANDLE;
+            }
 
             // Overshoot so a cell that adds a handful of instances does not force a reallocation.
             mGeometryTableCapacity = needed + needed / 2 + 64;
@@ -1604,8 +1617,7 @@ namespace Vk
                 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                 mGeometryTableBuffer, mGeometryTableMemory);
-            VK_CHECK(vkMapMemory(mDevice->handle(), mGeometryTableMemory, 0, VK_WHOLE_SIZE, 0,
-                &mGeometryTableMapped));
+            VK_CHECK(vmaMapMemory(mDevice->allocator(), mGeometryTableMemory, &mGeometryTableMapped));
 
             // The buffer handle changed, so every RT set has to be repointed at it.
             VkDescriptorBufferInfo bufferInfo = {};
@@ -1725,17 +1737,13 @@ namespace Vk
 
         if (mGeometryTableMapped != nullptr)
         {
-            vkUnmapMemory(mDevice->handle(), mGeometryTableMemory);
+            vmaUnmapMemory(mDevice->allocator(), mGeometryTableMemory);
             mGeometryTableMapped = nullptr;
         }
         if (mGeometryTableBuffer != VK_NULL_HANDLE)
         {
-            vkDestroyBuffer(mDevice->handle(), mGeometryTableBuffer, nullptr);
+            vmaDestroyBuffer(mDevice->allocator(), mGeometryTableBuffer, mGeometryTableMemory);
             mGeometryTableBuffer = VK_NULL_HANDLE;
-        }
-        if (mGeometryTableMemory != VK_NULL_HANDLE)
-        {
-            vkFreeMemory(mDevice->handle(), mGeometryTableMemory, nullptr);
             mGeometryTableMemory = VK_NULL_HANDLE;
         }
 
@@ -1746,13 +1754,15 @@ namespace Vk
         {
             if (mUniformMapped[i])
             {
-                vkUnmapMemory(dev, mUniformMemory[i]);
+                vmaUnmapMemory(mDevice->allocator(), mUniformMemory[i]);
                 mUniformMapped[i] = nullptr;
             }
             if (mUniformBuffers[i] != VK_NULL_HANDLE)
-                vkDestroyBuffer(dev, mUniformBuffers[i], nullptr);
-            if (mUniformMemory[i] != VK_NULL_HANDLE)
-                vkFreeMemory(dev, mUniformMemory[i], nullptr);
+            {
+                vmaDestroyBuffer(mDevice->allocator(), mUniformBuffers[i], mUniformMemory[i]);
+                mUniformBuffers[i] = VK_NULL_HANDLE;
+                mUniformMemory[i] = VK_NULL_HANDLE;
+            }
         }
 
         if (mDescriptorPool != VK_NULL_HANDLE)

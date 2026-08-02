@@ -541,6 +541,11 @@ if (OPENMW_USE_VULKAN)
         vkrenderer
         )
 
+    # VulkanMemoryAllocator, vendored in extern/vma. vkvma.cpp is the only translation unit that
+    # defines VMA_IMPLEMENTATION; the rest just need the declarations.
+    list (APPEND COMPONENT_FILES ${CMAKE_CURRENT_SOURCE_DIR}/vk/vkvma.cpp)
+    source_group (components\\vk FILES ${CMAKE_CURRENT_SOURCE_DIR}/vk/vkvma.cpp)
+
     add_component_dir (nifvk
         meshconverter
         )
@@ -665,6 +670,7 @@ target_link_libraries(components ${BULLET_LIBRARIES})
 if (OPENMW_USE_VULKAN)
     target_link_libraries(components Vulkan::Vulkan)
     target_compile_definitions(components PUBLIC OPENMW_USE_VULKAN=1)
+    target_include_directories(components SYSTEM PRIVATE ${OpenMW_SOURCE_DIR}/extern/vma)
 endif()
 
 if (USE_QT)

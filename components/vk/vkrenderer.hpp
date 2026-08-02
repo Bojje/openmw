@@ -14,6 +14,10 @@
 #include "vkgeometry.hpp"
 #include "vkmath.hpp"
 
+// Forward declared rather than including vk_mem_alloc.h, which is a 700 KB single-header library and
+// would land in every translation unit that touches a Renderer.
+VK_DEFINE_HANDLE(VmaAllocation)
+
 struct SDL_Window;
 
 namespace Vk
@@ -106,26 +110,26 @@ namespace Vk
     struct GBufferAttachments
     {
         VkImage albedoImage = VK_NULL_HANDLE;
-        VkDeviceMemory albedoMemory = VK_NULL_HANDLE;
+        VmaAllocation albedoMemory = VK_NULL_HANDLE;
         VkImageView albedoView = VK_NULL_HANDLE;
 
         VkImage normalImage = VK_NULL_HANDLE;
-        VkDeviceMemory normalMemory = VK_NULL_HANDLE;
+        VmaAllocation normalMemory = VK_NULL_HANDLE;
         VkImageView normalView = VK_NULL_HANDLE;
 
         VkImage materialImage = VK_NULL_HANDLE;
-        VkDeviceMemory materialMemory = VK_NULL_HANDLE;
+        VmaAllocation materialMemory = VK_NULL_HANDLE;
         VkImageView materialView = VK_NULL_HANDLE;
 
         VkImage depthImage = VK_NULL_HANDLE;
-        VkDeviceMemory depthMemory = VK_NULL_HANDLE;
+        VmaAllocation depthMemory = VK_NULL_HANDLE;
         VkImageView depthView = VK_NULL_HANDLE;
     };
 
     struct RtOutputImage
     {
         VkImage image = VK_NULL_HANDLE;
-        VkDeviceMemory memory = VK_NULL_HANDLE;
+        VmaAllocation memory = VK_NULL_HANDLE;
         VkImageView view = VK_NULL_HANDLE;
     };
 
@@ -198,7 +202,7 @@ namespace Vk
         void writeCompositeDescriptor(uint32_t binding, VkImageView view);
 
         void createImage(uint32_t width, uint32_t height, VkFormat format, VkImageUsageFlags usage,
-            VkImage& image, VkDeviceMemory& memory);
+            VkImage& image, VmaAllocation& allocation);
         VkImageView createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags);
         void transitionImageLayout(VkCommandBuffer cmd, VkImage image, VkImageLayout oldLayout,
             VkImageLayout newLayout, VkImageAspectFlags aspectMask);
@@ -237,7 +241,7 @@ namespace Vk
         std::array<VkDescriptorSet, maxFramesInFlight> mRtDescriptorSets = {};
 
         std::array<VkBuffer, maxFramesInFlight> mUniformBuffers = {};
-        std::array<VkDeviceMemory, maxFramesInFlight> mUniformMemory = {};
+        std::array<VmaAllocation, maxFramesInFlight> mUniformMemory = {};
         std::array<void*, maxFramesInFlight> mUniformMapped = {};
 
         VkSampler mGBufferSampler = VK_NULL_HANDLE;
@@ -261,9 +265,13 @@ namespace Vk
         // rewritten whenever the TLAS is, which is rare (cell load/unload), so a staging copy would
         // buy nothing. Grown geometrically and never shrunk; mGeometryTableCapacity is in records.
         VkBuffer mGeometryTableBuffer = VK_NULL_HANDLE;
-        VkDeviceMemory mGeometryTableMemory = VK_NULL_HANDLE;
+        VmaAllocation mGeometryTableMemory = VK_NULL_HANDLE;
         void* mGeometryTableMapped = nullptr;
         uint32_t mGeometryTableCapacity = 0;
+
+        // The scene data last handed to updateScene. Kept CPU-side so the composite pass can recover the
+        // camera position without reading back out of the mapped uniform buffer, which is write-combined.
+        SceneData mCurrentScene = {};
 
         std::vector<MeshDrawCommand> mDrawCommands;
         uint32_t mCurrentFrame = 0;

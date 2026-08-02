@@ -2,6 +2,8 @@
 
 #include <utility>
 
+#include <vk_mem_alloc.h>
+
 #include "vkbuffer.hpp"
 #include "vkcommands.hpp"
 #include "vkcommon.hpp"
@@ -16,13 +18,15 @@ namespace Vk
 
     Texture::Texture(Texture&& other) noexcept
         : mDevice(other.mDevice)
+        , mAllocator(other.mAllocator)
         , mImage(other.mImage)
-        , mMemory(other.mMemory)
+        , mAllocation(other.mAllocation)
         , mView(other.mView)
     {
         other.mDevice = VK_NULL_HANDLE;
+        other.mAllocator = VK_NULL_HANDLE;
         other.mImage = VK_NULL_HANDLE;
-        other.mMemory = VK_NULL_HANDLE;
+        other.mAllocation = VK_NULL_HANDLE;
         other.mView = VK_NULL_HANDLE;
     }
 
@@ -32,8 +36,9 @@ namespace Vk
         {
             destroy();
             mDevice = std::exchange(other.mDevice, VK_NULL_HANDLE);
+            mAllocator = std::exchange(other.mAllocator, VK_NULL_HANDLE);
             mImage = std::exchange(other.mImage, VK_NULL_HANDLE);
-            mMemory = std::exchange(other.mMemory, VK_NULL_HANDLE);
+            mAllocation = std::exchange(other.mAllocation, VK_NULL_HANDLE);
             mView = std::exchange(other.mView, VK_NULL_HANDLE);
         }
         return *this;
@@ -46,14 +51,15 @@ namespace Vk
 
         if (mView != VK_NULL_HANDLE)
             vkDestroyImageView(mDevice, mView, nullptr);
+        // Destroys the image and returns its suballocation to the pool in one call; the memory is owned
+        // by the allocator, so there is nothing left to free afterwards.
         if (mImage != VK_NULL_HANDLE)
-            vkDestroyImage(mDevice, mImage, nullptr);
-        if (mMemory != VK_NULL_HANDLE)
-            vkFreeMemory(mDevice, mMemory, nullptr);
+            vmaDestroyImage(mAllocator, mImage, mAllocation);
 
         mView = VK_NULL_HANDLE;
         mImage = VK_NULL_HANDLE;
-        mMemory = VK_NULL_HANDLE;
+        mAllocation = VK_NULL_HANDLE;
+        mAllocator = VK_NULL_HANDLE;
         mDevice = VK_NULL_HANDLE;
     }
 
@@ -62,6 +68,7 @@ namespace Vk
     {
         Texture texture;
         texture.mDevice = device.handle();
+        texture.mAllocator = device.allocator();
 
         VkImageCreateInfo imageInfo = {};
         imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -76,19 +83,14 @@ namespace Vk
         imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
         imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
-        VK_CHECK(vkCreateImage(texture.mDevice, &imageInfo, nullptr, &texture.mImage));
+        // AUTO picks device-local for an image that is only ever sampled and transfer-copied into.
+        VmaAllocationCreateInfo allocInfo = {};
+        allocInfo.usage = VMA_MEMORY_USAGE_AUTO;
 
-        VkMemoryRequirements memRequirements;
-        vkGetImageMemoryRequirements(texture.mDevice, texture.mImage, &memRequirements);
-
-        VkMemoryAllocateInfo allocInfo = {};
-        allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-        allocInfo.allocationSize = memRequirements.size;
-        allocInfo.memoryTypeIndex
-            = device.findMemoryType(memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-        VK_CHECK(vkAllocateMemory(texture.mDevice, &allocInfo, nullptr, &texture.mMemory));
-        VK_CHECK(vkBindImageMemory(texture.mDevice, texture.mImage, texture.mMemory, 0));
+        // Create, allocate and bind happen in one call, so there is no longer a window where a failed
+        // allocation leaves a created-but-unbound image behind to be cleaned up.
+        VK_CHECK(vmaCreateImage(
+            texture.mAllocator, &imageInfo, &allocInfo, &texture.mImage, &texture.mAllocation, nullptr));
 
         // Staging upload. The source data is used verbatim, so block-compressed formats are copied
         // as blocks without any decode step.

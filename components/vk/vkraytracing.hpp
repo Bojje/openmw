@@ -6,6 +6,12 @@
 
 #include <vulkan/vulkan.h>
 
+// Forward declared for the same reason vkdevice.hpp does it: vk_mem_alloc.h is a 700 KB single-header
+// library and nothing out here needs more than the handle types. Repeating the typedefs is harmless,
+// the header itself declares them identically.
+VK_DEFINE_HANDLE(VmaAllocator)
+VK_DEFINE_HANDLE(VmaAllocation)
+
 namespace Vk
 {
     class Device;
@@ -57,9 +63,12 @@ namespace Vk
         void destroy();
 
         VkDevice mDevice = VK_NULL_HANDLE;
+        // The allocator is stored per structure rather than looked up from a Device: destroy() runs
+        // from the destructor, which has no Device reference to reach for.
+        VmaAllocator mAllocator = VK_NULL_HANDLE;
         VkAccelerationStructureKHR mAccelerationStructure = VK_NULL_HANDLE;
         VkBuffer mBuffer = VK_NULL_HANDLE;
-        VkDeviceMemory mMemory = VK_NULL_HANDLE;
+        VmaAllocation mAllocation = VK_NULL_HANDLE;
         VkDeviceAddress mDeviceAddress = 0;
     };
 
@@ -92,7 +101,7 @@ namespace Vk
         VkPipelineLayout mPipelineLayout = VK_NULL_HANDLE;
 
         VkBuffer mSbtBuffer = VK_NULL_HANDLE;
-        VkDeviceMemory mSbtMemory = VK_NULL_HANDLE;
+        VmaAllocation mSbtAllocation = VK_NULL_HANDLE;
 
         VkStridedDeviceAddressRegionKHR mRaygenRegion = {};
         VkStridedDeviceAddressRegionKHR mMissRegion = {};

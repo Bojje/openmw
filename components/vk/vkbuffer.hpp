@@ -3,6 +3,10 @@
 
 #include <vulkan/vulkan.h>
 
+// Forward declared so the 700 KB vk_mem_alloc.h header stays out of everything that holds a Buffer.
+VK_DEFINE_HANDLE(VmaAllocator)
+VK_DEFINE_HANDLE(VmaAllocation)
+
 namespace Vk
 {
     class Device;
@@ -28,7 +32,6 @@ namespace Vk
             const void* data, VkDeviceSize size);
 
         VkBuffer handle() const { return mBuffer; }
-        VkDeviceMemory memory() const { return mMemory; }
         VkDeviceSize size() const { return mSize; }
         VkDeviceAddress deviceAddress() const;
 
@@ -36,8 +39,12 @@ namespace Vk
         void cleanup();
 
         VkDevice mDevice = VK_NULL_HANDLE;
+        VmaAllocator mAllocator = VK_NULL_HANDLE;
         VkBuffer mBuffer = VK_NULL_HANDLE;
-        VkDeviceMemory mMemory = VK_NULL_HANDLE;
+        // Suballocation out of a VMA pool, not a dedicated VkDeviceMemory. There is deliberately no
+        // memory() accessor any more: the underlying VkDeviceMemory is shared with other buffers, so
+        // handing it out would invite someone to map or free the whole block.
+        VmaAllocation mAllocation = VK_NULL_HANDLE;
         VkDeviceSize mSize = 0;
     };
 }

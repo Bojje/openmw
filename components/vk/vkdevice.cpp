@@ -8,6 +8,8 @@
 
 #include <components/debug/debuglog.hpp>
 
+#include <vk_mem_alloc.h>
+
 #include "vkinstance.hpp"
 
 namespace Vk
@@ -31,10 +33,30 @@ namespace Vk
     {
         selectPhysicalDevice(instance.handle(), surface);
         createLogicalDevice();
+        createAllocator(instance);
+    }
+
+    void Device::createAllocator(Instance& instance)
+    {
+        VmaAllocatorCreateInfo info = {};
+        info.physicalDevice = mPhysicalDevice;
+        info.device = mDevice;
+        info.instance = instance.handle();
+        info.vulkanApiVersion = VK_API_VERSION_1_3;
+        // The renderer enables VK_KHR_buffer_device_address whenever ray tracing is available, and VMA
+        // has to be told so: without this flag it will not set VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT
+        // aside correctly and vkGetBufferDeviceAddress on a suballocated buffer misbehaves.
+        if (mRayTracingSupported)
+            info.flags |= VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
+
+        VK_CHECK(vmaCreateAllocator(&info, &mAllocator));
     }
 
     Device::~Device()
     {
+        // Before the device: every suballocation lives in memory this owns.
+        if (mAllocator != VK_NULL_HANDLE)
+            vmaDestroyAllocator(mAllocator);
         if (mDevice != VK_NULL_HANDLE)
             vkDestroyDevice(mDevice, nullptr);
     }

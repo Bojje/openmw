@@ -7,10 +7,13 @@
 #include <cstring>
 #include <utility>
 
+#include <vk_mem_alloc.h>
+
 namespace Vk
 {
     Buffer::Buffer(Device& device, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties)
         : mDevice(device.handle())
+        , mAllocator(device.allocator())
         , mSize(size)
     {
         VkBufferCreateInfo bufferInfo{};
@@ -19,27 +22,33 @@ namespace Vk
         bufferInfo.usage = usage;
         bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-        VK_CHECK(vkCreateBuffer(mDevice, &bufferInfo, nullptr, &mBuffer));
+        // Suballocated out of VMA's pools rather than given its own vkAllocateMemory. A cell load
+        // creates thousands of these; dedicated allocations made that thousands of driver allocations,
+        // which is slow and wasteful once each is rounded up to the allocation granularity.
+        //
+        // The device address flag chaining that used to live here is gone: the allocator is created
+        // with VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT, so VMA adds
+        // VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT to the underlying block itself.
+        VmaAllocationCreateInfo allocInfo{};
+        allocInfo.usage = VMA_MEMORY_USAGE_AUTO;
 
-        VkMemoryRequirements memRequirements;
-        vkGetBufferMemoryRequirements(mDevice, mBuffer, &memRequirements);
+        // Callers still express intent as VkMemoryPropertyFlags, which is the right vocabulary at this
+        // interface. Translate it: HOST_VISIBLE means the caller intends to map and write, which for
+        // this renderer is always a staging upload or a persistently mapped uniform buffer.
+        if ((properties & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) != 0)
+        {
+            allocInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
+            allocInfo.requiredFlags = properties;
+        }
+        else if (properties != 0)
+        {
+            allocInfo.requiredFlags = properties;
+        }
 
-        VkMemoryAllocateFlagsInfo allocFlagsInfo{};
-        allocFlagsInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO;
-
-        bool needsDeviceAddress = (usage & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT) != 0;
-        if (needsDeviceAddress)
-            allocFlagsInfo.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
-
-        VkMemoryAllocateInfo allocInfo{};
-        allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-        allocInfo.allocationSize = memRequirements.size;
-        allocInfo.memoryTypeIndex = device.findMemoryType(memRequirements.memoryTypeBits, properties);
-        if (needsDeviceAddress)
-            allocInfo.pNext = &allocFlagsInfo;
-
-        VK_CHECK(vkAllocateMemory(mDevice, &allocInfo, nullptr, &mMemory));
-        VK_CHECK(vkBindBufferMemory(mDevice, mBuffer, mMemory, 0));
+        // create + allocate + bind in one call, so there is no window in which the VkBuffer exists but
+        // the allocation has failed. The previous two-step version leaked the VkBuffer if the throw
+        // landed between them -- which is exactly what happened when memory ran out.
+        VK_CHECK(vmaCreateBuffer(mAllocator, &bufferInfo, &allocInfo, &mBuffer, &mAllocation, nullptr));
     }
 
     Buffer::~Buffer()
@@ -49,12 +58,13 @@ namespace Vk
 
     Buffer::Buffer(Buffer&& other) noexcept
         : mDevice(other.mDevice)
+        , mAllocator(other.mAllocator)
         , mBuffer(other.mBuffer)
-        , mMemory(other.mMemory)
+        , mAllocation(other.mAllocation)
         , mSize(other.mSize)
     {
         other.mBuffer = VK_NULL_HANDLE;
-        other.mMemory = VK_NULL_HANDLE;
+        other.mAllocation = VK_NULL_HANDLE;
         other.mSize = 0;
     }
 
@@ -64,11 +74,12 @@ namespace Vk
         {
             cleanup();
             mDevice = other.mDevice;
+            mAllocator = other.mAllocator;
             mBuffer = other.mBuffer;
-            mMemory = other.mMemory;
+            mAllocation = other.mAllocation;
             mSize = other.mSize;
             other.mBuffer = VK_NULL_HANDLE;
-            other.mMemory = VK_NULL_HANDLE;
+            other.mAllocation = VK_NULL_HANDLE;
             other.mSize = 0;
         }
         return *this;
@@ -77,13 +88,13 @@ namespace Vk
     void* Buffer::map()
     {
         void* data;
-        VK_CHECK(vkMapMemory(mDevice, mMemory, 0, mSize, 0, &data));
+        VK_CHECK(vmaMapMemory(mAllocator, mAllocation, &data));
         return data;
     }
 
     void Buffer::unmap()
     {
-        vkUnmapMemory(mDevice, mMemory);
+        vmaUnmapMemory(mAllocator, mAllocation);
     }
 
     void Buffer::copyFrom(const void* data, VkDeviceSize size)
@@ -125,13 +136,9 @@ namespace Vk
     {
         if (mBuffer != VK_NULL_HANDLE)
         {
-            vkDestroyBuffer(mDevice, mBuffer, nullptr);
+            vmaDestroyBuffer(mAllocator, mBuffer, mAllocation);
             mBuffer = VK_NULL_HANDLE;
-        }
-        if (mMemory != VK_NULL_HANDLE)
-        {
-            vkFreeMemory(mDevice, mMemory, nullptr);
-            mMemory = VK_NULL_HANDLE;
+            mAllocation = VK_NULL_HANDLE;
         }
     }
 }

@@ -5,6 +5,11 @@
 
 #include <vulkan/vulkan.h>
 
+// Forward declared rather than including vk_mem_alloc.h, which is a 700 KB single-header library and
+// would land in every translation unit that touches a Texture.
+VK_DEFINE_HANDLE(VmaAllocator)
+VK_DEFINE_HANDLE(VmaAllocation)
+
 namespace Vk
 {
     class Device;
@@ -41,8 +46,10 @@ namespace Vk
         void destroy();
 
         VkDevice mDevice = VK_NULL_HANDLE;
+        // Kept alongside the allocation because teardown needs the allocator and Texture holds no Device&.
+        VmaAllocator mAllocator = VK_NULL_HANDLE;
         VkImage mImage = VK_NULL_HANDLE;
-        VkDeviceMemory mMemory = VK_NULL_HANDLE;
+        VmaAllocation mAllocation = VK_NULL_HANDLE;
         VkImageView mView = VK_NULL_HANDLE;
     };
 }
