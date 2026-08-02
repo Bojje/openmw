@@ -74,10 +74,12 @@ const float sAcesPreExposure = 0.6;
 // The right fix is a real auto-exposure pass, and OpenMW already has the luminance machinery for it
 // in files/shaders/lib/luminance/. Until that is wired up this constant stands in for it, and any
 // future auto-exposure should replace it rather than stack on top.
-const float sExposure = 2.5;
+const float sExposure = 4.0;
 
 vec3 acesFilmic(vec3 x) {
-    x *= sAcesPreExposure * sExposure;
+    // Exposure is applied by the caller now, to both the tonemapped and untonemapped paths, so it
+    // must not be applied a second time here.
+    x *= sAcesPreExposure;
     float a = 2.51;
     float b = 0.03;
     float c = 2.43;
@@ -385,7 +387,39 @@ void main() {
     // hardware applies the sRGB transfer function on write. Encoding here as well double-encodes: a
     // linear 0.216 -- mid grey -- leaves this shader at 0.5 and reaches the display at 0.74, which lifts
     // the whole midtone range and reads as a pale, low-contrast image.
-    color = acesFilmic(color);
+    // Mostly untonemapped, with a little ACES blended in for highlight rolloff only.
+    //
+    // Full ACES was making the image read far darker than the OSG renderer's, and exposure is the
+    // wrong lever for that. ACES is built for HDR input: its toe deliberately crushes the bottom of
+    // the range on the assumption that there is plenty of headroom above 1.0 to compress back down.
+    // Nothing here is HDR -- peak radiance is barely above 1 -- so the curve only ever crushes and
+    // never gets to do the job it exists for. Raising sExposure pushes the midtones up the toe but
+    // flattens the highlights on the way, which is why 2.5 and 4.0 both still looked dark next to
+    // OSG. OSG does not tone map at all; it multiplies these same numbers in gamma space.
+    //
+    // So the untonemapped value carries the image and ACES contributes a shoulder, which keeps a
+    // bright sky or a torch flame from clipping flat. Note the plain path deliberately takes no
+    // exposure multiplier -- OSG applies none either, and that is the match being aimed at.
+    //
+    // This whole block is still standing in for a real auto-exposure pass, which OpenMW already has
+    // the luminance machinery for in files/shaders/lib/luminance/. Replace it rather than stack on it.
+    // Exposure gains BOTH paths. It used to be applied only inside acesFilmic, which meant that once
+    // the tone map was blended down to a quarter, raising it barely moved the picture -- three
+    // quarters of the result was not being exposed at all.
+    //
+    // Gain above 1 is not a fudge here, it is compensating for a real difference in where the two
+    // renderers do their arithmetic. OSG lights in gamma space: it multiplies gamma-encoded albedo by
+    // gamma-encoded light. This renderer decodes both to linear first. Two values that each sit near
+    // 0.5 in gamma are near 0.21 in linear, so their product is 0.046 and encodes back to about 0.24,
+    // where OSG's product is 0.25. Linear lighting is therefore systematically darker for the same
+    // authored content, and every colour correctly decoded on the way in -- sun, ambient, and vertex
+    // colours most recently -- moves it further down. That is not a bug in the decoding; it is the
+    // price of doing the lighting properly, and it has to be paid back somewhere.
+    //
+    // Here is where it is paid back, until a real auto-exposure pass replaces the whole block.
+    const float sTonemapStrength = 0.25;
+    vec3 exposed = color * sExposure;
+    color = mix(clamp(exposed, 0.0, 1.0), acesFilmic(exposed), sTonemapStrength);
 
     // Fog after the tone map, not before. OpenMW mixes toward the fog colour on the pre-transfer value
     // and never tone maps at all, so mixing in linear beforehand would put the midpoint somewhere else
