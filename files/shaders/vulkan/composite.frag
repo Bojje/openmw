@@ -44,7 +44,9 @@ void main() {
     if (depthSample >= 1.0) {
         vec3 skyTop = vec3(0.2, 0.4, 0.8);
         vec3 skyHorizon = vec3(0.6, 0.75, 0.9);
-        float t = fragTexCoord.y;
+        // fragTexCoord.y is 0 at the *top* of the screen in Vulkan, so it has to be flipped: using it
+        // directly put the pale horizon colour at the zenith and the deep blue along the horizon.
+        float t = 1.0 - fragTexCoord.y;
         outColor = vec4(mix(skyHorizon, skyTop, t), 1.0);
         return;
     }
@@ -58,6 +60,9 @@ void main() {
 
     float NdotL = max(dot(N, L), 0.0);
 
+    // Strictly 0 or 1: the shadow ray either hits (payload stays at its pre-trace zero) or misses
+    // (shadow.rmiss writes w = 1). There is no penumbra and no partial occlusion, so this steps
+    // straight from full sun to the flat 0.15 ambient below -- a 7x jump with hard aliased edges.
     float shadow = rtSample.r;
 
     // Attenuate the reflection by surface roughness instead of adding it flat. Morrowind surfaces are
