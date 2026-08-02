@@ -21,6 +21,23 @@ namespace Vk
         float x, y, z, w;
     };
 
+    // sRGB to linear, for a single channel in [0, 1].
+    //
+    // Every authored colour that enters this renderer has to go through this, and it is the single
+    // most repeated mistake in the whole colour path. Morrowind's colours -- cell mood, light
+    // diffuse, weather sun, NIF vertex colours, terrain VCLR -- were authored by artists working in
+    // gamma space, and the OSG renderer lights in gamma space throughout. This renderer lights in
+    // linear, and its textures are already decoded because they are uploaded as _SRGB block formats
+    // (HANDOFF trap 8). Multiplying a gamma-space factor into a decoded albedo mixes two spaces in
+    // one product and systematically brightens and desaturates the result.
+    //
+    // Scalars must NOT go through this. Sun visibility, occlusion and attenuation are not colours;
+    // decoding them would be a second, subtler version of the same mistake.
+    inline float srgbToLinear(float c)
+    {
+        return c <= 0.04045f ? c / 12.92f : std::pow((c + 0.055f) / 1.055f, 2.4f);
+    }
+
     // The two helpers below take raw float[16] rather than Mat4. Transforms that flow through the
     // NIF converter and the rendering manager are stored as plain float[16] members inside their
     // own structs (NifVk::VulkanMesh::transform, CellMeshes::Instance::transform), so a raw-array

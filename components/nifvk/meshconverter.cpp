@@ -430,13 +430,18 @@ namespace NifVk
                 dst[7] = 0.f;
             }
 
-            // Color
+            // Color, decoded to linear on the way in.
+            //
+            // NIF vertex colours are authored in gamma space like every other colour in Morrowind's
+            // content, and gbuffer.frag multiplies them into an albedo that is already linear because
+            // the textures are uploaded as _SRGB block formats. Leaving them encoded mixes two spaces
+            // in one product. Alpha is a coverage scalar, not a colour, so it passes through.
             if (hasColors)
             {
                 const osg::Vec4f& c = data->mColors[i];
-                dst[8] = c.x();
-                dst[9] = c.y();
-                dst[10] = c.z();
+                dst[8] = Vk::srgbToLinear(c.x());
+                dst[9] = Vk::srgbToLinear(c.y());
+                dst[10] = Vk::srgbToLinear(c.z());
                 dst[11] = c.w();
             }
             else

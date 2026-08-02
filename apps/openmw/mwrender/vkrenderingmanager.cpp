@@ -166,18 +166,11 @@ namespace MWRender
 
     namespace
     {
-        // Morrowind's colours -- cell mood, light diffuse, weather sun -- were authored by artists
-        // looking at gamma-space compositing, and the OSG renderer still lights in gamma space. This
-        // renderer lights in linear, so they have to be decoded on the way in or every one of them is
-        // systematically too bright. Scalars such as sun visibility must NOT go through this.
-        float srgbToLinear(float c)
-        {
-            return c <= 0.04045f ? c / 12.92f : std::pow((c + 0.055f) / 1.055f, 2.4f);
-        }
-
+        // Vk::srgbToLinear does the work; see vkmath.hpp for why every authored colour needs it and
+        // why scalars must not have it.
         Vk::Vec4 decodeColor(const osg::Vec4f& c)
         {
-            return { srgbToLinear(c.r()), srgbToLinear(c.g()), srgbToLinear(c.b()), c.a() };
+            return { Vk::srgbToLinear(c.r()), Vk::srgbToLinear(c.g()), Vk::srgbToLinear(c.b()), c.a() };
         }
     }
 

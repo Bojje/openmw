@@ -16,6 +16,7 @@
 #include <components/esm/path.hpp>
 #include <components/esm3/loadland.hpp>
 #include <components/esm3/loadltex.hpp>
+#include <components/vk/vkmath.hpp>
 
 #include "../mwbase/environment.hpp"
 #include "../mwworld/esmstore.hpp"
@@ -173,10 +174,18 @@ namespace
             float b = 1.0f;
             if (hasData(*colourSource, ESM::Land::DATA_VCLR))
             {
+                // Decoded to linear, like every other authored colour that enters this renderer.
+                //
+                // VCLR is the per-vertex terrain tint and it was authored by artists looking at
+                // gamma-space compositing -- the OSG renderer lights in gamma space throughout. The
+                // G-buffer fragment shader multiplies this straight into an albedo that *has* been
+                // decoded, because the textures are uploaded as _SRGB block formats (trap 8). So the
+                // two factors of that product were in different spaces, which systematically
+                // brightened and desaturated every shaded patch of ground.
                 const std::span<const std::uint8_t> colors = colourSource->getColors();
-                r = colors[colourIndex * 3] / 255.0f;
-                g = colors[colourIndex * 3 + 1] / 255.0f;
-                b = colors[colourIndex * 3 + 2] / 255.0f;
+                r = Vk::srgbToLinear(colors[colourIndex * 3] / 255.0f);
+                g = Vk::srgbToLinear(colors[colourIndex * 3 + 1] / 255.0f);
+                b = Vk::srgbToLinear(colors[colourIndex * 3 + 2] / 255.0f);
             }
 
             out[8] = r;
