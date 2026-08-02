@@ -17,6 +17,7 @@
 // Vk::Geometry is held by value in CellTerrain, so unlike the other Vk types it cannot be forward
 // declared here.
 #include <components/vk/vkgeometry.hpp>
+#include <components/vk/vkmath.hpp>
 
 struct SDL_Window;
 
@@ -143,6 +144,10 @@ namespace MWRender
 
         std::unordered_map<const MWWorld::CellStore*, CellMeshes> mCellMeshes;
         std::unordered_map<const MWWorld::CellStore*, CellTerrain> mCellTerrain;
+
+        // Previous frame's projection * view, handed to the shaders for temporal reprojection.
+        Vk::Mat4 mPrevViewProjection;
+        uint32_t mFrameIndex = 0;
     };
 }
 

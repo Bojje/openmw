@@ -252,6 +252,12 @@ namespace SceneUtil
         /// Internal use only, called automatically by the LightSource's UpdateCallback
         void addLight(LightSource* lightSource, const osg::Matrixf& worldMat, size_t frameNum);
 
+        /// Every light the current frame's update traversal collected, with the world matrix each was
+        /// found at. Only valid after that traversal has filled it through addLight() and before the
+        /// next frame's update() clears it again - which is where a renderer driven outside of OSG,
+        /// such as the Vulkan one in Engine::frame(), reads it.
+        const std::vector<LightSourceTransform>& getLights() const { return mLights; }
+
         const std::vector<LightSourceViewBound>& getLightsInViewSpace(
             osgUtil::CullVisitor* cv, const osg::RefMatrix* viewMatrix, size_t frameNum);
 

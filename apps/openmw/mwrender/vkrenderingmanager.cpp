@@ -202,6 +202,16 @@ namespace MWRender
         scene.viewInverse = Vk::invertMat4(scene.view);
         scene.projInverse = Vk::invertMat4(scene.projection);
 
+        // Carried across frames so a temporal pass can find where a surface was last frame. Seeded
+        // with this frame's value on the very first frame so the history is a no-op rather than
+        // garbage; mFrameIndex being 0 also tells a consumer not to trust it yet.
+        Vk::Mat4 viewProjection;
+        Vk::multiplyMat4(scene.projection.data, scene.view.data, viewProjection.data);
+        scene.prevViewProjection = mFrameIndex == 0 ? viewProjection : mPrevViewProjection;
+        scene.frameIndex = mFrameIndex;
+        mPrevViewProjection = viewProjection;
+        ++mFrameIndex;
+
         // The shaders reconstruct the direction *towards* the light as -sunDirection, so this has to be
         // the direction the light travels. World::getSunLightPosition() is the opposite convention -- it
         // points towards the sun -- and the caller negates it. Getting this backwards leaves every

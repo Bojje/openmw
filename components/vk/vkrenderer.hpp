@@ -60,6 +60,21 @@ namespace Vk
         // x = fog start, y = fog end, both in world units along the view axis. OpenMW's default fog is
         // planar and linear: clamp((abs(viewZ) - start) / (end - start), 0, 1).
         Vec4 fogParams;
+        // Last frame's projection * view, for temporal reprojection.
+        //
+        // No motion vector G-buffer target is needed for this, and that is worth understanding before
+        // anyone adds one: every instance in the TLAS is static world geometry, because markTlasDirty
+        // only fires on cell load and actors are not in the acceleration structure at all. With a
+        // static scene, a surface's previous screen position is just prevViewProjection * worldPos.
+        // The moment moving objects enter the TLAS that stops being true and real motion vectors
+        // become necessary.
+        Mat4 prevViewProjection;
+        // Frames rendered so far, for jittered sampling sequences and for deciding how much history a
+        // temporal accumulator may trust. Wraps; only ever used modulo something small.
+        uint32_t frameIndex = 0;
+        uint32_t scenePad0 = 0;
+        uint32_t scenePad1 = 0;
+        uint32_t scenePad2 = 0;
     };
 
     // What a caller hands to submitMesh. Grouped into a struct rather than passed as a parameter list
