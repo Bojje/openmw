@@ -262,19 +262,28 @@ namespace Vk
         VkImageView view = VK_NULL_HANDLE;
     };
 
-    // Ray traced ambient occlusion, written by raygen and sampled by the composite pass.
+    // One-bounce indirect light, written by raygen and sampled by the composite pass.
+    //   .rgb = albedo of whatever the hemisphere ray hit, i.e. the colour the bounce carries
+    //   .a   = sky visibility, which is also exactly the ambient occlusion term
     //
-    // A separate single-channel target rather than a channel of the existing RT output, which has
-    // none free: that image is .r = sun visibility, .gba = reflected radiance. DENOISER-PLAN.md §1
-    // proposes repacking the pair into R16G16_SFLOAT plus B10G11R11_UFLOAT_PACK32 to save bandwidth,
-    // and that is still the right end state -- but **neither of those is a mandatory storage image
-    // format**. Both require `shaderStorageImageExtendedFormats`, which this device does not enable,
-    // so taking that route means a device feature query plus a fallback path for the case where it is
-    // absent. R32_SFLOAT is mandatory everywhere and costs 4 B/px, which at 1280x800 is 4 MB. The
-    // plan's own budget puts the whole denoiser at "noise in comparison" to the ray tracing pass, so
-    // this buys correctness now and defers an optimisation that cannot be measured until there is a
-    // Steam Deck to measure it on.
-    constexpr VkFormat rtAoFormat = VK_FORMAT_R32_SFLOAT;
+    // Those two come from a single ray. The hemisphere ray uses miss index 0, so escaping it returns
+    // through miss.rmiss with w = -1, and hitting returns through closesthit.rchit with w = the hit
+    // distance and rgb = the surface albedo. Occlusion is the sign of w and the bounce colour is the
+    // rgb, so ambient occlusion is not a separate feature with a separate ray -- it is the shadow
+    // that one-bounce GI casts.
+    //
+    // **The stored rgb is albedo, not radiance, and that distinction is load-bearing.** Sky and sun
+    // colour move with the weather, sunrise and the lightning flash; accumulating a lit colour would
+    // put all of that into a 32-frame history and smear a lightning flash across half a second. The
+    // albedo of a rock is frame-invariant, so composite.frag multiplies it by the current light
+    // instead. This is the same argument that made the accumulator store visibility rather than
+    // radiance, applied to a colour.
+    //
+    // R16G16B16A16_SFLOAT because it is a mandatory storage image format. DENOISER-PLAN.md §1 wants
+    // packed formats here to save bandwidth, but R16G16_SFLOAT and B10G11R11_UFLOAT_PACK32 both need
+    // shaderStorageImageExtendedFormats, which this device does not enable -- so that route costs a
+    // feature query plus a fallback path, for a saving that cannot be measured without a Deck.
+    constexpr VkFormat rtIndirectFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
 
     // The accumulated signal. R16G16B16A16_SFLOAT rather than an 8-bit format, which looks tempting
     // for a mask in [0, 1] and is wrong: an exponential accumulator moves the stored value by
@@ -393,9 +402,9 @@ namespace Vk
 
         GBufferAttachments mGBuffer;
         RtOutputImage mRtOutput;
-        // Ambient occlusion. Created, destroyed, cleared and transitioned in lockstep with mRtOutput,
-        // so anything done to one must be done to the other.
-        RtOutputImage mRtAo;
+        // One-bounce indirect light and ambient occlusion. Created, destroyed, cleared and
+        // transitioned in lockstep with mRtOutput, so anything done to one must be done to the other.
+        RtOutputImage mRtIndirect;
 
         // Temporal accumulator history. Read and write are separate images rather than one
         // read-modify-write target because they have to be: pixel A reads the history at pixel B's
@@ -403,6 +412,11 @@ namespace Vk
         // between raygen invocations, so a single buffer is a data race with no way to fix it.
         std::array<DenoiseTarget, maxFramesInFlight> mDenoiseHistory = {};
         std::array<DenoiseTarget, maxFramesInFlight> mDenoiseGeom = {};
+        // Accumulated bounce albedo, ping-ponged exactly like mDenoiseHistory and sharing its
+        // reprojection, rejection tests and blend weight. A separate pair rather than more channels
+        // on mDenoiseHistory because that image is full: .r visibility, .g its second moment, .b sky
+        // visibility, .a history length.
+        std::array<DenoiseTarget, maxFramesInFlight> mDenoiseIndirect = {};
         // Set by buildTlas, consumed by the next updateScene. A cell load changes what casts shadows,
         // and the depth and normal rejection tests cannot see that: a newly loaded building throwing a
         // new shadow across unchanged ground passes both tests and would keep its stale history.

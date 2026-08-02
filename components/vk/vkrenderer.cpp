@@ -94,7 +94,7 @@ namespace Vk
             mRayTracingEnabled = true;
 
             writeCompositeDescriptor(3, mRtOutput.view);
-            writeCompositeDescriptor(7, mRtAo.view);
+            writeCompositeDescriptor(7, mRtIndirect.view);
         }
     }
 
@@ -721,10 +721,19 @@ namespace Vk
         // RT layout: TLAS + storage image + G-buffer samplers
         if (mDevice->rayTracingSupported())
         {
-            std::array<VkDescriptorSetLayoutBinding, 14> bindings = {};
+            std::array<VkDescriptorSetLayoutBinding, 16> bindings = {};
+
+            // Bounce albedo history, read (14) and write (15). Same ping-pong rule as bindings 9-12.
+            for (uint32_t i = 14; i <= 15; ++i)
+            {
+                bindings[i].binding = i;
+                bindings[i].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+                bindings[i].descriptorCount = 1;
+                bindings[i].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
+            }
 
             // Ambient occlusion output. Its own target because the RT output has no free channel --
-            // .r is sun visibility and .gba is reflected radiance. See rtAoFormat.
+            // .r is sun visibility and .gba is reflected radiance. See rtIndirectFormat.
             bindings[13].binding = 13;
             bindings[13].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
             bindings[13].descriptorCount = 1;
@@ -828,11 +837,11 @@ namespace Vk
             // maxSceneTextures-element sampler array, so the array has to be counted that many times.
             { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                 16 + maxFramesInFlight * 4 + maxSceneTextures * maxFramesInFlight },
-            // Per RT set: the ray tracing output, the ambient occlusion output, and the four denoise
-            // history bindings. Plus slack. This count is exact rather than generous, so adding a
-            // storage image anywhere without raising it fails vkAllocateDescriptorSets with
-            // VK_ERROR_OUT_OF_POOL_MEMORY at startup.
-            { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, maxFramesInFlight * 6 + 2 },
+            // Per RT set: the ray tracing output, the indirect light output, the four denoise history
+            // bindings and the two bounce albedo history bindings -- eight. Plus slack. This count is
+            // exact rather than generous, so adding a storage image anywhere without raising it fails
+            // vkAllocateDescriptorSets with VK_ERROR_OUT_OF_POOL_MEMORY at startup.
+            { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, maxFramesInFlight * 8 + 2 },
         };
 
         uint32_t maxSets = maxFramesInFlight * 2 + 4;
@@ -1058,10 +1067,10 @@ namespace Vk
             mRtOutput.image, mRtOutput.memory);
         mRtOutput.view = createImageView(mRtOutput.image, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_ASPECT_COLOR_BIT);
 
-        createImage(extent.width, extent.height, rtAoFormat,
+        createImage(extent.width, extent.height, rtIndirectFormat,
             VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-            mRtAo.image, mRtAo.memory);
-        mRtAo.view = createImageView(mRtAo.image, rtAoFormat, VK_IMAGE_ASPECT_COLOR_BIT);
+            mRtIndirect.image, mRtIndirect.memory);
+        mRtIndirect.view = createImageView(mRtIndirect.image, rtIndirectFormat, VK_IMAGE_ASPECT_COLOR_BIT);
 
         VkCommandBuffer cmd = mCommandPool->beginSingleTime();
 
@@ -1085,18 +1094,21 @@ namespace Vk
         transitionImageLayout(cmd, mRtOutput.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT);
 
-        // Same treatment for the ambient occlusion target, and for the same reason: the composite
-        // pass samples it unconditionally but the RT pass is skipped whenever there is no TLAS.
-        // Cleared to 1.0 -- fully unoccluded -- so a frame without ray tracing looks like the
-        // renderer did before AO existed rather than like everything is in shadow.
-        transitionImageLayout(cmd, mRtAo.image, VK_IMAGE_LAYOUT_UNDEFINED,
+        // Same treatment for the indirect light target, and for the same reason: the composite pass
+        // samples it unconditionally but the RT pass is skipped whenever there is no TLAS.
+        //
+        // Cleared to (0, 0, 0, 1): no bounce colour, fully sky-visible. That makes a frame without
+        // ray tracing look like the renderer did before any of this existed -- no indirect term and
+        // no occlusion -- rather than like the world is sealed inside a black box.
+        transitionImageLayout(cmd, mRtIndirect.image, VK_IMAGE_LAYOUT_UNDEFINED,
             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT);
 
-        VkClearColorValue aoClear = {};
-        aoClear.float32[0] = 1.0f;
-        vkCmdClearColorImage(cmd, mRtAo.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &aoClear, 1, &range);
+        VkClearColorValue indirectClear = {};
+        indirectClear.float32[3] = 1.0f;
+        vkCmdClearColorImage(
+            cmd, mRtIndirect.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &indirectClear, 1, &range);
 
-        transitionImageLayout(cmd, mRtAo.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        transitionImageLayout(cmd, mRtIndirect.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT);
 
         mCommandPool->endSingleTime(cmd, mDevice->graphicsQueue());
@@ -1105,7 +1117,7 @@ namespace Vk
     void Renderer::destroyRtOutput()
     {
         VkDevice dev = mDevice->handle();
-        for (RtOutputImage* target : { &mRtOutput, &mRtAo })
+        for (RtOutputImage* target : { &mRtOutput, &mRtIndirect })
         {
             if (target->view != VK_NULL_HANDLE)
             {
@@ -1135,9 +1147,10 @@ namespace Vk
 
         for (uint32_t i = 0; i < maxFramesInFlight; ++i)
         {
-            const std::array<std::pair<DenoiseTarget*, VkFormat>, 2> targets = {
+            const std::array<std::pair<DenoiseTarget*, VkFormat>, 3> targets = {
                 std::make_pair(&mDenoiseHistory[i], denoiseHistoryFormat),
-                std::make_pair(&mDenoiseGeom[i], denoiseGeomFormat)
+                std::make_pair(&mDenoiseGeom[i], denoiseGeomFormat),
+                std::make_pair(&mDenoiseIndirect[i], rtIndirectFormat)
             };
 
             for (const auto& [target, format] : targets)
@@ -1183,7 +1196,7 @@ namespace Vk
 
         for (uint32_t i = 0; i < maxFramesInFlight; ++i)
         {
-            for (DenoiseTarget* target : { &mDenoiseHistory[i], &mDenoiseGeom[i] })
+            for (DenoiseTarget* target : { &mDenoiseHistory[i], &mDenoiseGeom[i], &mDenoiseIndirect[i] })
             {
                 if (target->view != VK_NULL_HANDLE)
                 {
@@ -1267,17 +1280,33 @@ namespace Vk
                 makeStorageInfo(mDenoiseGeom[frame].view)         // binding 12: geometry, write
             };
 
-            const VkDescriptorImageInfo aoStorageInfo = makeStorageInfo(mRtAo.view);
+            const std::array<VkDescriptorImageInfo, 2> indirectInfos = {
+                makeStorageInfo(mDenoiseIndirect[prevFrame].view), // binding 14: bounce, read
+                makeStorageInfo(mDenoiseIndirect[frame].view)      // binding 15: bounce, write
+            };
 
-            std::array<VkWriteDescriptorSet, 11> writes = {};
+            const VkDescriptorImageInfo indirectStorageInfo = makeStorageInfo(mRtIndirect.view);
 
-            // Binding 13: ambient occlusion output
+            std::array<VkWriteDescriptorSet, 13> writes = {};
+
+            // Binding 13: indirect light output (bounce albedo + sky visibility)
             writes[10].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
             writes[10].dstSet = mRtDescriptorSets[frame];
             writes[10].dstBinding = 13;
             writes[10].descriptorCount = 1;
             writes[10].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-            writes[10].pImageInfo = &aoStorageInfo;
+            writes[10].pImageInfo = &indirectStorageInfo;
+
+            // Bindings 14-15: bounce albedo history, read and write
+            for (uint32_t i = 0; i < 2; ++i)
+            {
+                writes[i + 11].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                writes[i + 11].dstSet = mRtDescriptorSets[frame];
+                writes[i + 11].dstBinding = 14 + i;
+                writes[i + 11].descriptorCount = 1;
+                writes[i + 11].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+                writes[i + 11].pImageInfo = &indirectInfos[i];
+            }
 
             // Binding 1: output storage image
             writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -1770,10 +1799,12 @@ namespace Vk
             // covers, but that is a consequence of maxFramesInFlight being 2 rather than anything
             // this code states, and the barrier costs nothing to include.
             {
-                std::array<VkImageMemoryBarrier, 4> denoiseBarriers = {};
-                const std::array<VkImage, 4> denoiseImages = {
+                std::array<VkImageMemoryBarrier, 6> denoiseBarriers = {};
+                const std::array<VkImage, 6> denoiseImages = {
                     mDenoiseHistory[1 - mCurrentFrame].image, mDenoiseGeom[1 - mCurrentFrame].image,
-                    mDenoiseHistory[mCurrentFrame].image, mDenoiseGeom[mCurrentFrame].image
+                    mDenoiseIndirect[1 - mCurrentFrame].image,
+                    mDenoiseHistory[mCurrentFrame].image, mDenoiseGeom[mCurrentFrame].image,
+                    mDenoiseIndirect[mCurrentFrame].image
                 };
 
                 for (size_t i = 0; i < denoiseBarriers.size(); ++i)
@@ -1800,7 +1831,7 @@ namespace Vk
             transitionImageLayout(cmd, mRtOutput.image,
                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL,
                 VK_IMAGE_ASPECT_COLOR_BIT);
-            transitionImageLayout(cmd, mRtAo.image,
+            transitionImageLayout(cmd, mRtIndirect.image,
                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL,
                 VK_IMAGE_ASPECT_COLOR_BIT);
 
@@ -1813,7 +1844,7 @@ namespace Vk
             transitionImageLayout(cmd, mRtOutput.image,
                 VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                 VK_IMAGE_ASPECT_COLOR_BIT);
-            transitionImageLayout(cmd, mRtAo.image,
+            transitionImageLayout(cmd, mRtIndirect.image,
                 VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                 VK_IMAGE_ASPECT_COLOR_BIT);
         }
@@ -1920,7 +1951,7 @@ namespace Vk
         if (mRtOutput.view != VK_NULL_HANDLE)
         {
             writeCompositeDescriptor(3, mRtOutput.view);
-            writeCompositeDescriptor(7, mRtAo.view);
+            writeCompositeDescriptor(7, mRtIndirect.view);
         }
         else
         {

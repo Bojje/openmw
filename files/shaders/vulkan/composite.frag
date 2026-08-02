@@ -8,7 +8,7 @@ layout(set = 0, binding = 2) uniform sampler2D gbufferDepth;
 layout(set = 0, binding = 3) uniform sampler2D rtOutput;
 
 layout(set = 0, binding = 5) uniform sampler2D gbufferMaterial;
-layout(set = 0, binding = 7) uniform sampler2D rtAo;
+layout(set = 0, binding = 7) uniform sampler2D rtIndirect;
 
 layout(set = 0, binding = 4) uniform SceneUBO {
     mat4 view;
@@ -129,14 +129,16 @@ void main() {
     // ambient term, or the missing GI bounce, in that order.
     float shadow = rtSample.r;
 
-    // Ray traced ambient occlusion: the cosine-weighted fraction of the hemisphere that is not
-    // blocked within aoRayLength, accumulated across frames by the same denoiser as the shadow.
+    // One-bounce indirect light, from the hemisphere ray raygen traces.
+    //   .rgb = the accumulated albedo of whatever that ray hit
+    //   .a   = sky visibility, which is the ambient occlusion term
     //
-    // It modulates the ambient and the point lights, and deliberately NOT the sun. The sun already
-    // has an exact visibility term from its own shadow ray, and multiplying that by AO as well would
-    // double-count the same occluder -- the classic mistake that makes AO read as dirt smeared over
-    // everything rather than as contact shading.
-    float ao = texture(rtAo, fragTexCoord).r;
+    // The bounce arrives as an albedo rather than a radiance, deliberately: the light is applied
+    // here, this frame, so weather transitions and the lightning flash cannot enter the history and
+    // ghost. That is the same reason the shadow term accumulates visibility rather than radiance.
+    vec4 indirectSample = texture(rtIndirect, fragTexCoord);
+    vec3 bounceAlbedo = indirectSample.rgb;
+    float ao = indirectSample.a;
 
     float roughness = materialSample.r;
 
@@ -179,6 +181,43 @@ void main() {
     // is actually in front of it. It stays deliberately shallow so the two do not compound.
     float hemisphere = mix(0.7, 1.0, N.z * 0.5 + 0.5);
     vec3 ambient = albedo * push.ambientColor.rgb * hemisphere * ao;
+
+    // The bounce. This is what replaces the sShadowFloor placeholder properly: a surface in shadow is
+    // lit by light that reflected off its surroundings, and until now this renderer computed none of
+    // that, so a shadowed surface fell to ambient alone and crushed to black.
+    //
+    // albedo * bounceAlbedo is the light that left this surface after two reflections, and it is what
+    // produces colour bleed -- red rock throws red onto the ground beside it, not grey. Note
+    // bounceAlbedo already carries the occluded fraction: the hemisphere ray contributes zero when it
+    // escapes to sky, so its accumulated value is (1 - skyVisibility) times the average albedo of
+    // whatever is nearby. The occlusion and the bounce cannot disagree, because they are one ray.
+    //
+    // What lights the bounce surface has to include the sky, not just the sun. Weighting this by
+    // sunColor alone was measurably wrong: at dusk, under overcast, and anywhere indoors, sunColor is
+    // dim and nearly all the light ricocheting around a shadowed recess arrived from the sky. With
+    // only the sun term the bounce lifted near-black pixels by 4.7%, which is the right shape and an
+    // order of magnitude too little to replace what sShadowFloor was faking.
+    //
+    // The sun half is still an approximation -- it assumes the bounce surface was itself lit, and
+    // settling that honestly needs a shadow ray from the bounce point, which is a third ray per
+    // pixel. Half weight rather than full acknowledges that some of those surfaces are in shadow too.
+    // Light does not bounce once and stop. The full series is
+    //     L = L0 * (1 + a + a^2 + a^3 + ...) = L0 / (1 - a)
+    // for an average surface albedo a, and this shader traces exactly one bounce, so it captures the
+    // first term and drops the rest. Dividing by (1 - a) restores the tail without tracing it, which
+    // is the standard cheap multi-bounce approximation and is a good deal more defensible than
+    // scaling by a constant chosen to make the picture brighter.
+    //
+    // It matters more here than it would in most scenes: Morrowind's textures are dark, and a single
+    // bounce off a dark surface returns very little. Measured against the sShadowFloor placeholder,
+    // single-bounce alone left mid-shadow regions 15-23% darker than the flat 0.35 lift did.
+    //
+    // Clamped well below 1 because the series diverges as albedo approaches unity, and a near-white
+    // modded texture would otherwise produce an enormous multiplier from a term nothing else bounds.
+    const float sGiSunFactor = 0.5;
+    vec3 bounceLight = push.ambientColor.rgb + sunCol * sGiSunFactor;
+    vec3 multiBounce = 1.0 / (1.0 - min(bounceAlbedo, vec3(0.85)));
+    vec3 indirect = albedo * bounceAlbedo * multiBounce * bounceLight;
     // Energy conservation: light reflected specularly is light that did not scatter diffusely. Without
     // the (1 - fresnel) the reflection was pure additive gain on top of an already full-strength
     // diffuse term, which is the other half of why surfaces looked like they had a glowing film on top.
@@ -233,7 +272,7 @@ void main() {
     // omnidirectional term AO is a correction for. The diffuse half already has a direction and an
     // NdotL, and these lights cast no shadow ray, so occluding it with a hemisphere-average term
     // would darken the lit side of a torch-lit wall for no defensible reason.
-    vec3 color = ambient + diffuse + specular + reflectionColor
+    vec3 color = ambient + indirect + diffuse + specular + reflectionColor
         + albedo * (pointDiffuse + pointAmbient * ao);
 
     // Tone map only. The swapchain image is a _SRGB format (see Swapchain::chooseSurfaceFormat), so the

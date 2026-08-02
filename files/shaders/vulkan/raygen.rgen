@@ -20,10 +20,14 @@ layout(set = 0, binding = 10, rgba16f) uniform writeonly image2D historyOut;
 layout(set = 0, binding = 11, rg32ui)  uniform readonly  uimage2D geomIn;
 layout(set = 0, binding = 12, rg32ui)  uniform writeonly uimage2D geomOut;
 
-// Ambient occlusion. Its own image because outputImage has no free channel: .r is sun visibility and
-// .gba is reflected radiance. r32f rather than a packed format because r16f and b10g11r11 both need
-// shaderStorageImageExtendedFormats, which this device does not enable.
-layout(set = 0, binding = 13, r32f) uniform writeonly image2D aoImage;
+// One-bounce indirect light: .rgb = bounce albedo, .a = sky visibility (the ambient occlusion term).
+// Its own image because outputImage has no free channel: .r is sun visibility and .gba is reflected
+// radiance.
+layout(set = 0, binding = 13, rgba16f) uniform writeonly image2D indirectImage;
+
+// Bounce albedo history, ping-ponged and reprojected exactly like the visibility history.
+layout(set = 0, binding = 14, rgba16f) uniform readonly  image2D indirectIn;
+layout(set = 0, binding = 15, rgba16f) uniform writeonly image2D indirectOut;
 
 // Read from the scene UBO rather than push constants: two mat4 plus a vec4 is 144 bytes, over the
 // 128-byte maxPushConstantsSize that Vulkan guarantees on all implementations.
@@ -61,15 +65,15 @@ const float rayTMin = 1.0;
 const float sunRayLength = 100000.0;
 const float reflectionRayLength = 20000.0;
 
-// How far an ambient occlusion ray looks for an occluder, in world units. A unit is roughly 1.4 cm,
-// so this is about 2.8 m: far enough to darken the join between a wall and a floor, a doorway recess
-// and the underside of a rock, and short enough that an open field stays open. Occlusion beyond this
-// distance is what a GI bounce would express, not what AO should.
+// How far the hemisphere ray looks for a bounce surface, in world units. A unit is roughly 1.4 cm,
+// so this is about 7 m: far enough to pick up the wall across a room and the ground under an
+// overhang, short enough that an open field still sees mostly sky.
 //
-// This is the single most visually sensitive constant in the AO path. Too short and it degenerates
-// into a thin contact line; too long and every interior turns uniformly grey, because in a corridor
-// almost every hemisphere direction eventually hits something.
-const float aoRayLength = 200.0;
+// This is the single most visually sensitive constant in the indirect path, and it trades off in two
+// directions at once. Too short and the bounce degenerates into a thin contact line and the
+// occlusion with it; too long and every interior turns uniformly grey, because in a corridor almost
+// every direction eventually hits something and sky visibility collapses to zero everywhere.
+const float bounceRayLength = 500.0;
 
 layout(location = 0) rayPayloadEXT vec4 payload;
 
@@ -177,10 +181,11 @@ void main() {
         // stored view-space Z of 0.0, which fails the depth test against any real surface.
         imageStore(historyOut, pixelCoord, vec4(0.0));
         imageStore(geomOut, pixelCoord, uvec4(0u));
-        // Nothing occludes the sky. Writing 1.0 rather than leaving it stale matters for the same
-        // ping-pong reason the history images do -- and because composite.frag samples this at every
-        // pixel, so a stale value would tint the horizon.
-        imageStore(aoImage, pixelCoord, vec4(1.0));
+        // Nothing occludes the sky and it receives no bounce. Writing rather than leaving these
+        // stale matters for the same ping-pong reason the history images do -- and because
+        // composite.frag samples the output at every pixel, so a stale value would tint the horizon.
+        imageStore(indirectOut, pixelCoord, vec4(0.0, 0.0, 0.0, 1.0));
+        imageStore(indirectImage, pixelCoord, vec4(0.0, 0.0, 0.0, 1.0));
         return;
     }
 
@@ -241,28 +246,42 @@ void main() {
         0);
     shadowFactor = payload.w;
 
-    // Ambient occlusion. Same payload contract and the same ray flags as the shadow ray -- a hit
-    // leaves the pre-trace vec4(0.0) alone and a miss has shadow.rmiss write w = 1 -- so this needs
-    // no new miss shader, no new hit group, and no change to the shader binding table. It is the
-    // second and last ray this shader traces per pixel for vanilla content, since the reflection ray
-    // is gated off wherever specular strength is zero.
+    // One hemisphere ray, giving both the indirect bounce and the ambient occlusion.
     //
-    // Deliberately a short ray with a bounded length rather than an unbounded visibility query:
-    // occlusion past aoRayLength is what a GI bounce expresses, and treating it as occlusion instead
-    // is what makes naive AO turn interiors into uniform grey.
-    payload = vec4(0.0);
-    vec3 aoDir = sampleCosineHemisphere(N, aoXi);
+    // Occlusion and the first bounce are the same query asked two ways: "did anything block this
+    // direction" and "what colour was it". Miss index 0 routes a miss to miss.rmiss, which writes
+    // w = -1, and a hit runs closesthit.rchit, which writes the surface albedo with w = the hit
+    // distance. So the sign of w is the occlusion term and the rgb is the bounce colour, from a
+    // single trace. Ambient occlusion is not a separate feature here; it is the shadow that
+    // one-bounce GI casts.
+    //
+    // Note this ray deliberately does NOT set gl_RayFlagsTerminateOnFirstHitEXT, unlike the shadow
+    // ray. Terminating on the first hit found returns an arbitrary intersection, not the nearest one,
+    // which is fine for a binary visibility test and wrong for a bounce colour. Any-hit still runs,
+    // so alpha-tested foliage is still cut out of the bounce.
+    payload = vec4(0.0, 0.0, 0.0, -1.0);
+    vec3 bounceDir = sampleCosineHemisphere(N, aoXi);
     traceRayEXT(topLevelAS,
-        gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT,
+        gl_RayFlagsNoneEXT,
         0xFF,
         0, 0,
-        1,
+        0,
         worldPos + N * rayBias,
         rayTMin,
-        aoDir,
-        aoRayLength,
+        bounceDir,
+        bounceRayLength,
         0);
-    float rawAo = payload.w;
+
+    // Sky visibility: 1 when the ray escaped. Bounded range rather than an unbounded query, because
+    // occlusion past bounceRayLength is better described as "no nearby bounce surface" than as
+    // shadow, and treating it as shadow is what makes naive AO flatten interiors into uniform grey.
+    float rawSkyVisibility = payload.w < 0.0 ? 1.0 : 0.0;
+
+    // Albedo of the bounce surface, NOT its radiance. Storing a lit colour would put the weather,
+    // the sunrise and the lightning flash into a 32-frame history; an albedo is frame-invariant, and
+    // composite.frag multiplies it by whatever the light happens to be this frame. Zero on a miss --
+    // the sky's contribution is carried by rawSkyVisibility and coloured in the composite pass.
+    vec3 rawBounce = payload.w < 0.0 ? vec3(0.0) : payload.rgb;
 
     // Reflection ray, but only where it can affect the image.
     //
@@ -318,6 +337,7 @@ void main() {
     float historyMoment = 0.0;
     float historyAo = 0.0;
     float historyAge = 0.0;
+    vec3 historyBounce = vec3(0.0);
 
     if (prevClip.w > 0.0) {
         // Already Vulkan-convention: camera.projection is glToVulkanProjection-corrected on the CPU,
@@ -373,6 +393,9 @@ void main() {
                 historyMoment += weights[i] * tapHistory.g;
                 historyAo += weights[i] * tapHistory.b;
                 historyAge += weights[i] * tapHistory.a;
+                // The bounce rides the same tap: if a tap is trustworthy for visibility it is
+                // trustworthy for the indirect term, since both describe the same surface.
+                historyBounce += weights[i] * imageLoad(indirectIn, tap).rgb;
                 totalWeight += weights[i];
             }
 
@@ -383,11 +406,13 @@ void main() {
                 historyMoment /= totalWeight;
                 historyAo /= totalWeight;
                 historyAge /= totalWeight;
+                historyBounce /= totalWeight;
             } else {
                 historyMean = 0.0;
                 historyMoment = 0.0;
                 historyAo = 0.0;
                 historyAge = 0.0;
+                historyBounce = vec3(0.0);
             }
         }
     }
@@ -410,10 +435,12 @@ void main() {
     // AO rides the same reprojection, the same rejection tests and the same blend weight as the sun
     // visibility. That is the entire reason the accumulator was built before any stochastic term:
     // adding a second noisy signal costs one channel and one mix, not a second denoiser.
-    float ao = mix(historyAo, rawAo, alpha);
+    float skyVisibility = mix(historyAo, rawSkyVisibility, alpha);
+    vec3 bounce = mix(historyBounce, rawBounce, alpha);
 
-    imageStore(historyOut, pixelCoord, vec4(mean, moment, ao, min(age + 1.0, maxHistory)));
-    imageStore(aoImage, pixelCoord, vec4(ao, 0.0, 0.0, 0.0));
+    imageStore(historyOut, pixelCoord, vec4(mean, moment, skyVisibility, min(age + 1.0, maxHistory)));
+    imageStore(indirectOut, pixelCoord, vec4(bounce, skyVisibility));
+    imageStore(indirectImage, pixelCoord, vec4(bounce, skyVisibility));
     imageStore(geomOut, pixelCoord, uvec4(floatBitsToUint(viewPos.z), packNormal(N), 0u, 0u));
 
     // Store the accumulated visibility, plus the raw reflected radiance. composite.frag owns the
