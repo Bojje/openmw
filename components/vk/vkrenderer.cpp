@@ -608,7 +608,7 @@ namespace Vk
         // RT layout: TLAS + storage image + G-buffer samplers
         if (mDevice->rayTracingSupported())
         {
-            std::array<VkDescriptorSetLayoutBinding, 6> bindings = {};
+            std::array<VkDescriptorSetLayoutBinding, 8> bindings = {};
 
             // Scene UBO. The raygen shader reads its camera matrices and sun direction from here
             // rather than via push constants: two mat4 plus a vec4 is 144 bytes, which exceeds the
@@ -648,6 +648,21 @@ namespace Vk
             bindings[4].descriptorCount = 1;
             bindings[4].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
 
+            // Per-instance geometry table, indexed by gl_InstanceCustomIndexEXT. This is what lets the
+            // hit shaders reach the triangle they hit: each record carries the vertex and index buffer
+            // device addresses plus the texture slot, so any-hit can recover the UV and alpha-test.
+            bindings[6].binding = 6;
+            bindings[6].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+            bindings[6].descriptorCount = 1;
+            bindings[6].stageFlags = VK_SHADER_STAGE_ANY_HIT_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
+
+            // The scene texture array again, this time visible to the hit shaders. It is the same set
+            // of views the G-buffer pass samples; writeTextureArrayDescriptors keeps both in step.
+            bindings[7].binding = 7;
+            bindings[7].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            bindings[7].descriptorCount = maxSceneTextures;
+            bindings[7].stageFlags = VK_SHADER_STAGE_ANY_HIT_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
+
             VkDescriptorSetLayoutCreateInfo layoutInfo = {};
             layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
             layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
@@ -676,6 +691,14 @@ namespace Vk
         if (mDevice->rayTracingSupported())
         {
             poolSizes.push_back({ VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, maxFramesInFlight });
+            // The RT sets carry a second copy of the sampler array (binding 7) for the hit shaders,
+            // plus the geometry table.
+            poolSizes.push_back({ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, maxFramesInFlight });
+            for (VkDescriptorPoolSize& size : poolSizes)
+            {
+                if (size.type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
+                    size.descriptorCount += maxSceneTextures * maxFramesInFlight;
+            }
             maxSets += maxFramesInFlight;
         }
 
@@ -807,6 +830,15 @@ namespace Vk
             write.pImageInfo = imageInfos.data();
 
             vkUpdateDescriptorSets(mDevice->handle(), 1, &write, 0, nullptr);
+
+            // The hit shaders sample the same array at binding 7 to alpha-test and to look up hit
+            // albedo. Written from the same imageInfos so the two can never drift apart.
+            if (mRtDescriptorSets[frame] != VK_NULL_HANDLE)
+            {
+                write.dstSet = mRtDescriptorSets[frame];
+                write.dstBinding = 7;
+                vkUpdateDescriptorSets(mDevice->handle(), 1, &write, 0, nullptr);
+            }
         }
     }
 
@@ -1159,11 +1191,12 @@ namespace Vk
             auto miss = loadShader("miss.rmiss.spv");
             auto shadowMiss = loadShader("shadow.rmiss.spv");
             auto closestHit = loadShader("closesthit.rchit.spv");
+            auto anyHit = loadShader("anyhit.rahit.spv");
 
-            if (raygen && miss && shadowMiss && closestHit)
+            if (raygen && miss && shadowMiss && closestHit && anyHit)
             {
                 mRtPipeline = std::make_unique<RayTracingPipeline>(
-                    *mDevice, mRtDescriptorLayout, *raygen, *miss, *shadowMiss, *closestHit);
+                    *mDevice, mRtDescriptorLayout, *raygen, *miss, *shadowMiss, *closestHit, *anyHit);
                 Log(Debug::Info) << "Vulkan ray tracing pipeline created";
             }
             else
@@ -1453,15 +1486,63 @@ namespace Vk
         std::memcpy(mUniformMapped[mCurrentFrame], &sceneData, sizeof(SceneData));
     }
 
-    void Renderer::submitMesh(VkBuffer vertexBuffer, VkBuffer indexBuffer, uint32_t indexCount, Mat4 transform,
-        VkDeviceAddress blasAddress, uint32_t textureIndex)
+    void Renderer::submitMesh(const MeshSubmission& submission)
     {
-        Mat4 normalMatrix = computeNormalMatrix(transform);
+        Mat4 normalMatrix = computeNormalMatrix(submission.transform);
         // An out-of-range slot would index past the end of the shader's sampler array, so anything the
         // caller could not fit into the array falls back to slot 0.
-        const uint32_t slot = textureIndex < maxSceneTextures ? textureIndex : 0;
-        mDrawCommands.push_back(
-            { vertexBuffer, indexBuffer, indexCount, transform, normalMatrix, blasAddress, slot });
+        const uint32_t slot = submission.textureIndex < maxSceneTextures ? submission.textureIndex : 0;
+        mDrawCommands.push_back({ submission.vertexBuffer, submission.indexBuffer, submission.indexCount,
+            submission.transform, normalMatrix, submission.blasAddress, submission.vertexAddress,
+            submission.indexAddress, slot, submission.alphaTested });
+    }
+
+    void Renderer::uploadGeometryTable(const std::vector<GeometryRecord>& records)
+    {
+        if (records.empty())
+            return;
+
+        const uint32_t needed = static_cast<uint32_t>(records.size());
+        if (needed > mGeometryTableCapacity)
+        {
+            if (mGeometryTableMapped != nullptr)
+                vkUnmapMemory(mDevice->handle(), mGeometryTableMemory);
+            if (mGeometryTableBuffer != VK_NULL_HANDLE)
+                vkDestroyBuffer(mDevice->handle(), mGeometryTableBuffer, nullptr);
+            if (mGeometryTableMemory != VK_NULL_HANDLE)
+                vkFreeMemory(mDevice->handle(), mGeometryTableMemory, nullptr);
+
+            // Overshoot so a cell that adds a handful of instances does not force a reallocation.
+            mGeometryTableCapacity = needed + needed / 2 + 64;
+            createBufferLocal(*mDevice, sizeof(GeometryRecord) * mGeometryTableCapacity,
+                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                mGeometryTableBuffer, mGeometryTableMemory);
+            VK_CHECK(vkMapMemory(mDevice->handle(), mGeometryTableMemory, 0, VK_WHOLE_SIZE, 0,
+                &mGeometryTableMapped));
+
+            // The buffer handle changed, so every RT set has to be repointed at it.
+            VkDescriptorBufferInfo bufferInfo = {};
+            bufferInfo.buffer = mGeometryTableBuffer;
+            bufferInfo.offset = 0;
+            bufferInfo.range = VK_WHOLE_SIZE;
+
+            for (VkDescriptorSet set : mRtDescriptorSets)
+            {
+                if (set == VK_NULL_HANDLE)
+                    continue;
+                VkWriteDescriptorSet write = {};
+                write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                write.dstSet = set;
+                write.dstBinding = 6;
+                write.descriptorCount = 1;
+                write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+                write.pBufferInfo = &bufferInfo;
+                vkUpdateDescriptorSets(mDevice->handle(), 1, &write, 0, nullptr);
+            }
+        }
+
+        std::memcpy(mGeometryTableMapped, records.data(), sizeof(GeometryRecord) * records.size());
     }
 
     void Renderer::buildTlas()
@@ -1469,7 +1550,9 @@ namespace Vk
         mTlasDirty = false;
 
         std::vector<VkAccelerationStructureInstanceKHR> instances;
+        std::vector<GeometryRecord> records;
         instances.reserve(mDrawCommands.size());
+        records.reserve(mDrawCommands.size());
 
         for (const MeshDrawCommand& drawCmd : mDrawCommands)
         {
@@ -1488,8 +1571,19 @@ namespace Vk
             // drop shadow rays that pass through the back of a surface.
             instance.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
             instance.accelerationStructureReference = drawCmd.blasAddress;
+            // The hit shaders read records[gl_InstanceCustomIndexEXT], so the two arrays are filled in
+            // lockstep here. Building the table anywhere else risks the indices drifting apart, which
+            // would silently alpha-test against the wrong mesh's texture.
+            instance.instanceCustomIndex = static_cast<uint32_t>(records.size());
+
+            GeometryRecord record = {};
+            record.vertexAddress = drawCmd.vertexAddress;
+            record.indexAddress = drawCmd.indexAddress;
+            record.textureIndex = drawCmd.textureIndex;
+            record.alphaTested = drawCmd.alphaTested ? 1u : 0u;
 
             instances.push_back(instance);
+            records.push_back(record);
         }
 
         // The old TLAS may still be referenced by in-flight frames.
@@ -1498,6 +1592,8 @@ namespace Vk
 
         if (instances.empty())
             return;
+
+        uploadGeometryTable(records);
 
         mTlas = std::make_unique<AccelerationStructure>(
             AccelerationStructure::createTLAS(*mDevice, *mCommandPool, instances));
@@ -1537,6 +1633,22 @@ namespace Vk
         mRtPipeline.reset();
         // Owns a VkImage/VkImageView, so it has to go before the device is destroyed.
         mFallbackTexture.reset();
+
+        if (mGeometryTableMapped != nullptr)
+        {
+            vkUnmapMemory(mDevice->handle(), mGeometryTableMemory);
+            mGeometryTableMapped = nullptr;
+        }
+        if (mGeometryTableBuffer != VK_NULL_HANDLE)
+        {
+            vkDestroyBuffer(mDevice->handle(), mGeometryTableBuffer, nullptr);
+            mGeometryTableBuffer = VK_NULL_HANDLE;
+        }
+        if (mGeometryTableMemory != VK_NULL_HANDLE)
+        {
+            vkFreeMemory(mDevice->handle(), mGeometryTableMemory, nullptr);
+            mGeometryTableMemory = VK_NULL_HANDLE;
+        }
 
         if (mRayTracingEnabled)
             destroyRtOutput();

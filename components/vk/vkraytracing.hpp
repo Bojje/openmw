@@ -38,9 +38,12 @@ namespace Vk
         AccelerationStructure(AccelerationStructure&& other) noexcept;
         AccelerationStructure& operator=(AccelerationStructure&& other) noexcept;
 
+        // opaque has no default on purpose: every call site must state whether its geometry is
+        // alpha-tested, because getting it wrong is a silent visual bug rather than a compile error.
         static AccelerationStructure createBLAS(Device& device, CommandPool& commandPool,
             Buffer& vertexBuffer, uint32_t vertexCount, VkDeviceSize vertexStride,
-            VkFormat vertexFormat, Buffer& indexBuffer, uint32_t indexCount, VkIndexType indexType);
+            VkFormat vertexFormat, Buffer& indexBuffer, uint32_t indexCount, VkIndexType indexType,
+            bool opaque);
 
         static AccelerationStructure createTLAS(Device& device, CommandPool& commandPool,
             const std::vector<VkAccelerationStructureInstanceKHR>& instances);
@@ -69,7 +72,7 @@ namespace Vk
     public:
         RayTracingPipeline(Device& device, VkDescriptorSetLayout descriptorLayout,
             ShaderModule& raygen, ShaderModule& miss, ShaderModule& shadowMiss,
-            ShaderModule& closestHit);
+            ShaderModule& closestHit, ShaderModule& anyHit);
         ~RayTracingPipeline();
 
         RayTracingPipeline(const RayTracingPipeline&) = delete;

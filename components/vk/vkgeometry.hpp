@@ -23,6 +23,28 @@ namespace Vk
     constexpr VkDeviceSize sVertexStride = 48;
     constexpr uint32_t sFloatsPerVertex = 12;
 
+    // One entry per TLAS instance, indexed in the hit shaders by gl_InstanceCustomIndexEXT. This is
+    // what lets an any-hit shader alpha-test a leaf billboard: without it the hit shaders have no way
+    // to reach the geometry they hit, so every alpha-cutout quad occludes as a solid rectangle.
+    //
+    // The layout is mirrored by the GeometryRecord struct declared in anyhit.rahit and closesthit.rchit.
+    // Both addresses are declared there as buffer_reference types, which are 8-byte aligned, so this
+    // packs identically under std430. Keep the padding: it pins the stride at 32 bytes.
+    struct GeometryRecord
+    {
+        VkDeviceAddress vertexAddress = 0;
+        VkDeviceAddress indexAddress = 0;
+        uint32_t textureIndex = 0;
+        uint32_t alphaTested = 0;
+        uint32_t pad0 = 0;
+        uint32_t pad1 = 0;
+    };
+
+    static_assert(sizeof(GeometryRecord) == 32, "GeometryRecord must match the std430 layout in the hit shaders");
+    static_assert(offsetof(GeometryRecord, indexAddress) == 8, "GeometryRecord layout drifted from the shaders");
+    static_assert(offsetof(GeometryRecord, textureIndex) == 16, "GeometryRecord layout drifted from the shaders");
+    static_assert(offsetof(GeometryRecord, alphaTested) == 20, "GeometryRecord layout drifted from the shaders");
+
     // A drawable chunk of geometry on the device: vertex and index buffers plus, where the device
     // supports ray tracing, the BLAS built over them.
     struct Geometry
@@ -42,14 +64,20 @@ namespace Vk
 
         bool valid() const { return indexCount > 0; }
         VkDeviceAddress blasAddress() const;
+        VkDeviceAddress vertexAddress() const;
+        VkDeviceAddress indexAddress() const;
     };
 
     // Uploads interleaved vertices (sFloatsPerVertex floats each) and 32-bit indices into device-local
     // buffers via staging, then builds a BLAS if the device supports ray tracing. Returns an empty
     // Geometry for degenerate input -- createBLAS computes maxVertex as vertexCount - 1, which
     // underflows to 0xFFFFFFFF when handed zero vertices.
+    //
+    // \a alphaTested must be true for anything whose silhouette lives in its texture's alpha channel.
+    // Such geometry is left non-opaque in the BLAS so the any-hit shader runs and can discard the
+    // transparent texels; flagging it opaque makes a leaf billboard cast a solid rectangular shadow.
     Geometry uploadGeometry(Device& device, CommandPool& commandPool, const float* vertexData,
-        uint32_t vertexCount, const uint32_t* indices, uint32_t indexCount);
+        uint32_t vertexCount, const uint32_t* indices, uint32_t indexCount, bool alphaTested);
 }
 
 #endif

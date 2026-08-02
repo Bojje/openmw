@@ -40,6 +40,12 @@ namespace NifVk
         // Still needs Misc::ResourceHelpers::correctTexturePath() applied before use: Morrowind NIFs
         // reference textures without the "textures/" prefix and often name a .tga that ships as .dds.
         std::string baseTexture;
+
+        // True when the shape's silhouette lives in its texture's alpha channel rather than in its
+        // triangles. The ray tracer must leave such geometry non-opaque in the BLAS so the any-hit
+        // shader runs and can discard the cut-out texels; flagged opaque, a leaf billboard casts the
+        // shadow of a solid rectangle.
+        bool alphaTested = false;
     };
 
     class MeshConverter

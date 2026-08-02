@@ -18,8 +18,18 @@ namespace Vk
         return blas ? blas->deviceAddress() : VkDeviceAddress{ 0 };
     }
 
+    VkDeviceAddress Geometry::vertexAddress() const
+    {
+        return vertexBuffer ? vertexBuffer->deviceAddress() : VkDeviceAddress{ 0 };
+    }
+
+    VkDeviceAddress Geometry::indexAddress() const
+    {
+        return indexBuffer ? indexBuffer->deviceAddress() : VkDeviceAddress{ 0 };
+    }
+
     Geometry uploadGeometry(Device& device, CommandPool& commandPool, const float* vertexData,
-        uint32_t vertexCount, const uint32_t* indices, uint32_t indexCount)
+        uint32_t vertexCount, const uint32_t* indices, uint32_t indexCount, bool alphaTested)
     {
         Geometry geometry;
 
@@ -50,9 +60,12 @@ namespace Vk
 
         if (device.rayTracingSupported())
         {
+            // Alpha-tested geometry must stay non-opaque so the any-hit shader is invoked and can
+            // discard transparent texels. Marking it opaque is what made every leaf billboard occlude
+            // as a solid rectangle. Opaque is the faster path, so everything else keeps it.
             auto blas = AccelerationStructure::createBLAS(device, commandPool, *geometry.vertexBuffer,
                 vertexCount, sVertexStride, VK_FORMAT_R32G32B32_SFLOAT, *geometry.indexBuffer, indexCount,
-                VK_INDEX_TYPE_UINT32);
+                VK_INDEX_TYPE_UINT32, !alphaTested);
             geometry.blas = std::make_unique<AccelerationStructure>(std::move(blas));
         }
 

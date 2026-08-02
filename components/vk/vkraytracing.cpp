@@ -141,8 +141,15 @@ namespace Vk
 
     AccelerationStructure AccelerationStructure::createBLAS(Device& device, CommandPool& commandPool,
         Buffer& vertexBuffer, uint32_t vertexCount, VkDeviceSize vertexStride,
-        VkFormat vertexFormat, Buffer& indexBuffer, uint32_t indexCount, VkIndexType indexType)
+        VkFormat vertexFormat, Buffer& indexBuffer, uint32_t indexCount, VkIndexType indexType,
+        bool opaque)
     {
+        // maxVertex below is vertexCount - 1, which wraps to 0xFFFFFFFF on an empty mesh and tells the
+        // driver it may read four billion vertices out of the buffer. Callers guard against this today,
+        // but the failure mode is silent memory corruption during the build, so refuse it here too.
+        if (vertexCount == 0)
+            throw std::runtime_error("createBLAS called with vertexCount == 0");
+
         VkAccelerationStructureGeometryTrianglesDataKHR triangles = {};
         triangles.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR;
         triangles.vertexFormat = vertexFormat;
@@ -155,7 +162,12 @@ namespace Vk
         VkAccelerationStructureGeometryKHR geometry = {};
         geometry.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
         geometry.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
-        geometry.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
+        // VK_GEOMETRY_OPAQUE_BIT_KHR lets the traversal accept a hit without ever invoking the any-hit
+        // shader, so flagging everything opaque is what made alpha-tested leaf billboards occlude as
+        // solid rectangles: their cut-out texels were never sampled. Clearing the bit is the only way
+        // the any-hit shader gets a chance to discard those texels. Opaque is still the fast path and
+        // remains the right choice for ordinary geometry - only alpha-tested meshes should pass false.
+        geometry.flags = opaque ? VK_GEOMETRY_OPAQUE_BIT_KHR : 0;
         geometry.geometry.triangles = triangles;
 
         uint32_t primitiveCount = indexCount / 3;
@@ -354,7 +366,7 @@ namespace Vk
 
     RayTracingPipeline::RayTracingPipeline(Device& device, VkDescriptorSetLayout descriptorLayout,
         ShaderModule& raygen, ShaderModule& miss, ShaderModule& shadowMiss,
-        ShaderModule& closestHit)
+        ShaderModule& closestHit, ShaderModule& anyHit)
         : mDevice(device)
     {
         // No push constants: raygen reads its camera matrices and sun direction from the scene UBO
@@ -366,7 +378,7 @@ namespace Vk
         layoutInfo.pushConstantRangeCount = 0;
         VK_CHECK(vkCreatePipelineLayout(device.handle(), &layoutInfo, nullptr, &mPipelineLayout));
 
-        std::array<VkPipelineShaderStageCreateInfo, 4> stages = {};
+        std::array<VkPipelineShaderStageCreateInfo, 5> stages = {};
 
         stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
         stages[0].stage = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
@@ -388,10 +400,21 @@ namespace Vk
         stages[3].module = closestHit.handle();
         stages[3].pName = "main";
 
+        stages[4].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        stages[4].stage = VK_SHADER_STAGE_ANY_HIT_BIT_KHR;
+        stages[4].module = anyHit.handle();
+        stages[4].pName = "main";
+
         // Group 0: raygen
         // Group 1: miss (sky)
         // Group 2: miss (shadow)
-        // Group 3: closest hit
+        // Group 3: hit group (closest hit + any hit)
+        //
+        // The any-hit shader joins the existing triangles hit group rather than forming a new one: a
+        // hit group is one SBT record that names up to a closest-hit, an any-hit and an intersection
+        // shader. So there are 5 stages but still only 4 groups, and hitCount in
+        // createShaderBindingTable stays 1. Bumping it because "we added a shader" would misalign
+        // every region offset in the SBT.
         std::array<VkRayTracingShaderGroupCreateInfoKHR, 4> groups = {};
 
         groups[0].sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
@@ -419,7 +442,7 @@ namespace Vk
         groups[3].type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR;
         groups[3].generalShader = VK_SHADER_UNUSED_KHR;
         groups[3].closestHitShader = 3;
-        groups[3].anyHitShader = VK_SHADER_UNUSED_KHR;
+        groups[3].anyHitShader = 4;
         groups[3].intersectionShader = VK_SHADER_UNUSED_KHR;
 
         VkRayTracingPipelineCreateInfoKHR pipelineInfo = {};

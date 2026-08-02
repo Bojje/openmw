@@ -7,6 +7,7 @@ function(compile_vulkan_shaders TARGET_NAME SHADER_DIR OUTPUT_DIR)
         "${SHADER_DIR}/*.rgen"
         "${SHADER_DIR}/*.rchit"
         "${SHADER_DIR}/*.rmiss"
+        "${SHADER_DIR}/*.rahit"
     )
 
     set(SPV_FILES)

@@ -209,12 +209,21 @@ namespace MWRender
                 // in slot i + 1, so the sNoTexture sentinel maps straight to 0. The renderer clamps
                 // anything that does not fit in the array back to 0 as well.
                 const size_t textureIndex = mMeshTextures[inst.meshIndex];
-                const uint32_t textureSlot
-                    = textureIndex == sNoTexture ? 0u : static_cast<uint32_t>(textureIndex + 1);
 
-                mRenderer->submitMesh(mesh->vertexBuffer->handle(), mesh->indexBuffer->handle(),
-                    mesh->indexCount, transform,
-                    mesh->blas ? mesh->blas->deviceAddress() : VkDeviceAddress{ 0 }, textureSlot);
+                Vk::MeshSubmission submission;
+                submission.vertexBuffer = mesh->vertexBuffer->handle();
+                submission.indexBuffer = mesh->indexBuffer->handle();
+                submission.indexCount = mesh->indexCount;
+                submission.transform = transform;
+                submission.blasAddress
+                    = mesh->blas ? mesh->blas->deviceAddress() : VkDeviceAddress{ 0 };
+                submission.vertexAddress = mesh->vertexBuffer->deviceAddress();
+                submission.indexAddress = mesh->indexBuffer->deviceAddress();
+                submission.textureIndex
+                    = textureIndex == sNoTexture ? 0u : static_cast<uint32_t>(textureIndex + 1);
+                submission.alphaTested = mesh->alphaTested;
+
+                mRenderer->submitMesh(submission);
             }
         }
 
@@ -225,13 +234,21 @@ namespace MWRender
 
             for (const auto& chunk : terrain.chunks)
             {
-                const uint32_t textureSlot = chunk.textureIndex == sNoTexture
+                Vk::MeshSubmission submission;
+                submission.vertexBuffer = chunk.geometry.vertexBuffer->handle();
+                submission.indexBuffer = chunk.geometry.indexBuffer->handle();
+                submission.indexCount = chunk.geometry.indexCount;
+                submission.transform = transform;
+                submission.blasAddress = chunk.geometry.blasAddress();
+                submission.vertexAddress = chunk.geometry.vertexAddress();
+                submission.indexAddress = chunk.geometry.indexAddress();
+                submission.textureIndex = chunk.textureIndex == sNoTexture
                     ? 0u
                     : static_cast<uint32_t>(chunk.textureIndex + 1);
+                // Terrain is a solid heightfield; leaving it opaque keeps the fast traversal path.
+                submission.alphaTested = false;
 
-                mRenderer->submitMesh(chunk.geometry.vertexBuffer->handle(),
-                    chunk.geometry.indexBuffer->handle(), chunk.geometry.indexCount, transform,
-                    chunk.geometry.blasAddress(), textureSlot);
+                mRenderer->submitMesh(submission);
             }
         }
 
@@ -337,7 +354,7 @@ namespace MWRender
             const uint32_t indexCount = static_cast<uint32_t>(chunk.indices.size());
 
             Vk::Geometry geometry = Vk::uploadGeometry(mRenderer->device(), mRenderer->commandPool(),
-                chunk.vertices.data(), vertexCount, chunk.indices.data(), indexCount);
+                chunk.vertices.data(), vertexCount, chunk.indices.data(), indexCount, false);
             if (!geometry.valid())
                 continue;
 

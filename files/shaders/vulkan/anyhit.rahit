@@ -3,6 +3,9 @@
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_nonuniform_qualifier : require
 
+// Declared only so the stages agree on location 0. Nothing here writes to it: the shadow ray in
+// raygen.rgen pre-initialises the payload to vec4(0.0), an accepted hit has to leave it that way, and
+// shadow.rmiss is what sets w = 1 on a miss.
 layout(location = 0) rayPayloadInEXT vec4 payload;
 
 hitAttributeEXT vec2 attribs;
@@ -33,7 +36,7 @@ layout(set = 0, binding = 7) uniform sampler2D textures[512];
 const uint floatsPerVertex = 12;
 const uint texCoordOffset = 6;
 
-// Duplicated verbatim in anyhit.rahit. CompileShaders.cmake runs glslangValidator without an
+// Duplicated verbatim in closesthit.rchit. CompileShaders.cmake runs glslangValidator without an
 // include path, so a shared .glsl is not an option; edit both copies together.
 vec2 vertexTexCoord(Vertices vertices, uint index) {
     uint base = index * floatsPerVertex + texCoordOffset;
@@ -50,11 +53,19 @@ vec2 interpolateTexCoord(Vertices vertices, Indices indices, vec3 weights) {
 void main() {
     GeometryRecord record = geometries.records[gl_InstanceCustomIndexEXT];
 
+    // Opaque geometry is flagged as such in the BLAS and normally never reaches this shader, but
+    // instance and ray flags can override that per trace. The check is far cheaper than the dependent
+    // index/vertex reads and the texture fetch below.
+    if (record.alphaTested == 0)
+        return;
+
     vec3 weights = vec3(1.0 - attribs.x - attribs.y, attribs.x, attribs.y);
     vec2 uv = interpolateTexCoord(record.vertices, record.indices, weights);
-    vec3 albedo = texture(textures[nonuniformEXT(record.textureIndex)], uv).rgb;
+    float alpha = texture(textures[nonuniformEXT(record.textureIndex)], uv).a;
 
-    // w carries the hit distance because raygen distinguishes hit from miss on w > 0; miss.rmiss
-    // writes -1 there.
-    payload = vec4(albedo, gl_HitTEXT);
+    // The same 0.5 cutout gbuffer.frag discards on. The two have to stay equal: a leaf texel the
+    // raster pass throws away must not go on casting a shadow, or the foliage's silhouette and the
+    // shadow under it disagree.
+    if (alpha < 0.5)
+        ignoreIntersectionEXT;
 }

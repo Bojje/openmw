@@ -11,6 +11,7 @@
 #include <vulkan/vulkan.h>
 
 #include "vkcommon.hpp"
+#include "vkgeometry.hpp"
 #include "vkmath.hpp"
 
 struct SDL_Window;
@@ -44,6 +45,28 @@ namespace Vk
         Vec4 sunColor;
     };
 
+    // What a caller hands to submitMesh. Grouped into a struct rather than passed as a parameter list
+    // because the ray tracing path needs the buffer device addresses and the alpha-test flag in
+    // addition to what rasterization needs, and a nine-argument call is easy to get silently wrong.
+    struct MeshSubmission
+    {
+        VkBuffer vertexBuffer = VK_NULL_HANDLE;
+        VkBuffer indexBuffer = VK_NULL_HANDLE;
+        uint32_t indexCount = 0;
+        Mat4 transform;
+        // Device address of this mesh's BLAS, or 0 if it has none. Used to assemble the TLAS.
+        VkDeviceAddress blasAddress = 0;
+        // Device addresses of the same vertex and index buffers. The hit shaders read them through
+        // buffer references to recover the UV at a hit, which is what makes alpha testing possible.
+        VkDeviceAddress vertexAddress = 0;
+        VkDeviceAddress indexAddress = 0;
+        // Slot in the sampler array declared by the G-buffer fragment shader. 0 is the white fallback.
+        uint32_t textureIndex = 0;
+        // Whether the silhouette lives in the texture's alpha channel. Drives the any-hit shader's
+        // early-out; must agree with the opacity flag the BLAS was built with.
+        bool alphaTested = false;
+    };
+
     struct MeshDrawCommand
     {
         VkBuffer vertexBuffer;
@@ -51,10 +74,11 @@ namespace Vk
         uint32_t indexCount;
         Mat4 transform;
         Mat4 normalMatrix;
-        // Device address of this mesh's BLAS, or 0 if it has none. Used to assemble the TLAS.
         VkDeviceAddress blasAddress;
-        // Slot in the sampler array declared by the G-buffer fragment shader. 0 is the white fallback.
+        VkDeviceAddress vertexAddress;
+        VkDeviceAddress indexAddress;
         uint32_t textureIndex;
+        bool alphaTested;
     };
 
     // Layout of the G-buffer pipeline's push constant block. This must match the block declared in
@@ -122,8 +146,7 @@ namespace Vk
         bool loadShadersAndCreatePipelines(const std::string& shaderDir);
 
         void updateScene(const SceneData& sceneData);
-        void submitMesh(VkBuffer vertexBuffer, VkBuffer indexBuffer, uint32_t indexCount, Mat4 transform,
-            VkDeviceAddress blasAddress = 0, uint32_t textureIndex = 0);
+        void submitMesh(const MeshSubmission& submission);
 
         // Rewrites the G-buffer sampler array. views[i] is placed in slot i + 1; slot 0 and any slot
         // left over stay pointed at the white fallback texture. Callers therefore submit meshes with
@@ -163,6 +186,10 @@ namespace Vk
         void destroyRtOutput();
         void createRtDescriptorSets();
         void buildTlas();
+        // Uploads the per-instance GeometryRecord array the hit shaders index with
+        // gl_InstanceCustomIndexEXT, growing the device buffer when the instance count does. Called
+        // from buildTlas so the table and the TLAS instance order can never disagree.
+        void uploadGeometryTable(const std::vector<GeometryRecord>& records);
         void writeCompositeDescriptor(uint32_t binding, VkImageView view);
 
         void createImage(uint32_t width, uint32_t height, VkFormat format, VkImageUsageFlags usage,
@@ -224,6 +251,14 @@ namespace Vk
 
         std::unique_ptr<RayTracingPipeline> mRtPipeline;
         std::unique_ptr<AccelerationStructure> mTlas;
+
+        // Per-instance GeometryRecord array, parallel to the TLAS instance list. Host visible and
+        // rewritten whenever the TLAS is, which is rare (cell load/unload), so a staging copy would
+        // buy nothing. Grown geometrically and never shrunk; mGeometryTableCapacity is in records.
+        VkBuffer mGeometryTableBuffer = VK_NULL_HANDLE;
+        VkDeviceMemory mGeometryTableMemory = VK_NULL_HANDLE;
+        void* mGeometryTableMapped = nullptr;
+        uint32_t mGeometryTableCapacity = 0;
 
         std::vector<MeshDrawCommand> mDrawCommands;
         uint32_t mCurrentFrame = 0;
