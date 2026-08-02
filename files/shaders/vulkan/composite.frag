@@ -57,8 +57,21 @@ layout(location = 0) out vec4 outColor;
 // for the transfer function. Do not add a pow() here as well; see trap 12.
 const float sAcesPreExposure = 0.6;
 
+// Scene exposure. Not a fudge factor -- it is doing the job auto-exposure would.
+//
+// OpenMW's light colours are authored and consumed in gamma space, and decoding them to linear for
+// this pipeline shrinks them substantially: an ambient of 0.55 becomes 0.26. Combined with the fact
+// that nothing here is HDR (peak radiance is barely above 1), the tone curve never leaves its toe and
+// the whole image sits far darker than the OSG renderer's, which multiplies those same numbers
+// directly in gamma space with no curve at all.
+//
+// The right fix is a real auto-exposure pass, and OpenMW already has the luminance machinery for it
+// in files/shaders/lib/luminance/. Until that is wired up this constant stands in for it, and any
+// future auto-exposure should replace it rather than stack on top.
+const float sExposure = 2.5;
+
 vec3 acesFilmic(vec3 x) {
-    x *= sAcesPreExposure;
+    x *= sAcesPreExposure * sExposure;
     float a = 2.51;
     float b = 0.03;
     float c = 2.43;
@@ -102,10 +115,20 @@ void main() {
 
     float NdotL = max(dot(N, L), 0.0);
 
-    // Strictly 0 or 1: the shadow ray either hits (payload stays at its pre-trace zero) or misses
-    // (shadow.rmiss writes w = 1). There is no penumbra and no partial occlusion, so this steps
-    // straight from full sun to the flat 0.15 ambient below -- a 7x jump with hard aliased edges.
-    float shadow = rtSample.r;
+    // The ray traced term is strictly 0 or 1: the shadow ray either hits (payload keeps its pre-trace
+    // zero) or misses (shadow.rmiss writes w = 1). No penumbra, no partial occlusion.
+    //
+    // It is not used raw. A shadowed surface in the real world is still lit by light that bounced off
+    // everything around it, and this renderer computes no bounce at all -- there is no GI and no
+    // ambient occlusion, so a raw binary shadow drops straight to a flat ambient term and crushes to
+    // black. Vanilla Morrowind sidesteps this by having no sun shadows whatsoever, which is why the
+    // OSG renderer's shaded sides read as merely darker rather than absent.
+    //
+    // The floor stands in for that missing bounce. It is a placeholder for ray traced ambient
+    // occlusion plus a single GI bounce, and should be deleted the moment either exists -- at which
+    // point the shadow term can go back to being used raw.
+    const float sShadowFloor = 0.35;
+    float shadow = mix(sShadowFloor, 1.0, rtSample.r);
 
     float roughness = materialSample.r;
 
@@ -143,7 +166,9 @@ void main() {
     // downward-facing ones. A uniform fill gives every shadowed surface the same value, which reads as
     // dead flat -- this at least gives unlit geometry shape. It stands in for the sky occlusion an
     // ambient occlusion or GI term would compute properly. The world is Z-up.
-    float hemisphere = mix(0.45, 1.0, N.z * 0.5 + 0.5);
+    // Deliberately shallow. A strong hemisphere gradient looks right in a renderer that also has
+    // occlusion, but here it just compounds with the shadow term and buries downward-facing surfaces.
+    float hemisphere = mix(0.7, 1.0, N.z * 0.5 + 0.5);
     vec3 ambient = albedo * push.ambientColor.rgb * hemisphere;
     // Energy conservation: light reflected specularly is light that did not scatter diffusely. Without
     // the (1 - fresnel) the reflection was pure additive gain on top of an already full-strength

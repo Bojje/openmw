@@ -203,6 +203,94 @@ namespace Vk
     {
         return transposeMat4(invertAffine(model));
     }
+
+    // The six frustum planes of a view-projection matrix, as ax + by + cz + d = 0 with the normal
+    // pointing *into* the frustum, so a point is inside when every plane evaluates >= 0.
+    //
+    // Gribb-Hartmann: each plane is a sum or difference of two rows of the matrix. Rows, not columns,
+    // and Mat4 is column-major, so row r is data[0*4+r], data[1*4+r], data[2*4+r], data[3*4+r].
+    // Getting that transposed silently yields a frustum rotated 90 degrees, which culls the wrong
+    // half of the world and looks like flickering geometry rather than an obvious error.
+    //
+    // The near plane is row 2 alone rather than w + z, because this renderer's projection is already
+    // converted to Vulkan's [0, 1] depth range by glToVulkanProjection.
+    struct Frustum
+    {
+        float planes[6][4];
+    };
+
+    inline Frustum extractFrustum(const Mat4& viewProjection)
+    {
+        const float* m = viewProjection.data;
+        const auto row = [m](int r, int c) { return m[c * 4 + r]; };
+
+        Frustum f;
+        for (int i = 0; i < 4; ++i)
+        {
+            f.planes[0][i] = row(3, i) + row(0, i); // left
+            f.planes[1][i] = row(3, i) - row(0, i); // right
+            f.planes[2][i] = row(3, i) + row(1, i); // bottom
+            f.planes[3][i] = row(3, i) - row(1, i); // top
+            f.planes[4][i] = row(2, i); // near, [0, 1] depth
+            f.planes[5][i] = row(3, i) - row(2, i); // far
+        }
+
+        for (auto& plane : f.planes)
+        {
+            const float length
+                = std::sqrt(plane[0] * plane[0] + plane[1] * plane[1] + plane[2] * plane[2]);
+            if (length > 0.f)
+            {
+                plane[0] /= length;
+                plane[1] /= length;
+                plane[2] /= length;
+                plane[3] /= length;
+            }
+        }
+        return f;
+    }
+
+    // Whether a world-space axis-aligned box is at least partly inside the frustum.
+    //
+    // Tests the box corner furthest along each plane normal ("positive vertex"): if even that is
+    // behind a plane, every corner is, and the box can be rejected. The converse does not hold -- a
+    // box can pass all six and still be outside, near the corners -- so this is conservative, which
+    // is the correct direction for a culler.
+    inline bool boxInFrustum(const Frustum& frustum, const float boundsMin[3], const float boundsMax[3])
+    {
+        for (const auto& plane : frustum.planes)
+        {
+            const float x = plane[0] >= 0.f ? boundsMax[0] : boundsMin[0];
+            const float y = plane[1] >= 0.f ? boundsMax[1] : boundsMin[1];
+            const float z = plane[2] >= 0.f ? boundsMax[2] : boundsMin[2];
+            if (plane[0] * x + plane[1] * y + plane[2] * z + plane[3] < 0.f)
+                return false;
+        }
+        return true;
+    }
+
+    // World-space AABB of an object-space AABB under an affine transform.
+    //
+    // Not the eight-corner transform: for each output axis, accumulate the min and max contribution of
+    // every input axis. Same result, a third of the work, and it is the standard formulation.
+    inline void transformBounds(const Mat4& transform, const float boundsMin[3], const float boundsMax[3],
+        float outMin[3], float outMax[3])
+    {
+        const float* m = transform.data;
+        for (int r = 0; r < 3; ++r)
+        {
+            outMin[r] = m[12 + r];
+            outMax[r] = m[12 + r];
+            for (int c = 0; c < 3; ++c)
+            {
+                const float e = m[c * 4 + r];
+                const float a = e * boundsMin[c];
+                const float b = e * boundsMax[c];
+                outMin[r] += a < b ? a : b;
+                outMax[r] += a < b ? b : a;
+            }
+        }
+    }
 }
 
 #endif

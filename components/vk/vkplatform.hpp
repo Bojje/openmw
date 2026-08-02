@@ -13,6 +13,9 @@ namespace Vk
     // openmw-deps is compiled without SDL_VIDEO_VULKAN, so SDL_CreateWindow rejects SDL_WINDOW_VULKAN
     // and SDL_Vulkan_CreateSurface always fails. Creating the surface from the native window handle
     // keeps the Vulkan renderer buildable against the stock dependency bundle.
+    //
+    // Win32, Xlib and Wayland are implemented. The Unix build carries both Xlib and Wayland and
+    // decides between them at runtime from the window's SDL subsystem; see vkplatform.cpp.
 
     // Instance extensions needed to present to a window on this platform.
     std::vector<const char*> getRequiredPlatformInstanceExtensions();

@@ -671,6 +671,16 @@ if (OPENMW_USE_VULKAN)
     target_link_libraries(components Vulkan::Vulkan)
     target_compile_definitions(components PUBLIC OPENMW_USE_VULKAN=1)
     target_include_directories(components SYSTEM PRIVATE ${OpenMW_SOURCE_DIR}/extern/vma)
+
+    # vkplatform.cpp defines VK_USE_PLATFORM_XLIB_KHR on Unix, and vulkan.h then includes X11/Xlib.h;
+    # SDL_syswm.h does the same when SDL has the X11 driver. Headers only -- vkCreateXlibSurfaceKHR and
+    # vkCreateWaylandSurfaceKHR come from the Vulkan loader, and nothing here calls Xlib or
+    # libwayland-client directly. Wayland deliberately needs no package: both vulkan_wayland.h and
+    # SDL_syswm.h forward declare wl_display and wl_surface rather than including the client headers.
+    if (UNIX AND NOT APPLE)
+        find_package(X11 REQUIRED)
+        target_link_libraries(components X11::X11)
+    endif()
 endif()
 
 if (USE_QT)
