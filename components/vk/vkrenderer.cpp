@@ -95,6 +95,7 @@ namespace Vk
 
             writeCompositeDescriptor(3, mRtOutput.view);
             writeCompositeDescriptor(7, mRtIndirect.view);
+            writeCompositeHistoryDescriptors();
         }
     }
 
@@ -627,6 +628,35 @@ namespace Vk
         }
     }
 
+    void Renderer::writeCompositeHistoryDescriptors()
+    {
+        // Per frame rather than the same view for every set, unlike every other composite binding:
+        // the history ping-pongs, and composite has to read whichever half raygen just wrote, which
+        // is the one indexed by the frame being recorded.
+        //
+        // Bound in GENERAL rather than SHADER_READ_ONLY. Sampling from GENERAL is legal, and the
+        // alternative -- transitioning the history to SHADER_READ_ONLY for the composite pass and
+        // back to GENERAL for the next frame's raygen -- would add two layout transitions per frame
+        // to an image whose whole point is that it never changes layout.
+        for (uint32_t i = 0; i < maxFramesInFlight; i++)
+        {
+            VkDescriptorImageInfo imageInfo = {};
+            imageInfo.sampler = mGBufferSampler;
+            imageInfo.imageView = mDenoiseHistory[i].view;
+            imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+            VkWriteDescriptorSet write = {};
+            write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            write.dstSet = mCompositeDescriptorSets[i];
+            write.dstBinding = 8;
+            write.descriptorCount = 1;
+            write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            write.pImageInfo = &imageInfo;
+
+            vkUpdateDescriptorSets(mDevice->handle(), 1, &write, 0, nullptr);
+        }
+    }
+
     // Descriptor set layouts
 
     void Renderer::createDescriptorSetLayouts()
@@ -657,7 +687,15 @@ namespace Vk
 
         // Composite layout: G-buffer textures + RT output + scene UBO
         {
-            std::array<VkDescriptorSetLayoutBinding, 8> bindings = {};
+            std::array<VkDescriptorSetLayoutBinding, 9> bindings = {};
+
+            // Denoise history, for the per-pixel history length. composite runs a spatial fallback
+            // filter over pixels the temporal accumulator has nothing for, and this is how it knows
+            // which those are.
+            bindings[8].binding = 8;
+            bindings[8].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            bindings[8].descriptorCount = 1;
+            bindings[8].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
             // Ray traced ambient occlusion. This is what replaces the sShadowFloor placeholder: the
             // floor existed only because a fully shadowed surface had no occlusion term of any kind
@@ -836,6 +874,10 @@ namespace Vk
             // The scene set is allocated per frame in flight and each copy holds the full
             // maxSceneTextures-element sampler array, so the array has to be counted that many times.
             { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                // The 16 is slack that has absorbed every composite sampler added since: albedo,
+                // normal, depth, RT output, material, indirect and the denoise history are seven per
+                // composite set, so this is comfortable rather than exact -- unlike the storage image
+                // count above, which is exact and does have to be maintained.
                 16 + maxFramesInFlight * 4 + maxSceneTextures * maxFramesInFlight },
             // Per RT set: the ray tracing output, the indirect light output, the four denoise history
             // bindings and the two bounce albedo history bindings -- eight. Plus slack. This count is
@@ -958,10 +1000,11 @@ namespace Vk
             writeCompositeDescriptor(2, mGBuffer.depthView);
             writeCompositeDescriptor(3, mGBuffer.albedoView);
             writeCompositeDescriptor(5, mGBuffer.materialView);
-            // Placeholder, as binding 3 is: every element of the layout must be written before the set
-            // is used, whether or not ray tracing is available. The real view is bound below when it
-            // is, and without ray tracing the shader's AO sample is never used.
+            // Placeholders, as binding 3 is: every element of the layout must be written before the
+            // set is used, whether or not ray tracing is available. The real views are bound below
+            // when it is, and without ray tracing neither sample is ever read.
             writeCompositeDescriptor(7, mGBuffer.albedoView);
+            writeCompositeDescriptor(8, mGBuffer.albedoView);
 
             // Bind the scene UBO to each per-frame composite descriptor set
             for (uint32_t i = 0; i < maxFramesInFlight; i++)
@@ -1139,11 +1182,13 @@ namespace Vk
 
         VkCommandBuffer cmd = mCommandPool->beginSingleTime();
 
-        // No SAMPLED_BIT on purpose. Nothing samples these, and offering a sampler would invite a
-        // hardware bilinear history fetch -- which silently blends rejected taps back in before the
-        // shader ever gets to test them, defeating the whole rejection stage.
+        // SAMPLED_BIT so composite.frag can read the history length its spatial fallback is gated on.
+        // The warning that used to be here still stands in spirit: raygen's 2x2 history gather must
+        // keep using imageLoad, because a hardware bilinear fetch blends rejected taps back in before
+        // the shader can test them. Sampling for a scalar the fragment shader only reads 1:1 is a
+        // different thing entirely.
         const VkImageUsageFlags usage
-            = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+            = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 
         for (uint32_t i = 0; i < maxFramesInFlight; ++i)
         {
@@ -1847,6 +1892,30 @@ namespace Vk
             transitionImageLayout(cmd, mRtIndirect.image,
                 VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                 VK_IMAGE_ASPECT_COLOR_BIT);
+
+            // composite.frag samples this frame's history for the per-pixel history length. It stays
+            // in GENERAL -- sampling from GENERAL is legal and avoids two layout transitions per
+            // frame on an image whose whole point is never changing layout -- so this is a pure
+            // memory dependency from raygen's writes to the fragment shader's reads. Without it the
+            // spatial filter would gate on whatever was in the image last frame, which would fail
+            // intermittently and only while the camera moves.
+            {
+                VkImageMemoryBarrier barrier = {};
+                barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+                barrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+                barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+                barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+                barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+                barrier.image = mDenoiseHistory[mCurrentFrame].image;
+                barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+                barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+                barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                barrier.subresourceRange.levelCount = 1;
+                barrier.subresourceRange.layerCount = 1;
+
+                vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,
+                    VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+            }
         }
 
         // 3. Composite pass
@@ -1952,11 +2021,13 @@ namespace Vk
         {
             writeCompositeDescriptor(3, mRtOutput.view);
             writeCompositeDescriptor(7, mRtIndirect.view);
+            writeCompositeHistoryDescriptors();
         }
         else
         {
             writeCompositeDescriptor(3, mGBuffer.albedoView);
             writeCompositeDescriptor(7, mGBuffer.albedoView);
+            writeCompositeDescriptor(8, mGBuffer.albedoView);
         }
     }
 

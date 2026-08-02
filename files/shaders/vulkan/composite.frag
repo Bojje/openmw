@@ -9,6 +9,9 @@ layout(set = 0, binding = 3) uniform sampler2D rtOutput;
 
 layout(set = 0, binding = 5) uniform sampler2D gbufferMaterial;
 layout(set = 0, binding = 7) uniform sampler2D rtIndirect;
+// .a is the per-pixel history length. Bound to whichever half of the ping-pong raygen wrote this
+// frame, in GENERAL layout.
+layout(set = 0, binding = 8) uniform sampler2D denoiseHistory;
 
 layout(set = 0, binding = 4) uniform SceneUBO {
     mat4 view;
@@ -118,6 +121,93 @@ void main() {
 
     float NdotL = max(dot(N, L), 0.0);
 
+    // --- Spatial fallback for pixels the temporal accumulator has nothing for ------------------
+    //
+    // Temporal accumulation does nothing for a pixel with no history. A freshly disoccluded pixel is
+    // a single sample of the sun cone and a single sample of the hemisphere, and those pixels are not
+    // scattered -- they cluster into a wedge trailing every occluder as the camera moves. No amount
+    // of tuning the blend weight fixes it; there is nothing to blend with.
+    //
+    // A 5x5 cross-bilateral gather over the neighbours that lie on the same surface substitutes
+    // neighbouring samples for the missing history. It is applied only where the history is short,
+    // which is a small and spatially coherent minority of the frame -- about 0.65% while panning --
+    // so whole quads take the early-out.
+    //
+    // This lives in composite rather than in the separate compute pass DENOISER-PLAN.md proposes.
+    // The plan's argument for compute was that a graphics pass would need its own render pass and
+    // framebuffer for an offscreen target, and that is true of a pass that rewrites the signal in
+    // place: neighbours would race against the writes. Filtering here needs no target at all, because
+    // composite reads the ray tracing outputs and writes the swapchain, so there is no hazard and no
+    // extra image. What it gives up is feeding the filtered result back into the history, which real
+    // SVGF does -- so this improves what is displayed but not what converges. The *.comp glob is in
+    // cmake/CompileShaders.cmake now, so taking the feedback route later costs a pipeline, not a
+    // build system change.
+    float historyLength = texture(denoiseHistory, fragTexCoord).a;
+
+    vec4 rtFiltered = rtSample;
+    vec4 indirectFiltered = texture(rtIndirect, fragTexCoord);
+
+    // Above this the temporal estimate is trusted on its own. Provisional: it trades residual noise
+    // against over-blurring, and both halves of that are resolution and frame rate dependent, so it
+    // wants re-checking on a Steam Deck rather than being treated as settled.
+    const float sSpatialAgeThreshold = 8.0;
+
+    if (historyLength < sSpatialAgeThreshold)
+    {
+        vec3 centreNormal = normalize(normalSample.rgb * 2.0 - 1.0);
+        vec2 texel = 1.0 / vec2(textureSize(rtOutput, 0));
+
+        vec4 rtSum = vec4(0.0);
+        vec4 indirectSum = vec4(0.0);
+        float weightSum = 0.0;
+
+        for (int y = -2; y <= 2; ++y)
+        {
+            for (int x = -2; x <= 2; ++x)
+            {
+                vec2 tapUv = fragTexCoord + vec2(x, y) * texel;
+                if (any(lessThan(tapUv, vec2(0.0))) || any(greaterThanEqual(tapUv, vec2(1.0))))
+                    continue;
+
+                // Sky has no surface to share, and its depth would pass no sane test anyway.
+                float tapDepth = texture(gbufferDepth, tapUv).r;
+                if (tapDepth >= 1.0)
+                    continue;
+
+                // Edge stopping on the same two quantities the temporal rejection uses, and for the
+                // same reason: a neighbour is only a substitute for history if it is a sample of the
+                // same surface. Without this the filter bleeds shadow across silhouettes, which is a
+                // worse artifact than the noise it removes.
+                vec3 tapNormal = normalize(texture(gbufferNormal, tapUv).rgb * 2.0 - 1.0);
+                if (dot(centreNormal, tapNormal) <= 0.9)
+                    continue;
+
+                // Relative depth, so the tolerance means the same thing at 50 units and at 5000.
+                if (abs(tapDepth - depthSample) > 0.01 * max(depthSample, 1e-5))
+                    continue;
+
+                // Gaussian-ish spatial falloff. sigma ~1.5 px over a 5x5 support.
+                float d2 = float(x * x + y * y);
+                float weight = exp(-d2 / 4.5);
+
+                rtSum += texture(rtOutput, tapUv) * weight;
+                indirectSum += texture(rtIndirect, tapUv) * weight;
+                weightSum += weight;
+            }
+        }
+
+        if (weightSum > 0.0)
+        {
+            // Fade the filter out as history builds, rather than switching it off at the threshold.
+            // A hard cut leaves a visible seam that crawls across surfaces as pixels age past it.
+            float blend = 1.0 - historyLength / sSpatialAgeThreshold;
+            rtFiltered = mix(rtSample, rtSum / weightSum, blend);
+            indirectFiltered = mix(indirectFiltered, indirectSum / weightSum, blend);
+        }
+    }
+
+    rtSample = rtFiltered;
+
     // Used raw. This is now a soft, temporally accumulated estimate of the fraction of the sun's disc
     // that is visible, not the binary hit/miss it used to be, and there is no longer a floor under it.
     //
@@ -136,9 +226,8 @@ void main() {
     // The bounce arrives as an albedo rather than a radiance, deliberately: the light is applied
     // here, this frame, so weather transitions and the lightning flash cannot enter the history and
     // ghost. That is the same reason the shadow term accumulates visibility rather than radiance.
-    vec4 indirectSample = texture(rtIndirect, fragTexCoord);
-    vec3 bounceAlbedo = indirectSample.rgb;
-    float ao = indirectSample.a;
+    vec3 bounceAlbedo = indirectFiltered.rgb;
+    float ao = indirectFiltered.a;
 
     float roughness = materialSample.r;
 

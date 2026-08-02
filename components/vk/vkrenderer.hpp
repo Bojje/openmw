@@ -383,6 +383,10 @@ namespace Vk
         // from buildTlas so the table and the TLAS instance order can never disagree.
         void uploadGeometryTable(const std::vector<GeometryRecord>& records);
         void writeCompositeDescriptor(uint32_t binding, VkImageView view);
+        // Binding 8, the denoise history, which composite reads for the per-pixel history length its
+        // spatial fallback filter is gated on. Separate because it is the one composite binding whose
+        // view differs per frame in flight.
+        void writeCompositeHistoryDescriptors();
 
         void createImage(uint32_t width, uint32_t height, VkFormat format, VkImageUsageFlags usage,
             VkImage& image, VmaAllocation& allocation);

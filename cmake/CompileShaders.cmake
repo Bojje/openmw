@@ -1,7 +1,14 @@
 function(compile_vulkan_shaders TARGET_NAME SHADER_DIR OUTPUT_DIR)
+    # *.comp belongs here rather than with the ray tracing shaders: a compute shader needs no SPIR-V
+    # 1.4 feature and targeting vulkan1.2 keeps it consistent with the raster pass.
+    #
+    # Adding a .comp file without adding it to this glob fails in a way that looks like something
+    # else entirely: nothing is compiled, no .spv exists, loadShader returns nullptr, and the renderer
+    # reports the same "shaders not found" warning it uses for a missing shader directory.
     file(GLOB RASTER_SHADERS
         "${SHADER_DIR}/*.vert"
         "${SHADER_DIR}/*.frag"
+        "${SHADER_DIR}/*.comp"
     )
     file(GLOB RT_SHADERS
         "${SHADER_DIR}/*.rgen"
