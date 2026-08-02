@@ -20,8 +20,13 @@ namespace SceneUtil
     class WorkQueue;
     class WorkItem;
 
-    std::filesystem::path writeScreenshotToFile(
-        const std::filesystem::path& screenshotPath, const std::string& screenshotFormat, const osg::Image& image);
+    /// Writes \a image into \a screenshotPath as the first free "<namePrefix>NNN.<format>", and
+    /// returns that file name. \a namePrefix exists so a second renderer can write alongside the
+    /// first without the two taking turns at the same numbering -- which backend a file came from
+    /// then reads off its name rather than off the order they happened to be written in.
+    std::filesystem::path writeScreenshotToFile(const std::filesystem::path& screenshotPath,
+        const std::string& screenshotFormat, const osg::Image& image,
+        const std::string& namePrefix = "screenshot");
 
     class WriteScreenshotToFileOperation : public osgViewer::ScreenCaptureHandler::CaptureOperation
     {

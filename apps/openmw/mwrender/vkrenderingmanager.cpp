@@ -614,7 +614,9 @@ namespace MWRender
         for (uint32_t y = 0; y < height; ++y)
             std::memcpy(image->data(0, static_cast<int>(height - 1 - y)), pixels.data() + rowBytes * y, rowBytes);
 
-        return SceneUtil::writeScreenshotToFile(screenshotPath, format, *image);
+        // A prefix of its own, so a comparison harness can tell the two backends' screenshots apart
+        // by name instead of by the order they were written in.
+        return SceneUtil::writeScreenshotToFile(screenshotPath, format, *image, "vulkan");
     }
 
     std::vector<bool> VkRenderingManager::collectLiveTextures() const

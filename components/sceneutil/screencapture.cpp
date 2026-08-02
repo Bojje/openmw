@@ -58,8 +58,8 @@ namespace
 
 namespace SceneUtil
 {
-    std::filesystem::path writeScreenshotToFile(
-        const std::filesystem::path& screenshotPath, const std::string& screenshotFormat, const osg::Image& image)
+    std::filesystem::path writeScreenshotToFile(const std::filesystem::path& screenshotPath,
+        const std::string& screenshotFormat, const osg::Image& image, const std::string& namePrefix)
     {
         // Count screenshots.
         int shotCount = 0;
@@ -74,7 +74,7 @@ namespace SceneUtil
             stream.str("");
             stream.clear();
 
-            stream << "screenshot" << std::setw(3) << std::setfill('0') << shotCount++ << "." << screenshotFormat;
+            stream << namePrefix << std::setw(3) << std::setfill('0') << shotCount++ << "." << screenshotFormat;
 
             lastFileName = stream.str();
             lastFilePath = screenshotPath / lastFileName;
