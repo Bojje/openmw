@@ -4,6 +4,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -348,6 +349,26 @@ namespace Vk
         Device& device() { return *mDevice; }
         CommandPool& commandPool() { return *mCommandPool; }
 
+        // Records 2D overlay draws -- the user interface -- into the composite render pass, after the
+        // fullscreen composite draw and before the pass ends.
+        //
+        // A callback rather than a member subsystem because the interface has to stay downstream of
+        // this component: MyGUI lives in the dependency bundle and components/vk deliberately does not
+        // know about it, any more than it knows about OSG. It is nevertheless part of the renderer in
+        // the sense that matters -- Quake II put Draw_Pic inside the refresh interface precisely so
+        // that whichever backend the player selected drew the HUD too, and nothing composited one
+        // renderer's output into another's window.
+        using OverlayCallback = std::function<void(VkCommandBuffer cmd, uint32_t frameIndex, VkExtent2D extent)>;
+        void setOverlayCallback(OverlayCallback callback) { mOverlayCallback = std::move(callback); }
+
+        // The render pass an overlay pipeline must be created against. Fixed for the renderer's
+        // lifetime -- a resize recreates the framebuffers but not the pass -- so an overlay can build
+        // its pipelines once at startup and never revisit them.
+        VkRenderPass compositeRenderPass() const { return mCompositeRenderPass; }
+
+        // Current swapchain extent, so an overlay can size itself without holding a Swapchain.
+        VkExtent2D swapchainExtent() const;
+
         // Blocks until the device is idle. Callers that own GPU resources referenced by submitted
         // command buffers -- cell geometry, terrain -- must call this before destroying them, because
         // up to maxFramesInFlight submissions may still be reading those buffers and BLASes.
@@ -474,6 +495,8 @@ namespace Vk
         bool mTextureOverflowWarned = false;
 
         std::vector<VkCommandBuffer> mCommandBuffers;
+
+        OverlayCallback mOverlayCallback;
 
         std::unique_ptr<RayTracingPipeline> mRtPipeline;
         std::unique_ptr<AccelerationStructure> mTlas;

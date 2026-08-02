@@ -109,6 +109,11 @@ namespace Vk
         mSurface = createPlatformSurface(mInstance->handle(), mWindow);
     }
 
+    VkExtent2D Renderer::swapchainExtent() const
+    {
+        return mSwapchain->extent();
+    }
+
     void Renderer::createImage(uint32_t width, uint32_t height, VkFormat format,
         VkImageUsageFlags usage, VkImage& image, VmaAllocation& allocation)
     {
@@ -1967,6 +1972,14 @@ namespace Vk
 
                 vkCmdDraw(cmd, 3, 1, 0, 0);
             }
+
+            // The user interface draws here, sharing the composite pass rather than running one of its
+            // own. It blends straight onto the tone mapped scene in the swapchain image, so there is no
+            // second attachment, no extra layout transition and nothing to resolve. Outside the
+            // pipeline check above deliberately: if the composite shaders failed to load the UI should
+            // still appear, which is also what makes a black window with a working menu diagnosable.
+            if (mOverlayCallback)
+                mOverlayCallback(cmd, mCurrentFrame, extent);
 
             vkCmdEndRenderPass(cmd);
         }

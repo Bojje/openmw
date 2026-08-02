@@ -549,6 +549,13 @@ if (OPENMW_USE_VULKAN)
     add_component_dir (nifvk
         meshconverter
         )
+
+    # MyGUI's rendering platform implemented against Vk::Renderer, the sibling of myguiplatform.
+    # It reuses that directory's data manager and log listener rather than duplicating them, so it
+    # only builds when myguiplatform does -- which is unconditional.
+    add_component_dir (vkmyguiplatform
+        vkmyguiplatform vkmyguirendermanager vkmyguitexture vkmyguiadditivelayer
+        )
 endif()
 
 if (USE_QT)
