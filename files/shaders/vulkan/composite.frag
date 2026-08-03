@@ -76,6 +76,18 @@ const float sAcesPreExposure = 0.6;
 // future auto-exposure should replace it rather than stack on top.
 const float sExposure = 4.0;
 
+// The sRGB transfer function and its inverse, the same one Vk::srgbToLinear applies on the C++ side to
+// every authored colour. Needed here because the fog mix has to happen on display values -- see the
+// note where it is used.
+vec3 srgbEncode(vec3 c) {
+    c = clamp(c, 0.0, 1.0);
+    return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, greaterThan(c, vec3(0.0031308)));
+}
+
+vec3 srgbDecode(vec3 c) {
+    return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), greaterThan(c, vec3(0.04045)));
+}
+
 vec3 acesFilmic(vec3 x) {
     // Exposure is applied by the caller now, to both the tonemapped and untonemapped paths, so it
     // must not be applied a second time here.
@@ -435,15 +447,30 @@ void main() {
 
     // Fog after the tone map, not before. OpenMW mixes toward the fog colour on the pre-transfer value
     // and never tone maps at all, so mixing in linear beforehand would put the midpoint somewhere else
-    // entirely and distant terrain would come out too dark and too saturated. Applying it here on the
-    // display-linear result reproduces the reference curve closely, at the cost of the fog itself not
-    // being tone mapped -- which is the right trade when the goal is matching the mood.
+    // entirely and distant terrain would come out too dark and too saturated.
     //
     // Planar distance along the view axis, and a linear ramp, because that is what OpenMW's defaults
     // are: radial fog and exponential fog are both off in settings-default.cfg.
     float fogRange = max(scene.fogParams.y - scene.fogParams.x, 1.0);
     float fogValue = clamp((abs(viewPos.z) - scene.fogParams.x) / fogRange, 0.0, 1.0);
-    color = mix(color, scene.fogColor.rgb, fogValue);
+
+    // And the mix itself happens in the encoded domain, which is the part that was wrong. Being after
+    // the tone map is not the same as being after the transfer function: everything written to this
+    // attachment is linear and the hardware encodes it, because the swapchain is an _SRGB format. So
+    // mixing here was still a linear mix, and the sRGB transfer curve is convex, which means the
+    // average of two decoded values always encodes back brighter than the average of the two encoded
+    // ones. Distant terrain came out washed out toward the fog colour rather than tinted by it, and in
+    // foggy weather the difference was not subtle -- the middle distance went to near-white where the
+    // OSG image still reads as ground.
+    //
+    // Skipped entirely where there is no fog, which is every interior and the whole near field, so the
+    // six extra transfer-function evaluations are not paid for the majority of the frame.
+    if (fogValue > 0.0)
+    {
+        vec3 encoded = srgbEncode(color);
+        vec3 fogEncoded = srgbEncode(scene.fogColor.rgb);
+        color = srgbDecode(mix(encoded, fogEncoded, fogValue));
+    }
 
     outColor = vec4(color, 1.0);
 }
