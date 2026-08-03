@@ -11,8 +11,12 @@
 #include <unordered_map>
 #include <vector>
 
+#include <osg/Quat>
 #include <osg/Vec3f>
 #include <osg/Vec4f>
+#include <osg/ref_ptr>
+
+#include <components/sceneutil/positionattitudetransform.hpp>
 
 namespace osg
 {
@@ -134,8 +138,55 @@ namespace MWRender
             {
                 size_t meshIndex;
                 float transform[16];
+
+                // Whether this instance's BLAS goes into the acceleration structure.
+                //
+                // Cleared for good the first time the object it belongs to is seen to move, which is
+                // the same treatment actors already get and for the same two reasons: buildTlas idles
+                // the device and rebuilds the whole structure, so a thing that moves every frame would
+                // stall the device every frame, and the denoiser's reprojection is exact only because
+                // every instance in the TLAS is static world geometry (Vk::SceneData::prevViewFromCurView).
+                //
+                // The cost is that a door which has been opened once casts no ray traced shadow and
+                // appears in no reflection for the rest of the cell's life, even after it comes to
+                // rest. Putting it back would cost a second device idle, and doors get opened and shut
+                // again, so it would be a stall per swing rather than one per door.
+                bool traced = true;
             };
             std::vector<Instance> instances;
+
+            // The objects in this cell whose placement is worth re-reading, and where their instances
+            // live in the vector above.
+            //
+            // One entry per *object*, not per instance: a NIF yields several submeshes and they all
+            // move together, so the compare that decides whether anything moved happens once and the
+            // matrix multiply that follows happens per submesh only when it did.
+            //
+            // Not every object gets an entry. See trackableNode in the .cpp for the three cases that
+            // are deliberately left out, of which object paging's shared sentinel node is the one that
+            // would do visible damage.
+            struct MovedObject
+            {
+                // Held by ref_ptr rather than as a raw pointer, which is not defensive coding: taking
+                // an item out of a container or disabling a reference clears RefData's node, and the
+                // object we are pointing at would be freed underneath us mid-cell while our instances
+                // are still being submitted every frame. A held node that has left the graph simply
+                // stops changing, which is the same thing as not moving.
+                osg::ref_ptr<const SceneUtil::PositionAttitudeTransform> node;
+
+                // What the node said last time we looked. Copies of OSG's own floats, so an object
+                // that has not been written to compares bit-identical.
+                osg::Vec3f position;
+                osg::Quat attitude;
+                osg::Vec3f scale;
+
+                uint32_t firstInstance = 0;
+                uint32_t instanceCount = 0;
+                // Whether this object has already left the acceleration structure. Latched, so the
+                // TLAS is rebuilt once per object rather than once per frame of its swing.
+                bool detached = false;
+            };
+            std::vector<MovedObject> tracked;
         };
 
         // Terrain is stored per cell rather than in the shared mMeshes table because, unlike object
@@ -189,6 +240,21 @@ namespace MWRender
 
         // Rebuilds mActorInstances. Called from syncCells, which the engine calls once per frame.
         void syncActors(const std::set<MWWorld::CellStore*, std::less<>>& activeCells);
+
+        // Re-reads the placement of every tracked object and rewrites the instance transforms of the
+        // ones that moved. Returns true if any object left the acceleration structure this frame, in
+        // which case the caller must mark the TLAS dirty.
+        //
+        // This is the fix for doors that never swing and levers that never throw. mCellMeshes is baked
+        // once at cell load out of the reference's ESM::Position, which is right for a rock and wrong
+        // for anything a script or a door state touches afterwards.
+        //
+        // Deliberately not a scene graph traversal. It walks a flat vector of node pointers and
+        // compares ten floats each -- no NodeVisitor, no dynamic_cast, no allocation, and nothing
+        // proportional to the size of the graph. A naive version that accepted() the loaded cell root
+        // every frame would visit tens of thousands of nodes on a Bitter Coast exterior to find the
+        // two that had moved.
+        bool refreshMovedObjects();
 
         // Appends every mesh of one actor at its current position. Shared by the cell walk and by
         // the player, who is in no cell's reference list and has to be added by hand.

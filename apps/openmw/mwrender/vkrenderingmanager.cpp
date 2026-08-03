@@ -47,6 +47,7 @@
 #include "../mwworld/esmstore.hpp"
 #include "../mwworld/inventorystore.hpp"
 
+#include <components/sceneutil/positionattitudetransform.hpp>
 #include <components/sceneutil/skeleton.hpp>
 
 #include "animation.hpp"
@@ -169,6 +170,86 @@ namespace
         for (int row = 0; row < 4; ++row)
             for (int col = 0; col < 4; ++col)
                 out[col * 4 + row] = matrix(col, row);
+    }
+
+    // The same transform, read out of the OSG node the object is actually drawn through instead of out
+    // of the reference record.
+    //
+    // Same shape as makeObjectTransform above, and that is not a coincidence:
+    // SceneUtil::PositionAttitudeTransform::computeLocalToWorldMatrix starts from identity and does
+    // preMultTranslate, preMultRotate, preMultScale, which composes to scale * rotate * translate in
+    // OSG's row-vector convention -- exactly what makeObjectTransform builds. The two therefore agree
+    // element for element on an object that has not moved, and trackableNode below refuses to track
+    // anything where they do not.
+    //
+    // The node's own placement and no ancestor's. Object base nodes hang off a plain osg::Group per
+    // cell -- "Cell Root", objects.cpp:49-52 -- so there is no transform above them to accumulate.
+    // Accumulating one anyway would be worse than useless: makeObjectTransform ignores ancestors, so
+    // any contribution found up there would appear the first time an object moved and the object would
+    // jump. This is also why there is no hand-rolled computeLocalToWorld here the way there is in
+    // vkparticlereader.cpp -- there is no path to walk, and therefore no CameraRelativeTransform to
+    // trip over.
+    void makeNodeTransform(const SceneUtil::PositionAttitudeTransform& node, float out[16])
+    {
+        const osg::Matrixf matrix = osg::Matrixf::scale(node.getScale())
+            * osg::Matrixf::rotate(node.getAttitude())
+            * osg::Matrixf::translate(node.getPosition());
+
+        for (int row = 0; row < 4; ++row)
+            for (int col = 0; col < 4; ++col)
+                out[col * 4 + row] = matrix(col, row);
+    }
+
+    /// Whether two placements are the same to within float noise.
+    ///
+    /// Relative rather than absolute. Morrowind's world runs to +/-250,000 units and fp32 has a 24-bit
+    /// mantissa, so ulp(250000) is about 1/32 of a world unit: an absolute epsilon tight enough to mean
+    /// anything near the origin rejects every object in the east of the map, and one loose enough for
+    /// the east of the map accepts a foot of error in an interior.
+    bool transformsAgree(const float a[16], const float b[16])
+    {
+        for (int i = 0; i < 16; ++i)
+        {
+            const float magnitude = std::max(1.0f, std::max(std::abs(a[i]), std::abs(b[i])));
+            if (std::abs(a[i] - b[i]) > magnitude * 1.0e-4f)
+                return false;
+        }
+
+        return true;
+    }
+
+    /// The node this reference's instances may be refreshed from each frame, or null.
+    ///
+    /// Null is the ordinary answer for a good many references and none of the three cases is an error,
+    /// which is why this returns a pointer rather than throwing -- same arrangement as
+    /// LandComposite::tryCreate.
+    ///
+    ///  - No base node. The reference is not in the scene graph at all, so nothing will ever move it.
+    ///
+    ///  - A base node with no parent. That is object paging's sentinel: scene.cpp:108 keeps *one*
+    ///    PositionAttitudeTransform and hands that same pointer to every paged reference
+    ///    (scene.cpp:126) without ever adding it to the graph. Its position is the world origin and
+    ///    its attitude is whichever paged object happened to be added last, so reading a placement out
+    ///    of it would collect every paged static in the cell on the origin, all sharing one rotation.
+    ///
+    ///  - A node whose placement disagrees with the transform this renderer baked. Then the two
+    ///    conventions have drifted apart and there is no way to tell from here which of them is right,
+    ///    so the object keeps the placement it already has. That costs a door that will not swing --
+    ///    the bug we started with -- and avoids the far worse failure where every tracked object in the
+    ///    world jumps somewhere else the first time anything touches it.
+    const SceneUtil::PositionAttitudeTransform* trackableNode(
+        const MWWorld::ConstPtr& ptr, const float bakedTransform[16])
+    {
+        const SceneUtil::PositionAttitudeTransform* node = ptr.getRefData().getBaseNode();
+        if (node == nullptr || node->getNumParents() == 0)
+            return nullptr;
+
+        float nodeTransform[16];
+        makeNodeTransform(*node, nodeTransform);
+        if (!transformsAgree(nodeTransform, bakedTransform))
+            return nullptr;
+
+        return node;
     }
 }
 
@@ -462,8 +543,15 @@ namespace MWRender
                 submission.indexBuffer = mesh->indexBuffer->handle();
                 submission.indexCount = mesh->indexCount;
                 submission.transform = transform;
-                submission.blasAddress
-                    = mesh->blas ? mesh->blas->deviceAddress() : VkDeviceAddress{ 0 };
+                // Zero once this object has been seen to move, exactly as the actors below are
+                // zero, and for the same reasons: buildTlas idles the device to retire the old
+                // structure, and the denoiser's reprojection is exact only while every instance in the
+                // TLAS is static. An opened door therefore stops casting a ray traced shadow and stops
+                // appearing in reflections. That is the price of this fix and it is a deliberate one --
+                // see CellMeshes::Instance::traced.
+                submission.blasAddress = (inst.traced && mesh->blas)
+                    ? mesh->blas->deviceAddress()
+                    : VkDeviceAddress{ 0 };
                 submission.vertexAddress = mesh->vertexBuffer->deviceAddress();
                 submission.indexAddress = mesh->indexBuffer->deviceAddress();
                 // The sampler slot, not the storage index. Since eviction landed the two are
@@ -593,6 +681,7 @@ namespace MWRender
 
         CellMeshes cellMeshes;
         size_t skipped = 0;
+        size_t untracked = 0;
 
         store->forEachConst([&](const MWWorld::ConstPtr& ptr) {
             // Actors are handled by syncActors instead. Their transform has to be recomputed every
@@ -624,6 +713,8 @@ namespace MWRender
             float objectTransform[16];
             makeObjectTransform(ptr, objectTransform);
 
+            const uint32_t firstInstance = static_cast<uint32_t>(cellMeshes.instances.size());
+
             for (size_t meshIndex : *meshIndices)
             {
                 CellMeshes::Instance instance;
@@ -632,6 +723,27 @@ namespace MWRender
                 // transform, so the final instance transform is object * nifLocal.
                 Vk::multiplyMat4(objectTransform, mMeshes[meshIndex]->transform, instance.transform);
                 cellMeshes.instances.push_back(instance);
+            }
+
+            // Remember where to read this object's placement back from, so refreshMovedObjects can
+            // rewrite those instances when a script, a door state or the physics settles it somewhere
+            // else. Without this the transform above is the only one the object ever gets, which is
+            // why nothing in the world except an actor could move.
+            if (const SceneUtil::PositionAttitudeTransform* node = trackableNode(ptr, objectTransform))
+            {
+                CellMeshes::MovedObject tracked;
+                tracked.node = node;
+                tracked.position = node->getPosition();
+                tracked.attitude = node->getAttitude();
+                tracked.scale = node->getScale();
+                tracked.firstInstance = firstInstance;
+                tracked.instanceCount
+                    = static_cast<uint32_t>(cellMeshes.instances.size()) - firstInstance;
+                cellMeshes.tracked.push_back(std::move(tracked));
+            }
+            else
+            {
+                ++untracked;
             }
 
             return true;
@@ -644,8 +756,14 @@ namespace MWRender
                 ++textured;
         }
 
+        // untracked is worth a number rather than silence. A cell where it is roughly the whole
+        // reference count means trackableNode is rejecting everything, which is what a broken
+        // placement convention looks like from the outside -- a world that draws correctly and in
+        // which nothing can ever move again.
         Log(Debug::Info) << "Vulkan: loaded cell with " << cellMeshes.instances.size()
-                         << " instances (" << skipped << " models skipped), "
+                         << " instances (" << skipped << " models skipped, "
+                         << cellMeshes.tracked.size() << " objects tracked, " << untracked
+                         << " not), "
                          << mMeshes.size() << " meshes cached total, "
                          << textured << " with a base texture, "
                          << mTextures.size() << " textures uploaded";
@@ -868,9 +986,81 @@ namespace MWRender
         if (changed)
             syncTexturesToRenderer();
 
-        // The TLAS is only rebuilt when the instance set actually changes, not every frame.
-        if (changed)
+        // After the adds, so a cell loaded on this very frame is compared against the placement it
+        // was just baked with rather than sitting still for one more frame.
+        //
+        // This is also the right side of osgViewer's update traversal. Engine::frame runs
+        // updateTraversal at engine.cpp:356 and calls syncCells at engine.cpp:394, so a door that
+        // World::processDoors swung this frame has already had setAttitude called on its node by the
+        // time this reads it, and the Vulkan image agrees with the OSG one on the same frame rather
+        // than trailing it by one.
+        const bool detached = refreshMovedObjects();
+
+        // The TLAS is only rebuilt when the instance set actually changes, not every frame: a cell
+        // load or unload, or the first time an object moves and therefore has to leave it. A swinging
+        // door costs one rebuild at the moment it starts moving and none afterwards, because
+        // MovedObject::detached is latched.
+        if (changed || detached)
             mRenderer->markTlasDirty();
+    }
+
+    bool VkRenderingManager::refreshMovedObjects()
+    {
+        bool detachedAny = false;
+
+        for (auto& [store, cellMeshes] : mCellMeshes)
+        {
+            for (CellMeshes::MovedObject& tracked : cellMeshes.tracked)
+            {
+                const SceneUtil::PositionAttitudeTransform& node = *tracked.node;
+
+                // This compare is the entire per-frame cost of the feature for the overwhelming
+                // majority of objects, which are rocks and will never move. Ten floats against ten
+                // floats, on memory OSG has usually just touched during the update traversal.
+                //
+                // Exact equality, not a tolerance. These are copies of the same floats OSG holds, so
+                // anything nothing has written to is bit-identical -- and a tolerance would make the
+                // slow end of a rising platform invisible, which is the case hardest to notice and
+                // hardest to explain afterwards.
+                //
+                // All three, not just the position. A door swings: its position never changes and its
+                // attitude is the whole motion, so testing position alone finds nothing at all and
+                // would leave this fix doing nothing for the case it was written for.
+                if (node.getPosition() == tracked.position && node.getAttitude() == tracked.attitude
+                    && node.getScale() == tracked.scale)
+                    continue;
+
+                tracked.position = node.getPosition();
+                tracked.attitude = node.getAttitude();
+                tracked.scale = node.getScale();
+
+                float objectTransform[16];
+                makeNodeTransform(node, objectTransform);
+
+                for (uint32_t i = 0; i < tracked.instanceCount; ++i)
+                {
+                    CellMeshes::Instance& instance
+                        = cellMeshes.instances[tracked.firstInstance + i];
+                    // The same product addCell formed, with a new left-hand side. The converter baked
+                    // each submesh's place in the NIF hierarchy into mesh->transform and that part of
+                    // the object does not move, so only the object matrix is new.
+                    Vk::multiplyMat4(
+                        objectTransform, mMeshes[instance.meshIndex]->transform, instance.transform);
+                    instance.traced = false;
+                }
+
+                // Once per object, not once per frame of its motion. The rebuild it asks for idles the
+                // device, so a door that announced itself on every frame of a one-second swing would
+                // stall the device sixty times to open.
+                if (!tracked.detached)
+                {
+                    tracked.detached = true;
+                    detachedAny = true;
+                }
+            }
+        }
+
+        return detachedAny;
     }
 
     void VkRenderingManager::addActorInstances(const MWWorld::Ptr& ptr)
