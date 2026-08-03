@@ -130,6 +130,10 @@ namespace MWRender
             {
                 Vk::Geometry geometry;
                 size_t textureIndex; // index into mTextures, or npos when untextured
+                // Whether this chunk is offered to the acceleration structure. False for the water
+                // surface: it is opaque in the raster pass, so putting it in the TLAS would have it
+                // block the sun for everything beneath it and turn every seabed black.
+                bool inTlas = true;
             };
             std::vector<Chunk> chunks;
             // Cell-local vertices plus one translation to the cell origin, so terrain coordinates stay
@@ -163,6 +167,13 @@ namespace MWRender
         // Builds and uploads the heightfield for an exterior cell. Does nothing for interiors or for
         // exteriors with no LAND record.
         void addTerrain(const MWWorld::CellStore* store);
+
+        // Appends a flat water surface across the whole cell at its water height. A first pass and
+        // honest about it: one opaque quad with the first frame of the vanilla water texture on it,
+        // no animation, no transparency, no refraction and no reflection. Morrowind's water is very
+        // nearly opaque seen from above, so this reads as water at a distance and as a hard sheet up
+        // close, which is a different thing from the Bitter Coast having no water in it at all.
+        void addWater(const MWWorld::CellStore* store, CellTerrain& terrain);
 
         // Resolves a raw NIF texture name to an index into mTextures, loading it if needed. Returns
         // npos when the texture cannot be loaded, so callers can fall back to untextured rendering.

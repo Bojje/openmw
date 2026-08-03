@@ -386,7 +386,7 @@ namespace MWRender
                 submission.indexBuffer = chunk.geometry.indexBuffer->handle();
                 submission.indexCount = chunk.geometry.indexCount;
                 submission.transform = transform;
-                submission.blasAddress = chunk.geometry.blasAddress();
+                submission.blasAddress = chunk.inTlas ? chunk.geometry.blasAddress() : VkDeviceAddress{ 0 };
                 submission.vertexAddress = chunk.geometry.vertexAddress();
                 submission.indexAddress = chunk.geometry.indexAddress();
                 submission.textureIndex = textureSlot(chunk.textureIndex);
@@ -535,12 +535,64 @@ namespace MWRender
         if (terrain.chunks.empty())
             return;
 
+        addWater(store, terrain);
+
         syncTexturesToRenderer();
 
         Log(Debug::Info) << "Vulkan: loaded terrain for cell " << cellX << ", " << cellY << " -- "
                          << terrain.chunks.size() << " chunks, " << triangles << " triangles";
 
         mCellTerrain.emplace(store, std::move(terrain));
+    }
+
+    void VkRenderingManager::addWater(const MWWorld::CellStore* store, CellTerrain& terrain)
+    {
+        const MWWorld::Cell* cell = store->getCell();
+        if (cell == nullptr || !cell->hasWater())
+            return;
+
+        // The cell transform already translates to the cell's south-west corner and does not touch Z,
+        // so X and Y are cell-local and the height is absolute, exactly as the land chunks are.
+        const float size = ESM::Land::REAL_SIZE;
+        const float height = cell->getWaterHeight();
+
+        // Tiled rather than stretched: one texture across a whole 8192-unit cell is a smear. Eight
+        // repeats is roughly the scale the OSG renderer uses and is a guess that should be looked at
+        // rather than trusted.
+        constexpr float tiles = 8.0f;
+
+        // Twelve floats per vertex, matching the G-buffer layout: position, normal, texcoord, colour.
+        const std::vector<float> vertices = {
+            0.f, 0.f, height, 0.f, 0.f, 1.f, 0.f, 0.f, 1.f, 1.f, 1.f, 1.f, //
+            size, 0.f, height, 0.f, 0.f, 1.f, tiles, 0.f, 1.f, 1.f, 1.f, 1.f, //
+            size, size, height, 0.f, 0.f, 1.f, tiles, tiles, 1.f, 1.f, 1.f, 1.f, //
+            0.f, size, height, 0.f, 0.f, 1.f, 0.f, tiles, 1.f, 1.f, 1.f, 1.f //
+        };
+        const std::vector<uint32_t> indices = { 0, 1, 2, 0, 2, 3 };
+
+        Vk::Geometry geometry = Vk::uploadGeometry(mRenderer->device(), mRenderer->commandPool(), vertices.data(),
+            4, indices.data(), static_cast<uint32_t>(indices.size()), false);
+        if (!geometry.valid())
+            return;
+
+        CellTerrain::Chunk water;
+        water.geometry = std::move(geometry);
+        // The first frame of the vanilla animated water. The name is built the way
+        // MWRender::Water does it -- the Water_SurfaceTexture fallback is "water" and the frame
+        // number is appended with no separator, giving water00 -- and there are 32 frames that
+        // nothing cycles through yet, so the surface is still rather than rippling.
+        //
+        // No "textures/" prefix: getOrLoadTexture runs the name through correctTexturePath, which
+        // adds it. Passing the full path produces textures/textures/water/... , which fails, falls
+        // back to the white placeholder, and shows up as a sheet of flat white sea. So does
+        // guessing water_00 instead of water00, and it looks exactly the same.
+        water.textureIndex = getOrLoadTexture("water/water00.dds");
+        // Kept out of the acceleration structure on purpose. It is opaque in the raster pass, so a
+        // TLAS instance would block the sun for everything under it and every seabed would go black
+        // -- a worse lie than water that casts no shadow. It also means the water surface receives
+        // no ray traced shadow of its own.
+        water.inTlas = false;
+        terrain.chunks.push_back(std::move(water));
     }
 
     void VkRenderingManager::removeCell(const MWWorld::CellStore* store)
