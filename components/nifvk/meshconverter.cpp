@@ -349,6 +349,7 @@ namespace NifVk
 
             uint8_t* dst = mesh.skinAttributes.data() + static_cast<size_t>(v) * sSkinAttributeStride;
 
+
             // Renormalised over the four that were kept, and quantised to eight bits per weight.
             // The quantisation is why the last weight is the remainder rather than its own rounding:
             // four independently rounded weights need not sum to 255, and a vertex whose weights sum
