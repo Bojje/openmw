@@ -1,4 +1,4 @@
-#ifdef OPENMW_USE_VULKAN
+﻿#ifdef OPENMW_USE_VULKAN
 
 #include "vkrenderingmanager.hpp"
 
@@ -29,8 +29,14 @@
 #include <components/vk/vkrenderer.hpp>
 #include <components/vk/vktexture.hpp>
 
+#include <components/esm3/loadbody.hpp>
+#include <components/esm3/loadnpc.hpp>
+#include <components/esm3/loadrace.hpp>
+
 #include "../mwbase/environment.hpp"
 #include "../mwbase/world.hpp"
+#include "../mwworld/esmstore.hpp"
+#include "npcanimation.hpp"
 #include "../mwworld/cell.hpp"
 #include "../mwworld/cellstore.hpp"
 #include "../mwworld/class.hpp"
@@ -708,17 +714,19 @@ namespace MWRender
         if (model.empty())
             return;
 
-        // NPCs resolve to meshes/base_anim.nif, which is a skeleton with no geometry at all, so
-        // nothing comes back and no NPC and no player appears. Creatures resolve to their own mesh
-        // and do appear. Getting NPCs in means assembling body parts and placing each at its bone,
-        // which is a separate piece of work -- see section 5.
-        const std::vector<size_t>* meshIndices = getOrLoadMeshes(std::string(model.value()));
-        if (meshIndices == nullptr || meshIndices->empty())
-            return;
-
         float objectTransform[16];
         makeObjectTransform(ptr, objectTransform);
 
+        // An NPC's own model is meshes/base_anim.nif, a skeleton with no geometry in it, so this
+        // returns nothing for them and the body has to be assembled from parts instead. Creatures
+        // resolve to their own mesh and go straight through.
+        const std::vector<size_t>* meshIndices = getOrLoadMeshes(std::string(model.value()));
+        if (meshIndices == nullptr || meshIndices->empty())
+        {
+            if (ptr.getType() == ESM::NPC::sRecordId)
+                addNpcInstances(ptr, objectTransform);
+            return;
+        }
 
         for (size_t meshIndex : *meshIndices)
         {
@@ -727,6 +735,163 @@ namespace MWRender
             Vk::multiplyMat4(objectTransform, mMeshes[meshIndex]->transform, instance.transform);
             mActorInstances.push_back(instance);
         }
+    }
+
+    const std::unordered_map<std::string, std::array<float, 16>>* VkRenderingManager::getOrLoadSkeleton(
+        const std::string& model)
+    {
+        const auto cached = mSkeletonCache.find(model);
+        if (cached != mSkeletonCache.end())
+            return &cached->second;
+
+        std::unordered_map<std::string, std::array<float, 16>> bones;
+        try
+        {
+            const VFS::Path::Normalized path(model);
+            const Nif::NIFFilePtr nif = MWBase::Environment::get().getResourceSystem()->getNifFileManager()->get(path);
+            if (nif != nullptr)
+                bones = NifVk::MeshConverter::collectNodeTransforms(Nif::FileView(*nif));
+        }
+        catch (const std::exception& e)
+        {
+            // Cached empty, like a failed mesh: a skeleton that cannot be read will not start working,
+            // and every NPC of that race would otherwise retry it on every frame.
+            Log(Debug::Warning) << "Vulkan: failed to load skeleton " << model << ": " << e.what();
+        }
+
+        return &mSkeletonCache.emplace(model, std::move(bones)).first->second;
+    }
+
+    void VkRenderingManager::addNpcInstances(const MWWorld::ConstPtr& ptr, const float objectTransform[16])
+    {
+        const ESM::NPC* npc = ptr.get<ESM::NPC>()->mBase;
+        if (npc == nullptr)
+            return;
+
+        const MWWorld::ESMStore& store = *MWBase::Environment::get().getESMStore();
+        const ESM::Race* race = store.get<ESM::Race>().search(npc->mRace);
+        if (race == nullptr)
+            return;
+
+        const bool female = !npc->isMale();
+        const bool beast = (race->mData.mFlags & ESM::Race::Beast) != 0;
+
+        // The skeleton the parts hang on. Same choice MWClass::Npc::getCorrectedModel makes, and it
+        // has to match it or the bone names will not be the ones the parts expect.
+        const std::string skeletonModel = beast ? "meshes/base_animkna.nif" : "meshes/base_anim.nif";
+        const std::unordered_map<std::string, std::array<float, 16>>* bones = getOrLoadSkeleton(skeletonModel);
+        if (bones == nullptr || bones->empty())
+            return;
+
+        // Which bone each kind of part hangs from. The same table MWRender::NpcAnimation keeps, copied
+        // rather than shared because that class is welded to OSG and constructing one is a scene graph
+        // operation. Only the parts a naked NPC has are here: clothing, armour and held weapons are
+        // their own piece of work and would mean walking the inventory store.
+        struct PartBone
+        {
+            ESM::PartReferenceType part;
+            const char* bone;
+        };
+        static const PartBone sPartBones[] = {
+            { ESM::PRT_Neck, "Neck" },
+            { ESM::PRT_Cuirass, "Chest" },
+            { ESM::PRT_Groin, "Groin" },
+            { ESM::PRT_RHand, "Right Hand" },
+            { ESM::PRT_LHand, "Left Hand" },
+            { ESM::PRT_RWrist, "Right Wrist" },
+            { ESM::PRT_LWrist, "Left Wrist" },
+            { ESM::PRT_RForearm, "Right Forearm" },
+            { ESM::PRT_LForearm, "Left Forearm" },
+            { ESM::PRT_RUpperarm, "Right Upper Arm" },
+            { ESM::PRT_LUpperarm, "Left Upper Arm" },
+            { ESM::PRT_RFoot, "Right Foot" },
+            { ESM::PRT_LFoot, "Left Foot" },
+            { ESM::PRT_RAnkle, "Right Ankle" },
+            { ESM::PRT_LAnkle, "Left Ankle" },
+            { ESM::PRT_RKnee, "Right Knee" },
+            { ESM::PRT_LKnee, "Left Knee" },
+            { ESM::PRT_RLeg, "Right Upper Leg" },
+            { ESM::PRT_LLeg, "Left Upper Leg" },
+            { ESM::PRT_Tail, "Tail" },
+        };
+
+        const auto placeAt = [&](const std::string& partModel, const char* boneName) {
+            if (partModel.empty())
+                return;
+
+            const auto bone = bones->find(boneName);
+            if (bone == bones->end())
+                return;
+
+            const std::vector<size_t>* partMeshes = getOrLoadMeshes(partModel);
+            if (partMeshes == nullptr)
+                return;
+
+            float actorBone[16];
+            Vk::multiplyMat4(objectTransform, bone->second.data(), actorBone);
+
+            for (size_t meshIndex : *partMeshes)
+            {
+                ActorInstance instance;
+                instance.meshIndex = meshIndex;
+
+                // Three cases, and getting them mixed up is what makes an NPC a heap of parts.
+                //
+                // A rigid part is authored in the space of the bone that holds it: actor * that
+                // bone * the part's own place in its file.
+                //
+                // A skinned part is authored in its own skin space and carries an inverse bind
+                // transform per bone, so the bind pose is actor * its dominant bone's world *
+                // that bone's inverse bind. Its node transform is not used -- the skin replaces it.
+                // Hanging a skinned part off the attachment bone as though it were rigid applies a
+                // bone twice and throws it across the room; leaving the bone out entirely drops it
+                // at the actor's feet. Both were tried and both look like a broken NIF.
+                //
+                // A skinned part whose bone is not in this skeleton falls back to the attachment
+                // bone, which is wrong but local.
+                const NifVk::VulkanMesh& mesh = *mMeshes[meshIndex];
+                if (mesh.skinned && !mesh.skinBone.empty())
+                {
+                    const auto skinBone = bones->find(mesh.skinBone);
+                    if (skinBone != bones->end())
+                    {
+                        float actorSkinBone[16];
+                        Vk::multiplyMat4(objectTransform, skinBone->second.data(), actorSkinBone);
+                        Vk::multiplyMat4(actorSkinBone, mesh.skinInvBind, instance.transform);
+                    }
+                    else
+                    {
+                        Vk::multiplyMat4(actorBone, mesh.transform, instance.transform);
+                    }
+                }
+                else
+                {
+                    Vk::multiplyMat4(actorBone, mesh.transform, instance.transform);
+                }
+
+                mActorInstances.push_back(instance);
+            }
+        };
+
+        const std::vector<const ESM::BodyPart*>& parts
+            = MWRender::NpcAnimation::getBodyParts(npc->mRace, female, false, false);
+
+        for (const PartBone& entry : sPartBones)
+        {
+            if (static_cast<size_t>(entry.part) >= parts.size())
+                continue;
+            const ESM::BodyPart* part = parts[entry.part];
+            if (part == nullptr)
+                continue;
+            placeAt(Misc::ResourceHelpers::correctMeshPath(part->mModel.getNormalized()).value(), entry.bone);
+        }
+
+        // Head and hair are named on the NPC record itself rather than coming from the race's part
+        // list, because they are the two things character creation lets the player choose.
+        if (const ESM::BodyPart* head = store.get<ESM::BodyPart>().search(npc->mHead))
+            placeAt(Misc::ResourceHelpers::correctMeshPath(head->mModel.getNormalized()).value(), "Head");
+        if (const ESM::BodyPart* hair = store.get<ESM::BodyPart>().search(npc->mHair))
+            placeAt(Misc::ResourceHelpers::correctMeshPath(hair->mModel.getNormalized()).value(), "Head");
     }
 
     void VkRenderingManager::syncActors(const std::set<MWWorld::CellStore*, std::less<>>& activeCells)

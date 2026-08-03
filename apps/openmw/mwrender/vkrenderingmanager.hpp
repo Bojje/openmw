@@ -163,6 +163,15 @@ namespace MWRender
         // the player, who is in no cell's reference list and has to be added by hand.
         void addActorInstances(const MWWorld::ConstPtr& ptr);
 
+        // The NPC case, which is not one model but a skeleton plus a dozen body-part files hung on
+        // its bones by name. Falls back to nothing if the race's parts cannot be resolved.
+        void addNpcInstances(const MWWorld::ConstPtr& ptr, const float objectTransform[16]);
+
+        // Bind pose of a skeleton NIF, by node name, loaded once and cached. Keyed on the skeleton's
+        // model path, since beast races use a different one.
+        const std::unordered_map<std::string, std::array<float, 16>>* getOrLoadSkeleton(const std::string& model);
+        std::unordered_map<std::string, std::unordered_map<std::string, std::array<float, 16>>> mSkeletonCache;
+
         // A single NIF yields several submeshes, so the cache maps a model path to all of the
         // mMeshes indices it produced. Returns nullptr only if the model could not be loaded.
         const std::vector<size_t>* getOrLoadMeshes(const std::string& model);

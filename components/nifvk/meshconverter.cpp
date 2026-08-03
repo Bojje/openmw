@@ -224,6 +224,106 @@ namespace NifVk
         return meshes;
     }
 
+    void MeshConverter::describeSkin(const Nif::NiGeometry* geom, VulkanMesh& mesh)
+    {
+        Vk::identityMat4(mesh.skinInvBind);
+
+        const auto* skin = static_cast<const Nif::NiSkinInstance*>(geom->mSkin.getPtr());
+        if (skin == nullptr || skin->mData.empty())
+            return;
+
+        const Nif::NiSkinData* data = skin->mData.getPtr();
+        if (data == nullptr || data->mBones.empty())
+            return;
+
+        // Heaviest bone by total weight, not the first: a body part's bone list is in file order and
+        // the first entry is frequently a parent that barely touches it.
+        size_t dominant = 0;
+        float bestWeight = -1.0f;
+        for (size_t i = 0; i < data->mBones.size() && i < skin->mBones.size(); ++i)
+        {
+            float total = 0.0f;
+            for (const auto& [vertex, weight] : data->mBones[i].mWeights)
+            {
+                (void)vertex;
+                total += weight;
+            }
+            if (total > bestWeight)
+            {
+                bestWeight = total;
+                dominant = i;
+            }
+        }
+
+        if (dominant >= skin->mBones.size() || skin->mBones[dominant].empty())
+            return;
+
+        const Nif::NiAVObject* bone = skin->mBones[dominant].getPtr();
+        if (bone == nullptr || bone->mName.empty())
+            return;
+
+        mesh.skinBone = bone->mName;
+        nifTransformToMat4(data->mBones[dominant].mTransform, mesh.skinInvBind);
+    }
+
+    std::unordered_map<std::string, std::array<float, 16>> MeshConverter::collectNodeTransforms(
+        const Nif::FileView& nif)
+    {
+        std::unordered_map<std::string, std::array<float, 16>> transforms;
+
+        float identity[16];
+        Vk::identityMat4(identity);
+
+        for (size_t i = 0; i < nif.numRoots(); ++i)
+        {
+            const Nif::Record* root = nif.getRoot(i);
+            if (root == nullptr)
+                continue;
+
+            const auto* avObject = dynamic_cast<const Nif::NiAVObject*>(root);
+            if (avObject != nullptr)
+                collectNodeTransformsRecursive(avObject, identity, transforms);
+        }
+
+        return transforms;
+    }
+
+    void MeshConverter::collectNodeTransformsRecursive(const Nif::NiAVObject* node, const float parentTransform[16],
+        std::unordered_map<std::string, std::array<float, 16>>& output)
+    {
+        if (node == nullptr)
+            return;
+
+        // isHidden() is deliberately not checked, unlike in processNode. A hidden node still positions
+        // its children, and several of Morrowind's skeletons hide bones that body parts hang off.
+
+        float localMat[16];
+        nifTransformToMat4(node->mTransform, localMat);
+
+        float worldTransform[16];
+        Vk::multiplyMat4(parentTransform, localMat, worldTransform);
+
+        if (!node->mName.empty())
+        {
+            // First writer wins. Morrowind's skeletons repeat a few names -- most visibly "Bip01" on
+            // both the root and an accessory node -- and the one nearest the root is the one body parts
+            // are meant to hang from.
+            std::array<float, 16> stored;
+            std::copy(std::begin(worldTransform), std::end(worldTransform), stored.begin());
+            output.emplace(node->mName, stored);
+        }
+
+        const auto* niNode = dynamic_cast<const Nif::NiNode*>(node);
+        if (niNode != nullptr)
+        {
+            for (const auto& child : niNode->mChildren)
+            {
+                if (!child.empty())
+                    collectNodeTransformsRecursive(child.getPtr(), worldTransform, output);
+            }
+        }
+    }
+
     void MeshConverter::processNode(
         const Nif::NiAVObject* node, const float parentTransform[16], std::vector<VulkanMesh>& output)
     {
@@ -249,6 +349,9 @@ namespace NifVk
             if (!geom->mData.empty())
             {
                 VulkanMesh mesh = processGeometry(geom, worldTransform);
+                mesh.skinned = !geom->mSkin.empty();
+                if (mesh.skinned)
+                    describeSkin(geom, mesh);
                 if (mesh.indexCount > 0)
                     output.push_back(std::move(mesh));
             }
