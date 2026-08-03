@@ -1170,8 +1170,16 @@ namespace MWRender
         // The player is in no cell's reference list -- MWWorld::Player holds their LiveCellRef as a
         // member and hands out a Ptr to it -- so the cell walk above can never find them, however
         // thorough it is.
+        //
+        // Except in first person, where their body is not drawn at all. OSG swaps the third-person
+        // body for a separate hands-and-arms model there; this path has no equivalent yet, and
+        // drawing the third-person one from inside its own chest is worse than drawing nothing --
+        // an arm hangs into the bottom of the frame where the reference image has clear ground.
+        const MWRender::Camera* camera = MWBase::Environment::get().getWorld()->getCamera();
+        const bool firstPerson = camera != nullptr && camera->getMode() == MWRender::Camera::Mode::FirstPerson;
+
         const MWWorld::Ptr player = MWBase::Environment::get().getWorld()->getPlayerPtr();
-        if (!player.isEmpty())
+        if (!player.isEmpty() && !firstPerson)
             addActorInstances(player);
     }
 
