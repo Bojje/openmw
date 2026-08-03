@@ -349,7 +349,26 @@ namespace MWRender
         Vk::Texture target = Vk::Texture::createRenderTarget(
             mImpl->device, sSize, sSize, VK_FORMAT_R8G8B8A8_SRGB, 32);
 
-        VkImageView targetView = target.view();
+        // A view of level 0 alone, not the texture's own view.
+        //
+        // Texture::view() covers the whole mip chain because that is what a sampler wants, and a
+        // framebuffer attachment must name exactly one level -- VUID-VkFramebufferCreateInfo-
+        // pAttachments-00883. Passing the sampling view was a validation error on every bake, which is
+        // to say on every cell load, and it is the kind of thing a driver is entitled to handle any way
+        // it likes.
+        VkImageView targetView = VK_NULL_HANDLE;
+        {
+            VkImageViewCreateInfo viewInfo = {};
+            viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+            viewInfo.image = target.image();
+            viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+            viewInfo.format = VK_FORMAT_R8G8B8A8_SRGB;
+            viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            viewInfo.subresourceRange.baseMipLevel = 0;
+            viewInfo.subresourceRange.levelCount = 1;
+            viewInfo.subresourceRange.layerCount = 1;
+            check(vkCreateImageView(dev, &viewInfo, nullptr, &targetView), "target level 0 view");
+        }
 
         VkFramebuffer framebuffer = VK_NULL_HANDLE;
         {
@@ -436,6 +455,7 @@ namespace MWRender
         target.generateMipChain(mImpl->device, mImpl->commandPool);
 
         vkDestroyFramebuffer(dev, framebuffer, nullptr);
+        vkDestroyImageView(dev, targetView, nullptr);
 
         return target;
     }
