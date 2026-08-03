@@ -54,6 +54,7 @@ namespace MWRender
     class Camera;
     class LandComposite;
     class ParticleReader;
+    class SkyReader;
     struct LandBlend;
 
     class VkRenderingManager
@@ -247,6 +248,11 @@ namespace MWRender
         // Not owned. OSG's scene root, read once a frame for live particle state.
         osg::Node* mSceneRoot = nullptr;
         std::unique_ptr<ParticleReader> mParticleReader;
+        // Reads the same graph for the sun disc and the two moons. Separate from the particle reader
+        // because the two find different things in different ways -- the sky bodies are three named
+        // quads discriminated by a uniform, not an unbounded set of particle systems -- and because
+        // one of them can be switched off without touching the other.
+        std::unique_ptr<SkyReader> mSkyReader;
 
         std::unordered_map<std::string, std::vector<size_t>> mMeshCache;
         std::vector<std::unique_ptr<NifVk::VulkanMesh>> mMeshes;

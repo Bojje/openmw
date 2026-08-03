@@ -1547,6 +1547,10 @@ namespace Vk
         // Also not in the check below. Without these the world renders and the effects do not.
         auto particleVert = loadShader("particle.vert.spv");
         auto particleFrag = loadShader("particle.frag.spv");
+        // Nor these. Without them the sky keeps its gradient and loses the sun and both moons, which
+        // is a survivable build and an obvious one to look at.
+        auto skyVert = loadShader("sky.vert.spv");
+        auto skyFrag = loadShader("sky.frag.spv");
 
         if (!gbufVert || !gbufFrag || !compVert || !compFrag)
         {
@@ -1789,6 +1793,112 @@ namespace Vk
             blend.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
             VK_CHECK(vkCreateGraphicsPipelines(mDevice->handle(), VK_NULL_HANDLE, 1, &pipelineInfo,
                 nullptr, &mParticleBlendedPipeline));
+        }
+
+        // Sky pipeline -- the sun disc and the two moons. In the composite pass alongside the
+        // particles, sharing their two descriptor sets: the camera and the sampler array off the scene
+        // set, the G-buffer depth off the composite set. No render target and no pass of its own.
+        if (skyVert && skyFrag)
+        {
+            std::array<VkPipelineShaderStageCreateInfo, 2> stages
+                = { skyVert->stageInfo(VK_SHADER_STAGE_VERTEX_BIT),
+                      skyFrag->stageInfo(VK_SHADER_STAGE_FRAGMENT_BIT) };
+
+            std::array<VkDescriptorSetLayout, 2> setLayouts
+                = { mSceneDescriptorLayout, mCompositeDescriptorLayout };
+
+            // One range covering both stages, because both shaders declare the same block and a push
+            // constant block is one range shared by the whole pipeline. 112 bytes against the 128
+            // Vulkan guarantees everywhere -- pinned by the static_asserts on Vk::SkyElement.
+            VkPushConstantRange pushRange = {};
+            pushRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+            pushRange.offset = 0;
+            pushRange.size = sizeof(SkyElement);
+
+            VkPipelineLayoutCreateInfo layoutInfo = {};
+            layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+            layoutInfo.setLayoutCount = static_cast<uint32_t>(setLayouts.size());
+            layoutInfo.pSetLayouts = setLayouts.data();
+            layoutInfo.pushConstantRangeCount = 1;
+            layoutInfo.pPushConstantRanges = &pushRange;
+            VK_CHECK(
+                vkCreatePipelineLayout(mDevice->handle(), &layoutInfo, nullptr, &mSkyPipelineLayout));
+
+            // No vertex input: the corner comes from gl_VertexIndex and the rest from the push
+            // constant. There is no instancing either -- three bodies is fewer than the setup an
+            // instanced draw would need.
+            VkPipelineVertexInputStateCreateInfo vertexInput = {};
+            vertexInput.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+
+            VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
+            inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+            inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+
+            VkPipelineViewportStateCreateInfo viewportState = {};
+            viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+            viewportState.viewportCount = 1;
+            viewportState.scissorCount = 1;
+
+            VkPipelineRasterizationStateCreateInfo rasterizer = {};
+            rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+            rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+            rasterizer.lineWidth = 1.0f;
+            // These quads are oriented by the transform OSG puts them under rather than by the camera,
+            // so which way their two triangles wind depends on where the body is in the sky. Culling
+            // either face would lose the sun for half of every day.
+            rasterizer.cullMode = VK_CULL_MODE_NONE;
+
+            VkPipelineMultisampleStateCreateInfo multisampling = {};
+            multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+            multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+            // The composite pass has no depth attachment. sky.frag samples the G-buffer depth instead,
+            // and its test is not the particles' -- it draws only where nothing was drawn at all.
+            VkPipelineDepthStencilStateCreateInfo depthStencil = {};
+            depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+            depthStencil.depthTestEnable = VK_FALSE;
+            depthStencil.depthWriteEnable = VK_FALSE;
+
+            // Premultiplied alpha, which is the blend MoonUpdater authors on the moons
+            // (skyutil.cpp, ONE / ONE_MINUS_SRC_ALPHA). The sun's authored blend is the ordinary
+            // SRC_ALPHA / ONE_MINUS_SRC_ALPHA, and sky.frag multiplies the sun's colour by its own
+            // alpha so this one state covers both. That is deliberate: a second pipeline differing in
+            // a single blend factor is a second pipeline that has to be kept identical in every other
+            // respect, and the particle pair already shows how easily that becomes a pair of copies.
+            VkPipelineColorBlendAttachmentState blend = {};
+            blend.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT
+                | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+            blend.blendEnable = VK_TRUE;
+            blend.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
+            blend.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+            blend.colorBlendOp = VK_BLEND_OP_ADD;
+            blend.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+            blend.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+            blend.alphaBlendOp = VK_BLEND_OP_ADD;
+
+            VkPipelineColorBlendStateCreateInfo colorBlending = {};
+            colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+            colorBlending.attachmentCount = 1;
+            colorBlending.pAttachments = &blend;
+
+            VkGraphicsPipelineCreateInfo pipelineInfo = {};
+            pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+            pipelineInfo.stageCount = static_cast<uint32_t>(stages.size());
+            pipelineInfo.pStages = stages.data();
+            pipelineInfo.pVertexInputState = &vertexInput;
+            pipelineInfo.pInputAssemblyState = &inputAssembly;
+            pipelineInfo.pViewportState = &viewportState;
+            pipelineInfo.pRasterizationState = &rasterizer;
+            pipelineInfo.pMultisampleState = &multisampling;
+            pipelineInfo.pDepthStencilState = &depthStencil;
+            pipelineInfo.pColorBlendState = &colorBlending;
+            pipelineInfo.pDynamicState = &dynamicState;
+            pipelineInfo.layout = mSkyPipelineLayout;
+            pipelineInfo.renderPass = mCompositeRenderPass;
+            pipelineInfo.subpass = 0;
+
+            VK_CHECK(vkCreateGraphicsPipelines(
+                mDevice->handle(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &mSkyPipeline));
         }
 
         // Composite pipeline
@@ -2212,6 +2322,33 @@ namespace Vk
                 vkCmdDraw(cmd, 3, 1, 0, 0);
             }
 
+            // The sun disc and the two moons, read out of the live OSG sky graph -- see
+            // MWRender::SkyReader for why they are read rather than recomputed.
+            //
+            // Before the particles, not after. These are background: sky.frag draws them only where
+            // nothing else was drawn, so they can never cover geometry, but they would happily cover
+            // the rain and ash in front of them if they went last.
+            //
+            // One draw each, with the whole element in a push constant. Three draws does not justify a
+            // storage buffer, a descriptor binding and a mapped allocation per frame in flight, which
+            // is what the particle path needs for its hundreds.
+            if (mSkyPipeline != VK_NULL_HANDLE && !mSkyElements.empty())
+            {
+                std::array<VkDescriptorSet, 2> sets
+                    = { mSceneDescriptorSets[mCurrentFrame], mCompositeDescriptorSets[mCurrentFrame] };
+                vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mSkyPipelineLayout, 0,
+                    static_cast<uint32_t>(sets.size()), sets.data(), 0, nullptr);
+                vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mSkyPipeline);
+
+                for (const SkyElement& element : mSkyElements)
+                {
+                    vkCmdPushConstants(cmd, mSkyPipelineLayout,
+                        VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
+                        sizeof(SkyElement), &element);
+                    vkCmdDraw(cmd, 6, 1, 0, 0);
+                }
+            }
+
             // Particle effects -- fire, smoke, sparks, spell effects. In this pass rather than the
             // G-buffer because they are blended, and a G-buffer has nowhere to put a translucent
             // surface. After the tone mapped scene so they add light to a finished image, and before
@@ -2400,6 +2537,14 @@ namespace Vk
                 break;
             mParticleRuns.push_back({ run.first, std::min(run.count, usable - run.first), run.additive });
         }
+    }
+
+    void Renderer::updateSky(const std::vector<SkyElement>& elements)
+    {
+        // Copied rather than pointed at. The caller's vector is refilled by SkyReader::collect early
+        // in the frame and read again when the command buffer is recorded, and three structs of 112
+        // bytes is not worth turning that gap into a lifetime question.
+        mSkyElements = elements;
     }
 
     uint32_t Renderer::updateSkinMatrices(const float* matrices, uint32_t count)
@@ -2824,6 +2969,10 @@ namespace Vk
         if (mTextureSampler != VK_NULL_HANDLE)
             vkDestroySampler(dev, mTextureSampler, nullptr);
 
+        if (mSkyPipeline != VK_NULL_HANDLE)
+            vkDestroyPipeline(dev, mSkyPipeline, nullptr);
+        if (mSkyPipelineLayout != VK_NULL_HANDLE)
+            vkDestroyPipelineLayout(dev, mSkyPipelineLayout, nullptr);
         if (mParticleBlendedPipeline != VK_NULL_HANDLE)
             vkDestroyPipeline(dev, mParticleBlendedPipeline, nullptr);
         if (mParticlePipeline != VK_NULL_HANDLE)

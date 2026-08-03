@@ -11,6 +11,7 @@
 #include <osg/NodeVisitor>
 #include <osg/StateSet>
 #include <osg/Texture2D>
+#include <osg/Matrixd>
 #include <osgParticle/Particle>
 #include <osgParticle/ParticleSystem>
 
@@ -115,6 +116,12 @@ namespace
             const bool additive = resolveAdditive();
             const float brightness = resolveLightBrightness();
 
+            // FIXED alignment means the effect author chose the quad's orientation and it is not a
+            // billboard. Rain is the case that matters: (0.1, 0, 0) by (0, 0, -1) is a thin vertical
+            // streak, and a camera-facing square in its place is a white blob.
+            const bool fixedAlignment
+                = system.getParticleAlignment() == osgParticle::ParticleSystem::FIXED;
+
             // osgParticle keeps particles in local coordinates when the system's reference frame is
             // relative, which is what Morrowind's flame nodes use -- their ParticleFlag_LocalSpace is
             // set. The node path from the scene root supplies the rest.
@@ -135,7 +142,14 @@ namespace
                 const osg::Vec3 world = particle->getPosition() * localToWorld;
                 const osg::Vec4 colour = particle->getCurrentColor();
                 const float size = particle->getCurrentSize();
-                if (size <= 0.0f || colour.a() <= 0.0f)
+                // Opacity is two numbers in osgParticle, not one. getCurrentColor's alpha is the colour
+                // curve's, and getCurrentAlpha is a separate range the operators drive; Particle::render
+                // multiplies them together and so must this. Missing it left the weather at full
+                // opacity always, because MWRender's WeatherAlphaOperator fades rain and snow in and out
+                // through setAlphaRange and touches the colour not at all -- so a drizzle came down as
+                // hard as a storm.
+                const float alpha = colour.a() * particle->getCurrentAlpha();
+                if (size <= 0.0f || alpha <= 0.0f)
                     continue;
 
                 Vk::ParticleQuad quad = {};
@@ -150,11 +164,31 @@ namespace
                 quad.colour[0] = srgbToLinear(colour.r()) * brightness;
                 quad.colour[1] = srgbToLinear(colour.g()) * brightness;
                 quad.colour[2] = srgbToLinear(colour.b()) * brightness;
-                // osgParticle fades alpha over life through the same colour interpolation, so this
-                // already carries the fade.
-                quad.colour[3] = colour.a();
+                quad.colour[3] = alpha;
                 quad.textureIndex = texture;
                 quad.additive = additive ? 1u : 0u;
+
+                if (fixedAlignment)
+                {
+                    // The align vectors are in the system's own frame, so they need the same transform
+                    // the positions got -- the rotation part of it. osgParticle scales them by the
+                    // particle's current size exactly as it scales a billboard's camera axes, so the
+                    // two paths differ only in where the axes come from.
+                    const osg::Vec3 x
+                        = osg::Matrix::transform3x3(system.getAlignVectorX(), localToWorld) * size;
+                    const osg::Vec3 y
+                        = osg::Matrix::transform3x3(system.getAlignVectorY(), localToWorld) * size;
+                    quad.axisX[0] = static_cast<float>(x.x());
+                    quad.axisX[1] = static_cast<float>(x.y());
+                    quad.axisX[2] = static_cast<float>(x.z());
+                    quad.axisY[0] = static_cast<float>(y.x());
+                    quad.axisY[1] = static_cast<float>(y.y());
+                    quad.axisY[2] = static_cast<float>(y.z());
+                    // The flag, rather than testing the axes for zero in the shader: a fixed system
+                    // whose particles have shrunk to nothing would otherwise flip to billboarding for
+                    // one frame on the way out.
+                    quad.axisX[3] = 1.0f;
+                }
 
                 mOut.push_back(quad);
             }

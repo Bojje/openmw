@@ -3,6 +3,7 @@
 #include "vkrenderingmanager.hpp"
 
 #include <algorithm>
+#include <map>
 #include <cmath>
 #include <cstring>
 #include <exception>
@@ -56,6 +57,7 @@
 #include "camera.hpp"
 #include "vklandcomposite.hpp"
 #include "vkparticlereader.hpp"
+#include "vkskyreader.hpp"
 #include "vkterrainbuilder.hpp"
 
 namespace
@@ -170,11 +172,16 @@ namespace MWRender
         mRenderer = std::make_unique<Vk::Renderer>(window, enableValidation);
         mMeshConverter
             = std::make_unique<NifVk::MeshConverter>(mRenderer->device(), mRenderer->commandPool());
-        // Particle textures resolve through the ordinary loader, so they are cached and evicted with
-        // everything else. textureSlot maps a storage index to a live sampler slot; an unloaded
-        // texture becomes slot 0, the white fallback, rather than an out-of-range read.
-        mParticleReader = std::make_unique<ParticleReader>(
-            [this](const std::string& name, std::size_t& storageIndex) {
+        // Particle and sky textures resolve through the ordinary loader, so they are cached and
+        // evicted with everything else. textureSlot maps a storage index to a live sampler slot; an
+        // unloaded texture becomes slot 0, the white fallback, rather than an out-of-range read.
+        //
+        // One resolver, shared by both readers. The sky finds its images exactly the way the particles
+        // do -- by the file name off a stateset -- so a second copy would be a second place to get the
+        // "textures/" strip below wrong, and getting it wrong is silent: the texture simply fails to
+        // load and everything that wanted it draws as a white square.
+        std::function<uint32_t(const std::string&, std::size_t&)> resolveByName
+            = [this](const std::string& name, std::size_t& storageIndex) {
             // The leading "textures/" comes off first. These names arrive already resolved through
             // the VFS, whereas getOrLoadTexture expects a raw NIF reference and runs
             // correctTexturePath over it -- which prefixes "textures/" again and produces a path that
@@ -189,8 +196,32 @@ namespace MWRender
 
             const size_t index = getOrLoadTexture(std::string(stripped));
             storageIndex = index;
-            return static_cast<uint32_t>(textureSlot(index));
-        });
+            const uint32_t slot = static_cast<uint32_t>(textureSlot(index));
+
+            // Slot 0 is the 1x1 white fallback, so a name that lands there draws as a solid white
+            // shape and says nothing about why. That has cost hours twice already -- once on the
+            // particle textures and once on water -- because a white square looks like a shader bug
+            // rather than a missing file.
+            //
+            // Only after it has failed repeatedly, which is the difference between a real failure and
+            // the ordinary way a texture starts life. The first frame that asks for a texture is the
+            // frame that queues its upload, so it legitimately answers slot 0 once and resolves on the
+            // next -- warning on that made every sky and effect texture in the game report itself
+            // broken while they were all working.
+            if (slot == 0)
+            {
+                static std::map<std::string, int, Misc::StringUtils::CiComp> failures;
+                const int count = ++failures[std::string(stripped)];
+                if (count == 30)
+                    Log(Debug::Warning) << "Vulkan: texture '" << stripped
+                                        << "' has failed to load " << count
+                                        << " times; it is drawing as a white square";
+            }
+
+            return slot;
+        };
+        mParticleReader = std::make_unique<ParticleReader>(resolveByName);
+        mSkyReader = std::make_unique<SkyReader>(resolveByName);
         Log(Debug::Info) << "Vulkan renderer initialized";
     }
 
@@ -342,6 +373,12 @@ namespace MWRender
             mRenderer->updateParticles(
                 quads.data(), static_cast<uint32_t>(quads.size()), mParticleReader->runs());
         }
+
+        // Gathered in syncCells for the same reason and handed over unsorted: three quads that never
+        // overlap need no depth order, and the two moons cross the sun only when the sky has already
+        // faded them out.
+        if (mSkyReader != nullptr)
+            mRenderer->updateSky(mSkyReader->elements());
 
         mRenderer->updateScene(scene);
 
@@ -807,6 +844,17 @@ namespace MWRender
         {
             const size_t texturesBefore = mTextures.size();
             mParticleReader->collect(mSceneRoot);
+            if (mTextures.size() != texturesBefore)
+                changed = true;
+        }
+
+        // And the sky, for the same reason and in the same window. A moon changes phase at midnight
+        // and the new image is first seen here; collecting after the texture sync would draw it as the
+        // white fallback for a frame, which in the sky is the brightest thing on screen.
+        if (mSkyReader != nullptr)
+        {
+            const size_t texturesBefore = mTextures.size();
+            mSkyReader->collect(mSceneRoot);
             if (mTextures.size() != texturesBefore)
                 changed = true;
         }
@@ -1328,6 +1376,14 @@ namespace MWRender
         if (mParticleReader != nullptr)
         {
             for (const size_t index : mParticleReader->textureIndices())
+                mark(index);
+        }
+
+        // The sun and moon textures belong to no mesh either, and they are worse to lose: a moon that
+        // has been evicted and replaced by the white fallback is a solid white disc in the night sky.
+        if (mSkyReader != nullptr)
+        {
+            for (const size_t index : mSkyReader->textureIndices())
                 mark(index);
         }
 

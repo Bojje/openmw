@@ -9,6 +9,8 @@ struct ParticleQuad {
     float size;      // world-unit half extent
     vec4 colour;     // straight from the simulation, alpha included
     uvec4 params;    // .x = slot in the sampler array, .y = authored to blend additively
+    vec4 axisX;      // half extent along u, world space; .w non-zero means use these instead of facing
+    vec4 axisY;      // half extent along v, world space
 };
 
 layout(set = 0, binding = 0) uniform CameraUBO {
@@ -43,10 +45,18 @@ void main() {
     // Billboarded against the camera rather than against any world axis. The view matrix's rows are
     // the camera's basis vectors in world space, so its first two columns transposed give right and
     // up without inverting anything.
-    vec3 right = vec3(camera.view[0][0], camera.view[1][0], camera.view[2][0]);
-    vec3 up = vec3(camera.view[0][1], camera.view[1][1], camera.view[2][1]);
+    vec3 right = vec3(camera.view[0][0], camera.view[1][0], camera.view[2][0]) * quad.size;
+    vec3 up = vec3(camera.view[0][1], camera.view[1][1], camera.view[2][1]) * quad.size;
 
-    vec2 offset = (corner - 0.5) * 2.0 * quad.size;
+    // Unless the effect author fixed the orientation, which osgParticle's FIXED alignment mode is for.
+    // Rain is a thin vertical streak and billboarding it draws a square instead -- see the note on
+    // ParticleQuad::axisX.
+    if (quad.axisX.w != 0.0) {
+        right = quad.axisX.xyz;
+        up = quad.axisY.xyz;
+    }
+
+    vec2 offset = (corner - 0.5) * 2.0;
     vec3 world = quad.position + right * offset.x + up * offset.y;
 
     fragColour = quad.colour;

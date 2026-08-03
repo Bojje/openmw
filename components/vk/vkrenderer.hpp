@@ -178,10 +178,29 @@ namespace Vk
         // curve apply -- so it travels with the quad rather than in a parallel array that could fall
         // out of step with it.
         uint32_t additive;
-        uint32_t pad[2];
+        uint32_t particlePad[2];
+        // The quad's two half-extent axes in world space, already scaled by the particle's size, or all
+        // zero to mean "face the camera".
+        //
+        // osgParticle has two alignment modes and only one of them is a billboard. Rain is the other:
+        // sky.cpp sets FIXED with align vectors (0.1, 0, 0) and (0, 0, -1), which is a thin vertical
+        // streak, and drawing it as a camera-facing square instead turned every raindrop into a white
+        // blob the size of a house. Nothing caught it because the test harness pins the weather clear,
+        // and until the crash in CameraRelativeTransform was fixed the weather systems could not be
+        // read at all.
+        float axisX[4];
+        float axisY[4];
     };
 
-    static_assert(sizeof(ParticleQuad) == 48, "particle quad layout must match the shader's");
+    // std430 in the shader, so the struct is 16-byte aligned and the three vec4s land where
+    // particle.vert declares them. Nothing at build time compares the two declarations, which is why
+    // the offsets are pinned individually rather than only the size: inserting a float before colour
+    // would keep the size at 80 and silently shift every field after it.
+    static_assert(sizeof(ParticleQuad) == 80, "particle quad layout must match the shader's");
+    static_assert(offsetof(ParticleQuad, colour) == 16, "particle quad layout drifted from the shader");
+    static_assert(offsetof(ParticleQuad, textureIndex) == 32, "particle quad layout drifted from the shader");
+    static_assert(offsetof(ParticleQuad, axisX) == 48, "particle quad layout drifted from the shader");
+    static_assert(offsetof(ParticleQuad, axisY) == 64, "particle quad layout drifted from the shader");
 
     // One run of consecutive particle quads sharing a blend mode.
     //
@@ -203,6 +222,49 @@ namespace Vk
     // torch 35; a busy interior measured 364 in total. This is generous by an order of magnitude and
     // costs 48 bytes each.
     constexpr uint32_t maxParticleQuads = 8192;
+
+    // One sky billboard -- the sun disc, or one of the two moons -- read out of the live OSG sky graph
+    // by MWRender::SkyReader.
+    //
+    // This is the push constant block sky.vert and sky.frag declare, so the three declarations have to
+    // agree field for field and nothing at build time checks that they do. The static_asserts below
+    // pin the offsets that would silently shift if a field were inserted or resized, which is the same
+    // arrangement GBufferPushConstants uses and for the same reason.
+    //
+    // 112 bytes, leaving 16 of the 128 maxPushConstantsSize Vulkan guarantees everywhere. A fourth
+    // vec4 would still fit; a mat4 would not, which is why the quad travels as an origin and two axes
+    // rather than as its transform.
+    struct SkyElement
+    {
+        // World-space centre of the quad, with the sky's camera-relative offset already added back in.
+        // w is unused.
+        float position[4];
+        // World-space half extent along the quad's local +X, which is also the direction u runs in.
+        // Not a billboard axis: it comes from the transform OSG orients the body with, so the quad
+        // keeps its roll and a crescent moon's horns point where OSG points them.
+        float right[4];
+        // The same along local +Y and v.
+        float up[4];
+        // .rgb tint, .a fade. The sun's is (1, 1, 1, its material's diffuse alpha), because paintSun
+        // tints by nothing and fades by that. The moons carry their fade in atmosphereFade instead.
+        float colour[4];
+        // The two vec4s paintMoon needs, straight off the moon's stateset and not reassembled here.
+        // Unused by the sun.
+        float moonBlend[4];
+        float atmosphereFade[4];
+        // .x = sampler array slot for the phase image (moon) or the disc image (sun)
+        // .y = slot for the moon's full-circle mask. The sun repeats .x here rather than leaving it
+        //      zero: it never samples the mask, but every index the shader could form still has to be
+        //      inside the array.
+        // .z = non-zero for a moon, which is what picks paintMoon over paintSun
+        uint32_t params[4];
+    };
+
+    static_assert(sizeof(SkyElement) == 112, "sky push constant layout must match sky.vert/sky.frag");
+    static_assert(sizeof(SkyElement) <= 128, "exceeds the guaranteed maxPushConstantsSize");
+    static_assert(offsetof(SkyElement, colour) == 48, "SkyElement layout drifted from the shader");
+    static_assert(offsetof(SkyElement, moonBlend) == 64, "SkyElement layout drifted from the shader");
+    static_assert(offsetof(SkyElement, params) == 96, "SkyElement layout drifted from the shader");
 
     struct MeshSubmission
     {
@@ -406,6 +468,15 @@ namespace Vk
         // Anything past maxParticleQuads is dropped with one warning.
         void updateParticles(
             const ParticleQuad* quads, uint32_t count, const std::vector<ParticleRun>& runs);
+
+        // Uploads this frame's sky billboards -- the sun disc and the two moons -- and draws them in
+        // the composite pass. Replaces the previous frame's set wholesale, for the same reason the
+        // particles do: OSG owns the simulation behind them and it is re-read every frame.
+        //
+        // No cap and no overflow warning, unlike the particles, because there is nothing to overflow.
+        // The sky graph holds one sun and two moons and each is drawn straight from a push constant,
+        // so the cost of the whole feature is three draw calls whether the list is full or empty.
+        void updateSky(const std::vector<SkyElement>& elements);
 
         // Uploads this frame's bone palettes, as \a count column-major 4x4 matrices laid end to end.
         // A submission's boneOffset indexes this array, and its per-vertex bone indices are relative
@@ -637,6 +708,14 @@ namespace Vk
         VkPipeline mParticleBlendedPipeline = VK_NULL_HANDLE;
         VkPipelineLayout mParticlePipelineLayout = VK_NULL_HANDLE;
         std::vector<ParticleRun> mParticleRuns;
+
+        // The sun disc and the two moons. Drawn inside the composite pass, after the sky gradient the
+        // composite shader paints and *before* the particles, so rain and ash fall in front of a moon
+        // rather than behind it. Null if its shaders were missing, which costs the sun and moons and
+        // nothing else.
+        VkPipeline mSkyPipeline = VK_NULL_HANDLE;
+        VkPipelineLayout mSkyPipelineLayout = VK_NULL_HANDLE;
+        std::vector<SkyElement> mSkyElements;
 
         VkSampler mGBufferSampler = VK_NULL_HANDLE;
         // Separate from mGBufferSampler: scene textures want filtering and wrapping, whereas the
