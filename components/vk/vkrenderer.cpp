@@ -1547,6 +1547,10 @@ namespace Vk
         // Also not in the check below. Without these the world renders and the effects do not.
         auto particleVert = loadShader("particle.vert.spv");
         auto particleFrag = loadShader("particle.frag.spv");
+        // Nor these. Without them the world renders and the sea is a hole in it, which is what it was
+        // before the water surface existed at all.
+        auto waterVert = loadShader("water.vert.spv");
+        auto waterFrag = loadShader("water.frag.spv");
         // Nor these. Without them the sky keeps its gradient and loses the sun and both moons, which
         // is a survivable build and an obvious one to look at.
         auto skyVert = loadShader("sky.vert.spv");
@@ -1694,6 +1698,119 @@ namespace Vk
                 VK_CHECK(vkCreateGraphicsPipelines(mDevice->handle(), VK_NULL_HANDLE, 1,
                     &skinnedInfo, nullptr, &mGBufferSkinnedPipeline));
             }
+        }
+
+        // Water pipeline. Draws inside the composite render pass, between the tone mapped scene and
+        // the particles, so like them it needs no render pass and no framebuffer of its own.
+        //
+        // It is here rather than in the G-buffer, and that is the whole change. In the G-buffer the
+        // depth at a water pixel was the water *surface*, so the seabed was never written anywhere and
+        // every depth-based effect -- opacity, the depth tint, the shore fade -- had nothing to read.
+        // A G-buffer also has nowhere to put a translucent surface, which is why the sea was an opaque
+        // sheet with no transparency and no Fresnel.
+        if (waterVert && waterFrag)
+        {
+            std::array<VkPipelineShaderStageCreateInfo, 2> stages
+                = { waterVert->stageInfo(VK_SHADER_STAGE_VERTEX_BIT),
+                      waterFrag->stageInfo(VK_SHADER_STAGE_FRAGMENT_BIT) };
+
+            // The same two sets the particles use, and already bound with the right contents: the
+            // scene set carries the camera, the sampler array and the water height, the composite set
+            // carries the G-buffer depth. Reusing them is what keeps this free of descriptor plumbing.
+            std::array<VkDescriptorSetLayout, 2> setLayouts
+                = { mSceneDescriptorLayout, mCompositeDescriptorLayout };
+
+            // Four bytes, and it cannot be a shader constant: syncTexturesToRenderer compacts the
+            // sampler array down to what the loaded cells reference, so the normal map's slot moves
+            // whenever the live set does.
+            VkPushConstantRange pushRange = {};
+            pushRange.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+            pushRange.offset = 0;
+            pushRange.size = sizeof(uint32_t);
+
+            VkPipelineLayoutCreateInfo layoutInfo = {};
+            layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+            layoutInfo.setLayoutCount = static_cast<uint32_t>(setLayouts.size());
+            layoutInfo.pSetLayouts = setLayouts.data();
+            layoutInfo.pushConstantRangeCount = 1;
+            layoutInfo.pPushConstantRanges = &pushRange;
+            VK_CHECK(
+                vkCreatePipelineLayout(mDevice->handle(), &layoutInfo, nullptr, &mWaterPipelineLayout));
+
+            // No vertex input: the grid comes out of gl_VertexIndex. See sWaterVertexCount.
+            VkPipelineVertexInputStateCreateInfo vertexInput = {};
+            vertexInput.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+
+            VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
+            inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+            inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+
+            VkPipelineViewportStateCreateInfo viewportState = {};
+            viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+            viewportState.viewportCount = 1;
+            viewportState.scissorCount = 1;
+
+            VkPipelineRasterizationStateCreateInfo rasterizer = {};
+            rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+            rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+            rasterizer.lineWidth = 1.0f;
+            // The player swims, so the underside of the sea has to rasterise too. MWRender::Water
+            // reaches the same conclusion the same way, at water.cpp:627.
+            rasterizer.cullMode = VK_CULL_MODE_NONE;
+
+            VkPipelineMultisampleStateCreateInfo multisampling = {};
+            multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+            multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+            // The composite pass has no depth attachment, so there is nothing to test against here.
+            // water.frag samples the G-buffer depth and discards instead -- which it has to do
+            // regardless, because it needs that depth for the water column anyway.
+            VkPipelineDepthStencilStateCreateInfo depthStencil = {};
+            depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+            depthStencil.depthTestEnable = VK_FALSE;
+            depthStencil.depthWriteEnable = VK_FALSE;
+
+            // Premultiplied alpha -- ONE, not SRC_ALPHA -- and that choice is load-bearing.
+            //
+            // water.frag needs the Fresnel reflection to sit *outside* the coverage, so that an inch
+            // of clear water over sand still mirrors the sky at a grazing angle. SRC_ALPHA cannot
+            // express that: it scales the reflection by the same alpha as the depth tint, so shallow
+            // water stops reflecting. With ONE the shader premultiplies the tint itself and the blend
+            // unit produces fresnel * reflection + (1 - fresnel) * mix(seabed, waterColour, depth).
+            VkPipelineColorBlendAttachmentState blend = {};
+            blend.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT
+                | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+            blend.blendEnable = VK_TRUE;
+            blend.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
+            blend.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+            blend.colorBlendOp = VK_BLEND_OP_ADD;
+            blend.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+            blend.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+            blend.alphaBlendOp = VK_BLEND_OP_ADD;
+
+            VkPipelineColorBlendStateCreateInfo colorBlending = {};
+            colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+            colorBlending.attachmentCount = 1;
+            colorBlending.pAttachments = &blend;
+
+            VkGraphicsPipelineCreateInfo pipelineInfo = {};
+            pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+            pipelineInfo.stageCount = static_cast<uint32_t>(stages.size());
+            pipelineInfo.pStages = stages.data();
+            pipelineInfo.pVertexInputState = &vertexInput;
+            pipelineInfo.pInputAssemblyState = &inputAssembly;
+            pipelineInfo.pViewportState = &viewportState;
+            pipelineInfo.pRasterizationState = &rasterizer;
+            pipelineInfo.pMultisampleState = &multisampling;
+            pipelineInfo.pDepthStencilState = &depthStencil;
+            pipelineInfo.pColorBlendState = &colorBlending;
+            pipelineInfo.pDynamicState = &dynamicState;
+            pipelineInfo.layout = mWaterPipelineLayout;
+            pipelineInfo.renderPass = mCompositeRenderPass;
+            pipelineInfo.subpass = 0;
+
+            VK_CHECK(vkCreateGraphicsPipelines(
+                mDevice->handle(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &mWaterPipeline));
         }
 
         // Particle pipeline. Draws inside the composite render pass, after the tone mapped scene and
@@ -2349,6 +2466,39 @@ namespace Vk
                 }
             }
 
+            // The water surface. After the composite and the sky, before the particles, and all
+            // three of those are load-bearing.
+            //
+            // After the composite because water is a real translucent surface: ONE_MINUS_SRC_ALPHA
+            // reads what is already in the attachment, so it has to go over a finished background
+            // rather than a half-built one. It also inherits the viewport and scissor that draw set.
+            // After the sky because the sun and the moons are at infinity and the sea is in front of
+            // them; drawn the other way round, a moon low over the water sits on top of it. Before the
+            // particles because they are additive and therefore order independent -- they can go on
+            // top of anything, water cannot.
+            //
+            // sunParams.w is the "there is a water plane" flag; see Vk::SceneData::sunParams. Read
+            // from the CPU-side copy for the same reason the composite push constants are -- the
+            // mapped uniform buffer is write-combined and host reads from it are far slower than they
+            // look.
+            if (mWaterPipeline != VK_NULL_HANDLE && mCurrentScene.sunParams.w > 0.0f)
+            {
+                vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mWaterPipeline);
+
+                std::array<VkDescriptorSet, 2> sets
+                    = { mSceneDescriptorSets[mCurrentFrame], mCompositeDescriptorSets[mCurrentFrame] };
+                vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mWaterPipelineLayout, 0,
+                    static_cast<uint32_t>(sets.size()), sets.data(), 0, nullptr);
+
+                vkCmdPushConstants(cmd, mWaterPipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
+                    sizeof(uint32_t), &mWaterNormalMap);
+
+                // No vertex buffer and no index buffer: water.vert builds the grid from
+                // gl_VertexIndex. This count is the only place the grid size lives on this side and it
+                // has to agree with sSegments there.
+                vkCmdDraw(cmd, sWaterVertexCount, 1, 0, 0);
+            }
+
             // Particle effects -- fire, smoke, sparks, spell effects. In this pass rather than the
             // G-buffer because they are blended, and a G-buffer has nowhere to put a translucent
             // surface. After the tone mapped scene so they add light to a finished image, and before
@@ -2973,6 +3123,10 @@ namespace Vk
             vkDestroyPipeline(dev, mSkyPipeline, nullptr);
         if (mSkyPipelineLayout != VK_NULL_HANDLE)
             vkDestroyPipelineLayout(dev, mSkyPipelineLayout, nullptr);
+        if (mWaterPipeline != VK_NULL_HANDLE)
+            vkDestroyPipeline(dev, mWaterPipeline, nullptr);
+        if (mWaterPipelineLayout != VK_NULL_HANDLE)
+            vkDestroyPipelineLayout(dev, mWaterPipelineLayout, nullptr);
         if (mParticleBlendedPipeline != VK_NULL_HANDLE)
             vkDestroyPipeline(dev, mParticleBlendedPipeline, nullptr);
         if (mParticlePipeline != VK_NULL_HANDLE)

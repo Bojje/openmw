@@ -14,9 +14,33 @@ layout(location = 0) in vec2 fragUv;
 layout(location = 1) in vec4 fragColour;
 layout(location = 2) flat in uint fragTexture;
 layout(location = 3) flat in uint fragAdditive;
+layout(location = 4) in vec3 fragWorldPos;
 
 layout(set = 0, binding = 1) uniform sampler2D textures[512];
 layout(set = 1, binding = 2) uniform sampler2D gbufferDepth;
+
+// Only sunParams and viewInverse are read, but a uniform block has to be declared out to the last
+// member used or the offsets do not line up. Mirrors Vk::SceneData; the layout is pinned by
+// static_asserts on the C++ side and by nothing at all here.
+layout(set = 1, binding = 4) uniform SceneUBO {
+    mat4 view;
+    mat4 projection;
+    mat4 viewInverse;
+    mat4 projInverse;
+    vec4 sunDirection;
+    vec4 sunColor;
+    vec4 ambientColor;
+    vec4 skyColor;
+    vec4 fogColor;
+    vec4 fogParams;
+    mat4 prevViewFromCurView;
+    vec4 denoiseParams;
+    vec4 sunParams; // .z = water plane world Z, .w = 1 when there is a water plane
+    uint frameIndex;
+    uint lightCount;
+    uint isInterior;
+    uint scenePad1;
+} scene;
 
 layout(location = 0) out vec4 outColor;
 
@@ -82,6 +106,27 @@ void main() {
     // _SRGB format, and the reader decodes the particle colour on the way in.
     vec4 colour = texel * fragColour;
 
+    // Attenuate anything on the far side of the water surface from the camera.
+    //
+    // The depth test above cannot see the water any more. It used to: the surface was submitted into
+    // the G-buffer as an opaque terrain chunk, so its depth was there to be tested against. Now that
+    // it is a forward draw in this same pass, the depth buffer at a water pixel holds the seabed, and
+    // a torch on the far bank of a lake passes the test and shines through the water at full
+    // brightness. Seyda Neen and Vivec are full of that shot.
+    //
+    // For a flat plane the test is exact -- the particle and the camera are on opposite sides exactly
+    // when their signed heights have opposite signs -- so this needs no sorting and the particle pass
+    // stays one unsorted draw. That is the whole reason the water plane is worth special-casing rather
+    // than being folded into some general transparency ordering.
+    //
+    // A flat factor rather than a path length through the water. Morrowind's water reaches full
+    // opacity in about 2500 units (VISIBILITY in water.frag), which almost every such light is well
+    // past, and a suggestion of the light is closer to what you actually see than removing it.
+    float waterFade = 1.0;
+    if (scene.sunParams.w > 0.0
+        && (fragWorldPos.z - scene.sunParams.z) * (scene.viewInverse[3].z - scene.sunParams.z) < 0.0)
+        waterFade = 0.15;
+
     vec3 mapped = colour.rgb;
     if (fragAdditive != 0u)
     {
@@ -93,5 +138,5 @@ void main() {
     // blends SRC_ALPHA, ONE, so this adds colour * alpha and never darkens what is behind it; the
     // second pipeline uses the authored ONE_MINUS_SRC_ALPHA, which is what lets smoke darken a wall
     // instead of glowing on it.
-    outColor = vec4(mapped, colour.a * fade);
+    outColor = vec4(mapped, colour.a * fade * waterFade);
 }

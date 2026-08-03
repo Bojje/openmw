@@ -81,16 +81,23 @@ namespace
     // swapchain's sRGB store encodes them a second time -- the result is visibly washed out. The _SRGB
     // formats make the GPU convert to linear on sample, which is what the lighting maths expects.
     // Normal/material G-buffer targets stay UNORM; only colour is sRGB.
-    VkFormat toVkFormat(unsigned int glPixelFormat)
+    //
+    // \a srgb is false for the one texture in the game that is not a colour: the water normal map. A
+    // tangent-space normal is a direction packed into [0, 1], and the sRGB transfer function turns the
+    // flat value 0.5 into 0.21 -- so every normal in the map tilts hard the same way and the sea reads
+    // as lit from underneath. Nothing about the file says which kind it is, so the caller has to.
+    VkFormat toVkFormat(unsigned int glPixelFormat, bool srgb = true)
     {
         switch (glPixelFormat)
         {
-            case sGlDxt1Rgb: return VK_FORMAT_BC1_RGB_SRGB_BLOCK;
-            case sGlDxt1Rgba: return VK_FORMAT_BC1_RGBA_SRGB_BLOCK;
-            case sGlDxt3: return VK_FORMAT_BC2_SRGB_BLOCK;
-            case sGlDxt5: return VK_FORMAT_BC3_SRGB_BLOCK;
-            case sGlRgba: return VK_FORMAT_R8G8B8A8_SRGB;
-            case sGlBgra: return VK_FORMAT_B8G8R8A8_SRGB;
+            case sGlDxt1Rgb:
+                return srgb ? VK_FORMAT_BC1_RGB_SRGB_BLOCK : VK_FORMAT_BC1_RGB_UNORM_BLOCK;
+            case sGlDxt1Rgba:
+                return srgb ? VK_FORMAT_BC1_RGBA_SRGB_BLOCK : VK_FORMAT_BC1_RGBA_UNORM_BLOCK;
+            case sGlDxt3: return srgb ? VK_FORMAT_BC2_SRGB_BLOCK : VK_FORMAT_BC2_UNORM_BLOCK;
+            case sGlDxt5: return srgb ? VK_FORMAT_BC3_SRGB_BLOCK : VK_FORMAT_BC3_UNORM_BLOCK;
+            case sGlRgba: return srgb ? VK_FORMAT_R8G8B8A8_SRGB : VK_FORMAT_R8G8B8A8_UNORM;
+            case sGlBgra: return srgb ? VK_FORMAT_B8G8R8A8_SRGB : VK_FORMAT_B8G8R8A8_UNORM;
             // Three-channel formats are poorly supported as sampled images; they would need expanding
             // to four channels before upload, which is not implemented yet.
             case sGlRgb: return VK_FORMAT_UNDEFINED;
@@ -326,6 +333,43 @@ namespace MWRender
         constexpr float sDegToRad = 3.14159265358979f / 180.0f;
         scene.sunParams = { std::cos(sSunAngularRadiusDegrees * sDegToRad), 0.0f, 0.0f, 0.0f };
 
+        // The water plane, in the three spare floats of sunParams. See Vk::SceneData::sunParams for
+        // why it went there and not into a field of its own.
+        //
+        // The clock is the only one this renderer has. frameIndex counts frames and says nothing
+        // about how long they took, and there is no time value anywhere else in SceneData -- so
+        // without this the waves cannot move, which is most of why the old surface read as a sheet.
+        mWaterSeconds += MWBase::Environment::get().getFrameDuration();
+
+        // Taken from the player's cell rather than from the loaded cell set. An exterior loads nine
+        // cells that all share sea level and an interior loads one, so the set never disagrees with
+        // itself -- but the question being asked is which body of water the camera is standing in,
+        // and that is a property of where the player is.
+        float waterHeight = 0.0f;
+        bool hasWater = false;
+        {
+            const MWWorld::Ptr player = MWBase::Environment::get().getWorld()->getPlayerPtr();
+            if (!player.isEmpty() && player.isInCell() && player.getCell()->getCell() != nullptr)
+            {
+                // Exteriors always have water: MWWorld::Cell forces hasWater on and the height to -1
+                // for them (cell.cpp:100-101), which is Morrowind's sea level.
+                const MWWorld::Cell* cell = player.getCell()->getCell();
+                hasWater = cell->hasWater();
+                waterHeight = cell->getWaterHeight();
+            }
+        }
+
+        // Only if the normal map actually made it to the device. This flag gates the water draw *and*
+        // the particle pass's underwater attenuation, and a torch dimmed by water that is not being
+        // drawn is a worse failure than one that is not dimmed at all.
+        const uint32_t waterNormalSlot = textureSlot(mWaterNormalTexture);
+        hasWater = hasWater && waterNormalSlot != 0u;
+
+        scene.sunParams.y = static_cast<float>(mWaterSeconds);
+        scene.sunParams.z = waterHeight;
+        scene.sunParams.w = hasWater ? 1.0f : 0.0f;
+        mRenderer->setWaterNormalMap(waterNormalSlot);
+
         // The shaders reconstruct the direction *towards* the light as -sunDirection, so this has to be
         // the direction the light travels. World::getSunLightPosition() is the opposite convention -- it
         // points towards the sun -- and the caller negates it. Getting this backwards leaves every
@@ -515,7 +559,7 @@ namespace MWRender
                 submission.indexBuffer = chunk.geometry.indexBuffer->handle();
                 submission.indexCount = chunk.geometry.indexCount;
                 submission.transform = transform;
-                submission.blasAddress = chunk.inTlas ? chunk.geometry.blasAddress() : VkDeviceAddress{ 0 };
+                submission.blasAddress = chunk.geometry.blasAddress();
                 submission.vertexAddress = chunk.geometry.vertexAddress();
                 submission.indexAddress = chunk.geometry.indexAddress();
                 submission.textureIndex = textureSlot(chunk.textureIndex);
@@ -650,9 +694,11 @@ namespace MWRender
             terrain.transform[12] = static_cast<float>(cellX) * ESM::Land::REAL_SIZE;
             terrain.transform[13] = static_cast<float>(cellY) * ESM::Land::REAL_SIZE;
         }
-        // An interior has no heightfield and no cell offset, and it still reaches addWater below --
-        // Morrowind's caves and canalworks have water in them, and returning early here is what used
-        // to leave them dry.
+        // An interior has no heightfield and no cell offset, and now nothing else either. It used to
+        // reach addWater below -- Morrowind's caves and canalworks have water in them -- which is why
+        // this did not simply return early. The surface is one camera-following grid drawn in the
+        // composite pass now, so an interior falls through the empty check below and registers no
+        // terrain at all, which is correct: there is none.
 
         size_t triangles = 0;
 
@@ -677,10 +723,6 @@ namespace MWRender
             triangles += indexCount / 3;
         }
 
-        // Before the empty check, not after. An interior has no land chunks at all, so bailing on an
-        // empty list first is exactly what kept every cave and canal dry.
-        addWater(store, terrain);
-
         if (terrain.chunks.empty())
             return;
 
@@ -690,64 +732,6 @@ namespace MWRender
                          << terrain.chunks.size() << " chunks, " << triangles << " triangles";
 
         mCellTerrain.emplace(store, std::move(terrain));
-    }
-
-    void VkRenderingManager::addWater(const MWWorld::CellStore* store, CellTerrain& terrain)
-    {
-        const MWWorld::Cell* cell = store->getCell();
-        if (cell == nullptr || !cell->hasWater())
-            return;
-
-        // The cell transform already translates to the cell's south-west corner and does not touch Z,
-        // so X and Y are cell-local and the height is absolute, exactly as the land chunks are.
-        //
-        // An interior has no cell offset and no 8192-unit grid to sit on: its geometry is built
-        // around the origin and can run some way out, so the quad is centred and made generous
-        // rather than matched to a cell. It is hidden by the walls and the floor either way.
-        const bool exterior = cell->isExterior();
-        const float size = exterior ? ESM::Land::REAL_SIZE : 40000.0f;
-        const float origin = exterior ? 0.0f : -size * 0.5f;
-        const float height = cell->getWaterHeight();
-
-        // Tiled rather than stretched: one texture across a whole 8192-unit cell is a smear. Eight
-        // repeats is roughly the scale the OSG renderer uses and is a guess that should be looked at
-        // rather than trusted.
-        constexpr float tiles = 8.0f;
-
-        // Twelve floats per vertex, matching the G-buffer layout: position, normal, texcoord, colour.
-        const float lo = origin;
-        const float hi = origin + size;
-        const std::vector<float> vertices = {
-            lo, lo, height, 0.f, 0.f, 1.f, 0.f, 0.f, 1.f, 1.f, 1.f, 1.f, //
-            hi, lo, height, 0.f, 0.f, 1.f, tiles, 0.f, 1.f, 1.f, 1.f, 1.f, //
-            hi, hi, height, 0.f, 0.f, 1.f, tiles, tiles, 1.f, 1.f, 1.f, 1.f, //
-            lo, hi, height, 0.f, 0.f, 1.f, 0.f, tiles, 1.f, 1.f, 1.f, 1.f //
-        };
-        const std::vector<uint32_t> indices = { 0, 1, 2, 0, 2, 3 };
-
-        Vk::Geometry geometry = Vk::uploadGeometry(mRenderer->device(), mRenderer->commandPool(), vertices.data(),
-            4, indices.data(), static_cast<uint32_t>(indices.size()), false);
-        if (!geometry.valid())
-            return;
-
-        CellTerrain::Chunk water;
-        water.geometry = std::move(geometry);
-        // The first frame of the vanilla animated water. The name is built the way
-        // MWRender::Water does it -- the Water_SurfaceTexture fallback is "water" and the frame
-        // number is appended with no separator, giving water00 -- and there are 32 frames that
-        // nothing cycles through yet, so the surface is still rather than rippling.
-        //
-        // No "textures/" prefix: getOrLoadTexture runs the name through correctTexturePath, which
-        // adds it. Passing the full path produces textures/textures/water/... , which fails, falls
-        // back to the white placeholder, and shows up as a sheet of flat white sea. So does
-        // guessing water_00 instead of water00, and it looks exactly the same.
-        water.textureIndex = getOrLoadTexture("water/water00.dds");
-        // Kept out of the acceleration structure on purpose. It is opaque in the raster pass, so a
-        // TLAS instance would block the sun for everything under it and every seabed would go black
-        // -- a worse lie than water that casts no shadow. It also means the water surface receives
-        // no ray traced shadow of its own.
-        water.inTlas = false;
-        terrain.chunks.push_back(std::move(water));
     }
 
     void VkRenderingManager::removeCell(const MWWorld::CellStore* store)
@@ -857,6 +841,24 @@ namespace MWRender
             mSkyReader->collect(mSceneRoot);
             if (mTextures.size() != texturesBefore)
                 changed = true;
+        }
+
+        // Loaded once, and here rather than in the constructor because it goes through the ordinary
+        // texture path -- which needs the resource system, and that is not up when this object is
+        // built. Ahead of the sync below so it is given a sampler slot in the same pass; a frame with
+        // the texture loaded but no slot draws the sea with the white fallback, which is the flat
+        // untextured sheet this whole change exists to get rid of.
+        if (!mWaterNormalRequested)
+        {
+            mWaterNormalRequested = true;
+            // UNORM, not sRGB. See toVkFormat: these texels are directions, not colour.
+            mWaterNormalTexture = getOrLoadTexture("omw/water_nm.png", false);
+            if (mWaterNormalTexture == sNoTexture)
+            {
+                Log(Debug::Warning) << "Vulkan: textures/omw/water_nm.png could not be loaded; "
+                                       "the water surface will not be drawn";
+            }
+            changed = true;
         }
 
         // Once, after every add and erase, rather than per cell. This is the path that actually
@@ -1387,6 +1389,13 @@ namespace MWRender
                 mark(index);
         }
 
+        // The water normal map belongs to no cell either, and for a stronger reason than the
+        // particle textures do: the surface it is drawn on is generated in water.vert and exists
+        // nowhere in mCellTerrain. Without this it is dead the moment it loads, loses its slot, and
+        // resolves to the 1x1 white fallback -- which decodes to a normal of (1, 1, 1), flattening
+        // every wave in the game and tilting what is left the same way.
+        mark(mWaterNormalTexture);
+
         return live;
     }
 
@@ -1421,7 +1430,11 @@ namespace MWRender
             if (live[i] && mTextures[i] == nullptr && i < mTextureNames.size()
                 && !mTextureNames[i].empty())
             {
-                getOrLoadTexture(mTextureNames[i]); // reloads into index i, see the reloadInto path
+                // The srgb flag has to survive the round trip. It cannot fire for the water normal
+                // map today, because collectLiveTextures marks it live and only dead textures are
+                // evicted -- but that is a coupling between two distant functions, and getting it
+                // wrong reloads the normal map as sRGB and tilts every wave.
+                getOrLoadTexture(mTextureNames[i], i != mWaterNormalTexture);
                 if (mTextures[i] != nullptr)
                     ++reloaded;
             }
@@ -1513,7 +1526,7 @@ namespace MWRender
         return index;
     }
 
-    size_t VkRenderingManager::getOrLoadTexture(const std::string& nifTextureName)
+    size_t VkRenderingManager::getOrLoadTexture(const std::string& nifTextureName, bool srgb)
     {
         // A cached index whose texture is still resident, or a cached failure, is answered directly.
         // A cached index that was evicted falls through and reloads *into that same index*, which is
@@ -1542,7 +1555,7 @@ namespace MWRender
             osg::ref_ptr<osg::Image> image = imageManager->getImage(corrected);
             if (image != nullptr && image->valid() && image->data() != nullptr)
             {
-                const VkFormat format = toVkFormat(image->getPixelFormat());
+                const VkFormat format = toVkFormat(image->getPixelFormat(), srgb);
                 const uint32_t width = static_cast<uint32_t>(image->s());
                 const uint32_t height = static_cast<uint32_t>(image->t());
                 // Morrowind's DDS files ship a full mip chain and osg keeps it in one contiguous

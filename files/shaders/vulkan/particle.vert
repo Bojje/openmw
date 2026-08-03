@@ -30,6 +30,9 @@ layout(location = 0) out vec2 fragUv;
 layout(location = 1) out vec4 fragColour;
 layout(location = 2) flat out uint fragTexture;
 layout(location = 3) flat out uint fragAdditive;
+// For the underwater test in particle.frag. Already computed below for gl_Position, so carrying it
+// costs one interpolant and no arithmetic.
+layout(location = 4) out vec3 fragWorldPos;
 
 void main() {
     ParticleQuad quad = particles.quads[gl_InstanceIndex];
@@ -62,5 +65,6 @@ void main() {
     fragColour = quad.colour;
     fragTexture = quad.params.x;
     fragAdditive = quad.params.y;
+    fragWorldPos = world;
     gl_Position = camera.projection * camera.view * vec4(world, 1.0);
 }

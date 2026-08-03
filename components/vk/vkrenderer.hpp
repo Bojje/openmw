@@ -104,9 +104,21 @@ namespace Vk
         // from lit to unlit. Exactly 1.0 reproduces the old hard shadow bit for bit, which is what
         // makes the pre-existing behaviour the ground truth for this change.
         //
-        // Everything past x is spare. The sun's true angular radius is about 0.27 degrees; the value
-        // actually used is larger, because it is standing in for the softening that a real sky
-        // radiance model and an ambient occlusion term would otherwise provide.
+        // The sun's true angular radius is about 0.27 degrees; the value actually used is larger,
+        // because it is standing in for the softening that a real sky radiance model and an ambient
+        // occlusion term would otherwise provide.
+        //
+        // y, z and w were the spare this comment used to advertise, and the water surface took them:
+        //   y = seconds since the renderer started, for the wave scroll. There is no other clock in
+        //       SceneData at all -- frameIndex is a count, not a time.
+        //   z = the world Z of the water plane.
+        //   w = 1 when there is a water plane worth drawing, 0 otherwise. Gates the water draw and
+        //       the particle pass's underwater attenuation.
+        //
+        // They went here rather than into a field of their own because everything from
+        // prevViewFromCurView on has its offset pinned by a static_assert below and mirrored by hand
+        // in composite.frag, particle.frag, water.vert, water.frag and raygen.rgen. Nothing
+        // cross-checks those five, so inserting a field is five silent corruptions, not a build error.
         Vec4 sunParams;
         // Frames rendered so far, for jittered sampling sequences and for deciding how much history a
         // temporal accumulator may trust. Wraps; only ever used modulo something small.
@@ -222,6 +234,22 @@ namespace Vk
     // torch 35; a busy interior measured 364 in total. This is generous by an order of magnitude and
     // costs 48 bytes each.
     constexpr uint32_t maxParticleQuads = 8192;
+
+    // Vertices in one water surface draw: a 40 x 40 grid of quads, six vertices each, generated from
+    // gl_VertexIndex with no vertex buffer and no index buffer -- the same trick the particle
+    // billboards use, and for the same reason. Every vertex is a lattice point on a horizontal plane
+    // whose height and centre both come out of the scene uniform, so a buffer would hold nothing the
+    // vertex shader cannot compute and would have to be re-uploaded whenever the player moved.
+    //
+    // 40 is what MWRender::Water asks createWaterGeometry for (water.cpp:447), and it is there for
+    // the reason components/sceneutil/waterutil.cpp gives -- "some drivers don't like huge triangles"
+    // -- rather than for shading. The surface is flat and its normal comes entirely from the normal
+    // map, so a single quad would shade identically.
+    //
+    // Must equal sSegments * sSegments * 6 in water.vert. Disagreeing draws part of the grid or runs
+    // off the end of it, and neither of those looks like a mismatched constant on screen.
+    constexpr uint32_t sWaterGridSegments = 40;
+    constexpr uint32_t sWaterVertexCount = sWaterGridSegments * sWaterGridSegments * 6;
 
     // One sky billboard -- the sun disc, or one of the two moons -- read out of the live OSG sky graph
     // by MWRender::SkyReader.
@@ -469,6 +497,14 @@ namespace Vk
         void updateParticles(
             const ParticleQuad* quads, uint32_t count, const std::vector<ParticleRun>& runs);
 
+        // Points the water surface at its normal map, by slot in the scene sampler array.
+        //
+        // Zero means the texture is not resident, in which case the caller must also clear
+        // SceneData::sunParams.w -- that is what actually suppresses the draw. Drawing with slot 0
+        // would sample the 1x1 white fallback, which decodes to a normal of (1, 1, 1): every wave in
+        // the game flattened and tilted the same way.
+        void setWaterNormalMap(uint32_t textureSlot) { mWaterNormalMap = textureSlot; }
+
         // Uploads this frame's sky billboards -- the sun disc and the two moons -- and draws them in
         // the composite pass. Replaces the previous frame's set wholesale, for the same reason the
         // particles do: OSG owns the simulation behind them and it is re-read every frame.
@@ -708,6 +744,14 @@ namespace Vk
         VkPipeline mParticleBlendedPipeline = VK_NULL_HANDLE;
         VkPipelineLayout mParticlePipelineLayout = VK_NULL_HANDLE;
         std::vector<ParticleRun> mParticleRuns;
+
+        // The water surface, drawn in the composite pass between the tone mapped scene and the
+        // particles. Null if its shaders were missing, which costs the water and nothing else.
+        VkPipeline mWaterPipeline = VK_NULL_HANDLE;
+        VkPipelineLayout mWaterPipelineLayout = VK_NULL_HANDLE;
+        // Sampler slot of the water normal map, or 0 when it is not resident. Pushed as the water
+        // pipeline's only push constant.
+        uint32_t mWaterNormalMap = 0;
 
         // The sun disc and the two moons. Drawn inside the composite pass, after the sky gradient the
         // composite shader paints and *before* the particles, so rain and ash fall in front of a moon

@@ -148,10 +148,6 @@ namespace MWRender
             {
                 Vk::Geometry geometry;
                 size_t textureIndex; // index into mTextures, or npos when untextured
-                // Whether this chunk is offered to the acceleration structure. False for the water
-                // surface: it is opaque in the raster pass, so putting it in the TLAS would have it
-                // block the sun for everything beneath it and turn every seabed black.
-                bool inTlas = true;
             };
             std::vector<Chunk> chunks;
             // Cell-local vertices plus one translation to the cell origin, so terrain coordinates stay
@@ -216,16 +212,14 @@ namespace MWRender
         // exteriors with no LAND record.
         void addTerrain(const MWWorld::CellStore* store);
 
-        // Appends a flat water surface across the whole cell at its water height. A first pass and
-        // honest about it: one opaque quad with the first frame of the vanilla water texture on it,
-        // no animation, no transparency, no refraction and no reflection. Morrowind's water is very
-        // nearly opaque seen from above, so this reads as water at a distance and as a hard sheet up
-        // close, which is a different thing from the Bitter Coast having no water in it at all.
-        void addWater(const MWWorld::CellStore* store, CellTerrain& terrain);
-
         // Resolves a raw NIF texture name to an index into mTextures, loading it if needed. Returns
         // npos when the texture cannot be loaded, so callers can fall back to untextured rendering.
-        size_t getOrLoadTexture(const std::string& nifTextureName);
+        //
+        // \a srgb false uploads the pixels as UNORM instead of an _SRGB format. Exactly one caller
+        // wants that -- the water normal map, whose texels are directions rather than colours. The
+        // cache is keyed on the name alone, so a given name must always be asked for with the same
+        // flag or the second caller silently inherits the first one's decoding.
+        size_t getOrLoadTexture(const std::string& nifTextureName, bool srgb = true);
 
         /// Composites a cell's land textures into one and puts it in mTextures, returning its index.
         ///
@@ -319,6 +313,22 @@ namespace MWRender
 
         std::unordered_map<const MWWorld::CellStore*, CellMeshes> mCellMeshes;
         std::unordered_map<const MWWorld::CellStore*, CellTerrain> mCellTerrain;
+
+        // The water surface's normal map, textures/omw/water_nm.png, loaded once and then kept alive
+        // by collectLiveTextures.
+        //
+        // It belongs to no mesh, no actor and no terrain chunk -- the water grid is generated in
+        // water.vert and exists in no cell -- so without that mark it is dead the instant it loads,
+        // loses its slot, and resolves to the 1x1 white fallback. White decodes to a normal of
+        // (1, 1, 1), which flattens every wave in the game and tilts what is left the same way.
+        size_t mWaterNormalTexture = sNoTexture;
+        bool mWaterNormalRequested = false;
+
+        // Seconds since the renderer started, for the wave scroll. Accumulated in double because it
+        // never resets: fp32 starts quantising the scroll after a long enough session, and wrapping
+        // it instead makes the waves jump, because the six octaves scroll at speeds that never come
+        // back to an integer offset together.
+        double mWaterSeconds = 0.0;
 
         // Previous frame's view matrix. Composed with this frame's viewInverse into the view-to-view
         // transform the shaders reproject through; deliberately not a view-projection, see render().
