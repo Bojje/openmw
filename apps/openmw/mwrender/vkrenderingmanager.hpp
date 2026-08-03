@@ -14,6 +14,11 @@
 #include <osg/Vec3f>
 #include <osg/Vec4f>
 
+namespace osg
+{
+    class Node;
+}
+
 // Vk::Geometry is held by value in CellTerrain, so unlike the other Vk types it cannot be forward
 // declared here.
 #include <components/vk/vkgeometry.hpp>
@@ -48,6 +53,7 @@ namespace MWRender
 {
     class Camera;
     class LandComposite;
+    class ParticleReader;
     struct LandBlend;
 
     class VkRenderingManager
@@ -82,6 +88,11 @@ namespace MWRender
         };
 
         void render(Camera& camera, const FrameLighting& lighting);
+
+        /// The OSG scene graph, which this renderer reads but never owns. Needed because particle
+        /// effects are simulated by osgParticle and read from there every frame -- see ParticleReader
+        /// for why that is the arrangement rather than simulating them here.
+        void setSceneRoot(osg::Node* sceneRoot) { mSceneRoot = sceneRoot; }
         bool loadShaders(const std::filesystem::path& shaderDir);
 
         void addCell(const MWWorld::CellStore* store);
@@ -232,6 +243,10 @@ namespace MWRender
         // Null when the composite pass could not be built, which is not fatal -- terrain then
         // draws the way it did before, one chunk per land texture with hard edges between them.
         std::unique_ptr<LandComposite> mLandComposite;
+
+        // Not owned. OSG's scene root, read once a frame for live particle state.
+        osg::Node* mSceneRoot = nullptr;
+        std::unique_ptr<ParticleReader> mParticleReader;
 
         std::unordered_map<std::string, std::vector<size_t>> mMeshCache;
         std::vector<std::unique_ptr<NifVk::VulkanMesh>> mMeshes;

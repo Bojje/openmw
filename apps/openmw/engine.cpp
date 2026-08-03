@@ -890,6 +890,10 @@ void OMW::Engine::createVulkanRenderer()
         Vk::getDrawableSize(mWindow, mVkWidth, mVkHeight);
         mVkRenderingManager = std::make_unique<MWRender::VkRenderingManager>(mWindow, true);
 
+        // The scene graph this renderer reads particle state out of. OSG owns it and keeps
+        // simulating it whichever backend presents.
+        mVkRenderingManager->setSceneRoot(mViewer->getSceneData());
+
         auto shaderDir = mResDir / "shaders" / "vulkan";
         if (mVkRenderingManager->loadShaders(shaderDir))
             Log(Debug::Info) << "Vulkan renderer created with shaders from " << shaderDir;

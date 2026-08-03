@@ -156,6 +156,32 @@ namespace Vk
     // What a caller hands to submitMesh. Grouped into a struct rather than passed as a parameter list
     // because the ray tracing path needs the buffer device addresses and the alpha-test flag in
     // addition to what rasterization needs, and a nine-argument call is easy to get silently wrong.
+    // One camera-facing quad of a particle effect -- a flame, an ember, a puff of smoke.
+    //
+    // std430, and the layout is pinned by static_asserts below because the shader declares it again.
+    // Positions are world space and already carry whatever transform the emitter sits under, so the
+    // draw needs no model matrix at all.
+    struct ParticleQuad
+    {
+        float position[3];
+        // World-unit half extent. Morrowind's flame particles are 40-odd units, which is about half a
+        // metre at this scale.
+        float size;
+        // Straight from the simulation, including alpha, which fades over a particle's life. Premultiplied
+        // by nothing -- the blend does it.
+        float colour[4];
+        // Slot in the G-buffer sampler array, the same index space submitMesh uses.
+        uint32_t textureIndex;
+        uint32_t pad[3];
+    };
+
+    static_assert(sizeof(ParticleQuad) == 48, "particle quad layout must match the shader's");
+
+    // Particle quads drawn in one frame across every effect on screen. A campfire is about 21 and a
+    // torch 35; a busy interior measured 364 in total. This is generous by an order of magnitude and
+    // costs 48 bytes each.
+    constexpr uint32_t maxParticleQuads = 8192;
+
     struct MeshSubmission
     {
         VkBuffer vertexBuffer = VK_NULL_HANDLE;
@@ -350,6 +376,13 @@ namespace Vk
         // sets the light count the scene data carries. Anything past maxPointLights is dropped, with
         // a single warning rather than a crash.
         void updateLights(const PointLight* lights, uint32_t count);
+
+        // Uploads this frame's particle quads and draws them in the composite pass. Replaces the
+        // previous frame's set wholesale, like the lights and the bone palettes, because the
+        // simulation that owns them is re-read every frame rather than tracked.
+        //
+        // Anything past maxParticleQuads is dropped with one warning.
+        void updateParticles(const ParticleQuad* quads, uint32_t count);
 
         // Uploads this frame's bone palettes, as \a count column-major 4x4 matrices laid end to end.
         // A submission's boneOffset indexes this array, and its per-vertex bone indices are relative
@@ -562,6 +595,21 @@ namespace Vk
         bool mSkinOverflowWarned = false;
 
         void createSkinBuffers();
+
+        // Particle quads, per frame in flight and persistently mapped, for the same reason the lights
+        // and bone palettes are: rewritten every frame while the previous frame may still be reading.
+        std::array<VkBuffer, maxFramesInFlight> mParticleBuffers = {};
+        std::array<VmaAllocation, maxFramesInFlight> mParticleMemory = {};
+        std::array<void*, maxFramesInFlight> mParticleMapped = {};
+        uint32_t mParticleCount = 0;
+        bool mParticleOverflowWarned = false;
+
+        void createParticleBuffers();
+
+        // Drawn inside the composite pass, after the tone mapped scene and before the interface.
+        // Null if its shaders were missing, which costs the effects and nothing else.
+        VkPipeline mParticlePipeline = VK_NULL_HANDLE;
+        VkPipelineLayout mParticlePipelineLayout = VK_NULL_HANDLE;
 
         VkSampler mGBufferSampler = VK_NULL_HANDLE;
         // Separate from mGBufferSampler: scene textures want filtering and wrapping, whereas the

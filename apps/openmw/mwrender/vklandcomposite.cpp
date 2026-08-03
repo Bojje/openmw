@@ -249,10 +249,15 @@ namespace MWRender
             multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
             multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
-            // The weighted sum. src.rgb * src.a added to whatever is already there, which over the
-            // whole layer set gives sum(colour * weight) because the weights sum to 1. Alpha is
-            // accumulated too and ends at 1 for the same reason, which is what the terrain shader
-            // wants since it discards on albedo.a < 0.5.
+            // Colour is the weighted sum: src.rgb * src.a added to what is there, which over the whole
+            // layer set gives sum(colour * weight) because the weights sum to 1.
+            //
+            // Alpha uses ONE, ONE and not SRC_ALPHA, ONE, and the difference is a bug that shipped.
+            // With SRC_ALPHA the alpha channel accumulates sum(weight squared), not sum(weight) --
+            // where two textures meet at equal weight that is 0.25 + 0.25 = 0.5, and gbuffer.frag
+            // discards on albedo.a < 0.5. The result was holes punched through the ground along every
+            // blend transition, showing fog through the terrain in thin snaking lines. With ONE the
+            // channel accumulates sum(weight) = 1 everywhere, which is what the discard expects.
             VkPipelineColorBlendAttachmentState blend = {};
             blend.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT
                 | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
@@ -260,7 +265,7 @@ namespace MWRender
             blend.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
             blend.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
             blend.colorBlendOp = VK_BLEND_OP_ADD;
-            blend.srcAlphaBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+            blend.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
             blend.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
             blend.alphaBlendOp = VK_BLEND_OP_ADD;
 

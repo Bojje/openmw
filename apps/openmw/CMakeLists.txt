@@ -24,7 +24,7 @@ add_openmw_dir (mwrender
     renderbin actoranimation landmanager navmesh actorspaths recastmesh fogmanager objectpaging groundcover
     postprocessor pingpongcull luminancecalculator pingpongcanvas transparentpass precipitationocclusion ripples
     actorutil distortion animationpriority bonegroup blendmask animblendcontroller
-    vkrenderingmanager vkterrainbuilder vklightcollector vklandcomposite
+    vkrenderingmanager vkterrainbuilder vklightcollector vklandcomposite vkparticlereader
     )
 
 add_openmw_dir (mwinput

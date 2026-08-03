@@ -83,6 +83,8 @@ namespace Vk
         createLightBuffers();
         // Likewise, at binding 2 of the scene set.
         createSkinBuffers();
+        // And binding 3.
+        createParticleBuffers();
         createDescriptorSets();
         createGBufferPipeline();
         createCompositePipeline();
@@ -689,7 +691,7 @@ namespace Vk
     {
         // Scene layout (set 0 for G-buffer pass): camera UBO + the scene texture array
         {
-            std::array<VkDescriptorSetLayoutBinding, 3> bindings = {};
+            std::array<VkDescriptorSetLayoutBinding, 4> bindings = {};
 
             bindings[0].binding = 0;
             bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -710,6 +712,14 @@ namespace Vk
             bindings[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
             bindings[2].descriptorCount = 1;
             bindings[2].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+            // Particle quads. On the scene set rather than a set of its own so the particle pipeline
+            // can reach the camera and the sampler array through the same binding, which is what lets
+            // it draw inside the composite pass without any descriptor plumbing of its own.
+            bindings[3].binding = 3;
+            bindings[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+            bindings[3].descriptorCount = 1;
+            bindings[3].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
             VkDescriptorSetLayoutCreateInfo layoutInfo = {};
             layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -936,9 +946,9 @@ namespace Vk
             auto found = std::find_if(poolSizes.begin(), poolSizes.end(),
                 [](const VkDescriptorPoolSize& s) { return s.type == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; });
             if (found != poolSizes.end())
-                found->descriptorCount += maxFramesInFlight * 2;
+                found->descriptorCount += maxFramesInFlight * 3;
             else
-                poolSizes.push_back({ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, maxFramesInFlight * 2 });
+                poolSizes.push_back({ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, maxFramesInFlight * 3 });
         }
 
         if (mDevice->rayTracingSupported())
@@ -1006,7 +1016,12 @@ namespace Vk
                 skinInfo.offset = 0;
                 skinInfo.range = VK_WHOLE_SIZE;
 
-                std::array<VkWriteDescriptorSet, 2> writes = {};
+                VkDescriptorBufferInfo particleInfo = {};
+                particleInfo.buffer = mParticleBuffers[i];
+                particleInfo.offset = 0;
+                particleInfo.range = VK_WHOLE_SIZE;
+
+                std::array<VkWriteDescriptorSet, 3> writes = {};
 
                 writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
                 writes[0].dstSet = mSceneDescriptorSets[i];
@@ -1021,6 +1036,13 @@ namespace Vk
                 writes[1].descriptorCount = 1;
                 writes[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
                 writes[1].pBufferInfo = &skinInfo;
+
+                writes[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                writes[2].dstSet = mSceneDescriptorSets[i];
+                writes[2].dstBinding = 3;
+                writes[2].descriptorCount = 1;
+                writes[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+                writes[2].pBufferInfo = &particleInfo;
 
                 vkUpdateDescriptorSets(
                     mDevice->handle(), static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
@@ -1522,6 +1544,9 @@ namespace Vk
         auto gbufSkinnedVert = loadShader("gbuffer_skinned.vert.spv");
         auto compVert = loadShader("composite.vert.spv");
         auto compFrag = loadShader("composite.frag.spv");
+        // Also not in the check below. Without these the world renders and the effects do not.
+        auto particleVert = loadShader("particle.vert.spv");
+        auto particleFrag = loadShader("particle.frag.spv");
 
         if (!gbufVert || !gbufFrag || !compVert || !compFrag)
         {
@@ -1665,6 +1690,98 @@ namespace Vk
                 VK_CHECK(vkCreateGraphicsPipelines(mDevice->handle(), VK_NULL_HANDLE, 1,
                     &skinnedInfo, nullptr, &mGBufferSkinnedPipeline));
             }
+        }
+
+        // Particle pipeline. Draws inside the composite render pass, after the tone mapped scene and
+        // before the interface, so it needs no render pass and no framebuffer of its own.
+        if (particleVert && particleFrag)
+        {
+            std::array<VkPipelineShaderStageCreateInfo, 2> stages
+                = { particleVert->stageInfo(VK_SHADER_STAGE_VERTEX_BIT),
+                      particleFrag->stageInfo(VK_SHADER_STAGE_FRAGMENT_BIT) };
+
+            // Two sets: the scene set for the camera, the sampler array and the particle buffer, and
+            // the composite set for the G-buffer depth. Both are already allocated per frame in
+            // flight and already bound with the right contents; reusing them is what keeps this pass
+            // free of descriptor plumbing.
+            std::array<VkDescriptorSetLayout, 2> setLayouts
+                = { mSceneDescriptorLayout, mCompositeDescriptorLayout };
+
+            VkPipelineLayoutCreateInfo layoutInfo = {};
+            layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+            layoutInfo.setLayoutCount = static_cast<uint32_t>(setLayouts.size());
+            layoutInfo.pSetLayouts = setLayouts.data();
+            VK_CHECK(vkCreatePipelineLayout(
+                mDevice->handle(), &layoutInfo, nullptr, &mParticlePipelineLayout));
+
+            // No vertex input: the quad corner comes from gl_VertexIndex and the particle from
+            // gl_InstanceIndex.
+            VkPipelineVertexInputStateCreateInfo vertexInput = {};
+            vertexInput.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+
+            VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
+            inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+            inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+
+            VkPipelineViewportStateCreateInfo viewportState = {};
+            viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+            viewportState.viewportCount = 1;
+            viewportState.scissorCount = 1;
+
+            VkPipelineRasterizationStateCreateInfo rasterizer = {};
+            rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+            rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+            rasterizer.lineWidth = 1.0f;
+            // A billboard has no meaningful winding -- it faces the camera by construction, and which
+            // way round its two triangles come out depends on where the camera is.
+            rasterizer.cullMode = VK_CULL_MODE_NONE;
+
+            VkPipelineMultisampleStateCreateInfo multisampling = {};
+            multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+            multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+            // The composite pass has no depth attachment, so there is nothing to test against here.
+            // particle.frag samples the G-buffer depth instead.
+            VkPipelineDepthStencilStateCreateInfo depthStencil = {};
+            depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+            depthStencil.depthTestEnable = VK_FALSE;
+            depthStencil.depthWriteEnable = VK_FALSE;
+
+            // Additive. Order independent by construction, which is why this needs no sorting.
+            VkPipelineColorBlendAttachmentState blend = {};
+            blend.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT
+                | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+            blend.blendEnable = VK_TRUE;
+            blend.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+            blend.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
+            blend.colorBlendOp = VK_BLEND_OP_ADD;
+            blend.srcAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+            blend.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+            blend.alphaBlendOp = VK_BLEND_OP_ADD;
+
+            VkPipelineColorBlendStateCreateInfo colorBlending = {};
+            colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+            colorBlending.attachmentCount = 1;
+            colorBlending.pAttachments = &blend;
+
+            VkGraphicsPipelineCreateInfo pipelineInfo = {};
+            pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+            pipelineInfo.stageCount = static_cast<uint32_t>(stages.size());
+            pipelineInfo.pStages = stages.data();
+            pipelineInfo.pVertexInputState = &vertexInput;
+            pipelineInfo.pInputAssemblyState = &inputAssembly;
+            pipelineInfo.pViewportState = &viewportState;
+            pipelineInfo.pRasterizationState = &rasterizer;
+            pipelineInfo.pMultisampleState = &multisampling;
+            pipelineInfo.pDepthStencilState = &depthStencil;
+            pipelineInfo.pColorBlendState = &colorBlending;
+            pipelineInfo.pDynamicState = &dynamicState;
+            pipelineInfo.layout = mParticlePipelineLayout;
+            pipelineInfo.renderPass = mCompositeRenderPass;
+            pipelineInfo.subpass = 0;
+
+            VK_CHECK(vkCreateGraphicsPipelines(
+                mDevice->handle(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &mParticlePipeline));
         }
 
         // Composite pipeline
@@ -2088,6 +2205,28 @@ namespace Vk
                 vkCmdDraw(cmd, 3, 1, 0, 0);
             }
 
+            // Particle effects -- fire, smoke, sparks, spell effects. In this pass rather than the
+            // G-buffer because they are blended, and a G-buffer has nowhere to put a translucent
+            // surface. After the tone mapped scene so they add light to a finished image, and before
+            // the interface so the interface stays on top.
+            //
+            // Additive, so no sorting is needed: addition commutes, and the draw order of overlapping
+            // flames cannot change the result. That is the whole reason this needs no transparency
+            // architecture.
+            if (mParticlePipeline != VK_NULL_HANDLE && mParticleCount > 0)
+            {
+                vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mParticlePipeline);
+
+                std::array<VkDescriptorSet, 2> sets
+                    = { mSceneDescriptorSets[mCurrentFrame], mCompositeDescriptorSets[mCurrentFrame] };
+                vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mParticlePipelineLayout, 0,
+                    static_cast<uint32_t>(sets.size()), sets.data(), 0, nullptr);
+
+                // Six vertices a quad, one instance a particle. No vertex buffer: the corner comes
+                // from gl_VertexIndex and the particle from gl_InstanceIndex.
+                vkCmdDraw(cmd, 6, mParticleCount, 0, 0);
+            }
+
             // The user interface draws here, sharing the composite pass rather than running one of its
             // own. It blends straight onto the tone mapped scene in the swapchain image, so there is no
             // second attachment, no extra layout transition and nothing to resolve. Outside the
@@ -2197,6 +2336,34 @@ namespace Vk
                 mSkinBuffers[i], mSkinMemory[i]);
             VK_CHECK(vmaMapMemory(mDevice->allocator(), mSkinMemory[i], &mSkinMapped[i]));
         }
+    }
+
+    void Renderer::createParticleBuffers()
+    {
+        const VkDeviceSize size = sizeof(ParticleQuad) * maxParticleQuads;
+        for (uint32_t i = 0; i < maxFramesInFlight; i++)
+        {
+            createBufferLocal(*mDevice, size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                mParticleBuffers[i], mParticleMemory[i]);
+            VK_CHECK(vmaMapMemory(mDevice->allocator(), mParticleMemory[i], &mParticleMapped[i]));
+        }
+    }
+
+    void Renderer::updateParticles(const ParticleQuad* quads, uint32_t count)
+    {
+        const uint32_t usable = std::min(count, maxParticleQuads);
+        if (count > usable && !mParticleOverflowWarned)
+        {
+            mParticleOverflowWarned = true;
+            Log(Debug::Warning) << "Vulkan: " << count << " particle quads exceed the " << maxParticleQuads
+                                << " one frame can hold; the rest are dropped";
+        }
+
+        if (usable > 0 && quads != nullptr && mParticleMapped[mCurrentFrame] != nullptr)
+            std::memcpy(mParticleMapped[mCurrentFrame], quads, sizeof(ParticleQuad) * usable);
+
+        mParticleCount = usable;
     }
 
     uint32_t Renderer::updateSkinMatrices(const float* matrices, uint32_t count)
@@ -2583,6 +2750,17 @@ namespace Vk
                 mSkinBuffers[i] = VK_NULL_HANDLE;
                 mSkinMemory[i] = VK_NULL_HANDLE;
             }
+            if (mParticleMapped[i])
+            {
+                vmaUnmapMemory(mDevice->allocator(), mParticleMemory[i]);
+                mParticleMapped[i] = nullptr;
+            }
+            if (mParticleBuffers[i] != VK_NULL_HANDLE)
+            {
+                vmaDestroyBuffer(mDevice->allocator(), mParticleBuffers[i], mParticleMemory[i]);
+                mParticleBuffers[i] = VK_NULL_HANDLE;
+                mParticleMemory[i] = VK_NULL_HANDLE;
+            }
             if (mUniformMapped[i])
             {
                 vmaUnmapMemory(mDevice->allocator(), mUniformMemory[i]);
@@ -2610,6 +2788,10 @@ namespace Vk
         if (mTextureSampler != VK_NULL_HANDLE)
             vkDestroySampler(dev, mTextureSampler, nullptr);
 
+        if (mParticlePipeline != VK_NULL_HANDLE)
+            vkDestroyPipeline(dev, mParticlePipeline, nullptr);
+        if (mParticlePipelineLayout != VK_NULL_HANDLE)
+            vkDestroyPipelineLayout(dev, mParticlePipelineLayout, nullptr);
         if (mGBufferSkinnedPipeline != VK_NULL_HANDLE)
             vkDestroyPipeline(dev, mGBufferSkinnedPipeline, nullptr);
         if (mGBufferPipeline != VK_NULL_HANDLE)

@@ -54,6 +54,7 @@
 #include "../mwworld/class.hpp"
 #include "camera.hpp"
 #include "vklandcomposite.hpp"
+#include "vkparticlereader.hpp"
 #include "vkterrainbuilder.hpp"
 
 namespace
@@ -168,6 +169,12 @@ namespace MWRender
         mRenderer = std::make_unique<Vk::Renderer>(window, enableValidation);
         mMeshConverter
             = std::make_unique<NifVk::MeshConverter>(mRenderer->device(), mRenderer->commandPool());
+        // Particle textures resolve through the ordinary loader, so they are cached and evicted with
+        // everything else. textureSlot maps a storage index to a live sampler slot; an unloaded
+        // texture becomes slot 0, the white fallback, rather than an out-of-range read.
+        mParticleReader = std::make_unique<ParticleReader>([this](const std::string& name) {
+            return static_cast<uint32_t>(textureSlot(getOrLoadTexture(name)));
+        });
         Log(Debug::Info) << "Vulkan renderer initialized";
     }
 
@@ -307,6 +314,15 @@ namespace MWRender
         else
         {
             mRenderer->updateLights(nullptr, 0);
+        }
+
+        // Read the live particle simulation out of OSG and hand it over. Before updateScene for no
+        // ordering reason of its own -- it just belongs with the other per-frame uploads.
+        if (mParticleReader != nullptr)
+        {
+            mParticleReader->collect(mSceneRoot);
+            const std::vector<Vk::ParticleQuad>& quads = mParticleReader->quads();
+            mRenderer->updateParticles(quads.data(), static_cast<uint32_t>(quads.size()));
         }
 
         mRenderer->updateScene(scene);
