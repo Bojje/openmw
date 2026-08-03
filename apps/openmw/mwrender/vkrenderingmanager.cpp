@@ -923,9 +923,38 @@ namespace MWRender
                 //
                 // A rigid part is authored in the space of the bone that holds it: actor * that
                 // bone * the part's own place in its file.
+                // Off, and this is the switch. Everything behind it works -- the attributes reach the
+                // shader, every bone name resolves against the live skeleton, and the palettes are
+                // built from it -- but the result is measurably worse than the per-part placement
+                // below, and worse is worse however much of it is written.
+                //
+                // What the regression sweep said on 2026-08-03: interior alignment 61.8 -> 47.2 with
+                // this on, the two exteriors unchanged to within half a point. The interior is where
+                // the camera is closest to an actor, which is why only it moved.
+                //
+                // What it looks like: the body renders as separate pieces, the chest roughly a
+                // hundred units above the sleeves. What was ruled out, each by measurement rather
+                // than by reading:
+                //   - NiSkinData::mTransform, the global skin transform. Identity in every Morrowind
+                //     file dumped, so not it.
+                //   - The per-vertex data. Dumped from the converter: four indices and four weights a
+                //     vertex, weights summing to 255. Correct.
+                //   - The bone lookups. Every name in skinBones resolves in the live skeleton;
+                //     nothing falls back to the bind pose.
+                //   - The buffers reaching the shader. 191 of 851 actor shapes take the skinned
+                //     pipeline and 961 matrices upload per frame.
+                // What is left: the space the vertices are in. Every palette's translation clusters
+                // near (0, 4, 98) rather than near zero, which says the geometry is authored about
+                // the origin and the palette is lifting it to the chest -- but then the part ends up
+                // one bone too high, so something in the chain is applied twice. The next thing to
+                // check is RigGeometry::updateSkinToSkelMatrix, which cancels the node path from the
+                // skeleton root down to the trishape; this path has no such node path to cancel and
+                // may need the part file's own node transform instead of ignoring it.
+                constexpr bool sPerVertexSkinning = false;
+
                 const NifVk::VulkanMesh& mesh = *mMeshes[meshIndex];
                 float skinBoneMatrix[16];
-                if (mesh.skinBuffer && !mesh.skinBones.empty()
+                if (sPerVertexSkinning && mesh.skinBuffer && !mesh.skinBones.empty()
                     && mSkinMatrices.size() / 16 + mesh.skinBones.size() <= Vk::maxSkinMatrices)
                 {
                     // Real skinning. The vertices are in the skeleton's bind space, so the instance
