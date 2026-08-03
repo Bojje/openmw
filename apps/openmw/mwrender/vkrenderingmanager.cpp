@@ -555,6 +555,12 @@ namespace MWRender
 
             landChunks = buildLandChunks(cellX, cellY);
 
+            // Not consumed yet -- the bake that turns these into one composite texture per cell is
+            // the next piece. Built here because this is where it will belong, and because it is the
+            // only way to exercise the sampling arithmetic against real land data.
+            const LandBlend blend = buildLandBlend(cellX, cellY);
+            (void)blend;
+
             // Vertices come out cell-local, so all that is left is the translation to the cell's
             // south-west corner. Column-vector convention, matching makeObjectTransform.
             terrain.transform[12] = static_cast<float>(cellX) * ESM::Land::REAL_SIZE;

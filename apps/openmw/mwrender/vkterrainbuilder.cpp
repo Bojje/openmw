@@ -12,6 +12,7 @@
 #include <string_view>
 #include <utility>
 
+#include <components/debug/debuglog.hpp>
 #include <components/esm/esmterrain.hpp>
 #include <components/esm/path.hpp>
 #include <components/esm3/loadland.hpp>
@@ -73,7 +74,8 @@ namespace
             {
                 mSearched[slot] = true;
                 if (const ESM::Land* land = mStore.search(mCellX + offsetX, mCellY + offsetY))
-                    mData[slot].emplace(*land, ESM::Land::DATA_VNML | ESM::Land::DATA_VCLR);
+                    mData[slot].emplace(
+                        *land, ESM::Land::DATA_VNML | ESM::Land::DATA_VCLR | ESM::Land::DATA_VTEX);
             }
 
             return mData[slot].has_value() ? &*mData[slot] : nullptr;
@@ -309,10 +311,128 @@ namespace
 
         return path->getNormalized().value();
     }
+
+    /// The land texture at a tile that may lie one cell outside this one.
+    ///
+    /// A missing neighbour is the base texture rather than a hole -- ESMTerrain::Storage's
+    /// getTextureIdAt returns {0, 0} for absent land or absent VTEX, and the borrowed samples along a
+    /// map edge or an open coast depend on that.
+    std::string textureNameAcross(const MWWorld::ESMStore& store, const ESM::LandData& land,
+        EdgeNeighbours& neighbours, int cellOffsetX, int cellOffsetY, int tileX, int tileY)
+    {
+        if (cellOffsetX == 0 && cellOffsetY == 0)
+            return textureNameAt(store, land, tileX, tileY);
+
+        const ESM::LandData* neighbour = neighbours.get(cellOffsetX, cellOffsetY);
+        if (neighbour == nullptr)
+            return std::string(sDefaultTexture);
+
+        return textureNameAt(store, *neighbour, tileX, tileY);
+    }
+
+    /// The per-layer alpha maps that turn the hard 16x16 VTEX grid into the soft transitions OSG
+    /// shows. Reimplemented from ESMTerrain::Storage::getBlendmaps rather than shared, because the
+    /// Vulkan path deliberately does not depend on components/terrain.
+    ///
+    /// Everything about this is a vertex-centred grid over a texel-centred paint map, and the
+    /// off-by-ones are not symmetric. Four things are easy to get wrong and only one of them shows
+    /// up as an obvious error:
+    ///
+    ///   - The grid is 17 samples across for 16 texels. The extra sample is at the LOW end in X,
+    ///     borrowed from the cell to the west, and at the HIGH end in Y, borrowed from the cell to
+    ///     the north. Putting both extras on the same side shifts the whole map by half a texel.
+    ///   - VTEX is indexed [y * 16 + x]. Upstream calls the X axis "row" and the Y axis "col"
+    ///     throughout this subsystem, which is the opposite of the usual convention and is the
+    ///     single easiest way to produce a transposed map that still looks plausible.
+    ///   - Each sample is written as a 2x2 block into a doubled image. The doubling is not a quality
+    ///     choice: the quarter-texel nudge in the sampling UV is exactly half a doubled pixel and is
+    ///     not representable without it.
+    ///   - The weights sum to exactly 1 everywhere, because each sample writes 255 into exactly one
+    ///     layer and 0 stays everywhere else. The consumer must therefore composite as a weighted
+    ///     sum, not as alpha-over.
+    MWRender::LandBlend buildBlendMaps(
+        const MWWorld::ESMStore& store, const ESM::LandData& land, EdgeNeighbours& neighbours)
+    {
+        using MWRender::sBlendImageSize;
+        using MWRender::sBlendSamples;
+
+        MWRender::LandBlend blend;
+
+        std::array<std::size_t, sBlendSamples * sBlendSamples> sampleLayer{};
+        std::map<std::string, std::size_t, std::less<>> layerByTexture;
+
+        for (int j = 0; j < sBlendSamples; ++j) // j is world Y
+        {
+            // The extra Y sample is the far one, and it reads the north neighbour's first texel row.
+            const int cellOffsetY = j == sTextureSize ? 1 : 0;
+            const int srcY = j == sTextureSize ? 0 : j;
+
+            for (int i = 0; i < sBlendSamples; ++i) // i is world X
+            {
+                // The extra X sample is the near one, and it reads the west neighbour's last texel
+                // column. Opposite end from Y, which is not a mistake -- see the note above.
+                const int cellOffsetX = i == 0 ? -1 : 0;
+                const int srcX = i == 0 ? sTextureSize - 1 : i - 1;
+
+                std::string texture
+                    = textureNameAcross(store, land, neighbours, cellOffsetX, cellOffsetY, srcX, srcY);
+
+                auto found = layerByTexture.find(texture);
+                if (found == layerByTexture.end())
+                {
+                    found = layerByTexture.emplace(texture, blend.layers.size()).first;
+                    blend.layers.push_back(std::move(texture));
+                }
+
+                sampleLayer[static_cast<std::size_t>(j) * sBlendSamples + i] = found->second;
+            }
+        }
+
+        // One texture over the whole cell needs no blending at all, and saying so lets the caller
+        // skip the bake entirely and point the chunk straight at that texture.
+        if (blend.layers.size() <= 1)
+            return blend;
+
+        blend.maps.assign(blend.layers.size(), std::vector<std::uint8_t>(sBlendImageSize * sBlendImageSize, 0));
+
+        for (int j = 0; j < sBlendSamples; ++j)
+        {
+            for (int i = 0; i < sBlendSamples; ++i)
+            {
+                std::vector<std::uint8_t>& map
+                    = blend.maps[sampleLayer[static_cast<std::size_t>(j) * sBlendSamples + i]];
+
+                const std::size_t x = static_cast<std::size_t>(i) * 2;
+                const std::size_t y = static_cast<std::size_t>(j) * 2;
+                map[(y + 0) * sBlendImageSize + x + 0] = 255;
+                map[(y + 0) * sBlendImageSize + x + 1] = 255;
+                map[(y + 1) * sBlendImageSize + x + 0] = 255;
+                map[(y + 1) * sBlendImageSize + x + 1] = 255;
+            }
+        }
+
+        return blend;
+    }
 }
 
 namespace MWRender
 {
+    LandBlend buildLandBlend(int cellX, int cellY)
+    {
+        const MWWorld::ESMStore& store = *MWBase::Environment::get().getESMStore();
+        const MWWorld::Store<ESM::Land>& landStore = store.get<ESM::Land>();
+
+        const ESM::Land* record = landStore.search(cellX, cellY);
+        if (record == nullptr)
+            return {};
+
+        const ESM::LandData land(*record, sWantedData);
+        EdgeNeighbours neighbours(landStore, cellX, cellY);
+        LandBlend blend = buildBlendMaps(store, land, neighbours);
+
+        return blend;
+    }
+
     std::vector<LandChunk> buildLandChunks(int cellX, int cellY)
     {
         const MWWorld::ESMStore& store = *MWBase::Environment::get().getESMStore();
