@@ -778,7 +778,8 @@ namespace MWGui
 
         // Order matters: the widget must stop pointing at the old texture before it is freed.
         mAvatarImage->setRenderItemTexture(nullptr);
-        mPreviewTexture = createGuiTexture(mPreview->getTexture(), image, "character preview");
+        mPreviewTexture
+            = createGuiTexture(mPreview->getTexture(), image, "character preview", mPreview->getTextureStateSet());
         mAvatarImage->setRenderItemTexture(mPreviewTexture.get());
         // Through updatePreviewSize rather than a fixed UV set. The preview is rendered into a
         // sub-rectangle of its texture, sized to the panel, and the widget's UVs have to match it --

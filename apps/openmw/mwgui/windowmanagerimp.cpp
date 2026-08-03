@@ -44,6 +44,7 @@
 
 #ifdef OPENMW_USE_VULKAN
 #include <components/files/conversion.hpp>
+#include <components/vk/vkrenderer.hpp>
 #include <components/vkmyguiplatform/vkmyguiadditivelayer.hpp>
 #include <components/vkmyguiplatform/vkmyguiplatform.hpp>
 #endif
@@ -222,6 +223,7 @@ namespace MWGui
 #ifdef OPENMW_USE_VULKAN
         if (vkRenderer)
         {
+            mVkRenderer = vkRenderer;
             mVkGuiPlatform = std::make_unique<VkMyGUIPlatform::Platform>(*vkRenderer,
                 resourceSystem->getImageManager(), resourceSystem->getVFS(), mScalingFactor, resourcePath,
                 logpath / "MyGUI.log");
@@ -295,6 +297,8 @@ namespace MWGui
 
         auto loadingScreen = std::make_unique<LoadingScreen>(mResourceSystem, mViewer);
         mLoadingScreen = loadingScreen.get();
+        if (usingVulkanGui())
+            mLoadingScreen->setPresentCallback([this] { presentInterfaceFrame(); });
         mWindows.push_back(std::move(loadingScreen));
 
         // set up the hardware cursor manager
@@ -2139,6 +2143,24 @@ namespace MWGui
             && (!isGuiMode() || (mGuiModes.size() == 1 && (getMode() == GM_MainMenu || getMode() == GM_Rest)));
     }
 
+    void WindowManager::presentInterfaceFrame()
+    {
+#ifdef OPENMW_USE_VULKAN
+        if (mVkRenderer == nullptr)
+            return;
+
+        try
+        {
+            mVkRenderer->render();
+        }
+        catch (const std::exception& e)
+        {
+            Log(Debug::Error) << "Vulkan interface frame failed: " << e.what();
+            mVkRenderer = nullptr;
+        }
+#endif
+    }
+
     void WindowManager::playVideo(std::string_view name, bool allowSkipping, bool overrideSounds)
     {
         mVideoWidget->playVideo("video\\" + std::string{ name });
@@ -2196,6 +2218,7 @@ namespace MWGui
                 mViewer->eventTraversal();
                 mViewer->updateTraversal();
                 mViewer->renderingTraversals();
+                presentInterfaceFrame();
             }
             // at the time this function is called we are in the middle of a frame,
             // so out of order calls are necessary to get a correct frameNumber for the next frame.

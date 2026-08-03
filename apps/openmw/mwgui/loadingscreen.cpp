@@ -26,6 +26,7 @@
 #include "../mwbase/windowmanager.hpp"
 
 #include "backgroundimage.hpp"
+#include "guitexture.hpp"
 
 namespace MWGui
 {
@@ -328,7 +329,15 @@ namespace MWGui
 
         if (!mShowWallpaper && mLastRenderTime < mLoadingOnTime)
         {
-            setupCopyFramebufferToTextureCallback();
+            // The in-game loading background is the last frame of the game, copied out of the
+            // framebuffer. Under Vulkan the framebuffer this reads is the hidden OpenGL window's,
+            // which the world is not drawn into, so it would come back black. Fall back to the same
+            // splash screens the main menu loads use, which are read from the VFS and need no
+            // backend at all.
+            if (usingVulkanGuiPlatform())
+                changeWallpaper();
+            else
+                setupCopyFramebufferToTextureCallback();
         }
 
         MWBase::Environment::get().getInputManager()->update(0, true, true);
@@ -351,6 +360,8 @@ namespace MWGui
         mViewer->eventTraversal();
         mViewer->updateTraversal();
         mViewer->renderingTraversals();
+        if (mPresent)
+            mPresent();
         mViewer->advance(mViewer->getFrameStamp()->getSimulationTime());
 
         mLastRenderTime = mTimer.time_m();

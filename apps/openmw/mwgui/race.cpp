@@ -1,17 +1,18 @@
 #include "race.hpp"
 
 #include <MyGUI_Gui.h>
+#include <MyGUI_ITexture.h>
 #include <MyGUI_ImageBox.h>
 #include <MyGUI_ListBox.h>
 #include <MyGUI_ScrollBar.h>
 #include <MyGUI_UString.h>
 
+#include <osg/Image>
 #include <osg/Texture2D>
 
 #include <components/debug/debuglog.hpp>
 #include <components/esm3/loadbody.hpp>
 #include <components/esm3/loadrace.hpp>
-#include <components/myguiplatform/myguitexture.hpp>
 #include <components/settings/values.hpp>
 
 #include "../mwbase/environment.hpp"
@@ -19,6 +20,7 @@
 #include "../mwrender/characterpreview.hpp"
 #include "../mwworld/esmstore.hpp"
 
+#include "guitexture.hpp"
 #include "tooltips.hpp"
 
 namespace
@@ -160,11 +162,8 @@ namespace MWGui
         mPreview->rebuild();
         mPreview->setAngle(mCurrentAngle);
 
-        mPreviewTexture
-            = std::make_unique<MyGUIPlatform::OSGTexture>(mPreview->getTexture(), mPreview->getTextureStateSet());
-        mPreviewImage->setRenderItemTexture(mPreviewTexture.get());
-        // The widget is Y-down, the RTT image is Y-up, so this UV is inverted
-        mPreviewImage->getSubWidgetMain()->_setUVSet(MyGUI::FloatRect(0.f, 1.f, 1.f, 0.f));
+        mPreviewModifiedCount = 0;
+        refreshPreviewTexture();
 
         const ESM::NPC& proto = mPreview->getPrototype();
         setRaceId(proto.mRace);
@@ -208,6 +207,44 @@ namespace MWGui
 
         updateSkills();
         updateSpellPowers();
+    }
+
+    void RaceDialog::refreshPreviewTexture()
+    {
+        if (!mPreview)
+            return;
+
+        // Same shape as InventoryWindow::refreshPreviewTexture. Under the OSG platform the widget
+        // points at the render target and keeps itself current; under Vulkan the preview has to be
+        // uploaded again whenever the render behind it changes, which here is a head rotation or a
+        // change of race, face or hair.
+        osg::ref_ptr<osg::Image> image;
+        if (usingVulkanGuiPlatform())
+        {
+            image = mPreview->getImage();
+            if (image == nullptr || image->data() == nullptr)
+                return; // Not drawn yet. Asked again next frame.
+            if (mPreviewTexture && image->getModifiedCount() == mPreviewModifiedCount)
+                return;
+            mPreviewModifiedCount = image->getModifiedCount();
+        }
+        else if (mPreviewTexture)
+        {
+            return;
+        }
+
+        // Order matters: the widget must stop pointing at the old texture before it is freed.
+        mPreviewImage->setRenderItemTexture(nullptr);
+        mPreviewTexture
+            = createGuiTexture(mPreview->getTexture(), image, "race preview", mPreview->getTextureStateSet());
+        mPreviewImage->setRenderItemTexture(mPreviewTexture.get());
+        // The widget is Y-down, the RTT image is Y-up, so this UV is inverted
+        mPreviewImage->getSubWidgetMain()->_setUVSet(MyGUI::FloatRect(0.f, 1.f, 1.f, 0.f));
+    }
+
+    void RaceDialog::onFrame(float /*duration*/)
+    {
+        refreshPreviewTexture();
     }
 
     void RaceDialog::onClose()

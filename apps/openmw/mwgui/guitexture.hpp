@@ -13,6 +13,7 @@ namespace MyGUI
 namespace osg
 {
     class Image;
+    class StateSet;
     class Texture2D;
 }
 
@@ -46,8 +47,12 @@ namespace MWGui
     /// Returns nullptr when the Vulkan platform is live and \a image has not been filled yet, which
     /// for a readback means the render has not landed. Ask again next frame rather than treating it
     /// as a failure.
+    ///
+    /// \a stateSet is the state the OSG platform needs to draw the texture correctly -- the
+    /// character previews hand it a premultiplied-alpha blend function this way. It applies to the
+    /// OSG path only; the Vulkan platform has its own fixed pipeline state and ignores it.
     std::unique_ptr<MyGUI::ITexture> createGuiTexture(
-        osg::Texture2D* texture, osg::Image* image, std::string_view name);
+        osg::Texture2D* texture, osg::Image* image, std::string_view name, osg::StateSet* stateSet = nullptr);
 }
 
 #endif

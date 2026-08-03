@@ -2,15 +2,18 @@
 
 #include <osg-ffmpeg-videoplayer/videoplayer.hpp>
 
+#include <MyGUI_ITexture.h>
 #include <MyGUI_RenderManager.h>
 
+#include <osg/Image>
 #include <osg/Texture2D>
 
 #include <components/debug/debuglog.hpp>
-#include <components/myguiplatform/myguitexture.hpp>
 #include <components/vfs/manager.hpp>
 
 #include "../mwsound/movieaudiofactory.hpp"
+
+#include "guitexture.hpp"
 
 namespace MWGui
 {
@@ -46,11 +49,44 @@ namespace MWGui
 
         mPlayer->playVideo(std::move(videoStream), video);
 
-        osg::ref_ptr<osg::Texture2D> texture = mPlayer->getVideoTexture();
-        if (!texture)
+        // No texture work here, and specifically not from this call. The main menu's background
+        // video restarts itself from its own thread, so playVideo is not always on the main thread,
+        // and creating or freeing an interface texture off it would race the frame being drawn.
+        // commitFrame is called from the main thread in every one of these loops and does it there.
+        mRebind = true;
+    }
+
+    void VideoWidget::refreshTexture()
+    {
+        mVideoTexture = mPlayer->getVideoTexture();
+        if (!mVideoTexture)
             return;
 
-        mTexture = std::make_unique<MyGUIPlatform::OSGTexture>(texture);
+        const bool rebind = mRebind.exchange(false);
+        osg::Image* image = mVideoTexture->getImage();
+        if (usingVulkanGuiPlatform())
+        {
+            // Every frame of the video is a new upload, because there is no shared texture between
+            // the two backends -- the same trade as everywhere else the interface reads from OSG,
+            // and here it costs one texture per video frame rather than per interface change.
+            if (image == nullptr || image->data() == nullptr)
+                return;
+            if (!rebind && mTexture && image == mUploadedImage
+                && image->getModifiedCount() == mUploadedModifiedCount)
+                return;
+            mUploadedImage = image;
+            mUploadedModifiedCount = image->getModifiedCount();
+        }
+        else if (mTexture && !rebind)
+        {
+            return;
+        }
+
+        // Order matters: the widget must stop pointing at the old texture before it is freed.
+        setRenderItemTexture(nullptr);
+        mTexture = createGuiTexture(mVideoTexture, image, "video");
+        if (!mTexture)
+            return;
 
         setRenderItemTexture(mTexture.get());
         // Both the widget and the video frame are Y-down, so this UV is not inverted
@@ -75,10 +111,17 @@ namespace MWGui
     void VideoWidget::commitFrame()
     {
         mPlayer->commitFrame();
+        refreshTexture();
     }
 
     void VideoWidget::stop()
     {
+        // Before close(), which drops the player's reference to the frame this widget is drawing.
+        setRenderItemTexture(nullptr);
+        mTexture.reset();
+        mVideoTexture = nullptr;
+        mUploadedImage = nullptr;
+
         mPlayer->close();
     }
 

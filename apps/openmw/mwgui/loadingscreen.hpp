@@ -1,6 +1,7 @@
 #ifndef MWGUI_LOADINGSCREEN_H
 #define MWGUI_LOADINGSCREEN_H
 
+#include <functional>
 #include <memory>
 
 #include <osg/Timer>
@@ -34,6 +35,12 @@ namespace MWGui
     {
     public:
         LoadingScreen(Resource::ResourceSystem* resourceSystem, osgViewer::Viewer* viewer);
+
+        /// What to call once the loading screen has drawn itself, to get the result on the screen.
+        /// Empty under OpenGL, where osgViewer's own traversal presents. Under Vulkan the loading
+        /// screen is drawn by the Vulkan interface platform and has to be presented by the Vulkan
+        /// renderer, which this loop does not otherwise touch.
+        void setPresentCallback(std::function<void()> present) { mPresent = std::move(present); }
         virtual ~LoadingScreen();
 
         /// Overridden from Loading::Listener, see the Loading::Listener documentation for usage details
@@ -86,6 +93,8 @@ namespace MWGui
         osg::ref_ptr<osg::Texture2D> mTexture;
         osg::ref_ptr<CopyFramebufferToTextureCallback> mCopyFramebufferToTextureCallback;
         std::unique_ptr<MyGUI::ITexture> mGuiTexture;
+
+        std::function<void()> mPresent;
 
         void changeWallpaper();
 

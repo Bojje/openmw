@@ -48,6 +48,7 @@ namespace MWGui
         void setNextButtonShow(bool shown);
         void onOpen() override;
         void onClose() override;
+        void onFrame(float duration) override;
 
         bool exit() override { return false; }
 
@@ -88,6 +89,7 @@ namespace MWGui
         void updateSkills();
         void updateSpellPowers();
         void updatePreview();
+        void refreshPreviewTexture();
         void recountParts();
 
         void getBodyParts(int part, std::vector<ESM::RefId>& out);
@@ -120,6 +122,7 @@ namespace MWGui
         std::unique_ptr<MyGUI::ITexture> mPreviewTexture;
 
         bool mPreviewDirty;
+        unsigned int mPreviewModifiedCount = 0;
 
         bool onControllerButtonEvent(const SDL_ControllerButtonEvent& arg) override;
         bool onControllerThumbstickEvent(const SDL_ControllerAxisEvent& arg) override;

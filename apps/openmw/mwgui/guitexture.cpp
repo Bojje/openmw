@@ -68,14 +68,14 @@ namespace MWGui
         return createGuiTexture(texture, texture->getImage(), name);
     }
 
-    std::unique_ptr<MyGUI::ITexture> createGuiTexture(
-        osg::Texture2D* texture, [[maybe_unused]] osg::Image* image, [[maybe_unused]] std::string_view name)
+    std::unique_ptr<MyGUI::ITexture> createGuiTexture(osg::Texture2D* texture, [[maybe_unused]] osg::Image* image,
+        [[maybe_unused]] std::string_view name, osg::StateSet* stateSet)
     {
         if (!usingVulkanGuiPlatform())
         {
             if (texture == nullptr)
                 return nullptr;
-            return std::make_unique<MyGUIPlatform::OSGTexture>(texture);
+            return std::make_unique<MyGUIPlatform::OSGTexture>(texture, stateSet);
         }
 
 #ifdef OPENMW_USE_VULKAN

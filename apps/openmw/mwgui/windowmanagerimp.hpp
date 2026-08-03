@@ -442,12 +442,25 @@ namespace MWGui
         std::unique_ptr<MyGUIPlatform::Platform> mGuiPlatform;
 #ifdef OPENMW_USE_VULKAN
         std::unique_ptr<VkMyGUIPlatform::Platform> mVkGuiPlatform;
+        // Not owned. Cleared if a frame ever throws, so a broken renderer costs one log line rather
+        // than one per frame for the rest of the session.
+        Vk::Renderer* mVkRenderer = nullptr;
 #endif
         osgViewer::Viewer* mViewer;
 
         /// Whether the interface is being drawn by the Vulkan platform rather than the OSG one.
         /// A method rather than a stored flag so a build without Vulkan folds it to a constant
         /// instead of carrying a bool that can never be true.
+        /// Draw and present one frame containing the interface and nothing else.
+        ///
+        /// The video player and the loading screen drive their own frames rather than going through
+        /// Engine::frame, and what they drive is osgViewer. Under Vulkan that reaches no swapchain,
+        /// so the window would hold whatever the world last drew for the whole video or load. No
+        /// world geometry is submitted for these frames because none of it is visible behind a
+        /// full-screen video or a loading splash. Does nothing under the OSG platform, which the
+        /// viewer traversal already presented.
+        void presentInterfaceFrame();
+
         bool usingVulkanGui() const
         {
 #ifdef OPENMW_USE_VULKAN
