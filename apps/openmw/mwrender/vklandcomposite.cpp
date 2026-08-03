@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <array>
+#include <fstream>
 #include <stdexcept>
 
 #include <components/debug/debuglog.hpp>
@@ -73,6 +74,23 @@ namespace MWRender
                 vkDestroySampler(dev, clampSampler, nullptr);
         }
     };
+
+    std::unique_ptr<LandComposite> LandComposite::tryCreate(
+        Vk::Device& device, Vk::CommandPool& commandPool, const std::string& shaderDir)
+    {
+        // Checked rather than caught. A build whose shaders have not been compiled is a situation the
+        // caller can handle perfectly well, and the same check is what Renderer's own shader loading
+        // does; turning it into an exception would be using the expensive mechanism for the expected
+        // case. Anything that goes wrong past this point is a real Vulkan failure and still throws.
+        for (const char* name : { "/landcomposite.vert.spv", "/landcomposite.frag.spv" })
+        {
+            std::ifstream test(shaderDir + name, std::ios::binary);
+            if (!test.good())
+                return nullptr;
+        }
+
+        return std::unique_ptr<LandComposite>(new LandComposite(device, commandPool, shaderDir));
+    }
 
     LandComposite::LandComposite(
         Vk::Device& device, Vk::CommandPool& commandPool, const std::string& shaderDir)
@@ -273,6 +291,29 @@ namespace MWRender
     LandComposite::~LandComposite() = default;
 
     Vk::Texture LandComposite::bake(const LandBlend& blend, const std::vector<VkImageView>& layerViews)
+    {
+        // The whole body is wrapped once, here, because this is the boundary where the renderer's
+        // throwing convention has to become a result. VK_CHECK throws, and a throw that escapes this
+        // function reaches Engine::frame's handler, whose response is to destroy the entire renderer
+        // -- so an unlucky allocation during one cell load would black out the world rather than cost
+        // that cell its soft transitions. Callers get "no composite" and carry on.
+        //
+        // One catch at a module boundary, not a catch at every call site: nothing outside needs to
+        // know that compositing is implemented with a throwing API.
+        try
+        {
+            return bakeOrThrow(blend, layerViews);
+        }
+        catch (const std::exception& e)
+        {
+            Log(Debug::Warning) << "Vulkan: land composite failed, falling back to hard tile edges: "
+                                << e.what();
+            return {};
+        }
+    }
+
+    Vk::Texture LandComposite::bakeOrThrow(
+        const LandBlend& blend, const std::vector<VkImageView>& layerViews)
     {
         if (blend.layers.size() < 2 || blend.maps.size() != blend.layers.size()
             || layerViews.size() != blend.layers.size())

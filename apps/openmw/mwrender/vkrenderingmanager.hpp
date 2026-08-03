@@ -47,6 +47,8 @@ namespace MWWorld
 namespace MWRender
 {
     class Camera;
+    class LandComposite;
+    struct LandBlend;
 
     class VkRenderingManager
     {
@@ -213,8 +215,23 @@ namespace MWRender
         // npos when the texture cannot be loaded, so callers can fall back to untextured rendering.
         size_t getOrLoadTexture(const std::string& nifTextureName);
 
+        /// Composites a cell's land textures into one and puts it in mTextures, returning its index.
+        ///
+        /// sNoTexture when there is nothing to composite -- a cell painted with a single texture
+        /// needs no blending, and the caller should draw it the old way with that texture directly.
+        /// Also sNoTexture if any layer fails to load or the bake itself fails, so a failure here
+        /// costs the soft transitions and nothing else.
+        ///
+        /// The composite goes into mTextures like any other texture, so it participates in eviction
+        /// and in the sampler array on the same terms. It is keyed by cell rather than by file name,
+        /// since it has no file.
+        size_t bakeLandComposite(const LandBlend& blend);
+
         std::unique_ptr<Vk::Renderer> mRenderer;
         std::unique_ptr<NifVk::MeshConverter> mMeshConverter;
+        // Null when the composite pass could not be built, which is not fatal -- terrain then
+        // draws the way it did before, one chunk per land texture with hard edges between them.
+        std::unique_ptr<LandComposite> mLandComposite;
 
         std::unordered_map<std::string, std::vector<size_t>> mMeshCache;
         std::vector<std::unique_ptr<NifVk::VulkanMesh>> mMeshes;

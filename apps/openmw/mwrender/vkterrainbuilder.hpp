@@ -47,7 +47,13 @@ namespace MWRender
     /// texture. Vertex positions are cell-local: X/Y in [0, 8192] measured from the cell's south-west
     /// corner, Z the absolute world height. Returns empty if the cell has no LAND record or no
     /// height data.
-    std::vector<LandChunk> buildLandChunks(int cellX, int cellY);
+    ///
+    /// With \a oneChunk the split is skipped entirely: one chunk covers the cell, its `texture` is
+    /// left empty because no single land texture describes it, and its UVs run 0..1 rather than 0..16
+    /// so that a baked composite maps across the cell exactly once. That is the path that gets blended
+    /// ground; the split path is the fallback for a cell with a single texture, or one whose composite
+    /// could not be baked.
+    std::vector<LandChunk> buildLandChunks(int cellX, int cellY, bool oneChunk = false);
 
     /// The blend maps for one exterior cell. Empty `layers` if the cell has no LAND record.
     ///

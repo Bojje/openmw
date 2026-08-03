@@ -53,6 +53,7 @@
 #include "../mwworld/cellstore.hpp"
 #include "../mwworld/class.hpp"
 #include "camera.hpp"
+#include "vklandcomposite.hpp"
 #include "vkterrainbuilder.hpp"
 
 namespace
@@ -174,6 +175,16 @@ namespace MWRender
 
     bool VkRenderingManager::loadShaders(const std::filesystem::path& shaderDir)
     {
+        // Built here rather than in the constructor because it needs the shader directory, and kept
+        // out of the return value on purpose: a renderer that cannot composite land textures still
+        // draws terrain, just with the hard tile edges it had before. Losing the whole renderer over
+        // a cosmetic pass would be the wrong trade.
+        mLandComposite
+            = LandComposite::tryCreate(mRenderer->device(), mRenderer->commandPool(), shaderDir.string());
+        if (mLandComposite == nullptr)
+            Log(Debug::Warning) << "Vulkan: no land composite shaders in " << shaderDir
+                                << "; terrain will have hard tile edges";
+
         return mRenderer->loadShadersAndCreatePipelines(shaderDir.string());
     }
 
@@ -548,18 +559,20 @@ namespace MWRender
         Vk::identityMat4(terrain.transform);
 
         std::vector<LandChunk> landChunks;
+        size_t compositeTexture = sNoTexture;
         if (cell->isExterior())
         {
             const int cellX = cell->getGridX();
             const int cellY = cell->getGridY();
 
-            landChunks = buildLandChunks(cellX, cellY);
-
-            // Not consumed yet -- the bake that turns these into one composite texture per cell is
-            // the next piece. Built here because this is where it will belong, and because it is the
-            // only way to exercise the sampling arithmetic against real land data.
+            // Blended ground where the cell has more than one land texture, hard-edged tiles where
+            // it does not or where the bake is unavailable. The two paths need different geometry --
+            // one chunk with 0..1 UVs against several chunks with 0..16 -- so the blend is resolved
+            // before the chunks are built rather than after.
             const LandBlend blend = buildLandBlend(cellX, cellY);
-            (void)blend;
+            compositeTexture = bakeLandComposite(blend);
+
+            landChunks = buildLandChunks(cellX, cellY, compositeTexture != sNoTexture);
 
             // Vertices come out cell-local, so all that is left is the translation to the cell's
             // south-west corner. Column-vector convention, matching makeObjectTransform.
@@ -584,7 +597,10 @@ namespace MWRender
 
             CellTerrain::Chunk uploaded;
             uploaded.geometry = std::move(geometry);
-            uploaded.textureIndex = getOrLoadTexture(chunk.texture);
+            // A composited chunk carries no texture name of its own -- there is no single land texture
+            // that describes it -- so the baked slot is used directly.
+            uploaded.textureIndex
+                = compositeTexture != sNoTexture ? compositeTexture : getOrLoadTexture(chunk.texture);
             terrain.chunks.push_back(std::move(uploaded));
 
             triangles += indexCount / 3;
@@ -1347,6 +1363,41 @@ namespace MWRender
                              << " evicted, " << reloaded << " reloaded, " << mTextures.size()
                              << " indices known";
         }
+    }
+
+    size_t VkRenderingManager::bakeLandComposite(const LandBlend& blend)
+    {
+        // One texture over the whole cell is not a blend, it is a texture. Drawing it through a
+        // composite would cost a bake, a megabyte of VRAM and a resample of the diffuse for nothing.
+        if (blend.layers.size() < 2 || blend.maps.size() != blend.layers.size())
+            return sNoTexture;
+
+        if (mLandComposite == nullptr)
+            return sNoTexture;
+
+        // The layers have to be resident before the bake reads them, and they go through the ordinary
+        // texture path so they are cached, evictable and shared with anything else that uses them.
+        std::vector<VkImageView> views;
+        views.reserve(blend.layers.size());
+        for (const std::string& layer : blend.layers)
+        {
+            const size_t index = getOrLoadTexture(layer);
+            if (index == sNoTexture || mTextures[index] == nullptr)
+                return sNoTexture;
+            views.push_back(mTextures[index]->view());
+        }
+
+        auto baked = std::make_unique<Vk::Texture>(mLandComposite->bake(blend, views));
+        if (!baked->valid())
+            return sNoTexture;
+
+        // Appended rather than cached by name, because a composite has no file name to key on and no
+        // two cells share one. It still lives in mTextures, so eviction and the sampler array treat it
+        // exactly like any other texture.
+        const size_t index = mTextures.size();
+        mTextures.push_back(std::move(baked));
+        mTextureNames.emplace_back();
+        return index;
     }
 
     size_t VkRenderingManager::getOrLoadTexture(const std::string& nifTextureName)

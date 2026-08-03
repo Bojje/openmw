@@ -93,9 +93,14 @@ namespace
     class VertexWriter
     {
     public:
-        VertexWriter(const ESM::LandData& land, EdgeNeighbours& neighbours)
+        /// \a uvPerCell selects the texture coordinate convention. False tiles the diffuse once per
+        /// land texture tile, which is what a chunk drawn with a raw land texture wants. True runs the
+        /// UV 0..1 across the whole cell, which is what a chunk drawn with a baked composite wants --
+        /// the composite already has the tiling painted into it.
+        VertexWriter(const ESM::LandData& land, EdgeNeighbours& neighbours, bool uvPerCell)
             : mLand(land)
             , mNeighbours(neighbours)
+            , mUvPerCell(uvPerCell)
         {
         }
 
@@ -149,9 +154,11 @@ namespace
             out[5] = nz;
 
             // A land texture tile spans 4 quads (512 units), so u/v run 0..16 across the cell, which
-            // is the tiling vanilla uses.
-            out[6] = x / static_cast<float>(sQuadsPerTile);
-            out[7] = y / static_cast<float>(sQuadsPerTile);
+            // is the tiling vanilla uses. A composite has that tiling baked in already and wants 0..1.
+            const float uvDivisor
+                = mUvPerCell ? static_cast<float>(sQuadsPerSide) : static_cast<float>(sQuadsPerTile);
+            out[6] = x / uvDivisor;
+            out[7] = y / uvDivisor;
 
             // Colour takes the plain substitution only. The corner averaging above exists because a
             // corner *normal* is garbage in every cell that touches it; the colours there are fine.
@@ -292,6 +299,7 @@ namespace
 
         const ESM::LandData& mLand;
         EdgeNeighbours& mNeighbours;
+        bool mUvPerCell = false;
     };
 
     std::string textureNameAt(const MWWorld::ESMStore& store, const ESM::LandData& land, int tileX, int tileY)
@@ -433,7 +441,7 @@ namespace MWRender
         return blend;
     }
 
-    std::vector<LandChunk> buildLandChunks(int cellX, int cellY)
+    std::vector<LandChunk> buildLandChunks(int cellX, int cellY, bool oneChunk)
     {
         const MWWorld::ESMStore& store = *MWBase::Environment::get().getESMStore();
         const MWWorld::Store<ESM::Land>& landStore = store.get<ESM::Land>();
@@ -450,29 +458,41 @@ namespace MWRender
             return {};
 
         EdgeNeighbours neighbours(landStore, cellX, cellY);
-        const VertexWriter writer(land, neighbours);
+        const VertexWriter writer(land, neighbours, oneChunk);
 
         std::vector<LandChunk> chunks;
         std::vector<std::vector<std::int32_t>> remaps;
 
-        // Grouped by resolved file name rather than by raw vtex id: distinct (index, plugin) pairs can
-        // name the same texture, and merging them keeps the draw call count down.
-        std::map<std::string, std::size_t, std::less<>> chunkByTexture;
         std::array<std::size_t, sTextureSize * sTextureSize> tileChunk{};
 
-        for (int tileY = 0; tileY < sTextureSize; ++tileY)
+        if (oneChunk)
         {
-            for (int tileX = 0; tileX < sTextureSize; ++tileX)
+            // One chunk for the whole cell, drawn with a composite the caller bakes. tileChunk stays
+            // all zeroes, so every quad lands in it. `texture` is left empty deliberately: there is no
+            // single land texture that describes this chunk, and the caller must supply the composite.
+            chunks.emplace_back();
+            remaps.emplace_back(sLandSize * sLandSize, -1);
+        }
+        else
+        {
+            // Grouped by resolved file name rather than by raw vtex id: distinct (index, plugin) pairs
+            // can name the same texture, and merging them keeps the draw call count down.
+            std::map<std::string, std::size_t, std::less<>> chunkByTexture;
+
+            for (int tileY = 0; tileY < sTextureSize; ++tileY)
             {
-                std::string texture = textureNameAt(store, land, tileX, tileY);
-                auto found = chunkByTexture.find(texture);
-                if (found == chunkByTexture.end())
+                for (int tileX = 0; tileX < sTextureSize; ++tileX)
                 {
-                    found = chunkByTexture.emplace(texture, chunks.size()).first;
-                    chunks.emplace_back().texture = std::move(texture);
-                    remaps.emplace_back(sLandSize * sLandSize, -1);
+                    std::string texture = textureNameAt(store, land, tileX, tileY);
+                    auto found = chunkByTexture.find(texture);
+                    if (found == chunkByTexture.end())
+                    {
+                        found = chunkByTexture.emplace(texture, chunks.size()).first;
+                        chunks.emplace_back().texture = std::move(texture);
+                        remaps.emplace_back(sLandSize * sLandSize, -1);
+                    }
+                    tileChunk[static_cast<std::size_t>(tileY) * sTextureSize + tileX] = found->second;
                 }
-                tileChunk[static_cast<std::size_t>(tileY) * sTextureSize + tileX] = found->second;
             }
         }
 

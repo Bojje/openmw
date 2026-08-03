@@ -42,9 +42,13 @@ namespace MWRender
     class LandComposite
     {
     public:
-        /// Throws if the shaders are missing or the pipeline cannot be built. The caller should treat
-        /// that as "no compositing", not as fatal -- terrain still draws, with hard tile edges.
-        LandComposite(Vk::Device& device, Vk::CommandPool& commandPool, const std::string& shaderDir);
+        /// Null when the shaders are not present, which is an ordinary condition rather than an
+        /// exceptional one -- a build without compiled SPIR-V still runs, terrain just keeps the hard
+        /// tile edges it had. Genuine Vulkan failures still throw, the way VK_CHECK does everywhere
+        /// else in this renderer, because those are not conditions any caller can do better with.
+        static std::unique_ptr<LandComposite> tryCreate(
+            Vk::Device& device, Vk::CommandPool& commandPool, const std::string& shaderDir);
+
         ~LandComposite();
 
         LandComposite(const LandComposite&) = delete;
@@ -61,11 +65,29 @@ namespace MWRender
         /// load and off the frame loop.
         Vk::Texture bake(const LandBlend& blend, const std::vector<VkImageView>& layerViews);
 
-        /// Side length of the baked texture. 1024 rather than OSG's 512 because this covers a whole
-        /// cell where an OSG chunk covers a quarter of one, so this is the same texel density.
-        static constexpr uint32_t sSize = 1024;
+        /// Side length of the baked texture, for a whole cell.
+        ///
+        /// 2048 because that is what OSG effectively uses: it composites 16 chunks per cell at 512
+        /// each, which is four chunks and so 2048 texels across a cell side. 1024 was tried first and
+        /// is visibly softer -- a land texture tiles 16 times across a cell, so 1024 gives each tile
+        /// 64 texels of a 256-texel source and the bake samples two mip levels down. The regression
+        /// sweep saw it as a 9.7 point alignment drop, which is exactly right: blurring the ground
+        /// destroys edges, and edge overlap is what that number counts.
+        ///
+        /// It is not free. 2048 squared RGBA8 with a mip chain is about 21 MB per cell, so a loaded
+        /// 3x3 grid carries roughly 190 MB of composite. That is a lot on a 15 W handheld and is the
+        /// obvious thing to attack next -- the real answer is block compression, which needs a BC1
+        /// encoder this tree does not have. Composites go through mTextures, so eviction already
+        /// applies to them.
+        static constexpr uint32_t sSize = 2048;
 
     private:
+        LandComposite(Vk::Device& device, Vk::CommandPool& commandPool, const std::string& shaderDir);
+
+        /// The real work. Throws, because it is written against VK_CHECK and Vk::Texture, which do.
+        /// bake() is the one place that becomes a result.
+        Vk::Texture bakeOrThrow(const LandBlend& blend, const std::vector<VkImageView>& layerViews);
+
         struct Impl;
         std::unique_ptr<Impl> mImpl;
     };
