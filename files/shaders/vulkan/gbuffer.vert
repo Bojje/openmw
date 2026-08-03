@@ -9,12 +9,16 @@ layout(location = 3) in vec4 inColor;
 // A push-constant mat3 occupies 48 bytes: three columns, each padded out to a vec4.
 //   model         offset   0, 64 bytes
 //   normalMatrix  offset  64, 48 bytes
-//   textureIndex  offset 112,  4 bytes
-// 116 bytes total, under the guaranteed 128-byte limit.
+//   materialBits  offset 112,  4 bytes -- sampler slot plus the authored alpha test, unpacked in
+//                                         gbuffer.frag; see Vk::packMaterialBits
+//   roughness     offset 116,  4 bytes
+//   specular      offset 120,  4 bytes
+// The block runs to 128 bytes with boneOffset, which is exactly the guaranteed limit. This stage
+// declares only as far as it needs, which is legal.
 layout(push_constant) uniform PushConstants {
     layout(offset = 0)   mat4 model;
     layout(offset = 64)  mat3 normalMatrix;
-    layout(offset = 112) uint textureIndex;
+    layout(offset = 112) uint materialBits;
     layout(offset = 116) float roughness;
     layout(offset = 120) float specularStrength;
 } push;

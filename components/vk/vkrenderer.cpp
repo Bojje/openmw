@@ -1568,6 +1568,12 @@ namespace Vk
         // clouds and the stars -- which is survivable and obvious.
         auto skyMeshVert = loadShader("skymesh.vert.spv");
         auto skyMeshFrag = loadShader("skymesh.frag.spv");
+        // Nor these. Without them additively blended shapes -- light halos, magic effects -- are not
+        // drawn at all, which is the degradation this was designed around rather than an accident:
+        // submitMesh keeps them out of the G-buffer either way, and a missing glow is a good deal
+        // better than the hard-edged opaque disc the G-buffer used to make of one.
+        auto emissiveVert = loadShader("emissive.vert.spv");
+        auto emissiveFrag = loadShader("emissive.frag.spv");
 
         if (!gbufVert || !gbufFrag || !compVert || !compFrag)
         {
@@ -1710,6 +1716,63 @@ namespace Vk
 
                 VK_CHECK(vkCreateGraphicsPipelines(mDevice->handle(), VK_NULL_HANDLE, 1,
                     &skinnedInfo, nullptr, &mGBufferSkinnedPipeline));
+            }
+
+            // And both of those again with culling off, for shapes a NiStencilProperty marks
+            // DrawMode::Both. nifosg honours that by switching GL_CULL_FACE off and leaving the
+            // winding alone (nifloader.cpp:2504-2511), which is exactly VK_CULL_MODE_NONE with the
+            // same VK_FRONT_FACE_COUNTER_CLOCKWISE; a single-sided shape drawn both ways otherwise
+            // loses its far face entirely.
+            //
+            // Copied from the structs above rather than rebuilt, so the only thing that can differ
+            // between the culled and two-sided variants is the cull mode. Note this deliberately
+            // takes a *copy* of the rasterization state: pipelineInfo points at `rasterizer`, so
+            // mutating that in place would silently change the two pipelines already created.
+            VkPipelineRasterizationStateCreateInfo rasterizerTwoSided = rasterizer;
+            rasterizerTwoSided.cullMode = VK_CULL_MODE_NONE;
+
+            VkGraphicsPipelineCreateInfo twoSidedInfo = pipelineInfo;
+            twoSidedInfo.pRasterizationState = &rasterizerTwoSided;
+            VK_CHECK(vkCreateGraphicsPipelines(mDevice->handle(), VK_NULL_HANDLE, 1,
+                &twoSidedInfo, nullptr, &mGBufferPipelineTwoSided));
+
+            if (mGBufferSkinnedPipeline != VK_NULL_HANDLE)
+            {
+                std::array<VkPipelineShaderStageCreateInfo, 2> skinnedStages = {
+                    gbufSkinnedVert->stageInfo(VK_SHADER_STAGE_VERTEX_BIT),
+                    gbufFrag->stageInfo(VK_SHADER_STAGE_FRAGMENT_BIT)
+                };
+
+                std::array<VkVertexInputBindingDescription, 2> skinnedBindingDesc = {};
+                skinnedBindingDesc[0].binding = 0;
+                skinnedBindingDesc[0].stride = static_cast<uint32_t>(sVertexStride);
+                skinnedBindingDesc[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+                skinnedBindingDesc[1].binding = 1;
+                skinnedBindingDesc[1].stride = static_cast<uint32_t>(sSkinStride);
+                skinnedBindingDesc[1].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+                std::array<VkVertexInputAttributeDescription, 6> skinnedAttrDesc = {};
+                skinnedAttrDesc[0] = { 0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0 };
+                skinnedAttrDesc[1] = { 1, 0, VK_FORMAT_R32G32B32_SFLOAT, sizeof(float) * 3 };
+                skinnedAttrDesc[2] = { 2, 0, VK_FORMAT_R32G32_SFLOAT, sizeof(float) * 6 };
+                skinnedAttrDesc[3] = { 3, 0, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(float) * 8 };
+                skinnedAttrDesc[4] = { 4, 1, VK_FORMAT_R8G8B8A8_UINT, 0 };
+                skinnedAttrDesc[5] = { 5, 1, VK_FORMAT_R8G8B8A8_UNORM, 4 };
+
+                VkPipelineVertexInputStateCreateInfo skinnedVertexInput = {};
+                skinnedVertexInput.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+                skinnedVertexInput.vertexBindingDescriptionCount
+                    = static_cast<uint32_t>(skinnedBindingDesc.size());
+                skinnedVertexInput.pVertexBindingDescriptions = skinnedBindingDesc.data();
+                skinnedVertexInput.vertexAttributeDescriptionCount
+                    = static_cast<uint32_t>(skinnedAttrDesc.size());
+                skinnedVertexInput.pVertexAttributeDescriptions = skinnedAttrDesc.data();
+
+                VkGraphicsPipelineCreateInfo info = twoSidedInfo;
+                info.pStages = skinnedStages.data();
+                info.pVertexInputState = &skinnedVertexInput;
+                VK_CHECK(vkCreateGraphicsPipelines(mDevice->handle(), VK_NULL_HANDLE, 1,
+                    &info, nullptr, &mGBufferSkinnedPipelineTwoSided));
             }
         }
 
@@ -2276,6 +2339,137 @@ namespace Vk
                 mDevice->handle(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &mSkyMeshPipeline));
         }
 
+        // Additively blended world geometry -- light halos, the glow around a candle, magic effect
+        // meshes. 786 of the 4602 NiAlphaProperty records in the three shipped archives, across 218
+        // files, and they cluster: meshes\l\ is 80% alpha-blended and meshes\e\ 87%.
+        //
+        // In this pass rather than the G-buffer for the same reason the particles are. A deferred
+        // pass has nowhere to put a surface that does not cover what is behind it, and the G-buffer
+        // was drawing these as *opaque*: cut out at 0.5 and holding depth, so a candle's halo was a
+        // hard-edged disc that occluded the wall and got shaded as though it were a physical object.
+        //
+        // Additive is the one blend mode worth doing this for. GL_ONE as the destination makes the
+        // draws commute, so there is no sort here and none is needed; and the surface emits rather
+        // than receives, so there is no lighting to redo. An over-blended surface has neither
+        // property -- it would need a per-frame back-to-front sort and the whole of composite.frag
+        // reimplemented forward, and it would *still* be wrong, because the ray traced shadow, AO and
+        // indirect images are screen-space and describe the opaque surface behind it rather than it.
+        // That is a much larger piece of work and it is deliberately not this one.
+        if (emissiveVert && emissiveFrag)
+        {
+            std::array<VkPipelineShaderStageCreateInfo, 2> stages
+                = { emissiveVert->stageInfo(VK_SHADER_STAGE_VERTEX_BIT),
+                      emissiveFrag->stageInfo(VK_SHADER_STAGE_FRAGMENT_BIT) };
+
+            // The scene set for the camera and the sampler array, the composite set for the G-buffer
+            // depth this pass tests against by hand. Same two, in the same order, as the water and
+            // particle pipelines.
+            std::array<VkDescriptorSetLayout, 2> setLayouts
+                = { mSceneDescriptorLayout, mCompositeDescriptorLayout };
+
+            VkPushConstantRange pushRange = {};
+            pushRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+            pushRange.offset = 0;
+            pushRange.size = sizeof(EmissiveMeshPush);
+
+            VkPipelineLayoutCreateInfo layoutInfo = {};
+            layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+            layoutInfo.setLayoutCount = static_cast<uint32_t>(setLayouts.size());
+            layoutInfo.pSetLayouts = setLayouts.data();
+            layoutInfo.pushConstantRangeCount = 1;
+            layoutInfo.pPushConstantRanges = &pushRange;
+            VK_CHECK(vkCreatePipelineLayout(
+                mDevice->handle(), &layoutInfo, nullptr, &mEmissivePipelineLayout));
+
+            // The one 48-byte interleave the whole renderer shares, so these are the same meshes the
+            // G-buffer would have drawn and nothing had to be re-uploaded in another layout. The
+            // normal is written and never read, which is what the sky mesh pipeline does too.
+            std::array<VkVertexInputBindingDescription, 1> bindingDesc = {};
+            bindingDesc[0].binding = 0;
+            bindingDesc[0].stride = static_cast<uint32_t>(sVertexStride);
+            bindingDesc[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+            std::array<VkVertexInputAttributeDescription, 4> attrDesc = {};
+            attrDesc[0] = { 0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0 };
+            attrDesc[1] = { 1, 0, VK_FORMAT_R32G32B32_SFLOAT, sizeof(float) * 3 };
+            attrDesc[2] = { 2, 0, VK_FORMAT_R32G32_SFLOAT, sizeof(float) * 6 };
+            attrDesc[3] = { 3, 0, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(float) * 8 };
+
+            VkPipelineVertexInputStateCreateInfo vertexInput = {};
+            vertexInput.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+            vertexInput.vertexBindingDescriptionCount = static_cast<uint32_t>(bindingDesc.size());
+            vertexInput.pVertexBindingDescriptions = bindingDesc.data();
+            vertexInput.vertexAttributeDescriptionCount = static_cast<uint32_t>(attrDesc.size());
+            vertexInput.pVertexAttributeDescriptions = attrDesc.data();
+
+            VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
+            inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+            inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+
+            VkPipelineViewportStateCreateInfo viewportState = {};
+            viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+            viewportState.viewportCount = 1;
+            viewportState.scissorCount = 1;
+
+            // A glow quad is authored as a flat billboard and the camera goes round it, so the back
+            // face is as often the visible one. Culling here would make halos vanish from one side.
+            VkPipelineRasterizationStateCreateInfo rasterizer = {};
+            rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+            rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+            rasterizer.lineWidth = 1.0f;
+            rasterizer.cullMode = VK_CULL_MODE_NONE;
+
+            VkPipelineMultisampleStateCreateInfo multisampling = {};
+            multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+            multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+            // No depth attachment in this pass at all, so there is nothing to enable. emissive.frag
+            // samples the G-buffer depth and discards behind it, the same three lines particle.frag
+            // and water.frag use.
+            VkPipelineDepthStencilStateCreateInfo depthStencil = {};
+            depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+            depthStencil.depthTestEnable = VK_FALSE;
+            depthStencil.depthWriteEnable = VK_FALSE;
+
+            // The authored blend: SRC_ALPHA, ONE. That is what 786 of these records say and it is the
+            // same pair mParticlePipeline uses, so the fragment shader emits straight alpha carrying
+            // the weight rather than premultiplied colour.
+            VkPipelineColorBlendAttachmentState blend = {};
+            blend.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT
+                | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+            blend.blendEnable = VK_TRUE;
+            blend.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+            blend.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
+            blend.colorBlendOp = VK_BLEND_OP_ADD;
+            blend.srcAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+            blend.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+            blend.alphaBlendOp = VK_BLEND_OP_ADD;
+
+            VkPipelineColorBlendStateCreateInfo colorBlending = {};
+            colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+            colorBlending.attachmentCount = 1;
+            colorBlending.pAttachments = &blend;
+
+            VkGraphicsPipelineCreateInfo pipelineInfo = {};
+            pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+            pipelineInfo.stageCount = static_cast<uint32_t>(stages.size());
+            pipelineInfo.pStages = stages.data();
+            pipelineInfo.pVertexInputState = &vertexInput;
+            pipelineInfo.pInputAssemblyState = &inputAssembly;
+            pipelineInfo.pViewportState = &viewportState;
+            pipelineInfo.pRasterizationState = &rasterizer;
+            pipelineInfo.pMultisampleState = &multisampling;
+            pipelineInfo.pDepthStencilState = &depthStencil;
+            pipelineInfo.pColorBlendState = &colorBlending;
+            pipelineInfo.pDynamicState = &dynamicState;
+            pipelineInfo.layout = mEmissivePipelineLayout;
+            pipelineInfo.renderPass = mCompositeRenderPass;
+            pipelineInfo.subpass = 0;
+
+            VK_CHECK(vkCreateGraphicsPipelines(
+                mDevice->handle(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &mEmissivePipeline));
+        }
+
         // Composite pipeline
         {
             std::array<VkPipelineShaderStageCreateInfo, 2> stages = {
@@ -2499,10 +2693,18 @@ namespace Vk
                 vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mGBufferPipelineLayout,
                     0, 1, &mSceneDescriptorSets[mCurrentFrame], 0, nullptr);
 
-                // Which of the two G-buffer pipelines is currently bound. Tracked rather than sorting
-                // the draws, because they already arrive grouped -- cell geometry, then actors, then
-                // terrain -- so this costs a couple of binds a frame and keeps submission order,
-                // which the caller relies on for nothing but is easier to reason about.
+                // Which of the four G-buffer pipelines is currently bound -- rigid or skinned,
+                // crossed with culled or two-sided. Tracked rather than sorting the draws, because
+                // they already arrive grouped -- cell geometry, then actors, then terrain -- so this
+                // costs a few binds a frame and keeps submission order, which the caller relies on
+                // for nothing but is easier to reason about.
+                //
+                // Two-sidedness does not group the way skinning does: a two-sided shape can sit
+                // anywhere in a cell's list, so in the worst case this alternates. It is bounded by
+                // twice the number of two-sided instances, and no file in Morrowind.bsa, Tribunal.bsa
+                // or Bloodmoon.bsa carries a NiStencilProperty at all -- the count is zero for
+                // unmodded content and small for modded. If a load ever shows otherwise, partition
+                // mDrawCommands by twoSided rather than sorting it; the order is not load-bearing.
                 VkPipeline boundPipeline = mGBufferPipeline;
 
                 for (const auto& drawCmd : mDrawCommands)
@@ -2513,7 +2715,18 @@ namespace Vk
 
                     const bool skinned = mGBufferSkinnedPipeline != VK_NULL_HANDLE
                         && drawCmd.skinBuffer != VK_NULL_HANDLE && drawCmd.boneOffset != sNoBones;
-                    const VkPipeline wanted = skinned ? mGBufferSkinnedPipeline : mGBufferPipeline;
+
+                    // Falls back to the culled variant if the two-sided one was not created, which
+                    // only happens if pipeline creation itself failed. Drawing one face is the old
+                    // behaviour and is survivable; a null pipeline is not.
+                    VkPipeline wanted = skinned ? mGBufferSkinnedPipeline : mGBufferPipeline;
+                    if (drawCmd.twoSided)
+                    {
+                        const VkPipeline twoSided
+                            = skinned ? mGBufferSkinnedPipelineTwoSided : mGBufferPipelineTwoSided;
+                        if (twoSided != VK_NULL_HANDLE)
+                            wanted = twoSided;
+                    }
                     if (wanted != boundPipeline)
                     {
                         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, wanted);
@@ -2533,7 +2746,10 @@ namespace Vk
                         pushData.normalMatrix[col * 4 + 2] = drawCmd.normalMatrix.data[col * 4 + 2];
                         pushData.normalMatrix[col * 4 + 3] = 0.0f;
                     }
-                    pushData.textureIndex = drawCmd.textureIndex;
+                    // Slot plus the authored alpha test in one word -- see Vk::packMaterialBits
+                    // for why they share it. drawCmd.textureIndex was already bounded by submitMesh.
+                    pushData.materialBits = packMaterialBits(drawCmd.textureIndex, drawCmd.alphaTest,
+                        drawCmd.alphaFunc, drawCmd.alphaThreshold);
                     pushData.roughness = drawCmd.roughness;
                     pushData.specularStrength = drawCmd.specularStrength;
                     pushData.boneOffset = skinned ? drawCmd.boneOffset : sNoBones;
@@ -2769,6 +2985,19 @@ namespace Vk
                 vkCmdDraw(cmd, sWaterVertexCount, 1, 0, 0);
             }
 
+            // Additively blended world geometry -- light halos, candle glow, magic effect meshes.
+            //
+            // Here for the same three reasons the particles below are, and in the same place in the
+            // order: after the water, because a glow behind the sea has to be attenuated by it rather
+            // than drawn over it, and emissive.frag applies the same flat underwater factor
+            // particle.frag does; after the tone mapped scene, because it adds light to a finished
+            // image; before the interface.
+            //
+            // Unsorted, and needs to be: GL_ONE as the destination makes these commute with each
+            // other and with the particles. That is the whole reason this fits in a deferred renderer
+            // without a transparency architecture.
+            drawEmissiveMeshes(cmd);
+
             // Particle effects -- fire, smoke, sparks, spell effects. In this pass rather than the
             // G-buffer because they are blended, and a G-buffer has nowhere to put a translucent
             // surface. After the tone mapped scene so they add light to a finished image, and before
@@ -2891,6 +3120,9 @@ namespace Vk
         }
 
         mDrawCommands.clear();
+        // With it, and for the same reason: submitMesh appends to both every frame, so a list that is
+        // not cleared grows without bound and redraws every glow the session has ever seen.
+        mEmissiveMeshes.clear();
 
         endFrame();
 
@@ -3071,6 +3303,31 @@ namespace Vk
             vkCmdPushConstants(cmd, mSkyMeshPipelineLayout,
                 VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(SkyMeshPush),
                 &mesh.push);
+            vkCmdDrawIndexed(cmd, mesh.indexCount, 1, 0, 0, 0);
+        }
+    }
+
+    void Renderer::drawEmissiveMeshes(VkCommandBuffer cmd)
+    {
+        if (mEmissivePipeline == VK_NULL_HANDLE || mEmissiveMeshes.empty())
+            return;
+
+        std::array<VkDescriptorSet, 2> sets
+            = { mSceneDescriptorSets[mCurrentFrame], mCompositeDescriptorSets[mCurrentFrame] };
+        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mEmissivePipelineLayout, 0,
+            static_cast<uint32_t>(sets.size()), sets.data(), 0, nullptr);
+        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mEmissivePipeline);
+
+        for (const EmissiveMeshDraw& mesh : mEmissiveMeshes)
+        {
+            const VkDeviceSize offset = 0;
+            vkCmdBindVertexBuffers(cmd, 0, 1, &mesh.vertexBuffer, &offset);
+            // 32-bit indices, which is what Vk::uploadGeometry writes and what the rest of the draw
+            // loop hardcodes.
+            vkCmdBindIndexBuffer(cmd, mesh.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+            vkCmdPushConstants(cmd, mEmissivePipelineLayout,
+                VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
+                sizeof(EmissiveMeshPush), &mesh.push);
             vkCmdDrawIndexed(cmd, mesh.indexCount, 1, 0, 0, 0);
         }
     }
@@ -3266,13 +3523,53 @@ namespace Vk
         // An out-of-range slot would index past the end of the shader's sampler array, so anything the
         // caller could not fit into the array falls back to slot 0.
         const uint32_t slot = submission.textureIndex < maxSceneTextures ? submission.textureIndex : 0;
+
+        // Additive shapes take a different route out of this function entirely: forward, in the
+        // composite pass, and into neither the raster draw list nor the TLAS.
+        //
+        // Out of the raster list because the G-buffer cannot express them -- it has no blending, so
+        // the best it could do was cut them out at some threshold and write them as opaque surfaces
+        // holding depth, which is how a candle's halo became a hard disc occluding the wall behind it.
+        //
+        // Out of the TLAS because a glow occludes nothing. Left in, its cut-out texels stop shadow
+        // rays and show up in reflections, so a light halo casts a faint shadow of itself. Dropping
+        // the BLAS address here is what removes it, and this is the only place that can: the TLAS is
+        // built from mDrawCommands and deliberately ignores visibility.
+        //
+        // Returned even when mEmissivePipeline is null. That is the intended degradation for a build
+        // whose emissive shaders are missing: the shape is not drawn, which is worse than drawing it
+        // correctly and better than drawing it wrong.
+        //
+        // One knock-on worth stating: the enchanted glow pass also walks mDrawCommands, so an
+        // additive shape can no longer carry a glow. That is the right answer rather than a
+        // casualty -- the glow is an overlay on a solid object the player can loot, and a halo quad
+        // is neither.
+        if (submission.additive)
+        {
+            if (mEmissivePipeline != VK_NULL_HANDLE && submission.visible && submission.indexCount > 0)
+            {
+                EmissiveMeshDraw draw;
+                draw.vertexBuffer = submission.vertexBuffer;
+                draw.indexBuffer = submission.indexBuffer;
+                draw.indexCount = submission.indexCount;
+                draw.push.model = submission.transform;
+                draw.push.params[0] = slot;
+                draw.push.params[1] = 0;
+                draw.push.params[2] = 0;
+                draw.push.params[3] = 0;
+                mEmissiveMeshes.push_back(draw);
+            }
+            return;
+        }
+
         mDrawCommands.push_back({ submission.vertexBuffer, submission.indexBuffer, submission.indexCount,
             submission.transform, normalMatrix, submission.blasAddress, submission.vertexAddress,
             submission.indexAddress, slot, submission.alphaTested, submission.roughness,
             submission.specularStrength, submission.visible, submission.skinBuffer,
             submission.boneOffset,
             { submission.glowColour[0], submission.glowColour[1], submission.glowColour[2] },
-            submission.glowTexture });
+            submission.glowTexture, submission.twoSided, submission.alphaTest, submission.alphaFunc,
+            submission.alphaThreshold });
     }
 
     void Renderer::uploadGeometryTable(const std::vector<GeometryRecord>& records)
@@ -3363,6 +3660,11 @@ namespace Vk
             record.indexAddress = drawCmd.indexAddress;
             record.textureIndex = drawCmd.textureIndex;
             record.alphaTested = drawCmd.alphaTested ? 1u : 0u;
+            // The authored test, so the any-hit shader cuts a leaf out at the same alpha the raster
+            // pass does. The slot argument is 0 because textureIndex above already carries it here;
+            // the same packer is used only so the two layouts cannot drift apart.
+            record.alphaBits = packMaterialBits(
+                0u, drawCmd.alphaTest, drawCmd.alphaFunc, drawCmd.alphaThreshold);
 
             instances.push_back(instance);
             records.push_back(record);
@@ -3499,6 +3801,10 @@ namespace Vk
         if (mTextureSampler != VK_NULL_HANDLE)
             vkDestroySampler(dev, mTextureSampler, nullptr);
 
+        if (mEmissivePipeline != VK_NULL_HANDLE)
+            vkDestroyPipeline(dev, mEmissivePipeline, nullptr);
+        if (mEmissivePipelineLayout != VK_NULL_HANDLE)
+            vkDestroyPipelineLayout(dev, mEmissivePipelineLayout, nullptr);
         if (mSkyMeshPipeline != VK_NULL_HANDLE)
             vkDestroyPipeline(dev, mSkyMeshPipeline, nullptr);
         if (mSkyMeshPipelineLayout != VK_NULL_HANDLE)
@@ -3522,6 +3828,10 @@ namespace Vk
             vkDestroyPipeline(dev, mGlowPipeline, nullptr);
         if (mGlowPipelineLayout != VK_NULL_HANDLE)
             vkDestroyPipelineLayout(dev, mGlowPipelineLayout, nullptr);
+        if (mGBufferSkinnedPipelineTwoSided != VK_NULL_HANDLE)
+            vkDestroyPipeline(dev, mGBufferSkinnedPipelineTwoSided, nullptr);
+        if (mGBufferPipelineTwoSided != VK_NULL_HANDLE)
+            vkDestroyPipeline(dev, mGBufferPipelineTwoSided, nullptr);
         if (mGBufferSkinnedPipeline != VK_NULL_HANDLE)
             vkDestroyPipeline(dev, mGBufferSkinnedPipeline, nullptr);
         if (mGBufferPipeline != VK_NULL_HANDLE)

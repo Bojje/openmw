@@ -21,7 +21,10 @@ struct GeometryRecord {
     Indices  indices;
     uint     textureIndex;
     uint     alphaTested;
-    uint     pad0;
+    // The alpha test this shape was authored with, packed by Vk::packMaterialBits: bit 27 says there
+    // is one, bits 24-26 the glAlphaFunc comparison, bits 16-23 the threshold in 0..255. Zero means
+    // the shape authored none.
+    uint     alphaBits;
     uint     pad1;
 };
 
@@ -63,9 +66,35 @@ void main() {
     vec2 uv = interpolateTexCoord(record.vertices, record.indices, weights);
     float alpha = texture(textures[nonuniformEXT(record.textureIndex)], uv).a;
 
-    // The same 0.5 cutout gbuffer.frag discards on. The two have to stay equal: a leaf texel the
-    // raster pass throws away must not go on casting a shadow, or the foliage's silhouette and the
-    // shadow under it disagree.
-    if (alpha < 0.5)
+    // The same decision gbuffer.frag makes, branch for branch. The two have to stay equal: a leaf
+    // texel the raster pass throws away must not go on casting a shadow, or the foliage's silhouette
+    // and the shadow under it disagree -- which is what happened when only the raster pass learned to
+    // read the authored threshold, and it showed as Bloodmoon's pines casting the shadow of a
+    // slightly fatter tree.
+    //
+    // Unlike gbuffer.frag this tests the texture's alpha alone, with no vertex colour in it. There is
+    // none to be had: the hit shaders recover only the UV from the vertex buffer, and interpolating a
+    // vertex colour as well would cost another three reads per any-hit invocation on the hottest path
+    // in the renderer. It differs only for shapes whose vertex alpha is not 1, which are rare.
+    bool keep;
+    if ((record.alphaBits & 0x08000000u) != 0u)
+    {
+        float threshold = float((record.alphaBits >> 16) & 0xFFu) / 255.0;
+        uint func = (record.alphaBits >> 24) & 0x7u;
+        if (func == 0u) keep = true;                   // ALWAYS
+        else if (func == 1u) keep = alpha <  threshold; // LESS
+        else if (func == 2u) keep = alpha == threshold; // EQUAL
+        else if (func == 3u) keep = alpha <= threshold; // LEQUAL
+        else if (func == 4u) keep = alpha >  threshold; // GREATER
+        else if (func == 5u) keep = alpha != threshold; // NOTEQUAL
+        else if (func == 6u) keep = alpha >= threshold; // GEQUAL
+        else keep = false;                              // NEVER
+    }
+    else
+    {
+        keep = alpha >= 0.5;
+    }
+
+    if (!keep)
         ignoreIntersectionEXT;
 }

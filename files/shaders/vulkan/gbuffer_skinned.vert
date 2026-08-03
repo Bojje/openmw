@@ -21,12 +21,13 @@ layout(location = 5) in vec4 inBoneWeights;
 // A push-constant mat3 occupies 48 bytes: three columns, each padded out to a vec4.
 //   model         offset   0, 64 bytes
 //   normalMatrix  offset  64, 48 bytes
-//   textureIndex  offset 112,  4 bytes
+//   materialBits  offset 112,  4 bytes -- sampler slot plus the authored alpha test, unpacked in
+//                                         gbuffer.frag; see Vk::packMaterialBits
 // 128 bytes total, exactly the guaranteed limit.
 layout(push_constant) uniform PushConstants {
     layout(offset = 0)   mat4 model;
     layout(offset = 64)  mat3 normalMatrix;
-    layout(offset = 112) uint textureIndex;
+    layout(offset = 112) uint materialBits;
     layout(offset = 116) float roughness;
     layout(offset = 120) float specularStrength;
     layout(offset = 124) uint boneOffset;

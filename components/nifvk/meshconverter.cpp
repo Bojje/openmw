@@ -113,43 +113,6 @@ namespace
         return {};
     }
 
-    // Whether this shape's silhouette lives in its texture's alpha channel rather than in its
-    // triangles, which decides whether the ray tracer may treat it as solid.
-    //
-    // Properties are inherited: nifosg's collectDrawableProperties walks the parent chain before the
-    // shape's own properties, so a NiAlphaProperty on an ancestor NiNode still governs the drawable
-    // below it. findBaseTexture above does not do this, which is a pre-existing limitation.
-    //
-    // Any NiAlphaProperty counts, whether it enables testing (bit 9) or blending (bit 0) -- a blended
-    // shape is no more solid than a tested one. The threshold and comparison mode are ignored on
-    // purpose; only the always-passes case would change the answer and it is not worth trusting the
-    // file for. Erring towards true is nearly free: a false positive only costs traversal time,
-    // whereas a false negative puts a solid rectangular shadow under a leaf billboard.
-    //
-    // Known gap: Morrowind ships some cut-out foliage with no NiAlphaProperty at all, relying on the
-    // texture's alpha alone. The signal that would catch it is the pixel format -- most diffuse maps
-    // are BC1_RGB and sample a == 1 -- but the texture is not resolved until after conversion has
-    // already built the BLAS, so it cannot reach here today.
-    bool findAlphaTested(const Nif::NiAVObject* node)
-    {
-        for (const auto& propertyPtr : node->mProperties)
-        {
-            if (propertyPtr.empty())
-                continue;
-
-            if (dynamic_cast<const Nif::NiAlphaProperty*>(propertyPtr.getPtr()) != nullptr)
-                return true;
-        }
-
-        for (const Nif::NiNode* parent : node->mParents)
-        {
-            if (parent != nullptr && findAlphaTested(parent))
-                return true;
-        }
-
-        return false;
-    }
-
     // Nearest property of the given type affecting this shape, or nullptr if there is none.
     //
     // Properties are inherited and the deepest one wins: nifosg's collectDrawableProperties pushes the
@@ -181,6 +144,50 @@ namespace
         }
 
         return nullptr;
+    }
+
+    // How this shape was authored to be composited, out of the two properties that say so.
+    //
+    // Both are inherited and the deepest wins, which is what findProperty already implements -- see
+    // the note there for why searching nearest-first picks the same property nifosg's
+    // applyDrawableProperties would end up with after walking the whole list.
+    //
+    // This replaces a findAlphaTested that answered one bool -- "is there a NiAlphaProperty at all"
+    // -- and then threw the flags away. That was enough to keep the ray tracer honest and not enough
+    // for anything else: it could not tell a shape authored to blend from one authored to cut out,
+    // and it could not tell what threshold a cut-out wanted, so gbuffer.frag decided for every shape
+    // in the game with one hardcoded 0.5.
+    //
+    // Known gap, unchanged and still worth writing down: Morrowind ships some cut-out foliage with no
+    // NiAlphaProperty at all, relying on the texture's alpha alone. The signal that would catch it is
+    // the pixel format -- most diffuse maps are BC1_RGB and sample a == 1 -- but the texture is not
+    // resolved until after conversion has built the BLAS, so it cannot reach here. The flat 0.5
+    // cutout gbuffer.frag keeps as its default is what covers those files, which is one more reason
+    // that default is not safe to remove.
+    NifVk::MeshRenderState findRenderState(const Nif::NiAVObject* node)
+    {
+        NifVk::MeshRenderState state;
+
+        if (const auto* alpha = findProperty<Nif::NiAlphaProperty>(node))
+        {
+            state.alphaTest = alpha->useAlphaTesting();
+            state.alphaFunc = static_cast<uint8_t>(alpha->alphaTestMode());
+            state.alphaThreshold = alpha->mThreshold;
+            state.blend = alpha->useAlphaBlending();
+            state.srcFactor = static_cast<uint8_t>(alpha->sourceBlendMode());
+            state.dstFactor = static_cast<uint8_t>(alpha->destinationBlendMode());
+        }
+
+        // mDrawMode only, not mEnabled. Those are two unrelated things on one record: mEnabled turns
+        // the stencil *buffer* on, which this renderer has none of, while the draw mode says which
+        // faces to rasterise and is honoured whether or not stencilling is. nifosg sets the cull mode
+        // outside its own `if (stencilprop->mEnabled)` for exactly that reason
+        // (nifloader.cpp:2504-2511), and reading mEnabled here would silently drop the majority of
+        // two-sided shapes.
+        if (const auto* stencil = findProperty<Nif::NiStencilProperty>(node))
+            state.twoSided = stencil->mDrawMode == Nif::NiStencilProperty::DrawMode::Both;
+
+        return state;
     }
 
     // Rec. 709 relative luminance. Same weights the engine already uses to collapse a colour to one
@@ -535,7 +542,10 @@ namespace NifVk
         VulkanMesh mesh;
         std::memcpy(mesh.transform, worldTransform, 16 * sizeof(float));
         mesh.baseTexture = findBaseTexture(geom);
-        mesh.alphaTested = findAlphaTested(geom);
+        mesh.renderState = findRenderState(geom);
+        // What the BLAS needs from all of that: whether a ray may treat this surface as solid. A
+        // shape that tests or blends has a silhouette its triangles do not describe, either way.
+        mesh.alphaTested = mesh.renderState.alphaTest || mesh.renderState.blend;
 
         // Whether a specular highlight is allowed on this shape at all. Two gates, both taken from
         // nifosg::Loader::applyDrawableProperties:

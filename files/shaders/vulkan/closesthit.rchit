@@ -18,7 +18,9 @@ struct GeometryRecord {
     Indices  indices;
     uint     textureIndex;
     uint     alphaTested;
-    uint     pad0;
+    // The authored alpha test, packed by Vk::packMaterialBits. Read by anyhit.rahit; declared here
+    // only so the two mirrors of this struct stay identical.
+    uint     alphaBits;
     uint     pad1;
 };
 

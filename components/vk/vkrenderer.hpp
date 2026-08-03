@@ -364,6 +364,22 @@ namespace Vk
         // Whether the silhouette lives in the texture's alpha channel. Drives the any-hit shader's
         // early-out; must agree with the opacity flag the BLAS was built with.
         bool alphaTested = false;
+        // The alpha test this shape was actually authored with, if it was authored with one. Where it
+        // is not set the G-buffer keeps its flat 0.5 cutout, which is what the whole of vanilla
+        // Morrowind depends on -- see gbuffer.frag. \a alphaFunc is in glAlphaFunc order and
+        // \a alphaThreshold is still in 0..255.
+        bool alphaTest = false;
+        uint8_t alphaFunc = 0;
+        uint8_t alphaThreshold = 0;
+        // Draw both faces. Costs a pipeline bind when it changes, because cull mode is baked into the
+        // pipeline and this device enables no extended dynamic state -- see the two-sided pipelines
+        // in loadShadersAndCreatePipelines.
+        bool twoSided = false;
+        // This shape adds light rather than covering what is behind it, so it belongs in the forward
+        // pass in the composite rather than in the G-buffer. submitMesh routes it there and it enters
+        // neither the raster draw list nor the TLAS: a glow quad should occlude nothing, cast no
+        // shadow and appear in no reflection.
+        bool additive = false;
         // Surface response from the NIF material. Defaults are fully rough with no specular, which is
         // what vanilla Morrowind content resolves to -- upstream disables specular outright for
         // Morrowind-era NIFs (nifosg::Loader::applyDrawableProperties).
@@ -420,29 +436,76 @@ namespace Vk
         uint32_t boneOffset;
         float glowColour[3];
         uint32_t glowTexture;
+        // Newer than any of the above and therefore after all of them, for the reason stated there.
+        // There is no `additive` here on purpose: an additive submission never reaches this list at
+        // all, so a field for it would be dead in every entry.
+        bool twoSided;
+        bool alphaTest;
+        uint8_t alphaFunc;
+        uint8_t alphaThreshold;
     };
 
+    // How the G-buffer's material word is packed: a sampler slot plus the alpha test the shape was
+    // authored with.
+    //
+    // Packed rather than given fields of its own because there is nowhere to put them. The push
+    // constant block below is *exactly* 128 bytes, which is the smallest maxPushConstantsSize Vulkan
+    // guarantees on any device, so it cannot grow by a byte. Slot numbers run to maxSceneTextures,
+    // which needs ten bits, and the other twenty-two were sitting unused.
+    //
+    // The alternative was a per-instance storage buffer, which is the right answer once more than
+    // this needs to travel -- but it is a descriptor binding, a mapped allocation per frame in
+    // flight and an index per draw, for eleven bits.
+    constexpr uint32_t sMaterialSlotBits = 10;
+    constexpr uint32_t sMaterialSlotMask = (1u << sMaterialSlotBits) - 1u;
+    constexpr uint32_t sMaterialThresholdShift = 16;
+    constexpr uint32_t sMaterialFuncShift = 24;
+    constexpr uint32_t sMaterialAlphaTestBit = 1u << 27;
+
+    // The one way this packing can break silently. If the sampler array is ever enlarged past what
+    // ten bits can name, high slots would alias onto the threshold field: a mesh would sample the
+    // wrong texture *and* pick up an alpha test nobody authored.
+    static_assert(maxSceneTextures <= sMaterialSlotMask + 1u,
+        "the sampler array outgrew the bits reserved for a slot in the G-buffer material word");
+
+    /// Builds that word. \a func and \a threshold are ignored unless \a alphaTest, so a shape with
+    /// no authored test packs to exactly the slot number and the shader takes its default branch.
+    inline uint32_t packMaterialBits(uint32_t slot, bool alphaTest, uint32_t func, uint32_t threshold)
+    {
+        uint32_t bits = slot & sMaterialSlotMask;
+        if (alphaTest)
+        {
+            bits |= sMaterialAlphaTestBit;
+            bits |= (func & 0x7u) << sMaterialFuncShift;
+            bits |= (threshold & 0xFFu) << sMaterialThresholdShift;
+        }
+        return bits;
+    }
+
     // Layout of the G-buffer pipeline's push constant block. This must match the block declared in
-    // gbuffer.vert / gbuffer.frag byte for byte:
+    // gbuffer.vert / gbuffer_skinned.vert / gbuffer.frag byte for byte:
     //
     //     offset   0, size 64  mat4 model
     //     offset  64, size 48  mat3 normalMatrix  (std430: 3 columns, each padded out to a vec4)
-    //     offset 112, size  4  uint  textureIndex
+    //     offset 112, size  4  uint  materialBits  (see packMaterialBits above)
     //     offset 116, size  4  float roughness
     //     offset 120, size  4  float specularStrength
-    //     total 124 bytes, within the 128-byte maxPushConstantsSize Vulkan guarantees everywhere.
+    //     offset 124, size  4  uint  boneOffset
+    //     total 128 bytes, exactly the maxPushConstantsSize Vulkan guarantees everywhere.
     //
-    // Only 4 bytes of headroom remain. Anything further -- emissive, a material index -- has to go in a
-    // per-instance buffer rather than here.
+    // There is no headroom at all. Anything further -- emissive, a material index -- has to go in a
+    // per-instance buffer rather than here, or into the spare bits of materialBits.
     //
     // The normal matrix is stored as 12 floats rather than a Mat4 because a push-constant mat3 pads
-    // each column to 16 bytes but has no fourth column; using a Mat4 here would shift textureIndex by
+    // each column to 16 bytes but has no fourth column; using a Mat4 here would shift materialBits by
     // 16 bytes and silently corrupt it.
     struct GBufferPushConstants
     {
         Mat4 model;
         float normalMatrix[12];
-        uint32_t textureIndex;
+        // Was plain textureIndex. Renamed because it is no longer only an index -- the offset has not
+        // moved and neither has its size, so the three shader declarations still line up.
+        uint32_t materialBits;
         float roughness;
         float specularStrength;
         // Only the skinned vertex shader declares this one, which is legal: a shader may use less of
@@ -453,10 +516,43 @@ namespace Vk
     static_assert(sizeof(GBufferPushConstants) == 128, "G-buffer push constant layout mismatch");
     static_assert(sizeof(GBufferPushConstants) <= 128, "exceeds the guaranteed maxPushConstantsSize");
     static_assert(offsetof(GBufferPushConstants, normalMatrix) == 64, "normalMatrix must be at byte 64");
-    static_assert(offsetof(GBufferPushConstants, textureIndex) == 112, "textureIndex must be at byte 112");
+    static_assert(offsetof(GBufferPushConstants, materialBits) == 112, "materialBits must be at byte 112");
     static_assert(offsetof(GBufferPushConstants, roughness) == 116, "roughness must be at byte 116");
     static_assert(offsetof(GBufferPushConstants, specularStrength) == 120, "specularStrength at byte 120");
     static_assert(offsetof(GBufferPushConstants, boneOffset) == 124, "boneOffset must be at byte 124");
+
+    // One additively blended shape, drawn forward in the composite pass instead of into the G-buffer.
+    //
+    // This is the push constant block emissive.vert and emissive.frag declare, so the three
+    // declarations have to agree field for field and nothing at build time checks that they do -- the
+    // same arrangement SkyMeshPush uses, and the static_asserts below are for the same reason.
+    //
+    // 80 bytes. No normal matrix, because nothing about this surface is lit: it emits.
+    struct EmissiveMeshPush
+    {
+        Mat4 model;
+        // .x = slot in the sampler array. .yzw unused, and present only because a push constant vec4
+        // has to be a vec4.
+        uint32_t params[4];
+    };
+
+    static_assert(sizeof(EmissiveMeshPush) == 80, "emissive push constants must match emissive.vert/.frag");
+    static_assert(sizeof(EmissiveMeshPush) <= 128, "exceeds the guaranteed maxPushConstantsSize");
+    static_assert(offsetof(EmissiveMeshPush, params) == 64, "EmissiveMeshPush layout drifted from the shader");
+
+    // One additive draw, held until the composite pass reaches it.
+    //
+    // Unsorted, and that is the property that makes this affordable. A destination factor of GL_ONE
+    // means overlapping draws commute, so there is no per-frame depth sort here and no equivalent of
+    // ParticleReader::sortForCamera. An over-blended shape would need one, and would need the
+    // deferred lighting redone forward besides -- see the note on the composite pass draw order.
+    struct EmissiveMeshDraw
+    {
+        VkBuffer vertexBuffer = VK_NULL_HANDLE;
+        VkBuffer indexBuffer = VK_NULL_HANDLE;
+        uint32_t indexCount = 0;
+        EmissiveMeshPush push;
+    };
 
     // Layout of the glow pipeline's push constant block, matching glow.vert / glow.frag byte for
     // byte. Same shape as the G-buffer's above, deliberately: the mat3 padding rule that puts
@@ -791,6 +887,14 @@ namespace Vk
         // It shares mGBufferPipelineLayout, so switching between the two mid-pass costs a bind and
         // nothing else -- the descriptor set and the push constants carry across.
         VkPipeline mGBufferSkinnedPipeline = VK_NULL_HANDLE;
+        // The same two again with culling switched off, for shapes whose NiStencilProperty asks for
+        // DrawMode::Both. Four pipelines rather than one with VK_DYNAMIC_STATE_CULL_MODE because that
+        // dynamic state needs extended dynamic state, and vkdevice.cpp enables none: no
+        // VkPhysicalDeviceVulkan13Features in the pNext chain, no VK_EXT_extended_dynamic_state in
+        // either extension list, and rateDevice() never looks at the device's apiVersion either. They
+        // share everything with the culled pair including the layout, so the choice is one bind.
+        VkPipeline mGBufferPipelineTwoSided = VK_NULL_HANDLE;
+        VkPipeline mGBufferSkinnedPipelineTwoSided = VK_NULL_HANDLE;
         VkPipeline mCompositePipeline = VK_NULL_HANDLE;
         VkPipelineLayout mCompositePipelineLayout = VK_NULL_HANDLE;
 
@@ -878,11 +982,20 @@ namespace Vk
         // Null if its shaders were missing, which costs the clouds and the stars and nothing else.
         VkPipeline mSkyMeshPipeline = VK_NULL_HANDLE;
         VkPipelineLayout mSkyMeshPipelineLayout = VK_NULL_HANDLE;
+
+        // Additively blended world geometry -- light halos, magic effects, the glow around a candle.
+        // Null when its shaders are not compiled, in which case those shapes are simply not drawn,
+        // which is still better than the hard-edged opaque disc the G-buffer made of them.
+        VkPipeline mEmissivePipeline = VK_NULL_HANDLE;
+        VkPipelineLayout mEmissivePipelineLayout = VK_NULL_HANDLE;
+        // Rebuilt every frame alongside mDrawCommands and cleared with it.
+        std::vector<EmissiveMeshDraw> mEmissiveMeshes;
         std::vector<SkyMeshDraw> mSkyMeshes;
 
         // Records the half of mSkyMeshes on one side of the sun and the moons. Called twice from
         // inside the composite pass, once before the billboards and once after.
         void drawSkyMeshes(VkCommandBuffer cmd, bool overBodies);
+        void drawEmissiveMeshes(VkCommandBuffer cmd);
 
         VkSampler mGBufferSampler = VK_NULL_HANDLE;
         // Separate from mGBufferSampler: scene textures want filtering and wrapping, whereas the

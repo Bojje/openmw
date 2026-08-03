@@ -49,14 +49,22 @@ namespace Vk
     //
     // The layout is mirrored by the GeometryRecord struct declared in anyhit.rahit and closesthit.rchit.
     // Both addresses are declared there as buffer_reference types, which are 8-byte aligned, so this
-    // packs identically under std430. Keep the padding: it pins the stride at 32 bytes.
+    // packs identically under std430. Keep the remaining padding: it pins the stride at 32 bytes.
     struct GeometryRecord
     {
         VkDeviceAddress vertexAddress = 0;
         VkDeviceAddress indexAddress = 0;
         uint32_t textureIndex = 0;
         uint32_t alphaTested = 0;
-        uint32_t pad0 = 0;
+        // The alpha test this shape was authored with, in the same packing the G-buffer push constant
+        // uses -- Vk::packMaterialBits builds both, so there is one layout rather than two that can
+        // drift. Zero means "no authored test", and anyhit.rahit then falls back to the same flat 0.5
+        // gbuffer.frag falls back to.
+        //
+        // This was a pad word, which is why it costs nothing: the stride, the upload and the binding
+        // are all unchanged. The two shaders had to be told about the rename either way, because a
+        // mirrored struct whose field names disagree is how these drift.
+        uint32_t alphaBits = 0;
         uint32_t pad1 = 0;
     };
 
@@ -64,6 +72,7 @@ namespace Vk
     static_assert(offsetof(GeometryRecord, indexAddress) == 8, "GeometryRecord layout drifted from the shaders");
     static_assert(offsetof(GeometryRecord, textureIndex) == 16, "GeometryRecord layout drifted from the shaders");
     static_assert(offsetof(GeometryRecord, alphaTested) == 20, "GeometryRecord layout drifted from the shaders");
+    static_assert(offsetof(GeometryRecord, alphaBits) == 24, "GeometryRecord layout drifted from the shaders");
 
     // A drawable chunk of geometry on the device: vertex and index buffers plus, where the device
     // supports ray tracing, the BLAS built over them.

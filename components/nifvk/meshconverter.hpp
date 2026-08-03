@@ -40,6 +40,70 @@ namespace NifVk
     /// so nothing has to distinguish "bone 255" from a padding byte.
     inline constexpr size_t sMaxSkinBones = 255;
 
+    /// glBlendFunc factor codes in the order NiAlphaProperty stores them (property.hpp:432-444).
+    /// Only the three that shipped content actually uses are named; the rest are passed through as
+    /// numbers because nothing here needs to understand them.
+    inline constexpr uint8_t sBlendOne = 0;
+    inline constexpr uint8_t sBlendSrcAlpha = 6;
+    inline constexpr uint8_t sBlendInvSrcAlpha = 7;
+
+    /// How a shape was authored to be composited: its NiAlphaProperty and NiStencilProperty, decoded
+    /// but not yet judged.
+    ///
+    /// Kept as authored rather than as a decision, because the three consumers make different ones --
+    /// the raster pass, the ray tracer and the forward additive pass each look at a different part of
+    /// this. Counted out of Morrowind.bsa, Tribunal.bsa and Bloodmoon.bsa together, 4602 records over
+    /// 7320 files, so the notes below are what the content contains rather than what the format allows.
+    struct MeshRenderState
+    {
+        /// Alpha testing, NiAlphaProperty bit 9.
+        ///
+        /// Vanilla Morrowind never sets this. Not rarely -- all 3099 of its records are blend-only
+        /// with a threshold of zero, because Morrowind relied on sorted blending and the D3D alpha
+        /// test was left off. The expansions do set it, 1140 records across 126 files, and those are
+        /// the only files whose silhouette the renderer can get right by reading the flag.
+        bool alphaTest = false;
+
+        /// The comparison, in the glAlphaFunc order NiAlphaProperty::alphaTestMode returns and
+        /// nifosg's getTestMode switches on (nifloader.cpp:1925-1949): 0 ALWAYS, 1 LESS, 2 EQUAL,
+        /// 3 LEQUAL, 4 GREATER, 5 NOTEQUAL, 6 GEQUAL, 7 NEVER. The fragment is kept where
+        /// `alpha FUNC threshold` holds. Shipped content uses GEQUAL (1007) and GREATER (133).
+        uint8_t alphaFunc = 0;
+
+        /// NiAlphaProperty::mThreshold, still in 0..255 -- divided by 255 wherever it is compared,
+        /// which is what nifosg::handleAlphaTesting does too (nifloader.cpp:2319). Shipped values are
+        /// 192 and 100; neither is the 0.5 the G-buffer currently assumes.
+        uint8_t alphaThreshold = 0;
+
+        /// Alpha blending, NiAlphaProperty bit 0. True for every record in all three archives.
+        bool blend = false;
+
+        /// Source and destination factors, in the glBlendFunc order the NiAlphaProperty accessors
+        /// return. Shipped content uses exactly three pairs: SRC_ALPHA/INV_SRC_ALPHA 3808 times,
+        /// SRC_ALPHA/ONE 786 times, and ONE/ONE once.
+        uint8_t srcFactor = sBlendSrcAlpha;
+        uint8_t dstFactor = sBlendInvSrcAlpha;
+
+        /// NiStencilProperty::DrawMode::Both, which nifosg honours by switching GL_CULL_FACE off
+        /// (nifloader.cpp:2506-2507) while leaving the winding alone.
+        ///
+        /// No shipped file uses it. The string "NiStencilProperty" does not appear once in
+        /// Morrowind.bsa, Tribunal.bsa or Bloodmoon.bsa, where NiTexturingProperty appears 25,797
+        /// times in the same scan -- so that is absence, not a parser that missed it. This is here
+        /// for mods, which do author it, and it is why the two-sided path is deliberately the cheap
+        /// one rather than the good one.
+        bool twoSided = false;
+
+        /// Whether this shape adds light rather than covering what is behind it.
+        ///
+        /// This is the one blend mode a deferred renderer can honour cheaply, and the reason is that
+        /// a destination factor of GL_ONE makes the draw order irrelevant -- addition commutes, so
+        /// there is nothing to sort -- and the surface emits rather than receives, so there is no
+        /// lighting to redo. Everything else needs both, plus ray traced shadow and indirect terms
+        /// that only exist for the opaque surface behind it.
+        bool additive() const { return blend && dstFactor == sBlendOne; }
+    };
+
     struct VulkanMesh
     {
         std::unique_ptr<Vk::Buffer> vertexBuffer;
@@ -70,7 +134,18 @@ namespace NifVk
         // triangles. The ray tracer must leave such geometry non-opaque in the BLAS so the any-hit
         // shader runs and can discard the cut-out texels; flagged opaque, a leaf billboard casts the
         // shadow of a solid rectangle.
+        //
+        // Derived from renderState below rather than read separately: it is true when the shape
+        // either tests or blends. That is a hair narrower than the old rule, which was "a
+        // NiAlphaProperty exists at all" -- a record with neither bit set would now be treated as
+        // solid. No such record exists in any of the three shipped archives, and a property that
+        // asks for neither test nor blend is asking for nothing.
         bool alphaTested = false;
+
+        // How the shape was authored to be composited. See MeshRenderState; the short version is
+        // that the renderer honours the authored alpha test where there is one, draws additive
+        // shapes forward instead of deferring them, and turns culling off for two-sided ones.
+        MeshRenderState renderState;
 
         // True when the shape carries a NiSkinInstance. It is converted in bind pose either way, but
         // the distinction matters to whoever places it: a skinned shape's vertices are already in the

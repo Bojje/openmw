@@ -577,6 +577,13 @@ namespace MWRender
                 // cell references, and a compacted slot for the ones they do.
                 submission.textureIndex = textureSlot(textureIndex);
                 submission.alphaTested = mesh->alphaTested;
+                // How the shape was authored to be composited. The renderer decides what it can do
+                // with each of these; see NifVk::MeshRenderState for what the content contains.
+                submission.alphaTest = mesh->renderState.alphaTest;
+                submission.alphaFunc = mesh->renderState.alphaFunc;
+                submission.alphaThreshold = mesh->renderState.alphaThreshold;
+                submission.twoSided = mesh->renderState.twoSided;
+                submission.additive = mesh->renderState.additive();
                 submission.roughness = mesh->roughness;
                 submission.specularStrength = mesh->specularStrength;
                 submission.visible = visible;
@@ -644,6 +651,14 @@ namespace MWRender
             submission.indexAddress = mesh->indexBuffer->deviceAddress();
             submission.textureIndex = textureSlot(mMeshTextures[inst.meshIndex]);
             submission.alphaTested = mesh->alphaTested;
+            // As above. Actors carry these too: a Golden Saint's aura and a summon's effect shell are
+            // additive shapes hung on a skeleton, and body parts are the one place a mod's
+            // two-sided cloth actually turns up.
+            submission.alphaTest = mesh->renderState.alphaTest;
+            submission.alphaFunc = mesh->renderState.alphaFunc;
+            submission.alphaThreshold = mesh->renderState.alphaThreshold;
+            submission.twoSided = mesh->renderState.twoSided;
+            submission.additive = mesh->renderState.additive();
             submission.roughness = mesh->roughness;
             submission.specularStrength = mesh->specularStrength;
             submission.visible = visible;
