@@ -1336,13 +1336,18 @@ namespace MWRender
         return SceneUtil::writeScreenshotToFile(screenshotPath, format, *image, "vulkan");
     }
 
-    std::vector<bool> VkRenderingManager::collectLiveTextures() const
+    std::vector<bool> VkRenderingManager::collectLiveTextures()
     {
         std::vector<bool> live(mTextures.size(), false);
+        mTextureLastUsed.resize(mTextures.size(), 0);
+        ++mTextureSyncCounter;
 
         const auto mark = [&](size_t index) {
             if (index != sNoTexture && index < live.size())
+            {
                 live[index] = true;
+                mTextureLastUsed[index] = mTextureSyncCounter;
+            }
         };
 
         for (const auto& [store, cellMeshes] : mCellMeshes)
@@ -1395,6 +1400,17 @@ namespace MWRender
         // resolves to the 1x1 white fallback -- which decodes to a normal of (1, 1, 1), flattening
         // every wave in the game and tilting what is left the same way.
         mark(mWaterNormalTexture);
+
+        // And anything used recently, not only this frame. See mTextureLastUsed: without this, every
+        // frame of an animated texture except the one currently bound looks dead, loses its slot and
+        // draws as the white fallback the moment the controller swings back to it.
+        for (size_t i = 0; i < live.size(); ++i)
+        {
+            if (live[i] || mTextureLastUsed[i] == 0)
+                continue;
+            if (mTextureSyncCounter - mTextureLastUsed[i] <= sTextureSlotGraceFrames)
+                live[i] = true;
+        }
 
         return live;
     }

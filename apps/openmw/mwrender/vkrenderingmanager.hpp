@@ -273,7 +273,7 @@ namespace MWRender
         // Every texture index the loaded cells reference, via their instances' meshes and their
         // terrain chunks. Recomputed whenever the cell set changes rather than tracked incrementally,
         // because the cell set is tiny and a refcount that drifts would fail silently and rarely.
-        std::vector<bool> collectLiveTextures() const;
+        std::vector<bool> collectLiveTextures();
 
         // "This mesh or terrain chunk has no usable texture." Lives in the header rather than the
         // .cpp because textureSlot below is inline and has to see it.
@@ -290,6 +290,21 @@ namespace MWRender
 
         std::unordered_map<std::string, size_t> mTextureCache;
         std::vector<std::unique_ptr<Vk::Texture>> mTextures;
+        // Parallel to mTextures: the value of mTextureSyncCounter when this texture was last drawn
+        // with, or 0 for one that never has been.
+        //
+        // A texture that is resident but not named this frame loses its sampler slot and answers 0,
+        // which is the white fallback. That is right for a cell the player has walked out of and
+        // wrong for a flipbook: NifOsg::FlipController binds one frame of an animated texture at a
+        // time, so the other frames look dead every frame, and each one draws white for a frame when
+        // the controller comes back to it. The water ripples do this thirteen times a second.
+        std::vector<uint64_t> mTextureLastUsed;
+        uint64_t mTextureSyncCounter = 0;
+        // Long enough to cover any flipbook -- the fastest in the game swaps about every fifth frame
+        // -- and short enough that a cell walked out of still gives its slots back within a second.
+        // Slots are the scarce thing here, not VRAM: the sampler array is 512 and eviction is a
+        // separate, much lazier decision.
+        static constexpr uint64_t sTextureSlotGraceFrames = 60;
         // Parallel to mTextures. An evicted slot keeps its name so getOrLoadTexture can reload into
         // the same index, which is what lets mMeshTextures and the terrain chunks keep holding plain
         // indices across an eviction instead of needing to be rewritten.
