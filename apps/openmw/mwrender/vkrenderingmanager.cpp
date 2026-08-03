@@ -16,6 +16,7 @@
 #include <components/debug/debuglog.hpp>
 #include <components/esm3/loadland.hpp>
 #include <components/misc/resourcehelpers.hpp>
+#include <components/misc/strings/algorithm.hpp>
 #include <components/nif/niffile.hpp>
 #include <components/nifvk/meshconverter.hpp>
 #include <components/resource/imagemanager.hpp>
@@ -172,8 +173,23 @@ namespace MWRender
         // Particle textures resolve through the ordinary loader, so they are cached and evicted with
         // everything else. textureSlot maps a storage index to a live sampler slot; an unloaded
         // texture becomes slot 0, the white fallback, rather than an out-of-range read.
-        mParticleReader = std::make_unique<ParticleReader>([this](const std::string& name) {
-            return static_cast<uint32_t>(textureSlot(getOrLoadTexture(name)));
+        mParticleReader = std::make_unique<ParticleReader>(
+            [this](const std::string& name, std::size_t& storageIndex) {
+            // The leading "textures/" comes off first. These names arrive already resolved through
+            // the VFS, whereas getOrLoadTexture expects a raw NIF reference and runs
+            // correctTexturePath over it -- which prefixes "textures/" again and produces a path that
+            // does not exist. The load then fails silently, textureSlot answers 0, and every flame in
+            // the game draws with the 1x1 white fallback. Water hit exactly this and looked the same:
+            // a flat white shape where the texture should be.
+            constexpr std::string_view prefix = "textures/";
+            std::string_view stripped = name;
+            if (stripped.size() > prefix.size()
+                && Misc::StringUtils::ciEqual(stripped.substr(0, prefix.size()), prefix))
+                stripped.remove_prefix(prefix.size());
+
+            const size_t index = getOrLoadTexture(std::string(stripped));
+            storageIndex = index;
+            return static_cast<uint32_t>(textureSlot(index));
         });
         Log(Debug::Info) << "Vulkan renderer initialized";
     }
@@ -316,11 +332,10 @@ namespace MWRender
             mRenderer->updateLights(nullptr, 0);
         }
 
-        // Read the live particle simulation out of OSG and hand it over. Before updateScene for no
-        // ordering reason of its own -- it just belongs with the other per-frame uploads.
+        // Gathered in syncCells, which runs earlier in the same frame and is where a newly seen
+        // particle texture can still be given a sampler slot. This only hands the result over.
         if (mParticleReader != nullptr)
         {
-            mParticleReader->collect(mSceneRoot);
             const std::vector<Vk::ParticleQuad>& quads = mParticleReader->quads();
             mRenderer->updateParticles(quads.data(), static_cast<uint32_t>(quads.size()));
         }
@@ -779,6 +794,19 @@ namespace MWRender
         // texture only an actor references would otherwise be evicted and come back as the white
         // fallback -- which for alpha-tested geometry is worse than a missing texture (trap 13).
         syncActors(activeCells);
+
+        // Before the texture sync for the same reason syncActors is. A particle texture is first
+        // seen here, and getOrLoadTexture only puts it in mTextures -- textureSlot answers 0, the
+        // white fallback, until syncTexturesToRenderer has rebuilt the sampler array. Collecting
+        // after the sync meant every flame in the game drew as a solid white quad, which looks like
+        // a texture that failed to load rather than one that loaded a moment too late.
+        if (mParticleReader != nullptr)
+        {
+            const size_t texturesBefore = mTextures.size();
+            mParticleReader->collect(mSceneRoot);
+            if (mTextures.size() != texturesBefore)
+                changed = true;
+        }
 
         // Once, after every add and erase, rather than per cell. This is the path that actually
         // unloads cells -- the loops above erase from the maps directly rather than going through
@@ -1288,6 +1316,16 @@ namespace MWRender
         {
             for (const auto& chunk : cellTerrain.chunks)
                 mark(chunk.textureIndex);
+        }
+
+        // Particle textures belong to no mesh, no actor and no terrain chunk -- the geometry they are
+        // drawn on does not exist until the frame is being built. Without this they are dead the
+        // instant they are loaded, get replaced by the white fallback, and every flame, spark and
+        // puff of smoke in the game draws as a solid white quad.
+        if (mParticleReader != nullptr)
+        {
+            for (const size_t index : mParticleReader->textureIndices())
+                mark(index);
         }
 
         return live;

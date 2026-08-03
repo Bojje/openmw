@@ -20,16 +20,19 @@ namespace
     class Collector : public osg::NodeVisitor
     {
     public:
-        Collector(std::vector<Vk::ParticleQuad>& out,
-            const std::function<uint32_t(const std::string&)>& resolveTexture)
+        Collector(std::vector<Vk::ParticleQuad>& out, std::vector<std::size_t>& textureIndices,
+            const std::function<uint32_t(const std::string&, std::size_t&)>& resolveTexture)
             : osg::NodeVisitor(TRAVERSE_ALL_CHILDREN)
             , mOut(out)
+            , mTextureIndices(textureIndices)
             , mResolveTexture(resolveTexture)
         {
-            // Particle systems can sit under nodes the cull traversal would skip for the OSG camera --
-            // and under the Vulkan path that camera is drawing into a hidden window anyway. The mask
-            // is what a node is hidden *from*, not whether it exists, so override it.
-            setNodeMaskOverride(~0u);
+            // Deliberately NOT setNodeMaskOverride. The first version had it, on the reasoning that a
+            // node mask says what a node is hidden from rather than whether it exists -- which is
+            // true in general and wrong here. OpenMW switches the weather particles off by clearing
+            // their node mask, so overriding it resurrects them: rain fell inside a tavern, indoors,
+            // through the ceiling. Honouring the mask is what makes this read the world OSG is
+            // actually showing rather than every system that happens to be in the graph.
         }
 
         void apply(osg::Node& node) override
@@ -90,32 +93,54 @@ namespace
         /// By name rather than by sharing OSG's texture object, because there is nothing to share: the
         /// OSG one is a GL texture in the other backend's context. ImageManager stamps the file name
         /// onto every image it loads, which is what makes this possible at all.
+        ///
+        /// Searched up the node path rather than read off the system, and that is not defensive
+        /// coding. NifOsg applies a particle system's drawable properties to its *parent* node --
+        /// `applyDrawableProperties(parentNode, ...)` in handleParticleSystem -- so the system's own
+        /// stateset has no texture on it and never will. Reading only the system gives every effect
+        /// in the game the white fallback, which looks like a solid white square where the flame
+        /// should be.
         uint32_t resolveSystemTexture(osgParticle::ParticleSystem& system)
         {
-            const osg::StateSet* stateSet = system.getStateSet();
-            if (stateSet == nullptr)
-                return 0;
+            const osg::NodePath& path = getNodePath();
 
-            const auto* texture
-                = dynamic_cast<const osg::Texture2D*>(stateSet->getTextureAttribute(0, osg::StateAttribute::TEXTURE));
-            if (texture == nullptr || texture->getImage() == nullptr)
-                return 0;
+            // Nearest first: the innermost stateset wins, the way state inheritance does.
+            for (auto it = path.rbegin(); it != path.rend(); ++it)
+            {
+                const osg::StateSet* stateSet = (*it)->getStateSet();
+                if (stateSet == nullptr)
+                    continue;
 
-            const std::string& name = texture->getImage()->getFileName();
-            if (name.empty())
-                return 0;
+                const auto* texture = dynamic_cast<const osg::Texture2D*>(
+                    stateSet->getTextureAttribute(0, osg::StateAttribute::TEXTURE));
+                if (texture == nullptr || texture->getImage() == nullptr)
+                    continue;
 
-            return mResolveTexture(name);
+                const std::string& name = texture->getImage()->getFileName();
+                if (!name.empty())
+                {
+                    std::size_t storageIndex = static_cast<std::size_t>(-1);
+                    const uint32_t slot = mResolveTexture(name, storageIndex);
+                    if (storageIndex != static_cast<std::size_t>(-1))
+                        mTextureIndices.push_back(storageIndex);
+                    return slot;
+                }
+            }
+
+            (void)system;
+            return 0;
         }
 
         std::vector<Vk::ParticleQuad>& mOut;
-        const std::function<uint32_t(const std::string&)>& mResolveTexture;
+        std::vector<std::size_t>& mTextureIndices;
+        const std::function<uint32_t(const std::string&, std::size_t&)>& mResolveTexture;
     };
 }
 
 namespace MWRender
 {
-    ParticleReader::ParticleReader(std::function<uint32_t(const std::string&)> resolveTexture)
+    ParticleReader::ParticleReader(
+        std::function<uint32_t(const std::string&, std::size_t&)> resolveTexture)
         : mResolveTexture(std::move(resolveTexture))
     {
     }
@@ -125,10 +150,11 @@ namespace MWRender
         // Cleared and rebuilt rather than tracked, for the same reason actors are: the simulation that
         // owns these is re-read every frame, so there is no state here that can go stale.
         mQuads.clear();
+        mTextureIndices.clear();
         if (sceneRoot == nullptr)
             return;
 
-        Collector collector(mQuads, mResolveTexture);
+        Collector collector(mQuads, mTextureIndices, mResolveTexture);
         sceneRoot->accept(collector);
     }
 }

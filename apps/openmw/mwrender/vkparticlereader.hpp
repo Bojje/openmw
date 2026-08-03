@@ -3,6 +3,7 @@
 
 #ifdef OPENMW_USE_VULKAN
 
+#include <cstddef>
 #include <functional>
 #include <string>
 #include <vector>
@@ -37,7 +38,10 @@ namespace MWRender
         /// \a resolveTexture maps an image file name to a slot in the renderer's sampler array. It is
         /// the caller's texture loader, so particle textures are cached, evicted and shared on the
         /// same terms as everything else.
-        explicit ParticleReader(std::function<uint32_t(const std::string&)> resolveTexture);
+        ///  resolveTexture returns the sampler slot to draw with and, through its out parameter,
+        /// the storage index that slot came from -- the caller needs the second to keep the texture
+        /// alive across eviction.
+        explicit ParticleReader(std::function<uint32_t(const std::string&, std::size_t&)> resolveTexture);
 
         /// Walks \a sceneRoot and refills the quad list. Cheap enough to do every frame: the walk is
         /// over the loaded cell graph and the particle count is in the hundreds.
@@ -45,9 +49,16 @@ namespace MWRender
 
         const std::vector<Vk::ParticleQuad>& quads() const { return mQuads; }
 
+        /// Storage indices of every texture referenced this frame, for the caller's live set. Without
+        /// this the eviction pass sees particle textures referenced by no mesh, no actor and no
+        /// terrain chunk, decides they are dead, and replaces them with the white fallback -- so every
+        /// flame in the game draws as a solid white quad.
+        const std::vector<std::size_t>& textureIndices() const { return mTextureIndices; }
+
     private:
-        std::function<uint32_t(const std::string&)> mResolveTexture;
+        std::function<uint32_t(const std::string&, std::size_t&)> mResolveTexture;
         std::vector<Vk::ParticleQuad> mQuads;
+        std::vector<std::size_t> mTextureIndices;
     };
 }
 
