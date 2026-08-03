@@ -119,6 +119,11 @@ namespace Vk
             case VK_FORMAT_B8G8R8A8_UNORM:
             case VK_FORMAT_B8G8R8A8_SRGB:
                 return static_cast<VkDeviceSize>(width) * height * 4;
+            // Single channel, for masks rather than colour -- the land texture blend maps are the
+            // first. Deliberately UNORM only: a weight is not a colour and must not be sRGB decoded
+            // on sample, or the ramp between two land textures acquires a curve.
+            case VK_FORMAT_R8_UNORM:
+                return static_cast<VkDeviceSize>(width) * height;
             default:
                 return 0;
         }
