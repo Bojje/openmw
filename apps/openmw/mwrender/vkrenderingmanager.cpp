@@ -30,6 +30,7 @@
 #include <components/vk/vktexture.hpp>
 
 #include "../mwbase/environment.hpp"
+#include "../mwbase/world.hpp"
 #include "../mwworld/cell.hpp"
 #include "../mwworld/cellstore.hpp"
 #include "../mwworld/class.hpp"
@@ -333,6 +334,46 @@ namespace MWRender
             }
         }
 
+        for (const auto& inst : mActorInstances)
+        {
+            const auto& mesh = mMeshes[inst.meshIndex];
+            Vk::Mat4 transform;
+            std::memcpy(transform.data, inst.transform, sizeof(float) * 16);
+
+            float worldMin[3];
+            float worldMax[3];
+            Vk::transformBounds(transform, mesh->boundsMin, mesh->boundsMax, worldMin, worldMax);
+            const bool visible = Vk::boxInFrustum(frustum, worldMin, worldMax);
+            if (visible)
+                ++drawn;
+            else
+                ++culled;
+
+            Vk::MeshSubmission submission;
+            submission.vertexBuffer = mesh->vertexBuffer->handle();
+            submission.indexBuffer = mesh->indexBuffer->handle();
+            submission.indexCount = mesh->indexCount;
+            submission.transform = transform;
+            // Deliberately not in the acceleration structure, and this is the whole reason actors
+            // can move at all today. buildTlas idles the device and allocates a new structure, and
+            // markTlasDirty only fires on cell load; something that moves every frame would mean
+            // rebuilding every frame, which is a device stall per frame. It would also break the
+            // denoiser's reprojection, which is exact rather than approximate precisely because the
+            // acceleration structure is static (vkrenderer.hpp, and trap 22). So actors rasterise
+            // into the G-buffer and are invisible to every ray: they receive no ray traced shadow
+            // and cast none. Fixing that is the motion vector work in DENOISER-PLAN section 7.
+            submission.blasAddress = VkDeviceAddress{ 0 };
+            submission.vertexAddress = mesh->vertexBuffer->deviceAddress();
+            submission.indexAddress = mesh->indexBuffer->deviceAddress();
+            submission.textureIndex = textureSlot(mMeshTextures[inst.meshIndex]);
+            submission.alphaTested = mesh->alphaTested;
+            submission.roughness = mesh->roughness;
+            submission.specularStrength = mesh->specularStrength;
+            submission.visible = visible;
+
+            mRenderer->submitMesh(submission);
+        }
+
         for (const auto& [store, terrain] : mCellTerrain)
         {
             Vk::Mat4 transform;
@@ -365,7 +406,8 @@ namespace MWRender
         {
             mLoggedCullRatio = true;
             Log(Debug::Info) << "Vulkan: frustum culling drew " << drawn << " of " << (drawn + culled)
-                             << " object instances";
+                             << " object instances, of which " << mActorInstances.size()
+                             << " are actor meshes";
         }
 
         mRenderer->render();
@@ -380,6 +422,12 @@ namespace MWRender
         size_t skipped = 0;
 
         store->forEachConst([&](const MWWorld::ConstPtr& ptr) {
+            // Actors are handled by syncActors instead. Their transform has to be recomputed every
+            // frame, and an instance baked here would be a second, motionless copy of the same
+            // creature standing where it happened to be when the cell loaded.
+            if (ptr.getClass().isActor())
+                return true;
+
             VFS::Path::Normalized model;
             try
             {
@@ -575,6 +623,11 @@ namespace MWRender
             changed = true;
         }
 
+        // Before the texture sync, not after: collectLiveTextures walks mActorInstances, and a
+        // texture only an actor references would otherwise be evicted and come back as the white
+        // fallback -- which for alpha-tested geometry is worse than a missing texture (trap 13).
+        syncActors(activeCells);
+
         // Once, after every add and erase, rather than per cell. This is the path that actually
         // unloads cells -- the loops above erase from the maps directly rather than going through
         // removeCell -- and each call rewrites the descriptor array behind a vkDeviceWaitIdle, so
@@ -585,6 +638,63 @@ namespace MWRender
         // The TLAS is only rebuilt when the instance set actually changes, not every frame.
         if (changed)
             mRenderer->markTlasDirty();
+    }
+
+    void VkRenderingManager::addActorInstances(const MWWorld::ConstPtr& ptr)
+    {
+        VFS::Path::Normalized model;
+        try
+        {
+            model = ptr.getClass().getCorrectedModel(ptr);
+        }
+        catch (const std::exception&)
+        {
+            return;
+        }
+
+        if (model.empty())
+            return;
+
+        // NPCs resolve to meshes/base_anim.nif, which is a skeleton with no geometry at all, so
+        // nothing comes back and no NPC and no player appears. Creatures resolve to their own mesh
+        // and do appear. Getting NPCs in means assembling body parts and placing each at its bone,
+        // which is a separate piece of work -- see section 5.
+        const std::vector<size_t>* meshIndices = getOrLoadMeshes(std::string(model.value()));
+        if (meshIndices == nullptr || meshIndices->empty())
+            return;
+
+        float objectTransform[16];
+        makeObjectTransform(ptr, objectTransform);
+
+
+        for (size_t meshIndex : *meshIndices)
+        {
+            ActorInstance instance;
+            instance.meshIndex = meshIndex;
+            Vk::multiplyMat4(objectTransform, mMeshes[meshIndex]->transform, instance.transform);
+            mActorInstances.push_back(instance);
+        }
+    }
+
+    void VkRenderingManager::syncActors(const std::set<MWWorld::CellStore*, std::less<>>& activeCells)
+    {
+        mActorInstances.clear();
+
+        for (const MWWorld::CellStore* cell : activeCells)
+        {
+            cell->forEachConst([&](const MWWorld::ConstPtr& ptr) {
+                if (ptr.getClass().isActor())
+                    addActorInstances(ptr);
+                return true;
+            });
+        }
+
+        // The player is in no cell's reference list -- MWWorld::Player holds their LiveCellRef as a
+        // member and hands out a Ptr to it -- so the cell walk above can never find them, however
+        // thorough it is.
+        const MWWorld::Ptr player = MWBase::Environment::get().getWorld()->getPlayerPtr();
+        if (!player.isEmpty())
+            addActorInstances(player);
     }
 
     void VkRenderingManager::resize(uint32_t width, uint32_t height)
@@ -637,6 +747,16 @@ namespace MWRender
                 if (instance.meshIndex < mMeshTextures.size())
                     mark(mMeshTextures[instance.meshIndex]);
             }
+        }
+
+        // Actors are not in mCellMeshes and their meshes are usually referenced by nothing else, so
+        // without this their textures look dead and get evicted -- and an evicted texture resolves
+        // to the white fallback, which for alpha-tested geometry undoes trap 13 rather than merely
+        // looking plain.
+        for (const auto& instance : mActorInstances)
+        {
+            if (instance.meshIndex < mMeshTextures.size())
+                mark(mMeshTextures[instance.meshIndex]);
         }
 
         // Terrain holds its texture index directly rather than going through a mesh.

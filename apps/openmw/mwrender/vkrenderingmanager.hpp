@@ -40,6 +40,7 @@ namespace NifVk
 namespace MWWorld
 {
     class CellStore;
+    class ConstPtr;
 }
 
 namespace MWRender
@@ -135,6 +136,25 @@ namespace MWRender
             // small instead of running out to the ±250,000 units the world spans.
             float transform[16];
         };
+
+        // Instances whose transform changes from frame to frame -- actors. Kept apart from
+        // mCellMeshes because that is baked once at cell load, which is exactly right for a rock and
+        // exactly wrong for something that walks. Rebuilt in full every frame from the active cells;
+        // there are a handful of actors in a loaded grid, so rebuilding costs less than tracking
+        // which ones moved, and it cannot go stale.
+        struct ActorInstance
+        {
+            size_t meshIndex;
+            float transform[16];
+        };
+        std::vector<ActorInstance> mActorInstances;
+
+        // Rebuilds mActorInstances. Called from syncCells, which the engine calls once per frame.
+        void syncActors(const std::set<MWWorld::CellStore*, std::less<>>& activeCells);
+
+        // Appends every mesh of one actor at its current position. Shared by the cell walk and by
+        // the player, who is in no cell's reference list and has to be added by hand.
+        void addActorInstances(const MWWorld::ConstPtr& ptr);
 
         // A single NIF yields several submeshes, so the cache maps a model path to all of the
         // mMeshes indices it produced. Returns nullptr only if the model could not be loaded.
