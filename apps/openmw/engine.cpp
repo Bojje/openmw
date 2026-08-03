@@ -409,6 +409,14 @@ bool OMW::Engine::frame(unsigned frameNumber, float frametime)
                     lighting.fogColour = mWorld->getFogColour();
                     lighting.fogStart = mWorld->getFogStart();
                     lighting.fogEnd = mWorld->getFogEnd();
+                    // Taken from the player rather than from the active cell set, because that set
+                    // holds one cell in an interior and nine outdoors and the question here is which
+                    // kind of place the camera is in.
+                    {
+                        const MWWorld::ConstPtr player = mWorld->getPlayerPtr();
+                        lighting.isInterior = !player.isEmpty() && player.isInCell()
+                            && player.getCell()->getCell() != nullptr && !player.getCell()->getCell()->isExterior();
+                    }
 
                     // Collected here rather than inside the renderer because the light manager fills
                     // its list during the update traversal and clears it at the start of the next

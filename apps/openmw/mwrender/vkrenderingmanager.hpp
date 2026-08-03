@@ -73,6 +73,9 @@ namespace MWRender
             /// Point lights affecting the visible scene, already collected and gamma-decoded. Empty
             /// when the light manager is unavailable.
             const std::vector<VkPointLight>* pointLights = nullptr;
+            /// Whether the player is in an interior cell. Changes what \a ambient means and therefore
+            /// how it is occluded -- see SceneData::isInterior.
+            bool isInterior = false;
         };
 
         void render(Camera& camera, const FrameLighting& lighting);

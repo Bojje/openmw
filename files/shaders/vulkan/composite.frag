@@ -29,7 +29,7 @@ layout(set = 0, binding = 4) uniform SceneUBO {
     vec4 sunParams;
     uint frameIndex;
     uint lightCount;
-    uint scenePad0;
+    uint isInterior;
     uint scenePad1;
 } scene;
 
@@ -288,7 +288,19 @@ void main() {
     // to: the hemisphere lerp now only expresses which way a surface faces, and `ao` expresses what
     // is actually in front of it. It stays deliberately shallow so the two do not compound.
     float hemisphere = mix(0.7, 1.0, N.z * 0.5 + 0.5);
-    vec3 ambient = albedo * push.ambientColor.rgb * hemisphere * ao;
+
+    // ...but only outdoors. `ao` is sky visibility -- the fraction of a cosine-weighted hemisphere
+    // that escapes to the sky -- and that is the right occlusion factor for ambient only where the
+    // ambient *is* sky light. Inside a sealed room nothing escapes, so it is near zero on every
+    // surface, and Morrowind's ambient is not sky light there: it is the cell's authored fill, and
+    // for most interiors it is the only light in the cell that is not a torch.
+    //
+    // Multiplying the two cancelled it. Measured in Balmora's Eight Plates before this: mean
+    // luminance 2.7 of 255 against OSG's 12.9, a ratio of 0.21, where the same build outdoors reads
+    // 1.16. The lights-only debug view was black, which is what sent the search to the point lights
+    // first -- they were fine, and every one of them was simply out of range of that room.
+    float ambientOcclusion = scene.isInterior != 0u ? 1.0 : ao;
+    vec3 ambient = albedo * push.ambientColor.rgb * hemisphere * ambientOcclusion;
 
     // The bounce. This is what replaces the sShadowFloor placeholder properly: a surface in shadow is
     // lit by light that reflected off its surroundings, and until now this renderer computed none of

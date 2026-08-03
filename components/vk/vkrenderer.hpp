@@ -113,7 +113,14 @@ namespace Vk
         uint32_t frameIndex = 0;
         // How many entries of the point light buffer are live this frame.
         uint32_t lightCount = 0;
-        uint32_t scenePad0 = 0;
+        // Non-zero in an interior. The ambient colour means something different there: outdoors it is
+        // sky light, which the ray traced sky visibility term is a correct occlusion factor for, but
+        // indoors it is Morrowind's authored per-cell fill and nothing escapes to sky, so that term
+        // is near zero everywhere and multiplying by it cancels the only light the cell has.
+        //
+        // Occupies what was scenePad0, so the block's layout does not change. Adding a field instead
+        // would shift everything after it in two shaders that nothing cross-checks -- trap 18.
+        uint32_t isInterior = 0;
         uint32_t scenePad1 = 0;
     };
 

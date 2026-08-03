@@ -258,6 +258,7 @@ namespace MWRender
         // looks different from one in an Ashlander yurt.
         scene.sunColor = decodeColor(lighting.sunDiffuse);
         scene.ambientColor = decodeColor(lighting.ambient);
+        scene.isInterior = lighting.isInterior ? 1u : 0u;
         scene.skyColor = decodeColor(lighting.skyColour);
         scene.fogColor = decodeColor(lighting.fogColour);
         // Distances, not colours -- decoding these would be meaningless.
