@@ -963,6 +963,26 @@ namespace MWRender
                     wearParts(equipped->get<ESM::Clothing>()->mBase->mParts);
                 else if (equipped->getType() == ESM::Armor::sRecordId)
                     wearParts(equipped->get<ESM::Armor>()->mBase->mParts);
+                else if (slot == MWWorld::InventoryStore::Slot_CarriedRight
+                    || slot == MWWorld::InventoryStore::Slot_CarriedLeft)
+                {
+                    // A held weapon, torch or shield is not a body part: it is an ordinary object
+                    // model hung on a bone of its own. Which bone the right hand uses depends on the
+                    // weapon type in the OSG path -- a bow sits differently from a sword -- and
+                    // "Weapon Bone" is the fallback that table itself names, which is close enough
+                    // for something that is not animated anyway.
+                    const char* bone = slot == MWWorld::InventoryStore::Slot_CarriedRight ? "Weapon Bone"
+                                                                                         : "Shield Bone";
+                    try
+                    {
+                        const std::string itemModel(equipped->getClass().getCorrectedModel(*equipped).value());
+                        covered[ESM::PRT_Weapon] = true;
+                        placeAt(itemModel, bone);
+                    }
+                    catch (const std::exception&)
+                    {
+                    }
+                }
             }
         }
         catch (const std::exception&)
