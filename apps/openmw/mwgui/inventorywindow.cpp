@@ -36,6 +36,7 @@
 #include "container.hpp"
 #include "countdialog.hpp"
 #include "draganddrop.hpp"
+#include "guitexture.hpp"
 #include "hud.hpp"
 #include "inventoryitemmodel.hpp"
 #include "itemtransfer.hpp"
@@ -96,8 +97,6 @@ namespace MWGui
         , mUpdateNextFrame(false)
         , mPendingControllerAction(ControllerAction::None)
     {
-        mPreviewTexture
-            = std::make_unique<MyGUIPlatform::OSGTexture>(mPreview->getTexture(), mPreview->getTextureStateSet());
         mPreview->rebuild();
 
         mMainWidget->castType<MyGUI::Window>()->eventWindowChangeCoord
@@ -117,9 +116,7 @@ namespace MWGui
         getWidget(mFilterEdit, "FilterEdit");
 
         mAvatarImage->eventMouseButtonClick += MyGUI::newDelegate(this, &InventoryWindow::onAvatarClicked);
-        mAvatarImage->setRenderItemTexture(mPreviewTexture.get());
-        // The widget is Y-down, the RTT image is Y-up, so this UV is inverted
-        mAvatarImage->getSubWidgetMain()->_setUVSet(MyGUI::FloatRect(0.f, 1.f, 1.f, 0.f));
+        refreshPreviewTexture();
 
         getWidget(mItemView, "ItemView");
         mItemView->eventItemClicked += MyGUI::newDelegate(this, &InventoryWindow::onItemSelected);
@@ -758,8 +755,40 @@ namespace MWGui
         mEncumbranceBar->setValue(static_cast<int>(std::ceil(encumbrance)), capacity);
     }
 
+    void InventoryWindow::refreshPreviewTexture()
+    {
+        // Under the OSG platform this runs once and the texture keeps itself current, because the
+        // widget is pointed at the render target itself. Under the Vulkan platform the preview has
+        // to be uploaded, so it is rebuilt whenever the render behind it changes -- equipping
+        // something, or dragging the figure round.
+        osg::ref_ptr<osg::Image> image;
+        if (usingVulkanGuiPlatform())
+        {
+            image = mPreview->getImage();
+            if (image == nullptr || image->data() == nullptr)
+                return; // Not drawn yet. Asked again next frame.
+            if (mPreviewTexture && image->getModifiedCount() == mPreviewModifiedCount)
+                return;
+            mPreviewModifiedCount = image->getModifiedCount();
+        }
+        else if (mPreviewTexture)
+        {
+            return;
+        }
+
+        // Order matters: the widget must stop pointing at the old texture before it is freed.
+        mAvatarImage->setRenderItemTexture(nullptr);
+        mPreviewTexture = createGuiTexture(mPreview->getTexture(), image, "character preview");
+        mAvatarImage->setRenderItemTexture(mPreviewTexture.get());
+        // Through updatePreviewSize rather than a fixed UV set. The preview is rendered into a
+        // sub-rectangle of its texture, sized to the panel, and the widget's UVs have to match it --
+        // setting them to the whole texture instead leaves the figure small in a mostly empty panel.
+        updatePreviewSize();
+    }
+
     void InventoryWindow::onFrame(float dt)
     {
+        refreshPreviewTexture();
         updateEncumbranceBar();
 
         if (mUpdateNextFrame)

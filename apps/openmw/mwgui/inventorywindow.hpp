@@ -116,6 +116,14 @@ namespace MWGui
         int mLastYSize;
 
         std::unique_ptr<MyGUI::ITexture> mPreviewTexture;
+
+        // Only used by the Vulkan interface platform, which holds a copy of the preview rather
+
+        // than the render target and so has to be told when it has changed.
+
+        unsigned int mPreviewModifiedCount = 0;
+
+        void refreshPreviewTexture();
         std::unique_ptr<MWRender::InventoryPreview> mPreview;
 
         bool mTrading;

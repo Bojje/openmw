@@ -17,6 +17,7 @@ namespace osg
     class Texture2D;
     class Camera;
     class Group;
+    class Image;
     class Viewport;
     class StateSet;
 }
@@ -43,6 +44,12 @@ namespace MWRender
         void rebuild();
 
         osg::ref_ptr<osg::Texture2D> getTexture();
+
+        /// A CPU copy of the same preview, for the Vulkan interface platform, which cannot sample an
+        /// OSG texture. Refilled on every redraw; its modified count moves when it does, so a
+        /// consumer holding an upload can tell when to make a new one. data() is null until the
+        /// preview has been drawn at least once.
+        osg::ref_ptr<osg::Image> getImage();
         /// Get the osg::StateSet required to render the texture correctly, if any.
         osg::StateSet* getTextureStateSet() { return mTextureStateSet; }
 
@@ -60,6 +67,7 @@ namespace MWRender
         osg::ref_ptr<osg::StateSet> mTextureStateSet;
         osg::ref_ptr<DrawOnceCallback> mDrawOnceCallback;
         osg::ref_ptr<CharacterPreviewRTTNode> mRTTNode;
+        osg::ref_ptr<osg::Image> mImage;
 
         osg::Vec3f mPosition;
         osg::Vec3f mLookAt;

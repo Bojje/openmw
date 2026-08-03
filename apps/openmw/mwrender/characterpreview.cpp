@@ -178,8 +178,49 @@ namespace MWRender
             camera->addChild(mGroup);
         }
 
+        /// A CPU copy of the preview for the Vulkan interface platform, which cannot sample an OSG
+        /// texture. Filled on every draw of this camera, and the camera only draws when a redraw was
+        /// asked for, so it costs one read per equip or rotation rather than one per frame.
+        ///
+        /// Reads the texture rather than the framebuffer, from a *final* draw callback. Attaching an
+        /// osg::Image to the camera the way MWRender::GlobalMap does does not work on an RTTNode --
+        /// HANDOFF trap 32 -- and the post-draw callback is never invoked for one of these cameras.
+        class Readback : public osg::Camera::DrawCallback
+        {
+        public:
+            Readback(osg::Texture2D* texture, osg::Image* image)
+                : mTexture(texture)
+                , mImage(image)
+            {
+            }
+
+            void operator()(osg::RenderInfo& renderInfo) const override
+            {
+                osg::State* state = renderInfo.getState();
+                if (!mTexture || !mImage || state == nullptr)
+                    return;
+
+                state->applyTextureAttribute(0, mTexture.get());
+                mImage->readImageFromCurrentTexture(renderInfo.getContextID(), false);
+                // So a consumer holding a copy can tell this one apart from the last.
+                mImage->dirty();
+            }
+
+        private:
+            osg::ref_ptr<osg::Texture2D> mTexture;
+            osg::ref_ptr<osg::Image> mImage;
+        };
+
+        void setReadbackTarget(osg::Texture2D* texture, osg::Image* image)
+        {
+            mReadback = new Readback(texture, image);
+        }
+
         void apply(osg::Camera* camera) override
         {
+            if (mReadback != nullptr && camera->getFinalDrawCallback() != mReadback)
+                camera->setFinalDrawCallback(mReadback);
+
             if (mCameraStateset)
                 camera->setStateSet(mCameraStateset);
             camera->setViewMatrix(mViewMatrix);
@@ -198,6 +239,7 @@ namespace MWRender
         osg::Matrixf mPerspectiveMatrix;
         osg::Matrixf mViewMatrix;
         osg::ref_ptr<osg::StateSet> mCameraStateset;
+        osg::ref_ptr<osg::Camera::DrawCallback> mReadback;
         float mAspectRatio;
 
         static constexpr float fovYDegrees = 12.3f;
@@ -336,6 +378,19 @@ namespace MWRender
     osg::ref_ptr<osg::Texture2D> CharacterPreview::getTexture()
     {
         return static_cast<osg::Texture2D*>(mRTTNode->getColorTexture(nullptr));
+    }
+
+    osg::ref_ptr<osg::Image> CharacterPreview::getImage()
+    {
+        if (!mImage)
+        {
+            // Created on the first ask rather than in the constructor, so the OSG platform -- which
+            // never asks -- pays nothing for it. Left unallocated: OSG fills it on the first read,
+            // so data() staying null is exactly "the preview has not been drawn yet".
+            mImage = new osg::Image;
+            mRTTNode->setReadbackTarget(getTexture(), mImage);
+        }
+        return mImage;
     }
 
     void CharacterPreview::rebuild()
