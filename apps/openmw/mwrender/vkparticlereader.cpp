@@ -2,6 +2,11 @@
 
 #include "vkparticlereader.hpp"
 
+#include <algorithm>
+#include <cmath>
+
+#include <osg/BlendFunc>
+#include <osg/Group>
 #include <osg/Image>
 #include <osg/NodeVisitor>
 #include <osg/StateSet>
@@ -9,8 +14,25 @@
 #include <osgParticle/Particle>
 #include <osgParticle/ParticleSystem>
 
+#include <components/sceneutil/lightcontroller.hpp>
+#include <components/sceneutil/lightmanager.hpp>
+
+#include "skyutil.hpp"
+
 namespace
 {
+    /// The sRGB transfer function, matching writeColor in vklightcollector.cpp.
+    ///
+    /// Particle colours arrive authored in gamma space, the same as every other colour in the game
+    /// data. The texture beside them is already decoded by the sampler, because the loader gives it an
+    /// _SRGB format, so leaving the colour undecoded multiplies a linear texel by a gamma factor and
+    /// gets neither.
+    float srgbToLinear(float c)
+    {
+        const float a = std::abs(c);
+        return a <= 0.04045f ? a / 12.92f : std::pow((a + 0.055f) / 1.055f, 2.4f);
+    }
+
     /// Finds every osgParticle::ParticleSystem under a node and reads its live particles out.
     ///
     /// apply(osg::Node&), not apply(osg::Geode&). NifOsg adds the system to the graph as a child node
@@ -44,14 +66,59 @@ namespace
         }
 
     private:
+        /// The accumulated transform down this node path.
+        ///
+        /// Hand-rolled rather than osg::computeLocalToWorld, for two reasons and the first is a crash.
+        /// That helper passes a **null** NodeVisitor to every Transform it walks, and
+        /// MWRender::CameraRelativeTransform::computeLocalToWorldMatrix dereferences it without a
+        /// check -- skyutil.cpp, `nv->getVisitorType()`. The sky's rain, snow, ash and blight systems
+        /// all hang under one of those, so walking the graph during any bad weather would take the
+        /// game down. It was never seen because the test harness pins the weather clear.
+        ///
+        /// The second reason is placement. That same function zeroes the translation for a relative
+        /// reference frame, because the sky is drawn around the camera rather than in the world. Left
+        /// at that, every raindrop in the game is emitted around the world origin. Adding the
+        /// transform's own view point back is what puts the weather where the player is.
+        osg::Matrix computeLocalToWorld()
+        {
+            const osg::NodePath& path = getNodePath();
+
+            osg::Matrix matrix;
+            osg::Vec3f cameraRelativeOrigin;
+            bool cameraRelative = false;
+
+            for (const osg::Node* node : path)
+            {
+                if (const osg::Transform* transform = node->asTransform())
+                {
+                    // `this` rather than nullptr. It is a NODE_VISITOR rather than a CULL_VISITOR, so
+                    // CameraRelativeTransform skips its view point update and takes the safe branch.
+                    transform->computeLocalToWorldMatrix(matrix, this);
+                }
+
+                if (const auto* relative = dynamic_cast<const MWRender::CameraRelativeTransform*>(node))
+                {
+                    cameraRelative = true;
+                    cameraRelativeOrigin = relative->getLastViewPoint();
+                }
+            }
+
+            if (cameraRelative)
+                matrix.postMultTranslate(cameraRelativeOrigin);
+
+            return matrix;
+        }
+
         void readSystem(osgParticle::ParticleSystem& system)
         {
             const uint32_t texture = resolveSystemTexture(system);
+            const bool additive = resolveAdditive();
+            const float brightness = resolveLightBrightness();
 
             // osgParticle keeps particles in local coordinates when the system's reference frame is
             // relative, which is what Morrowind's flame nodes use -- their ParticleFlag_LocalSpace is
             // set. The node path from the scene root supplies the rest.
-            const osg::Matrix localToWorld = osg::computeLocalToWorld(getNodePath());
+            const osg::Matrix localToWorld = computeLocalToWorld();
 
             const int count = static_cast<int>(system.numParticles());
             for (int i = 0; i < count; ++i)
@@ -75,17 +142,101 @@ namespace
                 quad.position[0] = static_cast<float>(world.x());
                 quad.position[1] = static_cast<float>(world.y());
                 quad.position[2] = static_cast<float>(world.z());
-                quad.size = size * 0.5f; // getCurrentSize is a diameter; the shader wants a half extent
-                quad.colour[0] = colour.r();
-                quad.colour[1] = colour.g();
-                quad.colour[2] = colour.b();
+                // getCurrentSize is already a half extent -- osgParticle builds its quad from
+                // +/- _current_size along the alignment axes. Halving it again drew every flame at
+                // half the size OSG does, which measured as roughly 40 screen pixels against 90 on
+                // the same torch in the same frame.
+                quad.size = size;
+                quad.colour[0] = srgbToLinear(colour.r()) * brightness;
+                quad.colour[1] = srgbToLinear(colour.g()) * brightness;
+                quad.colour[2] = srgbToLinear(colour.b()) * brightness;
                 // osgParticle fades alpha over life through the same colour interpolation, so this
                 // already carries the fade.
                 quad.colour[3] = colour.a();
                 quad.textureIndex = texture;
+                quad.additive = additive ? 1u : 0u;
 
                 mOut.push_back(quad);
             }
+        }
+
+        /// How bright the light this effect belongs to is right now, or 1 if it has none.
+        ///
+        /// This is the one place the Vulkan renderer deliberately draws something OSG does not. In
+        /// Morrowind a fire is two unrelated objects that happen to sit on the same node: an
+        /// osgParticle system for the flame, and an ESM light whose brightness a LightController
+        /// flickers between roughly 0.25 and 1 fifteen times a second. Nothing connects them, so the
+        /// walls behind a torch pulse while the flame itself is perfectly steady -- which is what a
+        /// video light looks like, not a fire, and it is the specific thing that was reported as the
+        /// fire and the light "not matching".
+        ///
+        /// A fire's flame and the light it casts are the same emission, so they are driven from the
+        /// same number here. The number is read, not invented: LightController has already computed it
+        /// this frame for the light, and this only asks what it decided.
+        ///
+        /// Found by looking for a LightSource among the siblings on the way up the node path, because
+        /// that is how the two are related -- Animation::addExtraLight adds the light as a child of the
+        /// same group the mesh is under, so they are siblings rather than one being above the other.
+        /// The first one found wins, so a torch in a lantern-lit room follows its own flame.
+        float resolveLightBrightness()
+        {
+            const osg::NodePath& path = getNodePath();
+            for (auto it = path.rbegin(); it != path.rend(); ++it)
+            {
+                osg::Group* group = (*it)->asGroup();
+                if (group == nullptr)
+                    continue;
+
+                const unsigned int children = group->getNumChildren();
+                for (unsigned int i = 0; i < children; ++i)
+                {
+                    auto* lightSource = dynamic_cast<SceneUtil::LightSource*>(group->getChild(i));
+                    if (lightSource == nullptr)
+                        continue;
+
+                    const auto* controller
+                        = dynamic_cast<const SceneUtil::LightController*>(lightSource->getUpdateCallback());
+                    if (controller == nullptr)
+                        continue;
+
+                    // Actor fade is in here for the same reason the controller applies it to the light:
+                    // a corpse dissolving away should take its torch flame with it.
+                    return controller->getBrightness() * lightSource->getActorFade();
+                }
+            }
+
+            // Smoke plumes, spell effects and the weather have no light of their own and must not be
+            // modulated by whatever light happens to be nearby.
+            return 1.0f;
+        }
+
+        /// Whether this system was authored to blend additively.
+        ///
+        /// Read rather than assumed. Morrowind authors most effects with SRC_ALPHA and
+        /// ONE_MINUS_SRC_ALPHA -- including flames and smoke -- and only some with a destination of
+        /// ONE. Drawing everything additively makes smoke *glow* on a dark wall instead of darkening
+        /// it, which is exactly how it looked before this existed.
+        ///
+        /// NifOsg puts the BlendFunc on the same stateset as the texture, which is the particle
+        /// system's parent node rather than the system -- see resolveSystemTexture.
+        bool resolveAdditive()
+        {
+            const osg::NodePath& path = getNodePath();
+            for (auto it = path.rbegin(); it != path.rend(); ++it)
+            {
+                const osg::StateSet* stateSet = (*it)->getStateSet();
+                if (stateSet == nullptr)
+                    continue;
+
+                const auto* blend = dynamic_cast<const osg::BlendFunc*>(
+                    stateSet->getAttribute(osg::StateAttribute::BLENDFUNC));
+                if (blend == nullptr)
+                    continue;
+
+                return blend->getDestination() == GL_ONE;
+            }
+
+            return false;
         }
 
         /// The system's texture, by file name, resolved through the caller's loader.
@@ -145,11 +296,52 @@ namespace MWRender
     {
     }
 
+    void ParticleReader::sortForCamera(const osg::Vec3f& cameraPosition)
+    {
+        mRuns.clear();
+        if (mQuads.empty())
+            return;
+
+        // Back to front, which is what a translucent surface needs and what OSG's transparent bin
+        // does. Sorted by squared distance because the ordering is all that matters and a square root
+        // per quad is not.
+        //
+        // One list rather than two batches by blend mode. Sorting the modes separately would be
+        // cheaper and would put every additive spark in front of every alpha blended flame regardless
+        // of where they actually are.
+        std::sort(mQuads.begin(), mQuads.end(),
+            [&cameraPosition](const Vk::ParticleQuad& a, const Vk::ParticleQuad& b) {
+                const float ax = a.position[0] - cameraPosition.x();
+                const float ay = a.position[1] - cameraPosition.y();
+                const float az = a.position[2] - cameraPosition.z();
+                const float bx = b.position[0] - cameraPosition.x();
+                const float by = b.position[1] - cameraPosition.y();
+                const float bz = b.position[2] - cameraPosition.z();
+                return (ax * ax + ay * ay + az * az) > (bx * bx + by * by + bz * bz);
+            });
+
+        // Broken into runs wherever the mode changes, so the draw loop switches pipeline as rarely as
+        // the sort order allows.
+        Vk::ParticleRun run = { 0, 0, mQuads[0].additive != 0u };
+        for (std::size_t i = 0; i < mQuads.size(); ++i)
+        {
+            const bool additive = mQuads[i].additive != 0u;
+            if (additive != run.additive)
+            {
+                mRuns.push_back(run);
+                run = { static_cast<uint32_t>(i), 0, additive };
+            }
+            ++run.count;
+        }
+        mRuns.push_back(run);
+    }
+
     void ParticleReader::collect(osg::Node* sceneRoot)
     {
         // Cleared and rebuilt rather than tracked, for the same reason actors are: the simulation that
         // owns these is re-read every frame, so there is no state here that can go stale.
         mQuads.clear();
+        mRuns.clear();
         mTextureIndices.clear();
         if (sceneRoot == nullptr)
             return;

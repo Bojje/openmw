@@ -172,10 +172,32 @@ namespace Vk
         float colour[4];
         // Slot in the G-buffer sampler array, the same index space submitMesh uses.
         uint32_t textureIndex;
-        uint32_t pad[3];
+        // Whether the effect was authored to blend additively, which is also the difference between an
+        // effect that emits light and one that merely tints what is behind it. It is what the sort
+        // groups runs by, and the fragment shader reads it to decide whether the exposure and the tone
+        // curve apply -- so it travels with the quad rather than in a parallel array that could fall
+        // out of step with it.
+        uint32_t additive;
+        uint32_t pad[2];
     };
 
     static_assert(sizeof(ParticleQuad) == 48, "particle quad layout must match the shader's");
+
+    // One run of consecutive particle quads sharing a blend mode.
+    //
+    // Effects are sorted back to front as one list, because a flame behind a puff of smoke has to be
+    // drawn before it; the list then breaks into runs wherever the mode changes. Sorting the two
+    // modes into separate batches instead would be cheaper and wrong -- it would put every spark in
+    // front of every flame regardless of where they are.
+    struct ParticleRun
+    {
+        uint32_t first;
+        uint32_t count;
+        // Additive is order independent and is what sparks and glows are authored with. The rest use
+        // the authored SRC_ALPHA / ONE_MINUS_SRC_ALPHA, which is what makes smoke darken what is
+        // behind it rather than glow.
+        bool additive;
+    };
 
     // Particle quads drawn in one frame across every effect on screen. A campfire is about 21 and a
     // torch 35; a busy interior measured 364 in total. This is generous by an order of magnitude and
@@ -382,7 +404,8 @@ namespace Vk
         // simulation that owns them is re-read every frame rather than tracked.
         //
         // Anything past maxParticleQuads is dropped with one warning.
-        void updateParticles(const ParticleQuad* quads, uint32_t count);
+        void updateParticles(
+            const ParticleQuad* quads, uint32_t count, const std::vector<ParticleRun>& runs);
 
         // Uploads this frame's bone palettes, as \a count column-major 4x4 matrices laid end to end.
         // A submission's boneOffset indexes this array, and its per-vertex bone indices are relative
@@ -609,7 +632,11 @@ namespace Vk
         // Drawn inside the composite pass, after the tone mapped scene and before the interface.
         // Null if its shaders were missing, which costs the effects and nothing else.
         VkPipeline mParticlePipeline = VK_NULL_HANDLE;
+        // The same pipeline with the authored alpha blend rather than additive. Everything else about
+        // it is identical, which is why they are built from one description with one field changed.
+        VkPipeline mParticleBlendedPipeline = VK_NULL_HANDLE;
         VkPipelineLayout mParticlePipelineLayout = VK_NULL_HANDLE;
+        std::vector<ParticleRun> mParticleRuns;
 
         VkSampler mGBufferSampler = VK_NULL_HANDLE;
         // Separate from mGBufferSampler: scene textures want filtering and wrapping, whereas the

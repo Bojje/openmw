@@ -1782,6 +1782,13 @@ namespace Vk
 
             VK_CHECK(vkCreateGraphicsPipelines(
                 mDevice->handle(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &mParticlePipeline));
+
+            // The authored blend. One field differs, so it is built from the same description rather
+            // than a second copy that could drift.
+            blend.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+            blend.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+            VK_CHECK(vkCreateGraphicsPipelines(mDevice->handle(), VK_NULL_HANDLE, 1, &pipelineInfo,
+                nullptr, &mParticleBlendedPipeline));
         }
 
         // Composite pipeline
@@ -2213,18 +2220,36 @@ namespace Vk
             // Additive, so no sorting is needed: addition commutes, and the draw order of overlapping
             // flames cannot change the result. That is the whole reason this needs no transparency
             // architecture.
-            if (mParticlePipeline != VK_NULL_HANDLE && mParticleCount > 0)
+            if (mParticlePipeline != VK_NULL_HANDLE && !mParticleRuns.empty())
             {
-                vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mParticlePipeline);
-
                 std::array<VkDescriptorSet, 2> sets
                     = { mSceneDescriptorSets[mCurrentFrame], mCompositeDescriptorSets[mCurrentFrame] };
                 vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mParticlePipelineLayout, 0,
                     static_cast<uint32_t>(sets.size()), sets.data(), 0, nullptr);
 
-                // Six vertices a quad, one instance a particle. No vertex buffer: the corner comes
-                // from gl_VertexIndex and the particle from gl_InstanceIndex.
-                vkCmdDraw(cmd, 6, mParticleCount, 0, 0);
+                // The quads arrive sorted back to front as one list, broken into runs wherever the
+                // blend mode changes. Walking them in order is what keeps a flame behind smoke behind
+                // the smoke.
+                //
+                // Six vertices a quad, one instance a particle, and firstInstance indexes the buffer:
+                // gl_InstanceIndex includes it, so no vertex buffer and no offset arithmetic.
+                VkPipeline bound = VK_NULL_HANDLE;
+                for (const ParticleRun& run : mParticleRuns)
+                {
+                    if (run.count == 0)
+                        continue;
+
+                    VkPipeline wanted = run.additive ? mParticlePipeline : mParticleBlendedPipeline;
+                    if (wanted == VK_NULL_HANDLE)
+                        wanted = mParticlePipeline;
+                    if (wanted != bound)
+                    {
+                        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, wanted);
+                        bound = wanted;
+                    }
+
+                    vkCmdDraw(cmd, 6, run.count, 0, run.first);
+                }
             }
 
             // The user interface draws here, sharing the composite pass rather than running one of its
@@ -2350,7 +2375,8 @@ namespace Vk
         }
     }
 
-    void Renderer::updateParticles(const ParticleQuad* quads, uint32_t count)
+    void Renderer::updateParticles(
+        const ParticleQuad* quads, uint32_t count, const std::vector<ParticleRun>& runs)
     {
         const uint32_t usable = std::min(count, maxParticleQuads);
         if (count > usable && !mParticleOverflowWarned)
@@ -2364,6 +2390,16 @@ namespace Vk
             std::memcpy(mParticleMapped[mCurrentFrame], quads, sizeof(ParticleQuad) * usable);
 
         mParticleCount = usable;
+
+        // Truncated to what actually fits, so an overflowing frame cannot draw instances past the end
+        // of the buffer.
+        mParticleRuns.clear();
+        for (const ParticleRun& run : runs)
+        {
+            if (run.first >= usable)
+                break;
+            mParticleRuns.push_back({ run.first, std::min(run.count, usable - run.first), run.additive });
+        }
     }
 
     uint32_t Renderer::updateSkinMatrices(const float* matrices, uint32_t count)
@@ -2788,6 +2824,8 @@ namespace Vk
         if (mTextureSampler != VK_NULL_HANDLE)
             vkDestroySampler(dev, mTextureSampler, nullptr);
 
+        if (mParticleBlendedPipeline != VK_NULL_HANDLE)
+            vkDestroyPipeline(dev, mParticleBlendedPipeline, nullptr);
         if (mParticlePipeline != VK_NULL_HANDLE)
             vkDestroyPipeline(dev, mParticlePipeline, nullptr);
         if (mParticlePipelineLayout != VK_NULL_HANDLE)

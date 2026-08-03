@@ -8,7 +8,7 @@ struct ParticleQuad {
     vec3 position;   // world space, already carrying the emitter's transform
     float size;      // world-unit half extent
     vec4 colour;     // straight from the simulation, alpha included
-    uvec4 params;    // .x = slot in the sampler array
+    uvec4 params;    // .x = slot in the sampler array, .y = authored to blend additively
 };
 
 layout(set = 0, binding = 0) uniform CameraUBO {
@@ -27,6 +27,7 @@ layout(set = 0, binding = 3, std430) readonly buffer Particles {
 layout(location = 0) out vec2 fragUv;
 layout(location = 1) out vec4 fragColour;
 layout(location = 2) flat out uint fragTexture;
+layout(location = 3) flat out uint fragAdditive;
 
 void main() {
     ParticleQuad quad = particles.quads[gl_InstanceIndex];
@@ -50,5 +51,6 @@ void main() {
 
     fragColour = quad.colour;
     fragTexture = quad.params.x;
+    fragAdditive = quad.params.y;
     gl_Position = camera.projection * camera.view * vec4(world, 1.0);
 }

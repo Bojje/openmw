@@ -8,6 +8,8 @@
 #include <string>
 #include <vector>
 
+#include <osg/Vec3f>
+
 #include <components/vk/vkrenderer.hpp>
 
 namespace osg
@@ -47,7 +49,15 @@ namespace MWRender
         /// over the loaded cell graph and the particle count is in the hundreds.
         void collect(osg::Node* sceneRoot);
 
+        /// Sorts the collected quads back to front from \a cameraPosition and rebuilds the runs.
+        ///
+        /// Separate from collect because they happen at different points in the frame: collecting has
+        /// to precede the texture sync, and sorting needs the camera, which is not known until the
+        /// frame is being rendered.
+        void sortForCamera(const osg::Vec3f& cameraPosition);
+
         const std::vector<Vk::ParticleQuad>& quads() const { return mQuads; }
+        const std::vector<Vk::ParticleRun>& runs() const { return mRuns; }
 
         /// Storage indices of every texture referenced this frame, for the caller's live set. Without
         /// this the eviction pass sees particle textures referenced by no mesh, no actor and no
@@ -58,6 +68,7 @@ namespace MWRender
     private:
         std::function<uint32_t(const std::string&, std::size_t&)> mResolveTexture;
         std::vector<Vk::ParticleQuad> mQuads;
+        std::vector<Vk::ParticleRun> mRuns;
         std::vector<std::size_t> mTextureIndices;
     };
 }

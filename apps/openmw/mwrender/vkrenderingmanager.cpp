@@ -333,11 +333,14 @@ namespace MWRender
         }
 
         // Gathered in syncCells, which runs earlier in the same frame and is where a newly seen
-        // particle texture can still be given a sampler slot. This only hands the result over.
+        // particle texture can still be given a sampler slot. Sorted here, because the camera is not
+        // known until now.
         if (mParticleReader != nullptr)
         {
+            mParticleReader->sortForCamera(camera.getPosition());
             const std::vector<Vk::ParticleQuad>& quads = mParticleReader->quads();
-            mRenderer->updateParticles(quads.data(), static_cast<uint32_t>(quads.size()));
+            mRenderer->updateParticles(
+                quads.data(), static_cast<uint32_t>(quads.size()), mParticleReader->runs());
         }
 
         mRenderer->updateScene(scene);

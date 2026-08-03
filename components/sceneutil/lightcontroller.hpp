@@ -31,6 +31,14 @@ namespace SceneUtil
 
         void operator()(SceneUtil::LightSource* node, osg::NodeVisitor* nv);
 
+        /// The current point of the flicker or pulse cycle, in roughly [0.25, 1].
+        ///
+        /// This is the scalar the controller multiplies the authored colour by, and until now nothing
+        /// outside the controller could see it -- the only evidence of it was the light's diffuse
+        /// colour, which cannot be told apart from a light that is simply dimmer. The Vulkan renderer
+        /// wants it so a fire's flame can rise and fall with the light the fire casts.
+        float getBrightness() const { return mBrightness; }
+
     private:
         LightType mType;
         osg::Vec4f mDiffuseColor;
