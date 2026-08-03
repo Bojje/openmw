@@ -348,6 +348,11 @@ namespace MWRender
             }
         }
 
+        // Before the first skinned submission, because it is what decides whether a palette is really
+        // there to be pointed at.
+        const uint32_t uploadedMatrices = mRenderer->updateSkinMatrices(
+            mSkinMatrices.data(), static_cast<uint32_t>(mSkinMatrices.size() / 16));
+
         for (const auto& inst : mActorInstances)
         {
             const auto& mesh = mMeshes[inst.meshIndex];
@@ -384,6 +389,16 @@ namespace MWRender
             submission.roughness = mesh->roughness;
             submission.specularStrength = mesh->specularStrength;
             submission.visible = visible;
+            // Only if the palette actually reached the device. uploadedMatrices is what the renderer
+            // took, which is less than what was offered when the frame overflowed, and a shape whose
+            // palette fell off the end would otherwise read whatever is at that offset -- another
+            // actor's bones, or last frame's.
+            if (inst.boneOffset != Vk::sNoBones && mesh->skinBuffer
+                && inst.boneOffset + mesh->skinBones.size() <= uploadedMatrices)
+            {
+                submission.skinBuffer = mesh->skinBuffer->handle();
+                submission.boneOffset = inst.boneOffset;
+            }
 
             mRenderer->submitMesh(submission);
         }
@@ -889,23 +904,56 @@ namespace MWRender
                 ActorInstance instance;
                 instance.meshIndex = meshIndex;
 
-                // Three cases, and getting them mixed up is what makes an NPC a heap of parts.
+                // Four cases, and getting them mixed up is what makes an NPC a heap of parts.
+                //
+                // A skinned part with a skin buffer is posed per vertex by the vertex shader. Its
+                // vertices are in the skeleton's bind space, so its instance transform is the
+                // actor's placement alone and the pose lives entirely in the bone palette.
+                //
+                // A skinned part with no buffer -- the palette was full, or the file named no bones
+                // this converter could use -- falls back to its heaviest bone: actor * that bone's
+                // world * that bone's inverse bind. Its node transform is not used, the skin
+                // replaces it. Hanging a skinned part off the attachment bone as though it were
+                // rigid applies a bone twice and throws it across the room; leaving the bone out
+                // entirely drops it at the actor's feet. Both were tried and both look like a
+                // broken NIF.
+                //
+                // A skinned part whose dominant bone is not in this skeleton either falls back
+                // again, to the attachment bone, which is wrong but local.
                 //
                 // A rigid part is authored in the space of the bone that holds it: actor * that
                 // bone * the part's own place in its file.
-                //
-                // A skinned part is authored in its own skin space and carries an inverse bind
-                // transform per bone, so the bind pose is actor * its dominant bone's world *
-                // that bone's inverse bind. Its node transform is not used -- the skin replaces it.
-                // Hanging a skinned part off the attachment bone as though it were rigid applies a
-                // bone twice and throws it across the room; leaving the bone out entirely drops it
-                // at the actor's feet. Both were tried and both look like a broken NIF.
-                //
-                // A skinned part whose bone is not in this skeleton falls back to the attachment
-                // bone, which is wrong but local.
                 const NifVk::VulkanMesh& mesh = *mMeshes[meshIndex];
                 float skinBoneMatrix[16];
-                if (mesh.skinned && !mesh.skinBone.empty() && lookupBone(mesh.skinBone, skinBoneMatrix))
+                if (mesh.skinBuffer && !mesh.skinBones.empty()
+                    && mSkinMatrices.size() / 16 + mesh.skinBones.size() <= Vk::maxSkinMatrices)
+                {
+                    // Real skinning. The vertices are in the skeleton's bind space, so the instance
+                    // transform is the actor's own placement and nothing else; the pose is entirely
+                    // in the palette.
+                    std::copy(objectTransform, objectTransform + 16, instance.transform);
+                    instance.boneOffset = static_cast<uint32_t>(mSkinMatrices.size() / 16);
+
+                    for (size_t bone = 0; bone < mesh.skinBones.size(); ++bone)
+                    {
+                        float boneWorld[16];
+                        float palette[16];
+                        if (lookupBone(mesh.skinBones[bone], boneWorld))
+                        {
+                            Vk::multiplyMat4(boneWorld, mesh.skinInvBinds[bone].data(), palette);
+                        }
+                        else
+                        {
+                            // Identity, not zero and not the inverse bind: in the bind pose a bone's
+                            // world transform is exactly the inverse of its inverse bind, so identity
+                            // is "leave these vertices where the file put them". A bone this skeleton
+                            // does not have then costs its vertices nothing but the pose.
+                            Vk::identityMat4(palette);
+                        }
+                        mSkinMatrices.insert(mSkinMatrices.end(), palette, palette + 16);
+                    }
+                }
+                else if (mesh.skinned && !mesh.skinBone.empty() && lookupBone(mesh.skinBone, skinBoneMatrix))
                 {
                     float actorSkinBone[16];
                     Vk::multiplyMat4(objectTransform, skinBoneMatrix, actorSkinBone);
@@ -1031,6 +1079,10 @@ namespace MWRender
     void VkRenderingManager::syncActors(const std::set<MWWorld::CellStore*, std::less<>>& activeCells)
     {
         mActorInstances.clear();
+        // Cleared together with the instances that index into it. An offset from last frame means
+        // nothing this frame: the actors have moved and the palettes were rebuilt in whatever order
+        // the cell walk produced.
+        mSkinMatrices.clear();
 
         for (MWWorld::CellStore* cell : activeCells)
         {

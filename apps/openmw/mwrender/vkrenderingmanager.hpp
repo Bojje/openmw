@@ -154,8 +154,17 @@ namespace MWRender
         {
             size_t meshIndex;
             float transform[16];
+            // Where this instance's bone palette starts in mSkinMatrices, or Vk::sNoBones if it has
+            // none and is therefore drawn rigidly. Per instance and not per mesh: two NPCs share the
+            // same shirt mesh and stand in different poses.
+            uint32_t boneOffset = Vk::sNoBones;
         };
         std::vector<ActorInstance> mActorInstances;
+
+        // Every bone palette in the frame, laid end to end, four-by-four column major. Rebuilt with
+        // mActorInstances and handed to the renderer whole, which is why an instance can name its own
+        // palette with a single offset and its vertices can carry eight-bit bone indices.
+        std::vector<float> mSkinMatrices;
 
         // Rebuilds mActorInstances. Called from syncCells, which the engine calls once per frame.
         void syncActors(const std::set<MWWorld::CellStore*, std::less<>>& activeCells);

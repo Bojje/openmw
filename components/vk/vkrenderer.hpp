@@ -178,6 +178,16 @@ namespace Vk
         // Morrowind-era NIFs (nifosg::Loader::applyDrawableProperties).
         float roughness = 1.0f;
         float specularStrength = 0.0f;
+        // The shape's skin, or nothing. Both must be set for the skinned pipeline to be used: the
+        // buffer supplies four bone indices and four weights per vertex, and boneOffset says where
+        // this instance's bone palette starts in the matrices handed to updateSkinMatrices. The
+        // indices in the buffer are relative to that offset.
+        //
+        // A shape with a skin buffer but no palette this frame -- the palette overflowed, or the
+        // caller chose not to build one -- draws through the rigid pipeline in bind pose.
+        VkBuffer skinBuffer = VK_NULL_HANDLE;
+        uint32_t boneOffset = sNoBones;
+
         // Whether this instance survives frustum culling.
         //
         // It gates the *raster* pass only. The TLAS deliberately ignores it: an object behind the
@@ -202,6 +212,11 @@ namespace Vk
         float roughness;
         float specularStrength;
         bool visible;
+        // At the end, and new fields must stay at the end: submitMesh builds this with a positional
+        // aggregate initialiser, so a field inserted in the middle silently shifts everything after
+        // it onto the wrong member.
+        VkBuffer skinBuffer;
+        uint32_t boneOffset;
     };
 
     // Layout of the G-buffer pipeline's push constant block. This must match the block declared in
@@ -227,14 +242,18 @@ namespace Vk
         uint32_t textureIndex;
         float roughness;
         float specularStrength;
+        // Only the skinned vertex shader declares this one, which is legal: a shader may use less of
+        // a push constant range than the layout provides. It is the last four bytes available.
+        uint32_t boneOffset;
     };
 
-    static_assert(sizeof(GBufferPushConstants) == 124, "G-buffer push constant layout mismatch");
+    static_assert(sizeof(GBufferPushConstants) == 128, "G-buffer push constant layout mismatch");
     static_assert(sizeof(GBufferPushConstants) <= 128, "exceeds the guaranteed maxPushConstantsSize");
     static_assert(offsetof(GBufferPushConstants, normalMatrix) == 64, "normalMatrix must be at byte 64");
     static_assert(offsetof(GBufferPushConstants, textureIndex) == 112, "textureIndex must be at byte 112");
     static_assert(offsetof(GBufferPushConstants, roughness) == 116, "roughness must be at byte 116");
     static_assert(offsetof(GBufferPushConstants, specularStrength) == 120, "specularStrength at byte 120");
+    static_assert(offsetof(GBufferPushConstants, boneOffset) == 124, "boneOffset must be at byte 124");
 
     struct GBufferAttachments
     {
@@ -331,6 +350,15 @@ namespace Vk
         // sets the light count the scene data carries. Anything past maxPointLights is dropped, with
         // a single warning rather than a crash.
         void updateLights(const PointLight* lights, uint32_t count);
+
+        // Uploads this frame's bone palettes, as \a count column-major 4x4 matrices laid end to end.
+        // A submission's boneOffset indexes this array, and its per-vertex bone indices are relative
+        // to that offset.
+        //
+        // Returns how many matrices were actually taken. Anything past maxSkinMatrices is dropped, so
+        // a caller that gets back less than it gave must not submit the shapes whose palettes fell
+        // off the end as skinned -- they would read another shape's bones.
+        uint32_t updateSkinMatrices(const float* matrices, uint32_t count);
 
         void submitMesh(const MeshSubmission& submission);
 
@@ -495,6 +523,10 @@ namespace Vk
 
         VkPipeline mGBufferPipeline = VK_NULL_HANDLE;
         VkPipelineLayout mGBufferPipelineLayout = VK_NULL_HANDLE;
+        // The same pipeline with a second vertex binding and a vertex shader that poses the vertex.
+        // It shares mGBufferPipelineLayout, so switching between the two mid-pass costs a bind and
+        // nothing else -- the descriptor set and the push constants carry across.
+        VkPipeline mGBufferSkinnedPipeline = VK_NULL_HANDLE;
         VkPipeline mCompositePipeline = VK_NULL_HANDLE;
         VkPipelineLayout mCompositePipelineLayout = VK_NULL_HANDLE;
 
@@ -521,6 +553,15 @@ namespace Vk
         bool mLightOverflowWarned = false;
 
         void createLightBuffers();
+
+        // Bone palettes, per frame in flight and persistently mapped for the same reason the light
+        // buffers are: rewritten every frame while the previous frame may still be reading.
+        std::array<VkBuffer, maxFramesInFlight> mSkinBuffers = {};
+        std::array<VmaAllocation, maxFramesInFlight> mSkinMemory = {};
+        std::array<void*, maxFramesInFlight> mSkinMapped = {};
+        bool mSkinOverflowWarned = false;
+
+        void createSkinBuffers();
 
         VkSampler mGBufferSampler = VK_NULL_HANDLE;
         // Separate from mGBufferSampler: scene textures want filtering and wrapping, whereas the

@@ -81,6 +81,8 @@ namespace Vk
         createUniformBuffers();
         // Before createDescriptorSets: the composite set binds these at binding 6.
         createLightBuffers();
+        // Likewise, at binding 2 of the scene set.
+        createSkinBuffers();
         createDescriptorSets();
         createGBufferPipeline();
         createCompositePipeline();
@@ -687,7 +689,7 @@ namespace Vk
     {
         // Scene layout (set 0 for G-buffer pass): camera UBO + the scene texture array
         {
-            std::array<VkDescriptorSetLayoutBinding, 2> bindings = {};
+            std::array<VkDescriptorSetLayoutBinding, 3> bindings = {};
 
             bindings[0].binding = 0;
             bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -700,6 +702,14 @@ namespace Vk
             bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
             bindings[1].descriptorCount = maxSceneTextures;
             bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+            // Bone palettes for the skinned pipeline. Declared on the shared scene layout rather than
+            // on a layout of its own so both G-buffer pipelines can use one descriptor set, which is
+            // what lets the draw loop switch between them without rebinding anything.
+            bindings[2].binding = 2;
+            bindings[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+            bindings[2].descriptorCount = 1;
+            bindings[2].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
             VkDescriptorSetLayoutCreateInfo layoutInfo = {};
             layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -920,14 +930,15 @@ namespace Vk
             poolSizes.push_back({ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, maxFramesInFlight });
         }
 
-        // The composite sets each hold a point light buffer, whether or not ray tracing is available.
+        // The composite sets each hold a point light buffer and the scene sets each hold a bone
+        // palette, whether or not ray tracing is available. Two per frame in flight.
         {
             auto found = std::find_if(poolSizes.begin(), poolSizes.end(),
                 [](const VkDescriptorPoolSize& s) { return s.type == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; });
             if (found != poolSizes.end())
-                found->descriptorCount += maxFramesInFlight;
+                found->descriptorCount += maxFramesInFlight * 2;
             else
-                poolSizes.push_back({ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, maxFramesInFlight });
+                poolSizes.push_back({ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, maxFramesInFlight * 2 });
         }
 
         if (mDevice->rayTracingSupported())
@@ -990,15 +1001,29 @@ namespace Vk
                 bufferInfo.offset = 0;
                 bufferInfo.range = sizeof(SceneData);
 
-                VkWriteDescriptorSet write = {};
-                write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-                write.dstSet = mSceneDescriptorSets[i];
-                write.dstBinding = 0;
-                write.descriptorCount = 1;
-                write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-                write.pBufferInfo = &bufferInfo;
+                VkDescriptorBufferInfo skinInfo = {};
+                skinInfo.buffer = mSkinBuffers[i];
+                skinInfo.offset = 0;
+                skinInfo.range = VK_WHOLE_SIZE;
 
-                vkUpdateDescriptorSets(mDevice->handle(), 1, &write, 0, nullptr);
+                std::array<VkWriteDescriptorSet, 2> writes = {};
+
+                writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                writes[0].dstSet = mSceneDescriptorSets[i];
+                writes[0].dstBinding = 0;
+                writes[0].descriptorCount = 1;
+                writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+                writes[0].pBufferInfo = &bufferInfo;
+
+                writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                writes[1].dstSet = mSceneDescriptorSets[i];
+                writes[1].dstBinding = 2;
+                writes[1].descriptorCount = 1;
+                writes[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+                writes[1].pBufferInfo = &skinInfo;
+
+                vkUpdateDescriptorSets(
+                    mDevice->handle(), static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
             }
 
             // Binding 1 must be fully populated before the first draw, even though nothing samples it
@@ -1492,6 +1517,9 @@ namespace Vk
 
         auto gbufVert = loadShader("gbuffer.vert.spv");
         auto gbufFrag = loadShader("gbuffer.frag.spv");
+        // Not in the check below. A build without it still renders everything, actors included, just
+        // without the per-vertex pose.
+        auto gbufSkinnedVert = loadShader("gbuffer_skinned.vert.spv");
         auto compVert = loadShader("composite.vert.spv");
         auto compFrag = loadShader("composite.frag.spv");
 
@@ -1594,6 +1622,49 @@ namespace Vk
 
             VK_CHECK(vkCreateGraphicsPipelines(mDevice->handle(), VK_NULL_HANDLE, 1,
                 &pipelineInfo, nullptr, &mGBufferPipeline));
+
+            // The same pipeline again with the skinning vertex shader and a second vertex binding.
+            // Everything else is deliberately shared with the block above, including the layout and
+            // the render pass, so the two cannot drift in any respect that matters to the G-buffer.
+            //
+            // Skipped rather than fatal if its shader is missing: the renderer then draws actors in
+            // bind pose, which is what it did before skinning existed.
+            if (gbufSkinnedVert)
+            {
+                std::array<VkPipelineShaderStageCreateInfo, 2> skinnedStages = {
+                    gbufSkinnedVert->stageInfo(VK_SHADER_STAGE_VERTEX_BIT),
+                    gbufFrag->stageInfo(VK_SHADER_STAGE_FRAGMENT_BIT)
+                };
+
+                std::array<VkVertexInputBindingDescription, 2> skinnedBindingDesc = {};
+                skinnedBindingDesc[0] = bindingDesc[0];
+                skinnedBindingDesc[1].binding = 1;
+                skinnedBindingDesc[1].stride = 8;
+                skinnedBindingDesc[1].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+                std::array<VkVertexInputAttributeDescription, 6> skinnedAttrDesc = {};
+                for (size_t i = 0; i < attrDesc.size(); ++i)
+                    skinnedAttrDesc[i] = attrDesc[i];
+                // Indices stay integers; weights are unorm bytes and arrive in the shader as floats
+                // already divided by 255, which is what makes four bytes enough to carry them.
+                skinnedAttrDesc[4] = { 4, 1, VK_FORMAT_R8G8B8A8_UINT, 0 };
+                skinnedAttrDesc[5] = { 5, 1, VK_FORMAT_R8G8B8A8_UNORM, 4 };
+
+                VkPipelineVertexInputStateCreateInfo skinnedVertexInput = vertexInput;
+                skinnedVertexInput.vertexBindingDescriptionCount
+                    = static_cast<uint32_t>(skinnedBindingDesc.size());
+                skinnedVertexInput.pVertexBindingDescriptions = skinnedBindingDesc.data();
+                skinnedVertexInput.vertexAttributeDescriptionCount
+                    = static_cast<uint32_t>(skinnedAttrDesc.size());
+                skinnedVertexInput.pVertexAttributeDescriptions = skinnedAttrDesc.data();
+
+                VkGraphicsPipelineCreateInfo skinnedInfo = pipelineInfo;
+                skinnedInfo.pStages = skinnedStages.data();
+                skinnedInfo.pVertexInputState = &skinnedVertexInput;
+
+                VK_CHECK(vkCreateGraphicsPipelines(mDevice->handle(), VK_NULL_HANDLE, 1,
+                    &skinnedInfo, nullptr, &mGBufferSkinnedPipeline));
+            }
         }
 
         // Composite pipeline
@@ -1819,11 +1890,26 @@ namespace Vk
                 vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mGBufferPipelineLayout,
                     0, 1, &mSceneDescriptorSets[mCurrentFrame], 0, nullptr);
 
+                // Which of the two G-buffer pipelines is currently bound. Tracked rather than sorting
+                // the draws, because they already arrive grouped -- cell geometry, then actors, then
+                // terrain -- so this costs a couple of binds a frame and keeps submission order,
+                // which the caller relies on for nothing but is easier to reason about.
+                VkPipeline boundPipeline = mGBufferPipeline;
+
                 for (const auto& drawCmd : mDrawCommands)
                 {
                     // Raster only. buildTlas deliberately does not check this -- see MeshSubmission.
                     if (!drawCmd.visible)
                         continue;
+
+                    const bool skinned = mGBufferSkinnedPipeline != VK_NULL_HANDLE
+                        && drawCmd.skinBuffer != VK_NULL_HANDLE && drawCmd.boneOffset != sNoBones;
+                    const VkPipeline wanted = skinned ? mGBufferSkinnedPipeline : mGBufferPipeline;
+                    if (wanted != boundPipeline)
+                    {
+                        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, wanted);
+                        boundPipeline = wanted;
+                    }
 
                     GBufferPushConstants pushData = {};
                     pushData.model = drawCmd.transform;
@@ -1839,15 +1925,25 @@ namespace Vk
                         pushData.normalMatrix[col * 4 + 3] = 0.0f;
                     }
                     pushData.textureIndex = drawCmd.textureIndex;
-                pushData.roughness = drawCmd.roughness;
-                pushData.specularStrength = drawCmd.specularStrength;
+                    pushData.roughness = drawCmd.roughness;
+                    pushData.specularStrength = drawCmd.specularStrength;
+                    pushData.boneOffset = skinned ? drawCmd.boneOffset : sNoBones;
 
                     vkCmdPushConstants(cmd, mGBufferPipelineLayout,
                         VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
                         0, sizeof(pushData), &pushData);
 
-                    VkDeviceSize offset = 0;
-                    vkCmdBindVertexBuffers(cmd, 0, 1, &drawCmd.vertexBuffer, &offset);
+                    if (skinned)
+                    {
+                        const std::array<VkBuffer, 2> buffers = { drawCmd.vertexBuffer, drawCmd.skinBuffer };
+                        const std::array<VkDeviceSize, 2> offsets = { 0, 0 };
+                        vkCmdBindVertexBuffers(cmd, 0, 2, buffers.data(), offsets.data());
+                    }
+                    else
+                    {
+                        VkDeviceSize offset = 0;
+                        vkCmdBindVertexBuffers(cmd, 0, 1, &drawCmd.vertexBuffer, &offset);
+                    }
                     vkCmdBindIndexBuffer(cmd, drawCmd.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
                     vkCmdDrawIndexed(cmd, drawCmd.indexCount, 1, 0, 0, 0);
                 }
@@ -2091,6 +2187,34 @@ namespace Vk
         }
     }
 
+    void Renderer::createSkinBuffers()
+    {
+        const VkDeviceSize size = sizeof(float) * 16 * maxSkinMatrices;
+        for (uint32_t i = 0; i < maxFramesInFlight; i++)
+        {
+            createBufferLocal(*mDevice, size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                mSkinBuffers[i], mSkinMemory[i]);
+            VK_CHECK(vmaMapMemory(mDevice->allocator(), mSkinMemory[i], &mSkinMapped[i]));
+        }
+    }
+
+    uint32_t Renderer::updateSkinMatrices(const float* matrices, uint32_t count)
+    {
+        const uint32_t usable = std::min(count, maxSkinMatrices);
+        if (count > usable && !mSkinOverflowWarned)
+        {
+            mSkinOverflowWarned = true;
+            Log(Debug::Warning) << "Vulkan: " << count << " bone matrices exceed the " << maxSkinMatrices
+                                << " one frame can hold; the shapes past that are drawn in bind pose";
+        }
+
+        if (usable > 0 && matrices != nullptr && mSkinMapped[mCurrentFrame] != nullptr)
+            std::memcpy(mSkinMapped[mCurrentFrame], matrices, sizeof(float) * 16 * usable);
+
+        return usable;
+    }
+
     void Renderer::updateLights(const PointLight* lights, uint32_t count)
     {
         const uint32_t usable = std::min(count, maxPointLights);
@@ -2269,7 +2393,8 @@ namespace Vk
         mDrawCommands.push_back({ submission.vertexBuffer, submission.indexBuffer, submission.indexCount,
             submission.transform, normalMatrix, submission.blasAddress, submission.vertexAddress,
             submission.indexAddress, slot, submission.alphaTested, submission.roughness,
-            submission.specularStrength, submission.visible });
+            submission.specularStrength, submission.visible, submission.skinBuffer,
+            submission.boneOffset });
     }
 
     void Renderer::uploadGeometryTable(const std::vector<GeometryRecord>& records)
@@ -2447,6 +2572,17 @@ namespace Vk
                 mLightBuffers[i] = VK_NULL_HANDLE;
                 mLightMemory[i] = VK_NULL_HANDLE;
             }
+            if (mSkinMapped[i])
+            {
+                vmaUnmapMemory(mDevice->allocator(), mSkinMemory[i]);
+                mSkinMapped[i] = nullptr;
+            }
+            if (mSkinBuffers[i] != VK_NULL_HANDLE)
+            {
+                vmaDestroyBuffer(mDevice->allocator(), mSkinBuffers[i], mSkinMemory[i]);
+                mSkinBuffers[i] = VK_NULL_HANDLE;
+                mSkinMemory[i] = VK_NULL_HANDLE;
+            }
             if (mUniformMapped[i])
             {
                 vmaUnmapMemory(mDevice->allocator(), mUniformMemory[i]);
@@ -2474,6 +2610,8 @@ namespace Vk
         if (mTextureSampler != VK_NULL_HANDLE)
             vkDestroySampler(dev, mTextureSampler, nullptr);
 
+        if (mGBufferSkinnedPipeline != VK_NULL_HANDLE)
+            vkDestroyPipeline(dev, mGBufferSkinnedPipeline, nullptr);
         if (mGBufferPipeline != VK_NULL_HANDLE)
             vkDestroyPipeline(dev, mGBufferPipeline, nullptr);
         if (mGBufferPipelineLayout != VK_NULL_HANDLE)

@@ -23,6 +23,26 @@ namespace Vk
     constexpr VkDeviceSize sVertexStride = 48;
     constexpr uint32_t sFloatsPerVertex = 12;
 
+    // Skinned geometry carries a second vertex buffer alongside that one, eight bytes per vertex:
+    //   bone indices  u8vec4  (offset 0)
+    //   bone weights  unorm8x4 (offset 4)
+    // Produced by NifVk::MeshConverter, bound as binding 1 by the skinned G-buffer pipeline, and read
+    // by gbuffer_skinned.vert. The indices are into the shape's own bone list, offset by the
+    // instance's boneOffset push constant.
+    constexpr VkDeviceSize sSkinStride = 8;
+
+    // Bone matrices the skinned pipeline can hold in one frame, across every actor on screen. One
+    // matrix is 64 bytes, so this is a megabyte per frame in flight.
+    //
+    // Sized against what a busy Morrowind exterior actually submits: a few hundred actor shapes, each
+    // naming the handful of bones its own vertices are weighted to rather than the whole skeleton.
+    // Overflowing is not fatal -- the shapes that do not fit are drawn in bind pose -- but it is
+    // reported once, because the symptom on its own reads as a broken skeleton.
+    constexpr uint32_t maxSkinMatrices = 16384;
+
+    /// A bone offset meaning "this shape is not skinned this frame".
+    constexpr uint32_t sNoBones = 0xFFFFFFFFu;
+
     // One entry per TLAS instance, indexed in the hit shaders by gl_InstanceCustomIndexEXT. This is
     // what lets an any-hit shader alpha-test a leaf billboard: without it the hit shaders have no way
     // to reach the geometry they hit, so every alpha-cutout quad occludes as a solid rectangle.
