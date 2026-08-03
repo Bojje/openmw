@@ -508,23 +508,28 @@ namespace MWRender
             return;
 
         const MWWorld::Cell* cell = store->getCell();
-        if (cell == nullptr || !cell->isExterior())
-            return;
-
-        const int cellX = cell->getGridX();
-        const int cellY = cell->getGridY();
-
-        std::vector<LandChunk> landChunks = buildLandChunks(cellX, cellY);
-        if (landChunks.empty())
+        if (cell == nullptr)
             return;
 
         CellTerrain terrain;
-
-        // Vertices come out cell-local, so all that is left is the translation to the cell's
-        // south-west corner. Column-vector convention, matching makeObjectTransform.
         Vk::identityMat4(terrain.transform);
-        terrain.transform[12] = static_cast<float>(cellX) * ESM::Land::REAL_SIZE;
-        terrain.transform[13] = static_cast<float>(cellY) * ESM::Land::REAL_SIZE;
+
+        std::vector<LandChunk> landChunks;
+        if (cell->isExterior())
+        {
+            const int cellX = cell->getGridX();
+            const int cellY = cell->getGridY();
+
+            landChunks = buildLandChunks(cellX, cellY);
+
+            // Vertices come out cell-local, so all that is left is the translation to the cell's
+            // south-west corner. Column-vector convention, matching makeObjectTransform.
+            terrain.transform[12] = static_cast<float>(cellX) * ESM::Land::REAL_SIZE;
+            terrain.transform[13] = static_cast<float>(cellY) * ESM::Land::REAL_SIZE;
+        }
+        // An interior has no heightfield and no cell offset, and it still reaches addWater below --
+        // Morrowind's caves and canalworks have water in them, and returning early here is what used
+        // to leave them dry.
 
         size_t triangles = 0;
 
@@ -546,14 +551,16 @@ namespace MWRender
             triangles += indexCount / 3;
         }
 
+        // Before the empty check, not after. An interior has no land chunks at all, so bailing on an
+        // empty list first is exactly what kept every cave and canal dry.
+        addWater(store, terrain);
+
         if (terrain.chunks.empty())
             return;
 
-        addWater(store, terrain);
-
         syncTexturesToRenderer();
 
-        Log(Debug::Info) << "Vulkan: loaded terrain for cell " << cellX << ", " << cellY << " -- "
+        Log(Debug::Info) << "Vulkan: loaded terrain for " << cell->getDescription() << " -- "
                          << terrain.chunks.size() << " chunks, " << triangles << " triangles";
 
         mCellTerrain.emplace(store, std::move(terrain));
@@ -567,7 +574,13 @@ namespace MWRender
 
         // The cell transform already translates to the cell's south-west corner and does not touch Z,
         // so X and Y are cell-local and the height is absolute, exactly as the land chunks are.
-        const float size = ESM::Land::REAL_SIZE;
+        //
+        // An interior has no cell offset and no 8192-unit grid to sit on: its geometry is built
+        // around the origin and can run some way out, so the quad is centred and made generous
+        // rather than matched to a cell. It is hidden by the walls and the floor either way.
+        const bool exterior = cell->isExterior();
+        const float size = exterior ? ESM::Land::REAL_SIZE : 40000.0f;
+        const float origin = exterior ? 0.0f : -size * 0.5f;
         const float height = cell->getWaterHeight();
 
         // Tiled rather than stretched: one texture across a whole 8192-unit cell is a smear. Eight
@@ -576,11 +589,13 @@ namespace MWRender
         constexpr float tiles = 8.0f;
 
         // Twelve floats per vertex, matching the G-buffer layout: position, normal, texcoord, colour.
+        const float lo = origin;
+        const float hi = origin + size;
         const std::vector<float> vertices = {
-            0.f, 0.f, height, 0.f, 0.f, 1.f, 0.f, 0.f, 1.f, 1.f, 1.f, 1.f, //
-            size, 0.f, height, 0.f, 0.f, 1.f, tiles, 0.f, 1.f, 1.f, 1.f, 1.f, //
-            size, size, height, 0.f, 0.f, 1.f, tiles, tiles, 1.f, 1.f, 1.f, 1.f, //
-            0.f, size, height, 0.f, 0.f, 1.f, 0.f, tiles, 1.f, 1.f, 1.f, 1.f //
+            lo, lo, height, 0.f, 0.f, 1.f, 0.f, 0.f, 1.f, 1.f, 1.f, 1.f, //
+            hi, lo, height, 0.f, 0.f, 1.f, tiles, 0.f, 1.f, 1.f, 1.f, 1.f, //
+            hi, hi, height, 0.f, 0.f, 1.f, tiles, tiles, 1.f, 1.f, 1.f, 1.f, //
+            lo, hi, height, 0.f, 0.f, 1.f, 0.f, tiles, 1.f, 1.f, 1.f, 1.f //
         };
         const std::vector<uint32_t> indices = { 0, 1, 2, 0, 2, 3 };
 
