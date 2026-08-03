@@ -264,6 +264,131 @@ namespace NifVk
 
         mesh.skinBone = bone->mName;
         nifTransformToMat4(data->mBones[dominant].mTransform, mesh.skinInvBind);
+
+        collectSkinWeights(skin, data, mesh);
+    }
+
+    void MeshConverter::collectSkinWeights(
+        const Nif::NiSkinInstance* skin, const Nif::NiSkinData* data, VulkanMesh& mesh)
+    {
+        const size_t boneCount = std::min(data->mBones.size(), skin->mBones.size());
+        if (boneCount == 0 || mesh.vertexCount == 0)
+            return;
+
+        // The NIF stores this the other way round from what a vertex shader wants: a list per bone of
+        // the vertices it touches, rather than a list per vertex of the bones that touch it. Inverting
+        // it is the whole of this function.
+        //
+        // A bone index in the output indexes mesh.skinBones, not the NIF's list. They differ whenever a
+        // bone is skipped -- an unnamed one, or one past the 255 an eight-bit index can name -- and the
+        // renderer only ever sees the compacted list.
+        struct Influence
+        {
+            uint8_t bone;
+            float weight;
+        };
+        std::vector<std::vector<Influence>> perVertex(mesh.vertexCount);
+
+        mesh.skinBones.reserve(boneCount);
+        mesh.skinInvBinds.reserve(boneCount);
+
+        for (size_t i = 0; i < boneCount; ++i)
+        {
+            if (skin->mBones[i].empty())
+                continue;
+            const Nif::NiAVObject* boneNode = skin->mBones[i].getPtr();
+            if (boneNode == nullptr || boneNode->mName.empty())
+                continue;
+            if (mesh.skinBones.size() >= sMaxSkinBones)
+            {
+                Log(Debug::Warning) << "Vulkan: skinned shape has more than " << sMaxSkinBones
+                                    << " bones, the rest are ignored";
+                break;
+            }
+
+            const uint8_t compacted = static_cast<uint8_t>(mesh.skinBones.size());
+            mesh.skinBones.emplace_back(boneNode->mName);
+
+            std::array<float, 16> invBind;
+            nifTransformToMat4(data->mBones[i].mTransform, invBind.data());
+            mesh.skinInvBinds.push_back(invBind);
+
+            for (const auto& [vertex, weight] : data->mBones[i].mWeights)
+            {
+                if (vertex >= mesh.vertexCount || weight <= 0.0f)
+                    continue;
+                perVertex[vertex].push_back({ compacted, weight });
+            }
+        }
+
+        if (mesh.skinBones.empty())
+            return;
+
+        // Four influences per vertex, which is what the shader blends and what every skinning
+        // implementation of this era settled on. Morrowind's own parts rarely exceed two.
+        mesh.skinAttributes.assign(static_cast<size_t>(mesh.vertexCount) * sSkinAttributeStride, 0);
+
+        for (uint32_t v = 0; v < mesh.vertexCount; ++v)
+        {
+            auto& influences = perVertex[v];
+            if (influences.empty())
+                continue;
+
+            if (influences.size() > 4)
+            {
+                std::partial_sort(influences.begin(), influences.begin() + 4, influences.end(),
+                    [](const Influence& a, const Influence& b) { return a.weight > b.weight; });
+                influences.resize(4);
+            }
+
+            float total = 0.0f;
+            for (const Influence& influence : influences)
+                total += influence.weight;
+            if (total <= 0.0f)
+                continue;
+
+            uint8_t* dst = mesh.skinAttributes.data() + static_cast<size_t>(v) * sSkinAttributeStride;
+
+            // Renormalised over the four that were kept, and quantised to eight bits per weight.
+            // The quantisation is why the last weight is the remainder rather than its own rounding:
+            // four independently rounded weights need not sum to 255, and a vertex whose weights sum
+            // to slightly less than one shrinks towards the origin visibly on a limb.
+            unsigned int assigned = 0;
+            for (size_t i = 0; i < influences.size(); ++i)
+            {
+                dst[i] = influences[i].bone;
+                if (i + 1 == influences.size())
+                {
+                    dst[4 + i] = static_cast<uint8_t>(255u - assigned);
+                }
+                else
+                {
+                    const unsigned int quantised = static_cast<unsigned int>(
+                        std::lround(influences[i].weight / total * 255.0f));
+                    const uint8_t clamped = static_cast<uint8_t>(std::min(quantised, 255u - assigned));
+                    dst[4 + i] = clamped;
+                    assigned += clamped;
+                }
+            }
+        }
+    }
+
+    void MeshConverter::uploadSkin(VulkanMesh& mesh)
+    {
+        if (mesh.skinAttributes.empty())
+            return;
+
+        // Vertex buffer usage only. Nothing traces against a skinned shape -- actors are rasterised
+        // and kept out of the acceleration structure -- so this needs neither a device address nor
+        // the acceleration-structure build flag the position buffer carries.
+        mesh.skinBuffer = std::make_unique<Vk::Buffer>(Vk::Buffer::createWithStaging(mDevice, mCommandPool,
+            VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, mesh.skinAttributes.data(),
+            static_cast<VkDeviceSize>(mesh.skinAttributes.size())));
+
+        // The CPU copy has done its job. A body's worth of parts is a few hundred kilobytes of it and
+        // nothing reads it again.
+        mesh.skinAttributes.clear();
+        mesh.skinAttributes.shrink_to_fit();
     }
 
     std::unordered_map<std::string, std::array<float, 16>> MeshConverter::collectNodeTransforms(
@@ -342,16 +467,15 @@ namespace NifVk
             || node->mRecordType == Nif::RC_BSSegmentedTriShape || node->mRecordType == Nif::RC_BSLODTriShape)
         {
             const auto* geom = static_cast<const Nif::NiGeometry*>(node);
-            if (!geom->mSkin.empty())
-            {
-                Log(Debug::Warning) << "Vulkan: skinned mesh not yet supported, converting in bind pose";
-            }
             if (!geom->mData.empty())
             {
                 VulkanMesh mesh = processGeometry(geom, worldTransform);
                 mesh.skinned = !geom->mSkin.empty();
                 if (mesh.skinned)
+                {
                     describeSkin(geom, mesh);
+                    uploadSkin(mesh);
+                }
                 if (mesh.indexCount > 0)
                     output.push_back(std::move(mesh));
             }
