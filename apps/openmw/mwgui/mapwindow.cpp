@@ -625,18 +625,27 @@ namespace MWGui
                     requestMapRender(&MWBase::Environment::get().getWorldModel()->getExterior(
                         ESM::ExteriorCellLocation(entry.mCellX, entry.mCellY, ESM::Cell::sDefaultWorldspaceId)));
 
-                // Still MyGUIPlatform::OSGTexture, and still a white square under the Vulkan
-                // platform. Unlike the other surfaces this one has no CPU copy to upload -- it is a
-                // render to texture with nothing reading it back. HANDOFF trap 33 records two ways
-                // of adding one that did not work, so that the next attempt starts further along.
                 osg::ref_ptr<osg::Texture2D> texture = mLocalMapRender->getMapTexture(entry.mCellX, entry.mCellY);
-                if (texture)
+                osg::ref_ptr<osg::Image> image = mLocalMapRender->getMapImage(entry.mCellX, entry.mCellY);
+                std::unique_ptr<MyGUI::ITexture> created = createGuiTexture(texture, image, "local map");
+                if (created)
                 {
-                    entry.mMapTexture = std::make_unique<MyGUIPlatform::OSGTexture>(texture);
+                    entry.mMapTexture = std::move(created);
                     entry.mMapWidget->setRenderItemTexture(entry.mMapTexture.get());
                     // The widget is Y-down, the RTT image is Y-up, so this UV is inverted
                     entry.mMapWidget->getSubWidgetMain()->_setUVSet(MyGUI::FloatRect(0.f, 1.f, 1.f, 0.f));
                     needRedraw = true;
+                }
+                else if (usingVulkanGuiPlatform())
+                {
+                    // Either the map has not been rendered yet or the readback has not landed. Leave
+                    // the slot empty so this is tried again next frame.
+                    //
+                    // Deliberately not gated on the texture existing. The placeholder below is
+                    // permanent -- nothing ever clears it, and the whole block is behind
+                    // `if (!entry.mMapTexture)` -- so setting it during the frames before the render
+                    // has happened means this segment stays blank for the rest of the session, which
+                    // is precisely the bug it looks like it is protecting against.
                 }
                 else
                     entry.mMapTexture = std::make_unique<MyGUIPlatform::OSGTexture>(std::string(), nullptr);

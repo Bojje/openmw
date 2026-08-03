@@ -58,11 +58,46 @@ namespace MWRender
             const osg::Vec3d& upVector, float zmin, float zmax);
 
         void setDefaults(osg::Camera* camera) override;
+        void apply(osg::Camera* camera) override;
+
+        void setReadbackTarget(osg::Texture2D* texture, osg::Image* image, int x, int y);
 
         osg::Node* mSceneRoot;
         osg::Matrix mProjectionMatrix;
         osg::Matrix mViewMatrix;
         bool mActive;
+        osg::ref_ptr<osg::Camera::DrawCallback> mReadback;
+    };
+
+    class LocalMapReadback : public osg::Camera::DrawCallback
+    {
+    public:
+        LocalMapReadback(osg::Texture2D* texture, osg::Image* image, int x, int y)
+            : mTexture(texture)
+            , mImage(image)
+            , mX(x)
+            , mY(y)
+        {
+        }
+
+        void operator()(osg::RenderInfo& renderInfo) const override
+        {
+            if (!mTexture || !mImage)
+                return;
+
+            osg::State* state = renderInfo.getState();
+            if (state == nullptr)
+                return;
+
+            state->applyTextureAttribute(0, mTexture.get());
+            mImage->readImageFromCurrentTexture(renderInfo.getContextID(), false);
+        }
+
+    private:
+        osg::ref_ptr<osg::Texture2D> mTexture;
+        osg::ref_ptr<osg::Image> mImage;
+        int mX;
+        int mY;
     };
 
     class CameraLocalUpdateCallback
@@ -175,6 +210,13 @@ namespace MWRender
         MapSegment& segment = mInterior ? mInteriorSegments[std::make_pair(segmentX, segmentY)]
                                         : mExteriorSegments[std::make_pair(segmentX, segmentY)];
         segment.mMapTexture = static_cast<osg::Texture2D*>(mLocalMapRTTs.back()->getColorTexture(nullptr));
+        // Reused, not replaced. setupRenderToTexture is called again whenever a segment's map is
+        // re-rendered, and handing out a fresh empty image each time means the widget picks up an
+        // empty one while the readback fills the one it was given -- which looks exactly like a
+        // readback that never runs.
+        if (!segment.mMapImage)
+            segment.mMapImage = new osg::Image;
+        mLocalMapRTTs.back()->setReadbackTarget(segment.mMapTexture, segment.mMapImage, segmentX, segmentY);
     }
 
     void LocalMap::requestMap(const MWWorld::CellStore* cell)
@@ -225,6 +267,16 @@ namespace MWRender
             return osg::ref_ptr<osg::Texture2D>();
         else
             return found->second.mMapTexture;
+    }
+
+    osg::ref_ptr<osg::Image> LocalMap::getMapImage(int x, int y)
+    {
+        auto& segments(mInterior ? mInteriorSegments : mExteriorSegments);
+        SegmentMap::iterator found = segments.find(std::make_pair(x, y));
+        if (found == segments.end())
+            return osg::ref_ptr<osg::Image>();
+        else
+            return found->second.mMapImage;
     }
 
     osg::ref_ptr<osg::Texture2D> LocalMap::getFogOfWarTexture(int x, int y)
@@ -689,6 +741,13 @@ namespace MWRender
     {
         setNodeMask(Mask_RenderToTexture);
 
+        // RGBA rather than the RTTNode default of RGB8. osg::Image::readImageFromCurrentTexture,
+        // which the Vulkan interface platform's readback of this texture uses, refuses an internal
+        // format it does not recognise -- it logs "error pixelFormat = 8051", which is GL_RGB8 in
+        // hex, and then the process goes down. The map is opaque either way, so the extra channel
+        // costs a byte per texel of a 256x256 image and nothing anyone can see.
+        setColorBufferInternalFormat(GL_RGBA);
+
         if (SceneUtil::AutoDepth::isReversed())
             mProjectionMatrix = SceneUtil::getReversedZProjectionMatrixAsOrtho(
                 -mapWorldSize / 2, mapWorldSize / 2, -mapWorldSize / 2, mapWorldSize / 2, 5, (zmax - zmin) + 10);
@@ -761,6 +820,17 @@ namespace MWRender
         SceneUtil::configureStateSetSunOverride(light, stateset);
 
         camera->addChild(mSceneRoot);
+    }
+
+    void LocalMapRenderToTexture::setReadbackTarget(osg::Texture2D* texture, osg::Image* image, int x, int y)
+    {
+        mReadback = new LocalMapReadback(texture, image, x, y);
+    }
+
+    void LocalMapRenderToTexture::apply(osg::Camera* camera)
+    {
+        if (mReadback != nullptr && camera->getFinalDrawCallback() != mReadback)
+            camera->setFinalDrawCallback(mReadback);
     }
 
     void CameraLocalUpdateCallback::operator()(LocalMapRenderToTexture* node, osg::NodeVisitor* nv)

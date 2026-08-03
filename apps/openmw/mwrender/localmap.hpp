@@ -61,6 +61,11 @@ namespace MWRender
 
         osg::ref_ptr<osg::Texture2D> getMapTexture(int x, int y);
 
+        /// The CPU copy of the same segment, for the Vulkan interface platform, which cannot sample
+        /// an OSG texture. Null, or an image whose data() is still null, until the render has
+        /// happened and been read back. Ask again next frame rather than waiting.
+        osg::ref_ptr<osg::Image> getMapImage(int x, int y);
+
         osg::ref_ptr<osg::Texture2D> getFogOfWarTexture(int x, int y);
 
         /**
@@ -130,6 +135,7 @@ namespace MWRender
             std::uint8_t mLastRenderNeighbourFlags = 0;
             bool mHasFogState = false;
             osg::ref_ptr<osg::Texture2D> mMapTexture;
+            osg::ref_ptr<osg::Image> mMapImage;
             osg::ref_ptr<osg::Texture2D> mFogOfWarTexture;
             osg::ref_ptr<osg::Image> mFogOfWarImage;
         };
