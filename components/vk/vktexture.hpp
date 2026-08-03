@@ -64,9 +64,35 @@ namespace Vk
         static Texture create(Device& device, CommandPool& commandPool, uint32_t width, uint32_t height,
             VkFormat format, const void* data, VkDeviceSize dataSize, uint32_t mipLevels = 1);
 
+        // An empty texture that can be rendered into and then sampled, for something composited on the
+        // GPU rather than uploaded -- the land texture composite is the first such caller.
+        //
+        // Differs from create() in usage flags and in nothing else. COLOR_ATTACHMENT so a framebuffer
+        // can name it, TRANSFER_SRC and TRANSFER_DST so vkCmdBlitImage can walk the mip chain down, and
+        // SAMPLED so the result can go in the scene sampler array like any other texture.
+        //
+        // Every level is left in UNDEFINED layout, because that is what a render pass with
+        // loadOp = CLEAR and a blit chain both want to start from; the caller owns the transitions. Note
+        // the shared sampler uses VK_LOD_CLAMP_NONE, so a target created with mipLevels > 1 whose levels
+        // are never filled will sample garbage rather than clamping to level 0.
+        //
+        // Block-compressed formats are refused: they cannot be colour attachments and vkCmdBlitImage
+        // cannot filter them, which is the whole reason mip generation does not exist elsewhere here.
+        static Texture createRenderTarget(
+            Device& device, uint32_t width, uint32_t height, VkFormat format, uint32_t mipLevels = 1);
+
         bool valid() const { return mImage != VK_NULL_HANDLE; }
         VkImage image() const { return mImage; }
         VkImageView view() const { return mView; }
+        uint32_t mipLevels() const { return mMipLevels; }
+
+        // Fills levels 1..n by successively halving level 0 with a linear blit, and leaves every level
+        // in SHADER_READ_ONLY_OPTIMAL. Level 0 must already hold the image and be in
+        // SHADER_READ_ONLY_OPTIMAL, which is where a render pass with that final layout leaves it.
+        //
+        // Without this a composite sampled at distance aliases badly: the shared sampler is trilinear
+        // with maxLod unclamped, so it selects levels that were never written.
+        void generateMipChain(Device& device, CommandPool& commandPool);
 
     private:
         void destroy();
@@ -77,6 +103,12 @@ namespace Vk
         VkImage mImage = VK_NULL_HANDLE;
         VmaAllocation mAllocation = VK_NULL_HANDLE;
         VkImageView mView = VK_NULL_HANDLE;
+        // Needed by generateMipChain, and by anything that has to barrier the whole chain rather than
+        // level 0. create() sets it to the number of levels it actually uploaded, which is not always
+        // the number it was asked for.
+        uint32_t mMipLevels = 1;
+        uint32_t mWidth = 0;
+        uint32_t mHeight = 0;
     };
 }
 

@@ -43,12 +43,18 @@ namespace Vk
         , mImage(other.mImage)
         , mAllocation(other.mAllocation)
         , mView(other.mView)
+        , mMipLevels(other.mMipLevels)
+        , mWidth(other.mWidth)
+        , mHeight(other.mHeight)
     {
         other.mDevice = VK_NULL_HANDLE;
         other.mAllocator = VK_NULL_HANDLE;
         other.mImage = VK_NULL_HANDLE;
         other.mAllocation = VK_NULL_HANDLE;
         other.mView = VK_NULL_HANDLE;
+        other.mMipLevels = 1;
+        other.mWidth = 0;
+        other.mHeight = 0;
     }
 
     Texture& Texture::operator=(Texture&& other) noexcept
@@ -61,6 +67,9 @@ namespace Vk
             mImage = std::exchange(other.mImage, VK_NULL_HANDLE);
             mAllocation = std::exchange(other.mAllocation, VK_NULL_HANDLE);
             mView = std::exchange(other.mView, VK_NULL_HANDLE);
+            mMipLevels = std::exchange(other.mMipLevels, 1);
+            mWidth = std::exchange(other.mWidth, 0);
+            mHeight = std::exchange(other.mHeight, 0);
         }
         return *this;
     }
@@ -279,6 +288,153 @@ namespace Vk
 
         VK_CHECK(vkCreateImageView(texture.mDevice, &viewInfo, nullptr, &texture.mView));
 
+        texture.mMipLevels = levelCount;
+        texture.mWidth = width;
+        texture.mHeight = height;
+
         return texture;
+    }
+
+    Texture Texture::createRenderTarget(
+        Device& device, uint32_t width, uint32_t height, VkFormat format, uint32_t mipLevels)
+    {
+        if (width == 0 || height == 0)
+            throw std::runtime_error("render target has a zero dimension");
+        if (levelSizeInBytes(format, 4, 4) == 0)
+            throw std::runtime_error("render target format is not one this class can size");
+
+        // Clamped to what the dimensions actually admit, so the chain always ends at 1x1 and never
+        // names a level the image does not have.
+        uint32_t maxLevels = 1;
+        for (uint32_t w = width, h = height; w > 1 || h > 1; ++maxLevels)
+        {
+            w = w > 1 ? w / 2 : 1;
+            h = h > 1 ? h / 2 : 1;
+        }
+        const uint32_t levelCount = std::max(1u, std::min(mipLevels, maxLevels));
+
+        Texture texture;
+        texture.mDevice = device.handle();
+        texture.mAllocator = device.allocator();
+        texture.mMipLevels = levelCount;
+        texture.mWidth = width;
+        texture.mHeight = height;
+
+        VkImageCreateInfo imageInfo = {};
+        imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+        imageInfo.imageType = VK_IMAGE_TYPE_2D;
+        imageInfo.format = format;
+        imageInfo.extent = { width, height, 1 };
+        imageInfo.mipLevels = levelCount;
+        imageInfo.arrayLayers = 1;
+        imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+        imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+        // TRANSFER_SRC as well as DST: generateMipChain blits level n-1 into level n, so every level
+        // is both a source and a destination at some point.
+        imageInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT
+            | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+        imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+        VmaAllocationCreateInfo allocInfo = {};
+        allocInfo.usage = VMA_MEMORY_USAGE_AUTO;
+
+        VK_CHECK(vmaCreateImage(
+            texture.mAllocator, &imageInfo, &allocInfo, &texture.mImage, &texture.mAllocation, nullptr));
+
+        VkImageViewCreateInfo viewInfo = {};
+        viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        viewInfo.image = texture.mImage;
+        viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        viewInfo.format = format;
+        viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        viewInfo.subresourceRange.levelCount = levelCount;
+        viewInfo.subresourceRange.layerCount = 1;
+
+        VK_CHECK(vkCreateImageView(texture.mDevice, &viewInfo, nullptr, &texture.mView));
+
+        return texture;
+    }
+
+    void Texture::generateMipChain(Device& device, CommandPool& commandPool)
+    {
+        if (mImage == VK_NULL_HANDLE || mMipLevels <= 1)
+            return;
+
+        VkCommandBuffer cmd = commandPool.beginSingleTime();
+
+        VkImageMemoryBarrier barrier = {};
+        barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.image = mImage;
+        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        barrier.subresourceRange.levelCount = 1;
+        barrier.subresourceRange.layerCount = 1;
+
+        int32_t width = static_cast<int32_t>(mWidth);
+        int32_t height = static_cast<int32_t>(mHeight);
+
+        for (uint32_t level = 1; level < mMipLevels; ++level)
+        {
+            // The source is whichever level was written last -- level 0 by the render pass, every one
+            // after that by the previous blit -- so it moves from SHADER_READ_ONLY to TRANSFER_SRC.
+            barrier.subresourceRange.baseMipLevel = level - 1;
+            barrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+            barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+            barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+            vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                0, 0, nullptr, 0, nullptr, 1, &barrier);
+
+            barrier.subresourceRange.baseMipLevel = level;
+            barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+            barrier.srcAccessMask = 0;
+            barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                0, 0, nullptr, 0, nullptr, 1, &barrier);
+
+            const int32_t nextWidth = width > 1 ? width / 2 : 1;
+            const int32_t nextHeight = height > 1 ? height / 2 : 1;
+
+            VkImageBlit blit = {};
+            blit.srcOffsets[1] = { width, height, 1 };
+            blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            blit.srcSubresource.mipLevel = level - 1;
+            blit.srcSubresource.layerCount = 1;
+            blit.dstOffsets[1] = { nextWidth, nextHeight, 1 };
+            blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            blit.dstSubresource.mipLevel = level;
+            blit.dstSubresource.layerCount = 1;
+
+            vkCmdBlitImage(cmd, mImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, mImage,
+                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_LINEAR);
+
+            // The source level is finished with; put it back where a sampler expects it.
+            barrier.subresourceRange.baseMipLevel = level - 1;
+            barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+            barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+            barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+            vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                0, 0, nullptr, 0, nullptr, 1, &barrier);
+
+            // The level just written becomes the next iteration's source, so it has to be in
+            // SHADER_READ_ONLY when the loop comes round -- which is also where the last level has to
+            // be left once the loop ends.
+            barrier.subresourceRange.baseMipLevel = level;
+            barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+            barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+            vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                0, 0, nullptr, 0, nullptr, 1, &barrier);
+
+            width = nextWidth;
+            height = nextHeight;
+        }
+
+        commandPool.endSingleTime(cmd, device.graphicsQueue());
     }
 }
