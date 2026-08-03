@@ -852,7 +852,12 @@ namespace Vk
             bindings[5].binding = 5;
             bindings[5].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
             bindings[5].descriptorCount = 1;
-            bindings[5].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
+            // Miss as well as raygen. miss.rmiss reads skyColor and fogColor out of this block so a ray
+            // that escapes the scene comes back with the weather's sky rather than a hardcoded blue.
+            // Declaring a binding in a shader whose stage is not in stageFlags is a validation error and
+            // undefined behaviour, and this was one from the moment that shader started reading it --
+            // caught only because the layer was on.
+            bindings[5].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_MISS_BIT_KHR;
 
             // TLAS
             bindings[0].binding = 0;

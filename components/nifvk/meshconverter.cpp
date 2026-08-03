@@ -5,6 +5,7 @@
 #include <cstring>
 
 #include <components/debug/debuglog.hpp>
+#include <components/misc/strings/algorithm.hpp>
 #include <components/nif/data.hpp>
 #include <components/nif/niffile.hpp>
 #include <components/nif/node.hpp>
@@ -467,6 +468,21 @@ namespace NifVk
         if (node->mRecordType == Nif::RC_NiTriShape || node->mRecordType == Nif::RC_NiTriStrips
             || node->mRecordType == Nif::RC_BSSegmentedTriShape || node->mRecordType == Nif::RC_BSLODTriShape)
         {
+            // Morrowind's own baked blob shadows, dropped by name the way NifOsg drops them
+            // (nifloader.cpp:851-858). They are flat black quads at the foot of a model with the blob
+            // in a texture's alpha, meant to be blended; the G-buffer has no blending and only the
+            // hard cutout in gbuffer.frag, so what actually rasterises is the opaque middle of the
+            // blob, black, writing depth. Left in, every object that is ever re-oriented drags a
+            // hard-edged black patch up out of the ground and into its own silhouette.
+            //
+            // Only for Morrowind-era files, which is the same gate NifOsg uses. Later games name real
+            // geometry this way and deleting a shape on its name alone would take something visible
+            // with it.
+            if (mNifVersion <= Nif::NIFFile::VER_MW
+                && (Misc::StringUtils::ciStartsWith(node->mName, "shadow")
+                    || Misc::StringUtils::ciStartsWith(node->mName, "tri shadow")))
+                return;
+
             const auto* geom = static_cast<const Nif::NiGeometry*>(node);
             if (!geom->mData.empty())
             {
