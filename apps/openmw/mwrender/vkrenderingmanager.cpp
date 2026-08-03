@@ -732,9 +732,10 @@ namespace MWRender
             {
                 CellMeshes::Instance instance;
                 instance.meshIndex = meshIndex;
-                // The converter bakes each submesh's place in the NIF node hierarchy into its own
-                // transform, so the final instance transform is object * nifLocal.
-                Vk::multiplyMat4(objectTransform, mMeshes[meshIndex]->transform, instance.transform);
+                // mMeshPlacements already holds this submesh's offset from the object origin --
+                // its place in the NIF node hierarchy, or its posed bone for a skinned shape --
+                // so the final instance transform is object * that.
+                Vk::multiplyMat4(objectTransform, mMeshPlacements[meshIndex].data(), instance.transform);
                 cellMeshes.instances.push_back(instance);
             }
 
@@ -1058,7 +1059,7 @@ namespace MWRender
                     // each submesh's place in the NIF hierarchy into mesh->transform and that part of
                     // the object does not move, so only the object matrix is new.
                     Vk::multiplyMat4(
-                        objectTransform, mMeshes[instance.meshIndex]->transform, instance.transform);
+                        objectTransform, mMeshPlacements[instance.meshIndex].data(), instance.transform);
                     instance.traced = false;
                 }
 
@@ -1840,9 +1841,44 @@ namespace MWRender
                     const size_t textureIndex
                         = mesh.baseTexture.empty() ? sNoTexture : getOrLoadTexture(mesh.baseTexture);
 
+                    // Where this submesh sits relative to the object's origin. Normally the shape's
+                    // place in the NIF node hierarchy, which the converter has already baked into
+                    // mesh.transform.
+                    //
+                    // A skinned shape is the exception: its vertices are in the skin's bind space,
+                    // not the node's, and the node transform says nothing about where they belong.
+                    // Every banner and flag in the game is skinned, and their bind space is a flat
+                    // quad lying in the local XY plane -- 80 by 128 units with z exactly 0 at every
+                    // vertex. The bone chain is what turns it upright and hangs it down; the inverse
+                    // bind of every bone in furn_banner_hlaalu_01 is a 90 degree rotation about X.
+                    // Place one of these by its node transform and it is drawn horizontal, which
+                    // from a camera below it is a sliver a pixel or two tall.
+                    //
+                    // Rigid, one bone for the whole shape -- the heaviest, the same fallback
+                    // syncActors uses for an actor part that could not get a palette. Flat instead
+                    // of curved, and it will not blow in the wind because nothing here reads the
+                    // NiKeyframeControllers, but both beat a banner nobody can see.
+                    std::array<float, 16> placement;
+                    std::memcpy(placement.data(), mesh.transform, sizeof(placement));
+                    if (mesh.skinned && !mesh.skinBone.empty())
+                    {
+                        // The object's own file. A banner carries its Root Bone/Bone02/... chain
+                        // alongside its geometry, so there is no separate skeleton to go and find.
+                        // An actor part names bones that live in base_anim.nif instead, so this
+                        // lookup misses and the node transform stands -- which is what keeps this
+                        // away from actors, who are posed by syncActors and never read this vector.
+                        if (const auto* restBones = getOrLoadSkeleton(model))
+                        {
+                            const auto bone = restBones->find(mesh.skinBone);
+                            if (bone != restBones->end())
+                                Vk::multiplyMat4(bone->second.data(), mesh.skinInvBind, placement.data());
+                        }
+                    }
+
                     indices.push_back(mMeshes.size());
                     mMeshes.push_back(std::make_unique<NifVk::VulkanMesh>(std::move(mesh)));
                     mMeshTextures.push_back(textureIndex);
+                    mMeshPlacements.push_back(placement);
                 }
             }
         }

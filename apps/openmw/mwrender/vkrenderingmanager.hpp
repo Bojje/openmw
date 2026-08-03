@@ -8,6 +8,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <array>
 #include <unordered_map>
 #include <vector>
 
@@ -321,6 +322,21 @@ namespace MWRender
         // Kept here rather than on NifVk::VulkanMesh so the NIF converter stays unaware of the
         // renderer's texture table.
         std::vector<size_t> mMeshTextures;
+
+        // Parallel to mMeshes: where this submesh sits relative to its object's origin, so that a
+        // placed instance is objectTransform * this and nothing more.
+        //
+        // For an ordinary shape it is the converter's mesh.transform, the shape's place in the NIF
+        // node hierarchy. For a skinned one it is that shape's heaviest bone, boneRestWorld *
+        // skinInvBind, because a skinned shape's vertices are in the skin's bind space and its node
+        // transform does not describe where they belong. Every banner and flag in Morrowind is
+        // skinned and their bind space is a flat quad in the local XY plane, so using the node
+        // transform draws them horizontal.
+        //
+        // One matrix rather than a branch at each use because addCell and refreshMovedObjects both
+        // build instance transforms, and if only one of them knew about skinned statics a banner
+        // would stand up when its cell loaded and fall flat the first time it was refreshed.
+        std::vector<std::array<float, 16>> mMeshPlacements;
 
         // Rebuilds the renderer's sampler array from the textures the currently loaded cells actually
         // reference, and frees the ones none of them do.
