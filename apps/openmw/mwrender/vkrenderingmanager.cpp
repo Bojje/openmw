@@ -459,7 +459,11 @@ namespace MWRender
         scene.sunParams.y = static_cast<float>(mWaterSeconds);
         scene.sunParams.z = waterHeight;
         scene.sunParams.w = hasWater ? 1.0f : 0.0f;
-        mRenderer->setWaterNormalMap(waterNormalSlot);
+        // In the uniform block rather than a push constant on the water pipeline, because raygen.rgen
+        // builds the same wave normal to aim the reflection ray and a raygen shader has no push
+        // constant range to receive it in. Zero when the texture is not resident, which is the same
+        // condition that just cleared sunParams.w -- and it is sunParams.w that suppresses the draw.
+        scene.waterNormalMap = waterNormalSlot;
 
         // The shaders reconstruct the direction *towards* the light as -sunDirection, so this has to be
         // the direction the light travels. World::getSunLightPosition() is the opposite convention -- it

@@ -30,7 +30,7 @@ layout(set = 0, binding = 4) uniform SceneUBO {
     uint frameIndex;
     uint lightCount;
     uint isInterior;
-    uint scenePad1;
+    uint waterNormalMap;
 } scene;
 
 // Mirrors Vk::PointLight. 64 bytes, std430; the layout is pinned by static_asserts on the C++ side.

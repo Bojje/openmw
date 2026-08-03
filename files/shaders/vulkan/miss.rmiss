@@ -23,7 +23,7 @@ layout(set = 0, binding = 5) uniform SceneUBO {
     uint frameIndex;
     uint lightCount;
     uint isInterior;
-    uint scenePad1;
+    uint waterNormalMap;
 } camera;
 
 void main() {

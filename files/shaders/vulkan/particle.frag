@@ -39,7 +39,7 @@ layout(set = 1, binding = 4) uniform SceneUBO {
     uint frameIndex;
     uint lightCount;
     uint isInterior;
-    uint scenePad1;
+    uint waterNormalMap;
 } scene;
 
 layout(location = 0) out vec4 outColor;

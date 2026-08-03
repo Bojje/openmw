@@ -36,7 +36,7 @@ layout(set = 0, binding = 0) uniform SceneUBO {
     uint frameIndex;
     uint lightCount;
     uint isInterior;
-    uint scenePad1;
+    uint waterNormalMap;
 } scene;
 
 // 150 cells across, subdivided 40 ways, which is what MWRender::Water asks for at water.cpp:447 --

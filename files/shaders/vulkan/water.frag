@@ -5,8 +5,15 @@
 // simulation, no rain. What is left is the part that carries the look -- six scrolling octaves of one
 // normal map, exact dielectric Fresnel, a sky reflection, sun glitter, and depth-derived opacity.
 //
-// It costs zero new render targets and zero rays. That is deliberate and worth keeping: the target is
-// a Steam Deck at 15 W, where a reflection pass means drawing the world twice.
+// The reflection is real now: raygen.rgen intersects this same plane analytically and fires one ray
+// per 2x2 pixels off the wave normal, and what arrives here is finished radiance. See the block there
+// for why that is cheaper than it sounds -- the water is not in the acceleration structure, so the
+// plane costs no geometry and the ray cannot come back and hit the surface it left.
+//
+// What that buys over the OSG renderer is the point of the exercise. OSG reflects by re-rendering the
+// world into a mirrored render target at reduced detail, and by default it leaves actors out of the
+// reflection entirely. One ray reflects everything in the acceleration structure, at the same detail
+// it is drawn at, for one 640x400 target on a Steam Deck at 1280x800.
 
 layout(location = 0) out vec4 outColor;
 
@@ -31,18 +38,20 @@ layout(set = 0, binding = 0) uniform SceneUBO {
     uint frameIndex;
     uint lightCount;
     uint isInterior;
-    uint scenePad1;
+    // Slot of textures/omw/water_nm.png in the sampler array above. It used to be a push constant on
+    // this pipeline; it moved into the block that was scenePad1 when raygen.rgen started building the
+    // same wave normal, because two shaders reading the slot from two different places is a bug
+    // waiting for the day they disagree. Occupying the pad rather than adding a field keeps every
+    // offset where the static_asserts in vkrenderer.hpp pin them.
+    uint waterNormalMap;
 } scene;
 
 layout(set = 0, binding = 1) uniform sampler2D textures[512];
 layout(set = 1, binding = 2) uniform sampler2D gbufferDepth;
-
-layout(push_constant) uniform WaterPush {
-    // Slot in the scene sampler array holding textures/omw/water_nm.png. It cannot be a constant:
-    // syncTexturesToRenderer compacts the array down to what the loaded cells actually reference, so
-    // the slot moves whenever the live set does.
-    uint normalMap;
-} push;
+// Half resolution, written by raygen.rgen. .rgb is finished reflected radiance and .a says whether the
+// ray tracing pass ran at all. Bound on the composite set beside the G-buffer depth this shader
+// already samples, so the pipeline gains no descriptor plumbing of its own.
+layout(set = 1, binding = 9) uniform sampler2D waterReflection;
 
 // Tweakables, straight from water.frag lines 13-48. Names and values unchanged so the two can be
 // compared line by line.
@@ -160,12 +169,12 @@ void main() {
     // is 0.0/0.0. It yields the same offset either way when it does not produce a NaN, and there is no
     // reason to keep the coin flip.
     vec3 seed = vec3(0.0, 0.0, 1.0);
-    vec3 normal0 = 2.0 * texture(textures[push.normalMap], normalCoords(UV, 0.05, 0.04, time, -0.015, -0.005, seed)).rgb - 1.0;
-    vec3 normal1 = 2.0 * texture(textures[push.normalMap], normalCoords(UV, 0.1, 0.08, time, 0.02, 0.015, normal0)).rgb - 1.0;
-    vec3 normal2 = 2.0 * texture(textures[push.normalMap], normalCoords(UV, 0.25, 0.07, time, -0.04, -0.03, normal1)).rgb - 1.0;
-    vec3 normal3 = 2.0 * texture(textures[push.normalMap], normalCoords(UV, 0.5, 0.09, time, 0.03, 0.04, normal2)).rgb - 1.0;
-    vec3 normal4 = 2.0 * texture(textures[push.normalMap], normalCoords(UV, 1.0, 0.4, time, -0.02, 0.1, normal3)).rgb - 1.0;
-    vec3 normal5 = 2.0 * texture(textures[push.normalMap], normalCoords(UV, 2.0, 0.7, time, 0.1, -0.06, normal4)).rgb - 1.0;
+    vec3 normal0 = 2.0 * texture(textures[scene.waterNormalMap], normalCoords(UV, 0.05, 0.04, time, -0.015, -0.005, seed)).rgb - 1.0;
+    vec3 normal1 = 2.0 * texture(textures[scene.waterNormalMap], normalCoords(UV, 0.1, 0.08, time, 0.02, 0.015, normal0)).rgb - 1.0;
+    vec3 normal2 = 2.0 * texture(textures[scene.waterNormalMap], normalCoords(UV, 0.25, 0.07, time, -0.04, -0.03, normal1)).rgb - 1.0;
+    vec3 normal3 = 2.0 * texture(textures[scene.waterNormalMap], normalCoords(UV, 0.5, 0.09, time, 0.03, 0.04, normal2)).rgb - 1.0;
+    vec3 normal4 = 2.0 * texture(textures[scene.waterNormalMap], normalCoords(UV, 1.0, 0.4, time, -0.02, 0.1, normal3)).rgb - 1.0;
+    vec3 normal5 = 2.0 * texture(textures[scene.waterNormalMap], normalCoords(UV, 2.0, 0.7, time, 0.1, -0.06, normal4)).rgb - 1.0;
 
     // Every octave weighted 0.1, which is what BIG_WAVES, MID_WAVES and SMALL_WAVES all come to with
     // no rain. Rain ripples and the ripple map are not ported: both read simulation state that lives
@@ -186,15 +195,41 @@ void main() {
     float ior = below ? (1.0 / 1.333) : (1.333 / 1.0);
     float fresnel = clamp(fresnel_dielectric(viewDir, normal, ior), 0.0, 1.0);
 
-    // The reflection, with no reflection render target and no reflection ray.
+    // The reflection, traced by raygen.rgen against this same plane. What comes back is already lit,
+    // exposed, tone mapped and fogged over the leg from the surface out to whatever it hit, so all
+    // that is left here is to weight it by Fresnel and blend.
     //
-    // composite.frag draws OpenMW's entire atmosphere as one lerp between the fog colour and the sky
-    // colour along the vertical (lines 112-113), because that is all the sky dome is -- a flat colour
-    // whose alpha ramps out at the horizon over a clear colour set to the fog colour. Reflecting it is
-    // the same lerp on the reflected direction. It tracks weather, sunrise and ash storms for free
-    // because both endpoints already do.
+    // Half a full-resolution texel of offset on the lookup, and it is not cosmetic. raygen samples at
+    // the top-left pixel of each 2x2 block, but the texel it writes is addressed from that block's
+    // centre -- so a plain fetch reads the answer for a point half a pixel away, and the whole
+    // reflection creeps up and to the left by that much. The shift puts the bilinear weights back over
+    // the pixels the rays were actually fired from.
+    vec2 halfResFix = 0.5 / vec2(textureSize(gbufferDepth, 0));
+    vec4 reflectSample = texture(waterReflection, screen + halfResFix);
+
     vec3 reflectDir = reflect(viewDir, normal);
-    vec3 reflection = mix(scene.fogColor.rgb, scene.skyColor.rgb, clamp(reflectDir.z, 0.0, 1.0));
+
+    // The reflected direction is recomputed here rather than read back, and it will not be bit-identical
+    // to the one raygen reflected off: that shader has no derivatives, so it picks the normal map's mip
+    // level analytically where this one gets it from the rasteriser. Both are the same wave field
+    // filtered to the pixel; they differ in filter width at distance. What matters is that the constants
+    // and the octave chain match, because that is what keeps the reflection sitting on the waves you can
+    // see rather than sliding across them.
+
+    // .a is 1 wherever raygen ran and 0 otherwise -- and it is 0 for the whole image or for none of it,
+    // because raygen writes every texel it launches over, including the ones with no water under them.
+    // So this is a per-frame switch, not a per-pixel blend, and a bilinear fetch can never straddle the
+    // two. It covers the frames before the first cell has an acceleration structure, and any build or
+    // device without ray tracing at all.
+    //
+    // The fallback is what this shader drew everywhere until now. composite.frag renders OpenMW's whole
+    // atmosphere as one lerp between the fog colour and the sky colour along the vertical (lines
+    // 112-113), because that is all the sky dome is -- a flat colour whose alpha ramps out at the
+    // horizon over a clear colour set to the fog colour. Reflecting it is the same lerp on the
+    // reflected direction, and it tracks weather, sunrise and ash storms for free because both
+    // endpoints already do.
+    vec3 skyFallback = mix(scene.fogColor.rgb, scene.skyColor.rgb, clamp(reflectDir.z, 0.0, 1.0));
+    vec3 reflection = reflectSample.a > 0.5 ? reflectSample.rgb : skyFallback;
 
     // From below, total internal reflection past about 49 degrees turns the underside of the sea into
     // a mirror, and what it mirrors is the underwater world this renderer does not draw. The water

@@ -29,6 +29,28 @@ layout(set = 0, binding = 13, rgba16f) uniform writeonly image2D indirectImage;
 layout(set = 0, binding = 14, rgba16f) uniform readonly  image2D indirectIn;
 layout(set = 0, binding = 15, rgba16f) uniform writeonly image2D indirectOut;
 
+// The water surface's reflection, at half resolution -- one texel per 2x2 launch pixels. Read back by
+// water.frag through a bilinear fetch in the composite pass.
+//
+// A target of its own rather than a channel of outputImage, and the reason is not that the channels
+// are full (they are: .r is sun visibility, .gba is the specular reflection). It is that both of the
+// existing targets are indexed by G-buffer pixel and describe the surface the G-buffer recorded --
+// and at a water pixel that surface is the seabed, not the sea. The water plane is a second surface
+// in front of it that the G-buffer knows nothing about, so it needs somewhere of its own to live.
+// Sharing a channel would mean two surfaces claiming one texel with no way to say which.
+//
+// Half resolution because a reflection off a moving wave has no sharp detail of its own to lose, and
+// it is the only new ray in the frame -- full resolution would cost four times as much for detail the
+// waves destroy on the way through. 640x400xRGBA16F is 2 MB on a Steam Deck at 1280x800.
+layout(set = 0, binding = 16, rgba16f) uniform writeonly image2D waterReflectOut;
+
+// The scene sampler array, the same one the hit shaders reach at this binding. raygen needs it for
+// exactly one texture -- the water normal map -- and the slot is dynamically uniform (it comes out of
+// the UBO), so this needs no nonuniformEXT and no descriptor indexing feature. The binding's
+// stageFlags on the C++ side had to gain RAYGEN for this; declaring a binding in a stage that is not
+// in stageFlags is a validation error and undefined behaviour.
+layout(set = 0, binding = 7) uniform sampler2D textures[512];
+
 // Read from the scene UBO rather than push constants: two mat4 plus a vec4 is 144 bytes, over the
 // 128-byte maxPushConstantsSize that Vulkan guarantees on all implementations.
 //
@@ -54,7 +76,12 @@ layout(set = 0, binding = 5) uniform SceneUBO {
     uint frameIndex;
     uint lightCount;
     uint isInterior;
-    uint scenePad1;
+    // Slot of textures/omw/water_nm.png in the sampler array. It cannot be a constant: the loader
+    // compacts the array down to what the live cells reference, so the slot moves. This occupies what
+    // was scenePad1, which keeps the block's size and every offset in it exactly where the
+    // static_asserts in vkrenderer.hpp pin them -- adding a field instead would shift the layout in
+    // six shader copies that nothing cross-checks.
+    uint waterNormalMap;
 } camera;
 
 // Morrowind's world unit is roughly 1.4 cm and an exterior cell spans 8192 units, so ray epsilons have
@@ -165,6 +192,287 @@ vec3 unpackNormal(uint bits) {
     return normalize(n);
 }
 
+// --- The water surface's reflection ---------------------------------------------------------------
+//
+// Morrowind's water is a single flat plane at a height the scene UBO already carries, and it is
+// deliberately NOT in the acceleration structure -- water stopped going into terrain.chunks when the
+// surface moved into the composite pass. Both facts are what make this affordable. The plane can be
+// intersected in closed form instead of traced, so it needs no geometry, no BLAS and no TLAS rebuild;
+// and a ray leaving the plane cannot turn round and hit the plane, so the reflection needs no
+// self-intersection handling beyond the usual bias.
+//
+// The OSG renderer produces the same picture by re-rendering the world into a mirrored render target
+// at reduced detail, with actors left out of it entirely by default. This is one ray.
+
+// Half resolution: the top-left pixel of each 2x2 block does the work and stores at pixelCoord >> 1.
+// Every other lane in the subgroup idles through it, which costs nothing in traversal -- the ray count
+// really is a quarter -- and the alternative, a compacted launch, would need a second pipeline and a
+// second shader binding table for one ray.
+bool isWaterReflectionPixel(ivec2 pixelCoord) {
+    return ((pixelCoord.x | pixelCoord.y) & 1) == 0;
+}
+
+// Wave field constants, and every one of them has to stay equal to water.frag's copy. If they drift,
+// the direction the reflection arrives from stops agreeing with the Fresnel and the sun glitter drawn
+// over it, and the sea reads as a mirror with a separate, differently-moving texture painted on top --
+// which looks like a texture bug rather than like a mismatch, so it is not an easy one to trace back.
+//
+// Copied rather than included: CompileShaders.cmake runs glslangValidator straight off disk with no
+// include path. Same arrangement as vertexTexCoord in closesthit.rchit and anyhit.rahit; edit
+// together.
+const float sWaveChoppyness = 0.05;
+const float sWaveScale = 75.0;
+const float sWaveBump = 0.5;
+const vec2 sWindDir = vec2(0.5, -0.8);
+const float sWindSpeed = 0.2;
+// water.frag spells this as worldPos.xy / (8192.0 * 5.0) * 3.0.
+const float sWaveUvScale = 3.0 / (8192.0 * 5.0);
+
+// Exposure and tone map, copied from composite.frag, and they have to stay copies for the reason set
+// out where they are used below.
+const float sAcesPreExposure = 0.6;
+const float sExposure = 4.0;
+const float sTonemapStrength = 0.25;
+
+// Half weight on the sun, exactly as composite.frag's one-bounce term does it, and for the same
+// reason its comment gives there: nothing here knows whether the reflected surface was itself lit.
+const float sReflectSunFactor = 0.5;
+
+// Narkowicz's fit to the ACES RRT+ODT, verbatim from composite.frag including its pre-exposure. See
+// the note there: the output is display-*linear*, so there is no transfer function in it and none
+// should be added.
+vec3 acesFilmic(vec3 x) {
+    x *= sAcesPreExposure;
+    float a = 2.51;
+    float b = 0.03;
+    float c = 2.43;
+    float d = 0.59;
+    float e = 0.14;
+    return clamp((x * (a * x + b)) / (x * (c * x + d) + e), 0.0, 1.0);
+}
+
+vec2 waveCoords(vec2 uv, float scale, float speed, float time, float timer1, float timer2, vec3 previousNormal) {
+    return uv * (sWaveScale * scale) + sWindDir * time * (sWindSpeed * speed)
+        - (previousNormal.xy / previousNormal.zz) * sWaveChoppyness + vec2(time * timer1, time * timer2);
+}
+
+// Mip level for one wave octave. A ray tracing shader has no derivatives, so textureLod is the only
+// sampling function available to it and the level has to be worked out by hand.
+//
+// This is not a formality. water.frag gets its filtering from the rasteriser, and at a few hundred
+// metres the six octaves compress to well under a pixel: sampled at level 0 there, the normal changes
+// completely between one texel and the next. That is a randomly oriented mirror, and it sparkles --
+// the exact artifact half resolution makes worse, and the reason this shader does not need a temporal
+// filter to look stable.
+//
+// The footprint is derived, not tuned. A pixel subtends 2 / (P[1][1] * height) radians vertically, so
+// at distance t along the view ray it spans t times that many world units across the ray. On a plane
+// seen at a grazing angle the footprint *along* the plane is stretched by 1 / |rayDir.z|, which is why
+// the horizon is the worst case and why it is the horizon that shimmers if this is left out. Octave i
+// samples the map at worldXY * sWaveUvScale * sWaveScale * scale, so its footprint in that octave's
+// own texture space scales with `scale` -- hence the log2, which spreads the six octaves across about
+// five mip levels the way the rasteriser would have.
+float waveLod(float baseLod, float scale) {
+    return baseLod + log2(scale);
+}
+
+// One water texel: intersect the plane, build the wave normal, fire one ray, store finished radiance.
+//
+// Called before the sky early-out in main, and that ordering is the easiest thing here to get wrong.
+// Most of the sea on screen has sky behind it rather than seabed, so a reflection computed after that
+// return would only ever reach the shallows -- and a screenshot of a bay is mostly shallows, so it
+// would look like it worked.
+void traceWaterReflection(ivec2 pixelCoord, ivec2 launchSize, vec2 uv, float sceneDepth) {
+    vec2 ndc = uv * 2.0 - 1.0;
+    vec4 rayView = camera.projInverse * vec4(ndc, 1.0, 1.0);
+    vec3 rayDir = normalize((camera.viewInverse * vec4(rayView.xyz / rayView.w, 0.0)).xyz);
+    vec3 cameraPos = camera.viewInverse[3].xyz;
+
+    // The flat-plane sky reflection, which is what water.frag drew at every pixel before this existed.
+    // It is the fallback, and it is written even for a texel with no water anywhere near it.
+    //
+    // That last part is not padding. water.frag reads this image with a bilinear fetch, so along every
+    // shoreline its 2x2 footprint straddles texels whose view ray never reached the sea. Zero in those
+    // puts a dark fringe around every island and every rock in the water; this puts the old sky
+    // reflection there instead, so the worst a shoreline can do is fall back to what it used to be.
+    vec3 flatReflect = reflect(rayDir, vec3(0.0, 0.0, 1.0));
+    vec4 result = vec4(
+        mix(camera.fogColor.rgb, camera.skyColor.rgb, clamp(flatReflect.z, 0.0, 1.0)), 1.0);
+
+    float waterHeight = camera.sunParams.z;
+
+    // Below the surface water.frag throws the reflection away and substitutes the water colour: past
+    // about 49 degrees the underside of the sea is a mirror of an underwater world this renderer does
+    // not draw, and reflecting the sky there reads as a hole in the sea. So the ray would be traced
+    // and discarded. Skipping it is the one early-out in this function that saves a ray rather than
+    // just some arithmetic.
+    bool above = cameraPos.z > waterHeight;
+
+    // Zero exactly along the horizon, where the plane is edge on. Same guard and same reasoning as
+    // water.frag: an infinity here turns the wave lookups into NaN, and a NaN reflection is a hole in
+    // the sea rather than a subtle error.
+    float denom = rayDir.z;
+    if (abs(denom) < 1.0e-6)
+        denom = denom < 0.0 ? -1.0e-6 : 1.0e-6;
+    float toPlane = (waterHeight - cameraPos.z) / denom;
+
+    bool traceIt = camera.sunParams.w > 0.0 && above && toPlane > 0.0;
+
+    vec3 worldPos = vec3(0.0);
+    if (traceIt) {
+        worldPos = cameraPos + rayDir * toPlane;
+
+        // Is the sea actually in front of what the G-buffer recorded here, or behind a cliff? Compared
+        // in view space rather than on raw depth values, because a depth buffer is hyperbolic and a
+        // comparison on it means something different at each end of the range. At sceneDepth 1.0 the
+        // reconstruction lands on the far plane, which nothing is ever nearer than -- so a sky pixel
+        // correctly counts as water in front, which is most of the sea.
+        //
+        // Both numbers are negative and grow more negative with distance, so nearer is greater.
+        float planeViewZ = (camera.view * vec4(worldPos, 1.0)).z;
+        traceIt = planeViewZ > reconstructViewPos(uv, sceneDepth).z;
+    }
+
+    if (traceIt) {
+        float time = camera.sunParams.y;
+        vec2 waveUv = worldPos.xy * sWaveUvScale;
+
+        // glToVulkanProjection negates the whole of row 1, so P[1][1] is -1/tan(fovY/2) here. The
+        // magnitude is what the footprint wants; taking it signed gives a negative level that clamps
+        // to 0 and puts the sparkle straight back.
+        float pixelAngle = 2.0 / (abs(camera.projection[1][1]) * float(launchSize.y));
+        float texWidth = float(textureSize(textures[camera.waterNormalMap], 0).x);
+        float footprint = toPlane * pixelAngle / max(abs(rayDir.z), 0.02);
+        float baseLod = log2(max(footprint * sWaveUvScale * sWaveScale * texWidth, 1.0));
+
+        // The same six octaves water.frag builds, in the same order, at the same scales and speeds and
+        // with the same pair of per-octave timers, each lookup displaced by the previous octave's
+        // normal. That feedback is the whole effect and it is why the six cannot be reordered, and why
+        // dropping the fine ones to save taps would change the coarse ones too.
+        //
+        // The seed is (0,0,1) rather than (0,0,0) for the same reason water.frag uses it: waveCoords
+        // divides xy by zz.
+        vec3 seed = vec3(0.0, 0.0, 1.0);
+        vec3 n0 = 2.0 * textureLod(textures[camera.waterNormalMap],
+            waveCoords(waveUv, 0.05, 0.04, time, -0.015, -0.005, seed), waveLod(baseLod, 0.05)).rgb - 1.0;
+        vec3 n1 = 2.0 * textureLod(textures[camera.waterNormalMap],
+            waveCoords(waveUv, 0.1, 0.08, time, 0.02, 0.015, n0), waveLod(baseLod, 0.1)).rgb - 1.0;
+        vec3 n2 = 2.0 * textureLod(textures[camera.waterNormalMap],
+            waveCoords(waveUv, 0.25, 0.07, time, -0.04, -0.03, n1), waveLod(baseLod, 0.25)).rgb - 1.0;
+        vec3 n3 = 2.0 * textureLod(textures[camera.waterNormalMap],
+            waveCoords(waveUv, 0.5, 0.09, time, 0.03, 0.04, n2), waveLod(baseLod, 0.5)).rgb - 1.0;
+        vec3 n4 = 2.0 * textureLod(textures[camera.waterNormalMap],
+            waveCoords(waveUv, 1.0, 0.4, time, -0.02, 0.1, n3), waveLod(baseLod, 1.0)).rgb - 1.0;
+        vec3 n5 = 2.0 * textureLod(textures[camera.waterNormalMap],
+            waveCoords(waveUv, 2.0, 0.7, time, 0.1, -0.06, n4), waveLod(baseLod, 2.0)).rgb - 1.0;
+
+        vec3 normal = (n0 + n1 + n2 + n3 + n4 + n5) * 0.1;
+        normal = normalize(vec3(-normal.x * sWaveBump, -normal.y * sWaveBump, normal.z));
+
+        vec3 reflectDir = reflect(rayDir, normal);
+
+        // A steep enough wave face reflects the view ray back down through the plane. Nothing stops
+        // that ray -- the water is not in the acceleration structure -- so it would carry on and come
+        // back with the seabed, which is refraction's answer to a reflection's question and reads as a
+        // patch of mud floating on the sea. Bending it back to horizontal is where the real ray would
+        // go after grazing the far side of the wave, and it is what the OSG reflection map does
+        // implicitly by having nothing below its own horizon.
+        reflectDir = normalize(vec3(reflectDir.xy, max(reflectDir.z, 1.0e-3)));
+
+        // Capped at the fog end. Past there everything resolves to the fog colour, and a miss already
+        // comes back as the sky lerp that the fog turns into exactly that -- so a longer ray buys a
+        // traversal across the whole loaded cell grid to reach an answer the miss shader gives for
+        // free. At OpenMW's default viewing distance of 7168 units that is a third of
+        // reflectionRayLength, and the saving lands where it is needed most: at a grazing angle, where
+        // the ray runs nearly parallel to the sea and crosses everything in the world.
+        //
+        // The lower clamp is not paranoia about a divide. SceneData::fogParams defaults to zeros and
+        // is refilled from the weather every frame, so a frame that arrives before the weather is set
+        // up -- or a cell with fog effectively off -- would otherwise ask for a ray of length zero and
+        // get a sea that reflects nothing but sky. 2000 units is about 28 m, enough for an interior
+        // pool to reflect the room around it.
+        float rayLength = clamp(camera.fogParams.y, 2000.0, reflectionRayLength);
+
+        // No TerminateOnFirstHit: that returns an arbitrary intersection rather than the nearest one,
+        // which is fine for a visibility test and wrong for a reflection. Any-hit still runs, so
+        // alpha-tested foliage is cut out of the reflection the same way it is cut out of the bounce.
+        payload = vec4(0.0, 0.0, 0.0, -1.0);
+        traceRayEXT(topLevelAS,
+            gl_RayFlagsNoneEXT,
+            0xFF,
+            0, 0,
+            0,
+            worldPos + vec3(0.0, 0.0, rayBias),
+            rayTMin,
+            reflectDir,
+            rayLength,
+            0);
+
+        vec3 radiance;
+        if (payload.w < 0.0) {
+            // A miss needs nothing done to it. miss.rmiss returns mix(fogColor, skyColor, up), which
+            // is the identical expression composite.frag draws the visible sky with -- and composite
+            // draws the sky on its early-out path, with no exposure and no tone map. So neither does
+            // this. Applying either would make the reflected sky brighter than the sky it sits under,
+            // along a horizon where the two meet edge to edge.
+            radiance = payload.rgb;
+        } else {
+            // A hit returns the surface's albedo and nothing else: closesthit.rchit does not light it,
+            // does not shadow it and does not fog it. Left raw, a reflected cliff arrives as flat
+            // full-brightness texture, which next to a correctly lit sky reads as a pale cut-out
+            // rather than as a reflection.
+            //
+            // Lit with composite.frag's own one-bounce formula, and inheriting its argument: there is
+            // no hit normal in the payload and no shadow ray from the hit, so the sun is half-weighted
+            // to acknowledge that some of what is reflected stands in shadow. The remaining errors
+            // point in opposite directions -- no NdotL makes the sun term too generous, no occlusion
+            // makes the ambient term too generous, no shadow ray makes both too bright -- so the total
+            // lands closer than any of the pieces.
+            //
+            // Doing it honestly costs a second ray from the hit point plus the hit normal in the
+            // payload, and the payload is a bare vec4 shared by the shadow, bounce and reflection rays
+            // across five shaders, with the contract spelled out on the shadow trace in main. Widening
+            // it is a much larger change than a water reflection should be allowed to drag in.
+            vec3 lit = payload.rgb * (camera.ambientColor.rgb + camera.sunColor.rgb * sReflectSunFactor);
+
+            // Exposure and the tone map, because composite.frag applies both to everything that is not
+            // sky before this image is ever blended over the result. Skipping them leaves the
+            // reflected cliff a quarter as bright as the real cliff standing beside it, which is the
+            // most obvious way this can be wrong and the easiest to overlook in a shot of open water
+            // where there is nothing to compare against.
+            //
+            // These constants are copies of composite.frag's and have to stay copies; there is nowhere
+            // to share them from. If that shader's exposure or tone map blend is retuned, retune here
+            // in the same commit.
+            vec3 exposed = lit * sExposure;
+            lit = mix(clamp(exposed, 0.0, 1.0), acesFilmic(exposed), sTonemapStrength);
+
+            // Fog over the reflected leg only -- surface out to whatever it hit. water.frag fogs the
+            // other leg, surface back to the eye, on the finished pixel. Splitting it that way is what
+            // fogs each leg exactly once: folding both in here would double the near leg, and folding
+            // neither leaves a reflected headland crisp while the real one at the same distance has
+            // faded out.
+            //
+            // Mixed linearly, matching the fog in water.frag. composite.frag does its fog in the
+            // encoded domain instead, so a reflected cliff and the real cliff at equal distance will
+            // not land on precisely the same colour in heavy weather. That difference is real and it
+            // is second order here: this term is Fresnel-weighted and then fogged again on the way out.
+            float fogRange = max(camera.fogParams.y - camera.fogParams.x, 1.0);
+            float fogValue = clamp((payload.w - camera.fogParams.x) / fogRange, 0.0, 1.0);
+            radiance = mix(lit, camera.fogColor.rgb, fogValue);
+        }
+
+        result = vec4(radiance, 1.0);
+    }
+
+    // Written on every path. Nothing else touches this image, so a texel left alone keeps a reflection
+    // of wherever the camera was standing when it was last written -- which after a fast turn is a
+    // slab of the wrong coastline sitting on the sea. The alpha is 1 here and 1 on the fallback path
+    // too, so it is 0 only when this shader did not run at all: for the whole image or none of it,
+    // never for part of one, which is what lets water.frag treat it as a switch instead of a blend.
+    imageStore(waterReflectOut, pixelCoord >> 1, result);
+}
+
 void main() {
     ivec2 pixelCoord = ivec2(gl_LaunchIDEXT.xy);
     ivec2 launchSize = ivec2(gl_LaunchSizeEXT.xy);
@@ -172,6 +480,12 @@ void main() {
 
     float depth = texture(gbufferDepth, uv).r;
     vec4 normalSample = texture(gbufferNormal, uv);
+
+    // The water reflection goes first, before the sky early-out below returns. Water in front of sky
+    // is not a corner case -- it is most of the sea in any coastal view, because the seabed drops out
+    // of the depth buffer long before the surface does.
+    if (isWaterReflectionPixel(pixelCoord))
+        traceWaterReflection(pixelCoord, launchSize, uv, depth);
 
     if (depth >= 1.0) {
         imageStore(outputImage, pixelCoord, vec4(1.0, 0.0, 0.0, 0.0));

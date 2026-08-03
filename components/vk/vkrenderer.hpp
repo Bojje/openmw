@@ -133,7 +133,15 @@ namespace Vk
         // Occupies what was scenePad0, so the block's layout does not change. Adding a field instead
         // would shift everything after it in two shaders that nothing cross-checks -- trap 18.
         uint32_t isInterior = 0;
-        uint32_t scenePad1 = 0;
+        // Slot of textures/omw/water_nm.png in the scene sampler array, or 0 when it is not resident.
+        // Read by water.frag for the wave normals and by raygen.rgen, which builds the same normals to
+        // aim the reflection ray. It used to be a push constant on the water pipeline; it moved here
+        // when raygen needed it too, because two shaders reading one slot from two places only works
+        // until the day they disagree, and a wrong slot samples the 1x1 white fallback -- which decodes
+        // to a normal of (1, 1, 1), flattening and tilting every wave in the game the same way.
+        //
+        // Occupies what was scenePad1, so nothing in the block moves.
+        uint32_t waterNormalMap = 0;
     };
 
     // std140 requires a vec4 to start on a 16-byte boundary, and the shader declarations in
@@ -646,6 +654,27 @@ namespace Vk
     // shadows this exists for live. fp16 carries ~11 bits of mantissa near 1.0 and has no such floor.
     constexpr VkFormat denoiseHistoryFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
 
+    // The water surface's reflection, written by raygen.rgen and sampled by water.frag.
+    //   .rgb = finished reflected radiance -- lit, exposed, tone mapped, and fogged over the leg from
+    //          the surface out to whatever the ray hit. Ready to be Fresnel-weighted and blended.
+    //   .a   = 1 if raygen ran, 0 if it did not.
+    //
+    // Half the swapchain's width and height, one texel per 2x2 pixels. That is the only new memory
+    // this feature costs: 640x400xRGBA16F is 2 MB at the Steam Deck's 1280x800, against a planar
+    // reflection pass that would need a colour target, a depth target and a second traversal of the
+    // scene graph to fill them.
+    //
+    // The alpha is a whole-frame switch and not a coverage mask, deliberately. raygen writes every
+    // texel of its launch, water or not, so the value is uniform across the image and water.frag's
+    // bilinear fetch can never land between a 0 and a 1. Texels with no water under them carry the
+    // flat-plane sky reflection, which is what keeps a shoreline from picking up a dark fringe where
+    // that fetch reaches past the edge of the sea.
+    //
+    // R16G16B16A16_SFLOAT for the same reason rtIndirectFormat is: it is a mandatory storage image
+    // format, and the packed alternatives need shaderStorageImageExtendedFormats, which this device
+    // does not enable.
+    constexpr VkFormat waterReflectFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
+
     // Packed depth and normal of whatever the accumulator last stored at each pixel, for the
     // rejection tests. R32G32_UINT rather than a float format for two reasons: view-space Z is in
     // world units and Morrowind's view distances overflow fp16's precision long before its range
@@ -684,14 +713,6 @@ namespace Vk
         // Anything past maxParticleQuads is dropped with one warning.
         void updateParticles(
             const ParticleQuad* quads, uint32_t count, const std::vector<ParticleRun>& runs);
-
-        // Points the water surface at its normal map, by slot in the scene sampler array.
-        //
-        // Zero means the texture is not resident, in which case the caller must also clear
-        // SceneData::sunParams.w -- that is what actually suppresses the draw. Drawing with slot 0
-        // would sample the 1x1 white fallback, which decodes to a normal of (1, 1, 1): every wave in
-        // the game flattened and tilted the same way.
-        void setWaterNormalMap(uint32_t textureSlot) { mWaterNormalMap = textureSlot; }
 
         // Uploads this frame's sky billboards -- the sun disc and the two moons -- and draws them in
         // the composite pass. Replaces the previous frame's set wholesale, for the same reason the
@@ -858,6 +879,10 @@ namespace Vk
         // One-bounce indirect light and ambient occlusion. Created, destroyed, cleared and
         // transitioned in lockstep with mRtOutput, so anything done to one must be done to the other.
         RtOutputImage mRtIndirect;
+        // The water reflection, at half the swapchain's extent -- see waterReflectFormat. In lockstep
+        // with the other two for creation, destruction and every layout transition, and the *only*
+        // thing about it that differs is the extent it is created at.
+        RtOutputImage mWaterReflect;
 
         // Temporal accumulator history. Read and write are separate images rather than one
         // read-modify-write target because they have to be: pixel A reads the history at pixel B's
@@ -954,9 +979,6 @@ namespace Vk
         // particles. Null if its shaders were missing, which costs the water and nothing else.
         VkPipeline mWaterPipeline = VK_NULL_HANDLE;
         VkPipelineLayout mWaterPipelineLayout = VK_NULL_HANDLE;
-        // Sampler slot of the water normal map, or 0 when it is not resident. Pushed as the water
-        // pipeline's only push constant.
-        uint32_t mWaterNormalMap = 0;
 
         // The enchanted item glow, drawn in the composite pass after the particles as a second pass
         // over meshes the G-buffer already drew. Null if its shaders were missing, which costs the
@@ -998,6 +1020,13 @@ namespace Vk
         void drawEmissiveMeshes(VkCommandBuffer cmd);
 
         VkSampler mGBufferSampler = VK_NULL_HANDLE;
+        // Nearest is right for every other composite binding and wrong for exactly one. A depth, a
+        // normal or a material must never be interpolated across a silhouette -- half of a
+        // foreground normal averaged with half a background one is a direction that describes
+        // neither surface. The water reflection is different: it is finished radiance at half
+        // resolution, and read with nearest it comes back in visible 2x2 blocks with stair-stepped
+        // edges wherever the reflected shoreline cuts across the waves.
+        VkSampler mLinearSampler = VK_NULL_HANDLE;
         // Separate from mGBufferSampler: scene textures want filtering and wrapping, whereas the
         // G-buffer attachments are sampled 1:1 and must not be interpolated or wrapped.
         VkSampler mTextureSampler = VK_NULL_HANDLE;

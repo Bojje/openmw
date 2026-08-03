@@ -100,6 +100,7 @@ namespace Vk
 
             writeCompositeDescriptor(3, mRtOutput.view);
             writeCompositeDescriptor(7, mRtIndirect.view);
+            writeCompositeDescriptor(9, mWaterReflect.view);
             writeCompositeHistoryDescriptors();
         }
     }
@@ -585,6 +586,12 @@ namespace Vk
         samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 
         VK_CHECK(vkCreateSampler(mDevice->handle(), &samplerInfo, nullptr, &mGBufferSampler));
+
+        // The same sampler with linear filtering, for the one composite binding that wants it. See
+        // the note on mLinearSampler.
+        samplerInfo.magFilter = VK_FILTER_LINEAR;
+        samplerInfo.minFilter = VK_FILTER_LINEAR;
+        VK_CHECK(vkCreateSampler(mDevice->handle(), &samplerInfo, nullptr, &mLinearSampler));
     }
 
     void Renderer::createTextureSampler()
@@ -640,7 +647,10 @@ namespace Vk
         for (uint32_t i = 0; i < maxFramesInFlight; i++)
         {
             VkDescriptorImageInfo imageInfo = {};
-            imageInfo.sampler = mGBufferSampler;
+            // Binding 9 is the half resolution water reflection and is the only one that is finished
+            // radiance rather than a per-pixel measurement of a surface. Everything else here must
+            // stay nearest -- see mLinearSampler.
+            imageInfo.sampler = (binding == 9) ? mLinearSampler : mGBufferSampler;
             imageInfo.imageView = view;
             imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
@@ -731,7 +741,7 @@ namespace Vk
 
         // Composite layout: G-buffer textures + RT output + scene UBO
         {
-            std::array<VkDescriptorSetLayoutBinding, 9> bindings = {};
+            std::array<VkDescriptorSetLayoutBinding, 10> bindings = {};
 
             // Denoise history, for the per-pixel history length. composite runs a spatial fallback
             // filter over pixels the temporal accumulator has nothing for, and this is how it knows
@@ -740,6 +750,16 @@ namespace Vk
             bindings[8].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
             bindings[8].descriptorCount = 1;
             bindings[8].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+            // The water reflection, at half extent. On this set rather than a set of its own for the
+            // same reason the water pass reuses this layout at all: the pipeline already binds it for
+            // the G-buffer depth, so a reflection costs one more binding and no descriptor plumbing.
+            // Nothing but water.frag declares it, which is fine -- a shader need not declare every
+            // binding in the layout it uses.
+            bindings[9].binding = 9;
+            bindings[9].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            bindings[9].descriptorCount = 1;
+            bindings[9].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
             // Ray traced ambient occlusion. This is what replaces the sShadowFloor placeholder: the
             // floor existed only because a fully shadowed surface had no occlusion term of any kind
@@ -803,7 +823,15 @@ namespace Vk
         // RT layout: TLAS + storage image + G-buffer samplers
         if (mDevice->rayTracingSupported())
         {
-            std::array<VkDescriptorSetLayoutBinding, 16> bindings = {};
+            std::array<VkDescriptorSetLayoutBinding, 17> bindings = {};
+
+            // The water surface's reflection, at half extent. Written by raygen only -- there is no
+            // history to ping-pong, because a reflection off a wave that moves every frame does not
+            // reproject the way a static surface's visibility does. See waterReflectFormat.
+            bindings[16].binding = 16;
+            bindings[16].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+            bindings[16].descriptorCount = 1;
+            bindings[16].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
 
             // Bounce albedo history, read (14) and write (15). Same ping-pong rule as bindings 9-12.
             for (uint32_t i = 14; i <= 15; ++i)
@@ -902,7 +930,12 @@ namespace Vk
             bindings[7].binding = 7;
             bindings[7].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
             bindings[7].descriptorCount = maxSceneTextures;
-            bindings[7].stageFlags = VK_SHADER_STAGE_ANY_HIT_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
+            // Raygen as well as the hit shaders, and that is new: it samples exactly one texture from
+            // this array, the water normal map, to build the wave normal the reflection ray comes off.
+            // The slot arrives in SceneData::waterNormalMap and is therefore dynamically uniform, so
+            // this needs no descriptor indexing feature and no nonuniformEXT at the use site.
+            bindings[7].stageFlags = VK_SHADER_STAGE_ANY_HIT_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR
+                | VK_SHADER_STAGE_RAYGEN_BIT_KHR;
 
             VkDescriptorSetLayoutCreateInfo layoutInfo = {};
             layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -923,16 +956,20 @@ namespace Vk
             // The scene set is allocated per frame in flight and each copy holds the full
             // maxSceneTextures-element sampler array, so the array has to be counted that many times.
             { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                // The 16 is slack that has absorbed every composite sampler added since: albedo,
-                // normal, depth, RT output, material, indirect and the denoise history are seven per
-                // composite set, so this is comfortable rather than exact -- unlike the storage image
-                // count above, which is exact and does have to be maintained.
-                16 + maxFramesInFlight * 4 + maxSceneTextures * maxFramesInFlight },
+                // The slack term absorbs the composite set's own samplers: albedo, normal, depth, RT
+                // output, material, indirect, the denoise history and now the water reflection are
+                // eight per composite set. It was 16 and eight per set across two sets consumed
+                // exactly all of it, so it is 20 now -- the comment used to call 16 "comfortable
+                // rather than exact" and by the time the eighth sampler landed that was no longer
+                // true. Unlike the storage image count below, this one has room to be wrong in the
+                // safe direction; keep it that way.
+                20 + maxFramesInFlight * 4 + maxSceneTextures * maxFramesInFlight },
             // Per RT set: the ray tracing output, the indirect light output, the four denoise history
-            // bindings and the two bounce albedo history bindings -- eight. Plus slack. This count is
-            // exact rather than generous, so adding a storage image anywhere without raising it fails
-            // vkAllocateDescriptorSets with VK_ERROR_OUT_OF_POOL_MEMORY at startup.
-            { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, maxFramesInFlight * 8 + 2 },
+            // bindings, the two bounce albedo history bindings and the water reflection -- nine. Plus
+            // slack. This count is exact rather than generous, so adding a storage image anywhere
+            // without raising it fails vkAllocateDescriptorSets with VK_ERROR_OUT_OF_POOL_MEMORY at
+            // startup.
+            { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, maxFramesInFlight * 9 + 2 },
         };
 
         uint32_t maxSets = maxFramesInFlight * 2 + 4;
@@ -1081,6 +1118,7 @@ namespace Vk
             // when it is, and without ray tracing neither sample is ever read.
             writeCompositeDescriptor(7, mGBuffer.albedoView);
             writeCompositeDescriptor(8, mGBuffer.albedoView);
+            writeCompositeDescriptor(9, mGBuffer.albedoView);
 
             // Bind the scene UBO to each per-frame composite descriptor set
             for (uint32_t i = 0; i < maxFramesInFlight; i++)
@@ -1191,6 +1229,17 @@ namespace Vk
             mRtIndirect.image, mRtIndirect.memory);
         mRtIndirect.view = createImageView(mRtIndirect.image, rtIndirectFormat, VK_IMAGE_ASPECT_COLOR_BIT);
 
+        // Half the swapchain, rounded up. The rounding matters on an odd extent: raygen stores at
+        // pixelCoord >> 1, so the last column and the last row of a 1281-wide launch need a texel of
+        // their own or the shader writes outside the image, which is undefined rather than clipped.
+        const uint32_t waterWidth = (extent.width + 1) / 2;
+        const uint32_t waterHeight = (extent.height + 1) / 2;
+        createImage(waterWidth, waterHeight, waterReflectFormat,
+            VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+            mWaterReflect.image, mWaterReflect.memory);
+        mWaterReflect.view
+            = createImageView(mWaterReflect.image, waterReflectFormat, VK_IMAGE_ASPECT_COLOR_BIT);
+
         VkCommandBuffer cmd = mCommandPool->beginSingleTime();
 
         // Clear rather than just transitioning. composite.frag samples this image unconditionally, but
@@ -1230,13 +1279,30 @@ namespace Vk
         transitionImageLayout(cmd, mRtIndirect.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT);
 
+        // And the water reflection, cleared to all zeros.
+        //
+        // Zero alpha is what water.frag reads as "the ray tracing pass has not run", and it falls back
+        // to the flat sky reflection it drew before any of this existed. So the frames before the first
+        // acceleration structure exists show the old water rather than black water, and the composite
+        // set has a valid image bound at binding 9 from the first draw -- an unwritten element of a
+        // layout without PARTIALLY_BOUND is undefined behaviour, not a read of black.
+        transitionImageLayout(cmd, mWaterReflect.image, VK_IMAGE_LAYOUT_UNDEFINED,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT);
+
+        VkClearColorValue waterClear = {};
+        vkCmdClearColorImage(
+            cmd, mWaterReflect.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &waterClear, 1, &range);
+
+        transitionImageLayout(cmd, mWaterReflect.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT);
+
         mCommandPool->endSingleTime(cmd, mDevice->graphicsQueue());
     }
 
     void Renderer::destroyRtOutput()
     {
         VkDevice dev = mDevice->handle();
-        for (RtOutputImage* target : { &mRtOutput, &mRtIndirect })
+        for (RtOutputImage* target : { &mRtOutput, &mRtIndirect, &mWaterReflect })
         {
             if (target->view != VK_NULL_HANDLE)
             {
@@ -1408,7 +1474,18 @@ namespace Vk
 
             const VkDescriptorImageInfo indirectStorageInfo = makeStorageInfo(mRtIndirect.view);
 
-            std::array<VkWriteDescriptorSet, 13> writes = {};
+            const VkDescriptorImageInfo waterReflectInfo = makeStorageInfo(mWaterReflect.view);
+
+            std::array<VkWriteDescriptorSet, 14> writes = {};
+
+            // Binding 16: the water surface's reflection. One image, not a ping-ponged pair: nothing
+            // reads it back across frames, because there is no temporal history on this signal.
+            writes[13].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            writes[13].dstSet = mRtDescriptorSets[frame];
+            writes[13].dstBinding = 16;
+            writes[13].descriptorCount = 1;
+            writes[13].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+            writes[13].pImageInfo = &waterReflectInfo;
 
             // Binding 13: indirect light output (bounce albedo + sky visibility)
             writes[10].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -1796,20 +1873,15 @@ namespace Vk
             std::array<VkDescriptorSetLayout, 2> setLayouts
                 = { mSceneDescriptorLayout, mCompositeDescriptorLayout };
 
-            // Four bytes, and it cannot be a shader constant: syncTexturesToRenderer compacts the
-            // sampler array down to what the loaded cells reference, so the normal map's slot moves
-            // whenever the live set does.
-            VkPushConstantRange pushRange = {};
-            pushRange.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-            pushRange.offset = 0;
-            pushRange.size = sizeof(uint32_t);
-
+            // No push constants. The normal map's slot used to be pushed here; it lives in
+            // SceneData::waterNormalMap now, because raygen.rgen builds the same wave normal to aim the
+            // reflection ray and needs the same slot, and a raygen shader has no push constant range of
+            // its own to receive it in. One value in one place is also one fewer way for the reflection
+            // and the surface to end up reading different textures.
             VkPipelineLayoutCreateInfo layoutInfo = {};
             layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
             layoutInfo.setLayoutCount = static_cast<uint32_t>(setLayouts.size());
             layoutInfo.pSetLayouts = setLayouts.data();
-            layoutInfo.pushConstantRangeCount = 1;
-            layoutInfo.pPushConstantRanges = &pushRange;
             VK_CHECK(
                 vkCreatePipelineLayout(mDevice->handle(), &layoutInfo, nullptr, &mWaterPipelineLayout));
 
@@ -2824,6 +2896,12 @@ namespace Vk
             transitionImageLayout(cmd, mRtIndirect.image,
                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL,
                 VK_IMAGE_ASPECT_COLOR_BIT);
+            // Not decoration: this branch of transitionImageLayout carries srcAccess SHADER_READ from
+            // srcStage FRAGMENT_SHADER, which is the write-after-read against last frame's water draw
+            // sampling the same image. Two frames in flight means the frame fence does not cover it.
+            transitionImageLayout(cmd, mWaterReflect.image,
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL,
+                VK_IMAGE_ASPECT_COLOR_BIT);
 
             mRtPipeline->bind(cmd);
             vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
@@ -2835,6 +2913,9 @@ namespace Vk
                 VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                 VK_IMAGE_ASPECT_COLOR_BIT);
             transitionImageLayout(cmd, mRtIndirect.image,
+                VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                VK_IMAGE_ASPECT_COLOR_BIT);
+            transitionImageLayout(cmd, mWaterReflect.image,
                 VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                 VK_IMAGE_ASPECT_COLOR_BIT);
 
@@ -2967,6 +3048,9 @@ namespace Vk
             // from the CPU-side copy for the same reason the composite push constants are -- the
             // mapped uniform buffer is write-combined and host reads from it are far slower than they
             // look.
+            //
+            // The reflection this draw samples was traced back in the ray tracing pass, off the same
+            // plane at the same height, so nothing has to happen here for it beyond binding the set.
             if (mWaterPipeline != VK_NULL_HANDLE && mCurrentScene.sunParams.w > 0.0f)
             {
                 vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mWaterPipeline);
@@ -2975,9 +3059,6 @@ namespace Vk
                     = { mSceneDescriptorSets[mCurrentFrame], mCompositeDescriptorSets[mCurrentFrame] };
                 vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mWaterPipelineLayout, 0,
                     static_cast<uint32_t>(sets.size()), sets.data(), 0, nullptr);
-
-                vkCmdPushConstants(cmd, mWaterPipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
-                    sizeof(uint32_t), &mWaterNormalMap);
 
                 // No vertex buffer and no index buffer: water.vert builds the grid from
                 // gl_VertexIndex. This count is the only place the grid size lives on this side and it
@@ -3180,6 +3261,7 @@ namespace Vk
         {
             writeCompositeDescriptor(3, mRtOutput.view);
             writeCompositeDescriptor(7, mRtIndirect.view);
+            writeCompositeDescriptor(9, mWaterReflect.view);
             writeCompositeHistoryDescriptors();
         }
         else
@@ -3187,6 +3269,7 @@ namespace Vk
             writeCompositeDescriptor(3, mGBuffer.albedoView);
             writeCompositeDescriptor(7, mGBuffer.albedoView);
             writeCompositeDescriptor(8, mGBuffer.albedoView);
+            writeCompositeDescriptor(9, mGBuffer.albedoView);
         }
     }
 
@@ -3798,6 +3881,8 @@ namespace Vk
 
         if (mGBufferSampler != VK_NULL_HANDLE)
             vkDestroySampler(dev, mGBufferSampler, nullptr);
+        if (mLinearSampler != VK_NULL_HANDLE)
+            vkDestroySampler(dev, mLinearSampler, nullptr);
         if (mTextureSampler != VK_NULL_HANDLE)
             vkDestroySampler(dev, mTextureSampler, nullptr);
 
