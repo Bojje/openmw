@@ -29,13 +29,16 @@
 #include <components/vk/vkrenderer.hpp>
 #include <components/vk/vktexture.hpp>
 
+#include <components/esm3/loadarmo.hpp>
 #include <components/esm3/loadbody.hpp>
+#include <components/esm3/loadclot.hpp>
 #include <components/esm3/loadnpc.hpp>
 #include <components/esm3/loadrace.hpp>
 
 #include "../mwbase/environment.hpp"
 #include "../mwbase/world.hpp"
 #include "../mwworld/esmstore.hpp"
+#include "../mwworld/inventorystore.hpp"
 #include "npcanimation.hpp"
 #include "../mwworld/cell.hpp"
 #include "../mwworld/cellstore.hpp"
@@ -699,7 +702,7 @@ namespace MWRender
             mRenderer->markTlasDirty();
     }
 
-    void VkRenderingManager::addActorInstances(const MWWorld::ConstPtr& ptr)
+    void VkRenderingManager::addActorInstances(const MWWorld::Ptr& ptr)
     {
         VFS::Path::Normalized model;
         try
@@ -762,7 +765,7 @@ namespace MWRender
         return &mSkeletonCache.emplace(model, std::move(bones)).first->second;
     }
 
-    void VkRenderingManager::addNpcInstances(const MWWorld::ConstPtr& ptr, const float objectTransform[16])
+    void VkRenderingManager::addNpcInstances(const MWWorld::Ptr& ptr, const float objectTransform[16])
     {
         const ESM::NPC* npc = ptr.get<ESM::NPC>()->mBase;
         if (npc == nullptr)
@@ -873,12 +876,79 @@ namespace MWRender
             }
         };
 
+        // Which slots something is already covering. Clothing and armour go on first and the bare
+        // body fills what is left, which is what upstream's priority system amounts to for a
+        // standing NPC. Without it a shirt and a bare chest occupy the same space and z-fight.
+        std::array<bool, ESM::PRT_Count> covered = {};
+
+        const auto boneForPart = [&](int part) -> const char* {
+            for (const PartBone& entry : sPartBones)
+            {
+                if (static_cast<int>(entry.part) == part)
+                    return entry.bone;
+            }
+            return nullptr;
+        };
+
+        // Everything the NPC is wearing. Each clothing or armour record names a body part per slot
+        // it covers, separately for male and female, and those parts hang off the same bones the
+        // bare body does.
+        const auto wearParts = [&](const ESM::PartReferenceList& list) {
+            for (const ESM::PartReference& reference : list.mParts)
+            {
+                if (reference.mPart >= ESM::PRT_Count)
+                    continue;
+
+                // A record often names only one of the two. Falling back to the other is what
+                // upstream does and is why a female NPC in a male-only shirt is dressed rather than
+                // topless.
+                const ESM::RefId& preferred = female ? reference.mFemale : reference.mMale;
+                const ESM::RefId& fallback = female ? reference.mMale : reference.mFemale;
+                const ESM::RefId& chosen = preferred.empty() ? fallback : preferred;
+                if (chosen.empty())
+                    continue;
+
+                const ESM::BodyPart* part = store.get<ESM::BodyPart>().search(chosen);
+                if (part == nullptr)
+                    continue;
+
+                const char* bone = boneForPart(reference.mPart);
+                if (bone == nullptr)
+                    continue;
+
+                covered[reference.mPart] = true;
+                placeAt(Misc::ResourceHelpers::correctMeshPath(part->mModel.getNormalized()).value(), bone);
+            }
+        };
+
+        try
+        {
+            MWWorld::InventoryStore& inventory = ptr.getClass().getInventoryStore(ptr);
+            for (int slot = 0; slot < MWWorld::InventoryStore::Slots; ++slot)
+            {
+                MWWorld::ContainerStoreIterator equipped = inventory.getSlot(slot);
+                if (equipped == inventory.end())
+                    continue;
+
+                if (equipped->getType() == ESM::Clothing::sRecordId)
+                    wearParts(equipped->get<ESM::Clothing>()->mBase->mParts);
+                else if (equipped->getType() == ESM::Armor::sRecordId)
+                    wearParts(equipped->get<ESM::Armor>()->mBase->mParts);
+            }
+        }
+        catch (const std::exception&)
+        {
+            // Not every NPC has an inventory store, and one that throws should still get a body.
+        }
+
         const std::vector<const ESM::BodyPart*>& parts
             = MWRender::NpcAnimation::getBodyParts(npc->mRace, female, false, false);
 
         for (const PartBone& entry : sPartBones)
         {
             if (static_cast<size_t>(entry.part) >= parts.size())
+                continue;
+            if (covered[entry.part])
                 continue;
             const ESM::BodyPart* part = parts[entry.part];
             if (part == nullptr)
@@ -898,9 +968,11 @@ namespace MWRender
     {
         mActorInstances.clear();
 
-        for (const MWWorld::CellStore* cell : activeCells)
+        for (MWWorld::CellStore* cell : activeCells)
         {
-            cell->forEachConst([&](const MWWorld::ConstPtr& ptr) {
+            // forEach rather than forEachConst: an NPC's clothing and armour come out of their
+            // inventory store, and MWWorld::Class::getInventoryStore takes a non-const Ptr.
+            cell->forEach([&](const MWWorld::Ptr& ptr) {
                 if (ptr.getClass().isActor())
                     addActorInstances(ptr);
                 return true;

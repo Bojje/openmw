@@ -41,6 +41,7 @@ namespace MWWorld
 {
     class CellStore;
     class ConstPtr;
+    class Ptr;
 }
 
 namespace MWRender
@@ -161,11 +162,12 @@ namespace MWRender
 
         // Appends every mesh of one actor at its current position. Shared by the cell walk and by
         // the player, who is in no cell's reference list and has to be added by hand.
-        void addActorInstances(const MWWorld::ConstPtr& ptr);
+        void addActorInstances(const MWWorld::Ptr& ptr);
 
         // The NPC case, which is not one model but a skeleton plus a dozen body-part files hung on
-        // its bones by name. Falls back to nothing if the race's parts cannot be resolved.
-        void addNpcInstances(const MWWorld::ConstPtr& ptr, const float objectTransform[16]);
+        // its bones by name, plus whatever they are wearing. Falls back to nothing if the race's
+        // parts cannot be resolved.
+        void addNpcInstances(const MWWorld::Ptr& ptr, const float objectTransform[16]);
 
         // Bind pose of a skeleton NIF, by node name, loaded once and cached. Keyed on the skeleton's
         // model path, since beast races use a different one.
