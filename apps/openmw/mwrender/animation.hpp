@@ -331,6 +331,14 @@ namespace MWRender
 
         MWWorld::Ptr getPtr() { return mPtr; }
 
+        /// The skeleton this actor's parts hang from, or null if it has none. Null for most
+        /// non-actors and for an actor whose object root has not been built yet.
+        ///
+        /// Exposed for the Vulkan renderer, which has to place body parts itself and wants the pose
+        /// the animation system is actually holding rather than the skeleton file's bind pose. Read
+        /// only: the caller reads Bone::mMatrixInSkeletonSpace after the update traversal has run.
+        SceneUtil::Skeleton* getSkeleton() { return mSkeleton; }
+
         /// Set active flag on the object skeleton, if one exists.
         /// @see SceneUtil::Skeleton::setActive
         /// 0 = Inactive, 1 = Active in place, 2 = Active

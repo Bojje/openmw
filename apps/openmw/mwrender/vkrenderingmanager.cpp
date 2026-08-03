@@ -39,6 +39,10 @@
 #include "../mwbase/world.hpp"
 #include "../mwworld/esmstore.hpp"
 #include "../mwworld/inventorystore.hpp"
+
+#include <components/sceneutil/skeleton.hpp>
+
+#include "animation.hpp"
 #include "npcanimation.hpp"
 #include "../mwworld/cell.hpp"
 #include "../mwworld/cellstore.hpp"
@@ -786,6 +790,38 @@ namespace MWRender
         if (bones == nullptr || bones->empty())
             return;
 
+        // The pose the animation system is actually holding this frame, if there is one. Preferred
+        // over the skeleton file's bind pose for the obvious reason: with the bind pose every NPC in
+        // the world stands in the same T-shape forever, and with this one they stand, walk and turn
+        // their heads. Bone::mMatrixInSkeletonSpace is in the actor's own space, which is exactly
+        // what objectTransform expects to be handed.
+        //
+        // It is a *rigid* animation: each part follows its dominant bone as one piece, so joints
+        // pull apart under strong deformation. That is the remaining gap and it needs real skinning,
+        // which is a per-vertex weighted sum -- see section 5.
+        SceneUtil::Skeleton* liveSkeleton = nullptr;
+        if (MWRender::Animation* animation = MWBase::Environment::get().getWorld()->getAnimation(ptr))
+            liveSkeleton = animation->getSkeleton();
+
+        // Live pose if the skeleton has that bone, bind pose otherwise. Both are in the actor's own
+        // space, so the caller does not have to care which it got.
+        const auto lookupBone = [&](const std::string& name, float out[16]) -> bool {
+            if (liveSkeleton != nullptr)
+            {
+                if (SceneUtil::Bone* bone = liveSkeleton->getBone(name))
+                {
+                    osgMatrixToMat4(bone->mMatrixInSkeletonSpace, *reinterpret_cast<Vk::Mat4*>(out));
+                    return true;
+                }
+            }
+
+            const auto found = bones->find(name);
+            if (found == bones->end())
+                return false;
+            std::copy(found->second.begin(), found->second.end(), out);
+            return true;
+        };
+
         // Which bone each kind of part hangs from. The same table MWRender::NpcAnimation keeps, copied
         // rather than shared because that class is welded to OSG and constructing one is a scene graph
         // operation. Only the parts a naked NPC has are here: clothing, armour and held weapons are
@@ -822,8 +858,8 @@ namespace MWRender
             if (partModel.empty())
                 return;
 
-            const auto bone = bones->find(boneName);
-            if (bone == bones->end())
+            float boneMatrix[16];
+            if (!lookupBone(boneName, boneMatrix))
                 return;
 
             const std::vector<size_t>* partMeshes = getOrLoadMeshes(partModel);
@@ -831,7 +867,7 @@ namespace MWRender
                 return;
 
             float actorBone[16];
-            Vk::multiplyMat4(objectTransform, bone->second.data(), actorBone);
+            Vk::multiplyMat4(objectTransform, boneMatrix, actorBone);
 
             for (size_t meshIndex : *partMeshes)
             {
@@ -853,19 +889,12 @@ namespace MWRender
                 // A skinned part whose bone is not in this skeleton falls back to the attachment
                 // bone, which is wrong but local.
                 const NifVk::VulkanMesh& mesh = *mMeshes[meshIndex];
-                if (mesh.skinned && !mesh.skinBone.empty())
+                float skinBoneMatrix[16];
+                if (mesh.skinned && !mesh.skinBone.empty() && lookupBone(mesh.skinBone, skinBoneMatrix))
                 {
-                    const auto skinBone = bones->find(mesh.skinBone);
-                    if (skinBone != bones->end())
-                    {
-                        float actorSkinBone[16];
-                        Vk::multiplyMat4(objectTransform, skinBone->second.data(), actorSkinBone);
-                        Vk::multiplyMat4(actorSkinBone, mesh.skinInvBind, instance.transform);
-                    }
-                    else
-                    {
-                        Vk::multiplyMat4(actorBone, mesh.transform, instance.transform);
-                    }
+                    float actorSkinBone[16];
+                    Vk::multiplyMat4(objectTransform, skinBoneMatrix, actorSkinBone);
+                    Vk::multiplyMat4(actorSkinBone, mesh.skinInvBind, instance.transform);
                 }
                 else
                 {
