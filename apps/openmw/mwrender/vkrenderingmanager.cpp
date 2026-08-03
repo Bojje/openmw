@@ -57,6 +57,7 @@
 #include "../mwworld/class.hpp"
 #include "camera.hpp"
 #include "vklandcomposite.hpp"
+#include "vkglowreader.hpp"
 #include "vkparticlereader.hpp"
 #include "vkskyreader.hpp"
 #include "vkterrainbuilder.hpp"
@@ -315,6 +316,10 @@ namespace MWRender
         // gives it one.
         mSkyReader = std::make_unique<SkyReader>(
             resolveByName, mRenderer->device(), mRenderer->commandPool());
+        // The same resolver again, for the 32 caustic frames the glow cycles through. They are
+        // ordinary textures and there is no reason for them to be loaded, cached or evicted on any
+        // other terms.
+        mGlowReader = std::make_unique<GlowReader>(resolveByName);
         Log(Debug::Info) << "Vulkan renderer initialized";
     }
 
@@ -575,6 +580,13 @@ namespace MWRender
                 submission.roughness = mesh->roughness;
                 submission.specularStrength = mesh->specularStrength;
                 submission.visible = visible;
+                // Enchanted glow, read off the live object this frame. Zero for the overwhelming
+                // majority -- 553 enchanted references exist across the whole game -- and the renderer
+                // skips a submission whose glow texture is zero, so this costs four stores.
+                submission.glowColour[0] = inst.glowColour[0];
+                submission.glowColour[1] = inst.glowColour[1];
+                submission.glowColour[2] = inst.glowColour[2];
+                submission.glowTexture = inst.glowTexture;
 
                 mRenderer->submitMesh(submission);
             }
@@ -1008,6 +1020,12 @@ namespace MWRender
         // World::processDoors swung this frame has already had setAttitude called on its node by the
         // time this reads it, and the Vulkan image agrees with the OSG one on the same frame rather
         // than trailing it by one.
+        // Before refreshMovedObjects, which is where the glow is actually read. All this
+        // clears is the "did anything glow" flag that decides whether the caustic frames are
+        // reported to the live set at all.
+        if (mGlowReader != nullptr)
+            mGlowReader->beginFrame();
+
         const bool detached = refreshMovedObjects();
 
         // The TLAS is only rebuilt when the instance set actually changes, not every frame: a cell
@@ -1026,6 +1044,43 @@ namespace MWRender
         {
             for (CellMeshes::MovedObject& tracked : cellMeshes.tracked)
             {
+                // The glow, read off this object every frame whether or not it has moved.
+                //
+                // It rides in this sweep rather than in a walk of its own because the list is
+                // already here and already being iterated: the marginal cost of a glow read on a
+                // non-glowing object is one node mask test and one stateset pointer, against the
+                // Vec3/Quat compares this loop was doing anyway. A third osg::NodeVisitor over the
+                // whole scene, which is what the particle and sky readers each cost, would be paid
+                // every frame to discover every frame that nothing in the cell is enchanted.
+                //
+                // The cost of sharing the list is that an object trackableNode rejected cannot
+                // glow either. Those are object paging's shared sentinel and references whose node
+                // placement disagrees with their baked transform -- merged scenery, not the
+                // individually placed items enchantments are put on -- so nothing enchanted is
+                // expected to fall in that set. It is the first thing to check if a known glowing
+                // item does not.
+                if (mGlowReader != nullptr && tracked.node != nullptr)
+                {
+                    float glowColour[3] = { 0.0f, 0.0f, 0.0f };
+                    uint32_t glowTexture = 0;
+                    mGlowReader->read(*tracked.node, glowColour, glowTexture);
+
+                    // Written every frame, including the frame a temporary spell-cast glow expires
+                    // and the read comes back false. Left unwritten, an Open spell would light a
+                    // door up for a second and a half and then for the rest of the cell's life.
+                    for (uint32_t i = 0; i < tracked.instanceCount; ++i)
+                    {
+                        const uint32_t index = tracked.firstInstance + i;
+                        if (index >= cellMeshes.instances.size())
+                            break;
+                        CellMeshes::Instance& instance = cellMeshes.instances[index];
+                        instance.glowColour[0] = glowColour[0];
+                        instance.glowColour[1] = glowColour[1];
+                        instance.glowColour[2] = glowColour[2];
+                        instance.glowTexture = glowTexture;
+                    }
+                }
+
                 const SceneUtil::PositionAttitudeTransform& node = *tracked.node;
 
                 // This compare is the entire per-frame cost of the feature for the overwhelming
@@ -1595,6 +1650,18 @@ namespace MWRender
         if (mSkyReader != nullptr)
         {
             for (const size_t index : mSkyReader->textureIndices())
+                mark(index);
+        }
+
+        // Every caustic frame of the enchanted glow, not the one bound this frame. A frame is up
+        // for a sixteenth of a second and comes round again two seconds later, so reported one at a
+        // time the other thirty-one look dead and lose their slots -- and the grace period below
+        // does not save them, because two seconds is 120 frames and the grace is 60. An evicted
+        // caustic resolves to the white fallback, which is not a dimmer glow but a solid
+        // object-shaped block of the enchantment colour added over the scene.
+        if (mGlowReader != nullptr)
+        {
+            for (const size_t index : mGlowReader->textureIndices())
                 mark(index);
         }
 

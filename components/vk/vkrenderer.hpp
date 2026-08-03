@@ -386,6 +386,16 @@ namespace Vk
         // the acceleration structure would make shadows pop in and out as the camera turns, which is a
         // far worse artifact than the draw call it saves.
         bool visible = true;
+
+        // The enchanted glow, or nothing. Slot 0 -- the white fallback -- means this mesh does not
+        // glow, which is true of all but a few hundred references in the game; there is no separate
+        // flag because a glow with no texture is not a thing that can be drawn.
+        //
+        // The colour is in *gamma* space, unlike every other colour that reaches this renderer. See
+        // glow.frag: the product with the caustic sample is taken in gamma the way objects.frag
+        // takes it, and decoded there.
+        float glowColour[3] = { 0.0f, 0.0f, 0.0f };
+        uint32_t glowTexture = 0;
     };
 
     struct MeshDrawCommand
@@ -408,6 +418,8 @@ namespace Vk
         // it onto the wrong member.
         VkBuffer skinBuffer;
         uint32_t boneOffset;
+        float glowColour[3];
+        uint32_t glowTexture;
     };
 
     // Layout of the G-buffer pipeline's push constant block. This must match the block declared in
@@ -445,6 +457,33 @@ namespace Vk
     static_assert(offsetof(GBufferPushConstants, roughness) == 116, "roughness must be at byte 116");
     static_assert(offsetof(GBufferPushConstants, specularStrength) == 120, "specularStrength at byte 120");
     static_assert(offsetof(GBufferPushConstants, boneOffset) == 124, "boneOffset must be at byte 124");
+
+    // Layout of the glow pipeline's push constant block, matching glow.vert / glow.frag byte for
+    // byte. Same shape as the G-buffer's above, deliberately: the mat3 padding rule that puts
+    // normalMatrix at 48 bytes rather than 36 is the thing most likely to be got wrong here, and
+    // having the two blocks read identically is what makes it obvious.
+    //
+    //     offset   0, size 64  mat4 model
+    //     offset  64, size 48  mat3 normalMatrix
+    //     offset 112, size 12  vec3 glowColour
+    //     offset 124, size  4  uint glowTexture
+    //     total 128 bytes, which is the maxPushConstantsSize Vulkan guarantees everywhere.
+    //
+    // No headroom at all. Anything else this pass ever needs has to displace something here or move
+    // to a per-instance buffer.
+    struct GlowPushConstants
+    {
+        Mat4 model;
+        float normalMatrix[12];
+        float glowColour[3];
+        uint32_t glowTexture;
+    };
+
+    static_assert(sizeof(GlowPushConstants) == 128, "glow push constant layout must match glow.vert/.frag");
+    static_assert(sizeof(GlowPushConstants) <= 128, "exceeds the guaranteed maxPushConstantsSize");
+    static_assert(offsetof(GlowPushConstants, normalMatrix) == 64, "normalMatrix must be at byte 64");
+    static_assert(offsetof(GlowPushConstants, glowColour) == 112, "glowColour must be at byte 112");
+    static_assert(offsetof(GlowPushConstants, glowTexture) == 124, "glowTexture must be at byte 124");
 
     struct GBufferAttachments
     {
@@ -814,6 +853,14 @@ namespace Vk
         // Sampler slot of the water normal map, or 0 when it is not resident. Pushed as the water
         // pipeline's only push constant.
         uint32_t mWaterNormalMap = 0;
+
+        // The enchanted item glow, drawn in the composite pass after the particles as a second pass
+        // over meshes the G-buffer already drew. Null if its shaders were missing, which costs the
+        // glow and nothing else. It draws out of mDrawCommands rather than a buffer of its own --
+        // the geometry is already there, and a glowing object is one that was submitted normally
+        // and also carries a glow texture.
+        VkPipeline mGlowPipeline = VK_NULL_HANDLE;
+        VkPipelineLayout mGlowPipelineLayout = VK_NULL_HANDLE;
 
         // The sun disc and the two moons. Drawn inside the composite pass, after the sky gradient the
         // composite shader paints and *before* the particles, so rain and ash fall in front of a moon

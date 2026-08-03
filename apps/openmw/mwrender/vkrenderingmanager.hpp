@@ -60,6 +60,7 @@ namespace MWRender
     class LandComposite;
     class ParticleReader;
     class SkyReader;
+    class GlowReader;
     struct LandBlend;
 
     class VkRenderingManager
@@ -139,6 +140,17 @@ namespace MWRender
             {
                 size_t meshIndex;
                 float transform[16];
+
+                // The enchanted glow this instance draws with, refreshed every frame by
+                // refreshMovedObjects. A glowTexture of 0 -- the white fallback slot -- means it
+                // does not glow, which is the case for all but a few hundred references in the
+                // game.
+                //
+                // Per instance rather than per mesh, because the glow belongs to the *reference*
+                // and not to the model: two iron daggers on the same table share a mesh and only
+                // one of them is enchanted.
+                float glowColour[3] = { 0.0f, 0.0f, 0.0f };
+                uint32_t glowTexture = 0;
 
                 // Whether this instance's BLAS goes into the acceleration structure.
                 //
@@ -314,6 +326,10 @@ namespace MWRender
         // quads discriminated by a uniform, not an unbounded set of particle systems -- and because
         // one of them can be switched off without touching the other.
         std::unique_ptr<SkyReader> mSkyReader;
+        // Reads the same graph again, but not by walking it: it is asked about one object at a
+        // time, from the tracked list refreshMovedObjects already sweeps. A third full traversal to
+        // find the handful of glowing objects in a cell would cost more than the feature is worth.
+        std::unique_ptr<GlowReader> mGlowReader;
 
         std::unordered_map<std::string, std::vector<size_t>> mMeshCache;
         std::vector<std::unique_ptr<NifVk::VulkanMesh>> mMeshes;

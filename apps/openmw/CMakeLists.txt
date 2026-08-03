@@ -25,7 +25,7 @@ add_openmw_dir (mwrender
     postprocessor pingpongcull luminancecalculator pingpongcanvas transparentpass precipitationocclusion ripples
     actorutil distortion animationpriority bonegroup blendmask animblendcontroller
     vkrenderingmanager vkterrainbuilder vklightcollector vklandcomposite vkparticlereader
-    vkskyreader vkskymesh
+    vkskyreader vkskymesh vkglowreader
     )
 
 add_openmw_dir (mwinput

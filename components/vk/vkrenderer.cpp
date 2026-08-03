@@ -1556,6 +1556,10 @@ namespace Vk
         // before the water surface existed at all.
         auto waterVert = loadShader("water.vert.spv");
         auto waterFrag = loadShader("water.frag.spv");
+        // Nor these. Without them every enchanted item in the game looks mundane, which is a
+        // gameplay signal rather than a decoration -- the glow is how a player tells loot apart.
+        auto glowVert = loadShader("glow.vert.spv");
+        auto glowFrag = loadShader("glow.frag.spv");
         // Nor these. Without them the sky keeps its gradient and loses the sun and both moons, which
         // is a survivable build and an obvious one to look at.
         auto skyVert = loadShader("sky.vert.spv");
@@ -1919,6 +1923,130 @@ namespace Vk
             blend.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
             VK_CHECK(vkCreateGraphicsPipelines(mDevice->handle(), VK_NULL_HANDLE, 1, &pipelineInfo,
                 nullptr, &mParticleBlendedPipeline));
+        }
+
+        // Glow pipeline. Draws inside the composite render pass, after the particles, so like them
+        // it needs no render pass and no framebuffer of its own.
+        if (glowVert && glowFrag)
+        {
+            std::array<VkPipelineShaderStageCreateInfo, 2> stages
+                = { glowVert->stageInfo(VK_SHADER_STAGE_VERTEX_BIT),
+                      glowFrag->stageInfo(VK_SHADER_STAGE_FRAGMENT_BIT) };
+
+            // The same two sets the particles and the water use: the scene set for the camera and
+            // the sampler array, the composite set for the G-buffer depth. Reusing them is what
+            // keeps this free of descriptor plumbing.
+            std::array<VkDescriptorSetLayout, 2> setLayouts
+                = { mSceneDescriptorLayout, mCompositeDescriptorLayout };
+
+            // Both stages, because the vertex shader needs the model and normal matrices and the
+            // fragment shader needs the colour and the slot. Declaring it fragment-only and pushing
+            // with a vertex stage flag is a validation error rather than a silent one, which is the
+            // one mercy here.
+            VkPushConstantRange pushRange = {};
+            pushRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+            pushRange.offset = 0;
+            pushRange.size = sizeof(GlowPushConstants);
+
+            VkPipelineLayoutCreateInfo layoutInfo = {};
+            layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+            layoutInfo.setLayoutCount = static_cast<uint32_t>(setLayouts.size());
+            layoutInfo.pSetLayouts = setLayouts.data();
+            layoutInfo.pushConstantRangeCount = 1;
+            layoutInfo.pPushConstantRanges = &pushRange;
+            VK_CHECK(vkCreatePipelineLayout(mDevice->handle(), &layoutInfo, nullptr, &mGlowPipelineLayout));
+
+            // The same vertex layout the G-buffer pass uses, because this draws the same buffers.
+            // All four attributes are described even though glow.vert reads only the first two: the
+            // binding stride has to cover the whole 48-byte vertex regardless, and leaving the
+            // unread ones out of the description would make the stride a second place to get it
+            // wrong.
+            std::array<VkVertexInputBindingDescription, 1> bindingDesc = {};
+            bindingDesc[0].binding = 0;
+            bindingDesc[0].stride = sizeof(float) * (3 + 3 + 2 + 4);
+            bindingDesc[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+            std::array<VkVertexInputAttributeDescription, 4> attrDesc = {};
+            attrDesc[0] = { 0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0 };
+            attrDesc[1] = { 1, 0, VK_FORMAT_R32G32B32_SFLOAT, sizeof(float) * 3 };
+            attrDesc[2] = { 2, 0, VK_FORMAT_R32G32_SFLOAT, sizeof(float) * 6 };
+            attrDesc[3] = { 3, 0, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(float) * 8 };
+
+            VkPipelineVertexInputStateCreateInfo vertexInput = {};
+            vertexInput.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+            vertexInput.vertexBindingDescriptionCount = static_cast<uint32_t>(bindingDesc.size());
+            vertexInput.pVertexBindingDescriptions = bindingDesc.data();
+            vertexInput.vertexAttributeDescriptionCount = static_cast<uint32_t>(attrDesc.size());
+            vertexInput.pVertexAttributeDescriptions = attrDesc.data();
+
+            VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
+            inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+            inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+
+            VkPipelineViewportStateCreateInfo viewportState = {};
+            viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+            viewportState.viewportCount = 1;
+            viewportState.scissorCount = 1;
+
+            // Back faces culled, the same way the G-buffer culls them. Without it the inside of a
+            // closed object is drawn as well, and since the glow is additive that doubles it
+            // wherever the two surfaces project to the same pixel.
+            VkPipelineRasterizationStateCreateInfo rasterizer = {};
+            rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+            rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+            rasterizer.lineWidth = 1.0f;
+            rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
+            rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+
+            VkPipelineMultisampleStateCreateInfo multisampling = {};
+            multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+            multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+            // The composite pass has no depth attachment, so there is nothing to test against here.
+            // glow.frag samples the G-buffer depth and discards instead.
+            VkPipelineDepthStencilStateCreateInfo depthStencil = {};
+            depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+            depthStencil.depthTestEnable = VK_FALSE;
+            depthStencil.depthWriteEnable = VK_FALSE;
+
+            // Straight addition -- ONE, ONE -- rather than the particles' SRC_ALPHA, ONE, because
+            // upstream adds the glow to the fragment with no weight at all: `gl_FragData[0].xyz +=
+            // envEffect`. The alpha factors leave the attachment's alpha alone; glow.frag writes
+            // zero there.
+            VkPipelineColorBlendAttachmentState blend = {};
+            blend.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT
+                | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+            blend.blendEnable = VK_TRUE;
+            blend.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
+            blend.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
+            blend.colorBlendOp = VK_BLEND_OP_ADD;
+            blend.srcAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+            blend.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+            blend.alphaBlendOp = VK_BLEND_OP_ADD;
+
+            VkPipelineColorBlendStateCreateInfo colorBlending = {};
+            colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+            colorBlending.attachmentCount = 1;
+            colorBlending.pAttachments = &blend;
+
+            VkGraphicsPipelineCreateInfo pipelineInfo = {};
+            pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+            pipelineInfo.stageCount = static_cast<uint32_t>(stages.size());
+            pipelineInfo.pStages = stages.data();
+            pipelineInfo.pVertexInputState = &vertexInput;
+            pipelineInfo.pInputAssemblyState = &inputAssembly;
+            pipelineInfo.pViewportState = &viewportState;
+            pipelineInfo.pRasterizationState = &rasterizer;
+            pipelineInfo.pMultisampleState = &multisampling;
+            pipelineInfo.pDepthStencilState = &depthStencil;
+            pipelineInfo.pColorBlendState = &colorBlending;
+            pipelineInfo.pDynamicState = &dynamicState;
+            pipelineInfo.layout = mGlowPipelineLayout;
+            pipelineInfo.renderPass = mCompositeRenderPass;
+            pipelineInfo.subpass = 0;
+
+            VK_CHECK(vkCreateGraphicsPipelines(
+                mDevice->handle(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &mGlowPipeline));
         }
 
         // Sky pipeline -- the sun disc and the two moons. In the composite pass alongside the
@@ -2681,6 +2809,68 @@ namespace Vk
                 }
             }
 
+            // The enchanted item glow. After the particles rather than before them, and both of the
+            // reasons are about addition: it is additive, so it commutes with the particles and its
+            // position relative to them cannot change the result, and putting it last keeps the one
+            // pass that walks mDrawCommands out of the middle of the effect draws.
+            //
+            // It is a second draw of geometry the G-buffer already drew. That is not how upstream
+            // does it -- OSG folds the glow into the object's own fragment shader as one extra
+            // texture fetch and an add, costing no draw call at all -- but Vk::GBufferPushConstants
+            // is full at 128 bytes with pinned offsets, so there is nowhere to put a colour and a
+            // slot. The draws are cheap because there are almost never any: 553 enchanted item
+            // references are placed across the whole of Morrowind, Tribunal and Bloodmoon, so a
+            // loaded cell set has none most of the time and single figures at worst.
+            if (mGlowPipeline != VK_NULL_HANDLE)
+            {
+                bool boundGlow = false;
+                for (const MeshDrawCommand& draw : mDrawCommands)
+                {
+                    // Slot 0 is the white fallback and means "no glow" -- see MeshSubmission. It is
+                    // also what an evicted texture answers, which is why the reader refuses to
+                    // report a glow it could not resolve: an object-shaped block of solid colour
+                    // added over the scene is far worse than no glow at all.
+                    if (draw.glowTexture == 0 || !draw.visible)
+                        continue;
+
+                    if (!boundGlow)
+                    {
+                        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mGlowPipeline);
+                        std::array<VkDescriptorSet, 2> sets = { mSceneDescriptorSets[mCurrentFrame],
+                            mCompositeDescriptorSets[mCurrentFrame] };
+                        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                            mGlowPipelineLayout, 0, static_cast<uint32_t>(sets.size()), sets.data(),
+                            0, nullptr);
+                        boundGlow = true;
+                    }
+
+                    GlowPushConstants push = {};
+                    push.model = draw.transform;
+                    // The 4x4 normal matrix squeezed into three padded columns, the same repacking
+                    // the G-buffer draw does. Copying all sixteen floats instead silently shifts
+                    // glowColour by four bytes and the glow comes out black.
+                    for (int col = 0; col < 3; ++col)
+                    {
+                        for (int row = 0; row < 3; ++row)
+                            push.normalMatrix[col * 4 + row] = draw.normalMatrix.data[col * 4 + row];
+                        push.normalMatrix[col * 4 + 3] = 0.0f;
+                    }
+                    push.glowColour[0] = draw.glowColour[0];
+                    push.glowColour[1] = draw.glowColour[1];
+                    push.glowColour[2] = draw.glowColour[2];
+                    push.glowTexture = draw.glowTexture;
+
+                    vkCmdPushConstants(cmd, mGlowPipelineLayout,
+                        VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
+                        sizeof(push), &push);
+
+                    VkDeviceSize offset = 0;
+                    vkCmdBindVertexBuffers(cmd, 0, 1, &draw.vertexBuffer, &offset);
+                    vkCmdBindIndexBuffer(cmd, draw.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+                    vkCmdDrawIndexed(cmd, draw.indexCount, 1, 0, 0, 0);
+                }
+            }
+
             // The user interface draws here, sharing the composite pass rather than running one of its
             // own. It blends straight onto the tone mapped scene in the swapchain image, so there is no
             // second attachment, no extra layout transition and nothing to resolve. Outside the
@@ -3080,7 +3270,9 @@ namespace Vk
             submission.transform, normalMatrix, submission.blasAddress, submission.vertexAddress,
             submission.indexAddress, slot, submission.alphaTested, submission.roughness,
             submission.specularStrength, submission.visible, submission.skinBuffer,
-            submission.boneOffset });
+            submission.boneOffset,
+            { submission.glowColour[0], submission.glowColour[1], submission.glowColour[2] },
+            submission.glowTexture });
     }
 
     void Renderer::uploadGeometryTable(const std::vector<GeometryRecord>& records)
@@ -3325,6 +3517,11 @@ namespace Vk
             vkDestroyPipeline(dev, mParticlePipeline, nullptr);
         if (mParticlePipelineLayout != VK_NULL_HANDLE)
             vkDestroyPipelineLayout(dev, mParticlePipelineLayout, nullptr);
+
+        if (mGlowPipeline != VK_NULL_HANDLE)
+            vkDestroyPipeline(dev, mGlowPipeline, nullptr);
+        if (mGlowPipelineLayout != VK_NULL_HANDLE)
+            vkDestroyPipelineLayout(dev, mGlowPipelineLayout, nullptr);
         if (mGBufferSkinnedPipeline != VK_NULL_HANDLE)
             vkDestroyPipeline(dev, mGBufferSkinnedPipeline, nullptr);
         if (mGBufferPipeline != VK_NULL_HANDLE)
