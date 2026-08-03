@@ -34,6 +34,11 @@
 #include <components/esm3/loadclot.hpp>
 #include <components/esm3/loadnpc.hpp>
 #include <components/esm3/loadrace.hpp>
+#include <components/esm3/loadweap.hpp>
+
+#include "../mwmechanics/creaturestats.hpp"
+#include "../mwmechanics/drawstate.hpp"
+#include "../mwmechanics/weapontype.hpp"
 
 #include "../mwbase/environment.hpp"
 #include "../mwbase/world.hpp"
@@ -1068,17 +1073,46 @@ namespace MWRender
                     || slot == MWWorld::InventoryStore::Slot_CarriedLeft)
                 {
                     // A held weapon, torch or shield is not a body part: it is an ordinary object
-                    // model hung on a bone of its own. Which bone the right hand uses depends on the
-                    // weapon type in the OSG path -- a bow sits differently from a sword -- and
-                    // "Weapon Bone" is the fallback that table itself names, which is close enough
-                    // for something that is not animated anyway.
-                    const char* bone = slot == MWWorld::InventoryStore::Slot_CarriedRight ? "Weapon Bone"
-                                                                                         : "Shield Bone";
+                    // model hung on a bone of its own.
+                    //
+                    // Which bone the right hand uses depends on the weapon's type, and the mapping
+                    // is data rather than convention: ESM::WeaponType::mAttachBone. A bow hangs off
+                    // "Weapon Bone Left", a crossbow off "Weapon Bone", a thrown weapon off its own.
+                    // Getting it wrong puts a bow through the NPC's chest rather than in its hand.
+                    //
+                    // The same fallback the OSG path uses, and for the same reason: a skeleton that
+                    // does not have the named bone -- older or modded content -- gets "Weapon Bone",
+                    // which every skeleton has. See MWRender::CreatureWeaponAnimation::updatePart.
+                    // An equipped weapon is only in the hand while it is drawn. The OSG path hangs
+                    // that off NpcAnimation::showWeapons, which the character controller drives from
+                    // the draw state; read the draw state directly instead, since there is no
+                    // animation object here to be told. Without this an NPC standing at a bar walks
+                    // around holding a sword nobody drew, which is geometry the reference image does
+                    // not have. What is *not* skipped is the sheathed weapon on the back: that needs
+                    // "Bip01 AttachShield" and is a separate piece of work.
+                    if (slot == MWWorld::InventoryStore::Slot_CarriedRight
+                        && ptr.getClass().getCreatureStats(ptr).getDrawState() != MWMechanics::DrawState::Weapon)
+                        continue;
+
+                    std::string bone = "Shield Bone";
+                    if (slot == MWWorld::InventoryStore::Slot_CarriedRight)
+                    {
+                        bone = "Weapon Bone";
+                        if (equipped->getType() == ESM::Weapon::sRecordId)
+                        {
+                            const int weaponType = equipped->get<ESM::Weapon>()->mBase->mData.mType;
+                            const std::string attachBone(MWMechanics::getWeaponType(weaponType)->mAttachBone);
+                            float unused[16];
+                            if (!attachBone.empty() && lookupBone(attachBone, unused))
+                                bone = attachBone;
+                        }
+                    }
+
                     try
                     {
                         const std::string itemModel(equipped->getClass().getCorrectedModel(*equipped).value());
                         covered[ESM::PRT_Weapon] = true;
-                        placeAt(itemModel, bone);
+                        placeAt(itemModel, bone.c_str());
                     }
                     catch (const std::exception&)
                     {
