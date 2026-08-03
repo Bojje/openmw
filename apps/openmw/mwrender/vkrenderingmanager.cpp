@@ -364,13 +364,19 @@ namespace MWRender
 
             float worldMin[3];
             float worldMax[3];
-            Vk::transformBounds(transform, mesh->boundsMin, mesh->boundsMax, worldMin, worldMax);
-            // A skinned shape's bounds describe where its vertices sit before the pose, and the pose
-            // is what actually decides where they land -- a part authored about the origin is drawn
-            // at the chest. Culling on those bounds threw away all but one skinned shape a frame,
-            // which read as the body being torn apart rather than as anything to do with culling.
-            // There are a couple of hundred of them at most, so they are simply not culled.
-            const bool visible = isSkinned || Vk::boxInFrustum(frustum, worldMin, worldMax);
+            if (isSkinned)
+            {
+                // Posed bounds, computed with the palette in syncActors. The mesh's own bounds
+                // describe where the vertices sit *before* the pose and culling on those threw away
+                // all but one skinned shape a frame -- HANDOFF trap 37.
+                std::copy(inst.worldMin, inst.worldMin + 3, worldMin);
+                std::copy(inst.worldMax, inst.worldMax + 3, worldMax);
+            }
+            else
+            {
+                Vk::transformBounds(transform, mesh->boundsMin, mesh->boundsMax, worldMin, worldMax);
+            }
+            const bool visible = Vk::boxInFrustum(frustum, worldMin, worldMax);
             if (visible)
                 ++drawn;
             else
@@ -959,6 +965,30 @@ namespace MWRender
                             Vk::identityMat4(palette);
                         }
                         mSkinMatrices.insert(mSkinMatrices.end(), palette, palette + 16);
+
+                        // The same bounds through the same matrix the vertices go through, unioned
+                        // over the bones. Done here rather than at submission time because this is
+                        // where the palette exists; recomputing it later would mean keeping it.
+                        Vk::Mat4 posed;
+                        Vk::multiplyMat4(objectTransform, palette, posed.data);
+
+                        float boneMin[3];
+                        float boneMax[3];
+                        Vk::transformBounds(posed, mesh.boundsMin, mesh.boundsMax, boneMin, boneMax);
+
+                        if (bone == 0)
+                        {
+                            std::copy(boneMin, boneMin + 3, instance.worldMin);
+                            std::copy(boneMax, boneMax + 3, instance.worldMax);
+                        }
+                        else
+                        {
+                            for (int axis = 0; axis < 3; ++axis)
+                            {
+                                instance.worldMin[axis] = std::min(instance.worldMin[axis], boneMin[axis]);
+                                instance.worldMax[axis] = std::max(instance.worldMax[axis], boneMax[axis]);
+                            }
+                        }
                     }
                 }
                 else if (mesh.skinned && !mesh.skinBone.empty() && lookupBone(mesh.skinBone, skinBoneMatrix))

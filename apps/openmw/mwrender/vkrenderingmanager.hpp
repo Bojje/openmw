@@ -158,6 +158,17 @@ namespace MWRender
             // none and is therefore drawn rigidly. Per instance and not per mesh: two NPCs share the
             // same shirt mesh and stand in different poses.
             uint32_t boneOffset = Vk::sNoBones;
+
+            // World-space bounds of a skinned instance, valid only when boneOffset is set.
+            //
+            // A skinned shape cannot be culled on its mesh's bounds put through its instance
+            // transform, because those describe the vertices before the pose and the pose is what
+            // decides where they land -- see HANDOFF trap 37, which is what happens when it is tried.
+            // These are the union of the mesh's bounds through every one of the instance's bone
+            // matrices, which over-estimates -- a vertex is only moved by the bones it is weighted
+            // to -- but never under-estimates, and an over-estimate only costs a draw.
+            float worldMin[3] = { 0.0f, 0.0f, 0.0f };
+            float worldMax[3] = { 0.0f, 0.0f, 0.0f };
         };
         std::vector<ActorInstance> mActorInstances;
 
