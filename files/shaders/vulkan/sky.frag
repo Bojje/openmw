@@ -26,6 +26,25 @@ layout(push_constant) uniform SkyPush {
 
 layout(location = 0) out vec4 outColor;
 
+// paintMoon below is a port of a shader that never leaves gamma space, and it has to be run there.
+// Its two textures arrive *linear*, because the loader gives them an _SRGB format and the sampler
+// decodes on read, while moonBlend and atmosphereFade are read straight off the OSG stateset and are
+// gamma. Multiplying one by the other mixes the two spaces, and because the products do not commute
+// with the transfer function the result is far too bright: a mask of 0.8 gamma against a fade of 0.37
+// gives 0.30 in display terms upstream and 0.51 here. That is why the moons were near-solid discs on a
+// night sky where the OSG image shows almost nothing.
+//
+// So: encode the samples back to gamma, composite exactly as upstream does, and decode the result for
+// the _SRGB attachment. Alpha is untouched -- the alpha channel of an _SRGB format is already linear.
+vec3 srgbEncode(vec3 c) {
+    c = clamp(c, 0.0, 1.0);
+    return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, greaterThan(c, vec3(0.0031308)));
+}
+
+vec3 srgbDecode(vec3 c) {
+    return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), greaterThan(c, vec3(0.04045)));
+}
+
 void main() {
     // Screen-space UV for the depth fetch. Vulkan's framebuffer origin is top-left and so is the depth
     // image's, so this needs no flip -- see trap 15, which is the same fact biting the other way round.
@@ -58,12 +77,12 @@ void main() {
         // color.rgb = mask.rgb * mask.a + phase.rgb * phase.a
         // color.a = mask.a
         // dst.rgb = color.rgb + dst.rgb * (1 - color.a)
-        vec3 maskTinted = mask.rgb * sky.atmosphereFade.rgb;
+        vec3 maskTinted = srgbEncode(mask.rgb) * sky.atmosphereFade.rgb;
         float maskAlpha = mask.a * sky.atmosphereFade.a;
-        vec3 phaseTinted = phase.rgb * sky.moonBlend.rgb;
+        vec3 phaseTinted = srgbEncode(phase.rgb) * sky.moonBlend.rgb;
         float phaseAlpha = phase.a * sky.atmosphereFade.a;
 
-        colour.rgb = maskTinted * maskAlpha + phaseTinted * phaseAlpha;
+        colour.rgb = srgbDecode(maskTinted * maskAlpha + phaseTinted * phaseAlpha);
         colour.a = maskAlpha;
     } else {
         // paintSun: the colour is the texture and the alpha is the texture's times the material's
