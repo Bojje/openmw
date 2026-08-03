@@ -42,10 +42,13 @@ namespace
         return (data.getLoadFlags() & flag) != 0;
     }
 
-    /// The three cells that share this cell's north and east edges, loaded on demand.
+    /// The eight cells surrounding this one, loaded on demand.
     ///
     /// Constructing an ESM::LandData re-reads the record and fills a ~45 KB LandRecordData, so the
     /// results are kept for the whole build instead of being rebuilt per edge vertex.
+    ///
+    /// All eight rather than the three to the north and east, because averaging a corner normal
+    /// reaches one vertex *back* across the south and west edges as well as forward.
     class EdgeNeighbours
     {
     public:
@@ -56,13 +59,15 @@ namespace
         {
         }
 
-        /// \a offsetX and \a offsetY are each 0 or 1; (0, 0) is this cell and is never asked for.
-        /// Returns nullptr when the neighbour has no LAND record.
+        /// \a offsetX and \a offsetY are each -1, 0 or 1; (0, 0) is this cell and returns nullptr,
+        /// so callers can hand this any offset and fall back to their own data on null. Also null
+        /// when the neighbour has no LAND record, which is the map edge and the sea.
         const ESM::LandData* get(int offsetX, int offsetY)
         {
-            const std::size_t slot = static_cast<std::size_t>(offsetY * 2 + offsetX);
-            if (slot == 0)
+            if (offsetX == 0 && offsetY == 0)
                 return nullptr;
+
+            const std::size_t slot = static_cast<std::size_t>((offsetY + 1) * 3 + (offsetX + 1));
 
             if (!mSearched[slot])
             {
@@ -78,8 +83,8 @@ namespace
         const MWWorld::Store<ESM::Land>& mStore;
         int mCellX;
         int mCellY;
-        std::array<std::optional<ESM::LandData>, 4> mData;
-        std::array<bool, 4> mSearched{};
+        std::array<std::optional<ESM::LandData>, 9> mData;
+        std::array<bool, 9> mSearched{};
     };
 
     /// Produces the 12 interleaved floats for one grid vertex of a single cell.
@@ -102,11 +107,52 @@ namespace
 
             // Morrowind writes garbage into the last row and column of the normal array (and
             // occasionally the colour array) because those vertices are duplicates of the first row
-            // and column of the neighbouring cell, which holds the real values.
-            // ESMTerrain::Storage::fixNormal/fixColour substitute the neighbour's copy; do the same.
-            // OpenMW goes further and averages the four surrounding normals at the cell corners
-            // (averageNormal), because some corners are garbage in every cell that touches them. Not
-            // worth it for a first pass -- the plain substitution removes the visible seam.
+            // and column of the neighbouring cell, which holds the real values. normalAt substitutes
+            // the neighbour's copy, the way ESMTerrain::Storage::fixNormal does.
+            //
+            // The four cell corners need more than that: they are garbage in *every* cell that
+            // touches them, so there is no neighbour holding a good value to substitute. OpenMW
+            // averages the four surrounding vertices instead (Storage::averageNormal) and so does
+            // this. Four vertices a cell, and without it each corner is a visible shading spike.
+            float nx = 0.0f;
+            float ny = 0.0f;
+            float nz = 1.0f;
+
+            const bool isCorner = (x == 0 || x == sQuadsPerSide) && (y == 0 || y == sQuadsPerSide);
+            if (isCorner)
+            {
+                float sum[3] = { 0.0f, 0.0f, 0.0f };
+                const int offsets[4][2] = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } };
+                for (const auto& offset : offsets)
+                {
+                    float neighbour[3];
+                    normalAt(x + offset[0], y + offset[1], neighbour);
+                    sum[0] += neighbour[0];
+                    sum[1] += neighbour[1];
+                    sum[2] += neighbour[2];
+                }
+                normalise(sum, nx, ny, nz);
+            }
+            else
+            {
+                float own[3];
+                normalAt(x, y, own);
+                nx = own[0];
+                ny = own[1];
+                nz = own[2];
+            }
+
+            out[3] = nx;
+            out[4] = ny;
+            out[5] = nz;
+
+            // A land texture tile spans 4 quads (512 units), so u/v run 0..16 across the cell, which
+            // is the tiling vanilla uses.
+            out[6] = x / static_cast<float>(sQuadsPerTile);
+            out[7] = y / static_cast<float>(sQuadsPerTile);
+
+            // Colour takes the plain substitution only. The corner averaging above exists because a
+            // corner *normal* is garbage in every cell that touches it; the colours there are fine.
             const ESM::LandData* edge = nullptr;
             int edgeX = x;
             int edgeY = y;
@@ -118,48 +164,6 @@ namespace
                 edgeX = offsetX != 0 ? 0 : x;
                 edgeY = offsetY != 0 ? 0 : y;
             }
-
-            const ESM::LandData* normalSource = &mLand;
-            std::size_t normalIndex = index;
-            if (edge != nullptr && hasData(*edge, ESM::Land::DATA_VNML))
-            {
-                normalSource = edge;
-                normalIndex = static_cast<std::size_t>(edgeY) * sLandSize + edgeX;
-            }
-
-            float nx = 0.0f;
-            float ny = 0.0f;
-            float nz = 1.0f;
-            if (hasData(*normalSource, ESM::Land::DATA_VNML))
-            {
-                const std::span<const std::int8_t> normals = normalSource->getNormals();
-                nx = static_cast<float>(normals[normalIndex * 3]);
-                ny = static_cast<float>(normals[normalIndex * 3 + 1]);
-                nz = static_cast<float>(normals[normalIndex * 3 + 2]);
-
-                const float length = std::sqrt(nx * nx + ny * ny + nz * nz);
-                if (length > 0.0f)
-                {
-                    nx /= length;
-                    ny /= length;
-                    nz /= length;
-                }
-                else
-                {
-                    nx = 0.0f;
-                    ny = 0.0f;
-                    nz = 1.0f;
-                }
-            }
-
-            out[3] = nx;
-            out[4] = ny;
-            out[5] = nz;
-
-            // A land texture tile spans 4 quads (512 units), so u/v run 0..16 across the cell, which
-            // is the tiling vanilla uses.
-            out[6] = x / static_cast<float>(sQuadsPerTile);
-            out[7] = y / static_cast<float>(sQuadsPerTile);
 
             const ESM::LandData* colourSource = &mLand;
             std::size_t colourIndex = index;
@@ -198,6 +202,92 @@ namespace
         }
 
     private:
+        static void normalise(const float in[3], float& x, float& y, float& z)
+        {
+            const float length = std::sqrt(in[0] * in[0] + in[1] * in[1] + in[2] * in[2]);
+            if (length > 0.0f)
+            {
+                x = in[0] / length;
+                y = in[1] / length;
+                z = in[2] / length;
+            }
+            else
+            {
+                // Straight up. A zero normal is not a direction and shading it as one puts a black
+                // spot on the ground; ESMTerrain::Storage::fixNormal makes the same substitution.
+                x = 0.0f;
+                y = 0.0f;
+                z = 1.0f;
+            }
+        }
+
+        /// The normal at a grid coordinate, which may be one vertex outside this cell in any
+        /// direction. Corner averaging needs that, and the last row and column need it anyway
+        /// because Morrowind fills them with garbage.
+        ///
+        /// A cell's vertex 64 is the same point as the next cell's vertex 0, so stepping across
+        /// costs 64 rather than 65 -- coordinate 65 is the neighbour's vertex 1, and -1 is the
+        /// previous neighbour's vertex 63. Getting that off by one puts the sample a whole quad
+        /// away, which is 128 world units and looks like noise rather than like an indexing bug.
+        void normalAt(int x, int y, float out[3]) const
+        {
+            int offsetX = 0;
+            int offsetY = 0;
+            if (x < 0)
+            {
+                offsetX = -1;
+                x += sQuadsPerSide;
+            }
+            else if (x >= sQuadsPerSide)
+            {
+                offsetX = 1;
+                x -= sQuadsPerSide;
+            }
+
+            if (y < 0)
+            {
+                offsetY = -1;
+                y += sQuadsPerSide;
+            }
+            else if (y >= sQuadsPerSide)
+            {
+                offsetY = 1;
+                y -= sQuadsPerSide;
+            }
+
+            const ESM::LandData* source = &mLand;
+            if (offsetX != 0 || offsetY != 0)
+            {
+                const ESM::LandData* neighbour = mNeighbours.get(offsetX, offsetY);
+                if (neighbour != nullptr && hasData(*neighbour, ESM::Land::DATA_VNML))
+                {
+                    source = neighbour;
+                }
+                else
+                {
+                    // No neighbour -- the map edge, or open sea with no LAND record. Clamp back into
+                    // this cell rather than reading past the end of the array.
+                    x = std::clamp(x, 0, sQuadsPerSide);
+                    y = std::clamp(y, 0, sQuadsPerSide);
+                }
+            }
+
+            out[0] = 0.0f;
+            out[1] = 0.0f;
+            out[2] = 1.0f;
+            if (!hasData(*source, ESM::Land::DATA_VNML))
+                return;
+
+            const std::size_t index = static_cast<std::size_t>(y) * sLandSize + x;
+            const std::span<const std::int8_t> normals = source->getNormals();
+            const float raw[3] = {
+                static_cast<float>(normals[index * 3]),
+                static_cast<float>(normals[index * 3 + 1]),
+                static_cast<float>(normals[index * 3 + 2]),
+            };
+            normalise(raw, out[0], out[1], out[2]);
+        }
+
         const ESM::LandData& mLand;
         EdgeNeighbours& mNeighbours;
     };
