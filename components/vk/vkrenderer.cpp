@@ -1555,6 +1555,10 @@ namespace Vk
         // is a survivable build and an obvious one to look at.
         auto skyVert = loadShader("sky.vert.spv");
         auto skyFrag = loadShader("sky.frag.spv");
+        // Nor these. Without them the sky keeps its gradient, its sun and its moons, and loses the
+        // clouds and the stars -- which is survivable and obvious.
+        auto skyMeshVert = loadShader("skymesh.vert.spv");
+        auto skyMeshFrag = loadShader("skymesh.frag.spv");
 
         if (!gbufVert || !gbufFrag || !compVert || !compFrag)
         {
@@ -2018,6 +2022,127 @@ namespace Vk
                 mDevice->handle(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &mSkyPipeline));
         }
 
+        // Sky mesh pipeline -- the cloud layer and the night sky dome. In the composite pass alongside
+        // the billboards and sharing their two descriptor sets, but with a vertex buffer bound: these
+        // are the NIF meshes OpenMW's sky is built from, and their per-vertex alpha is the horizon
+        // fade. Still no render target and no pass of its own.
+        if (skyMeshVert && skyMeshFrag)
+        {
+            std::array<VkPipelineShaderStageCreateInfo, 2> stages
+                = { skyMeshVert->stageInfo(VK_SHADER_STAGE_VERTEX_BIT),
+                      skyMeshFrag->stageInfo(VK_SHADER_STAGE_FRAGMENT_BIT) };
+
+            std::array<VkDescriptorSetLayout, 2> setLayouts
+                = { mSceneDescriptorLayout, mCompositeDescriptorLayout };
+
+            VkPushConstantRange pushRange = {};
+            pushRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+            pushRange.offset = 0;
+            pushRange.size = sizeof(SkyMeshPush);
+
+            VkPipelineLayoutCreateInfo layoutInfo = {};
+            layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+            layoutInfo.setLayoutCount = static_cast<uint32_t>(setLayouts.size());
+            layoutInfo.pSetLayouts = setLayouts.data();
+            layoutInfo.pushConstantRangeCount = 1;
+            layoutInfo.pPushConstantRanges = &pushRange;
+            VK_CHECK(vkCreatePipelineLayout(
+                mDevice->handle(), &layoutInfo, nullptr, &mSkyMeshPipelineLayout));
+
+            // The same interleave everything else in this renderer draws with, so
+            // MWRender::SkyMeshCache can hand its vertices to Vk::uploadGeometry unchanged. The normal
+            // is written and never read, which costs 12 bytes a vertex on two meshes and buys not
+            // having a second stride in the codebase that only the sky uses.
+            std::array<VkVertexInputBindingDescription, 1> bindingDesc = {};
+            bindingDesc[0].binding = 0;
+            bindingDesc[0].stride = static_cast<uint32_t>(sVertexStride);
+            bindingDesc[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+            std::array<VkVertexInputAttributeDescription, 4> attrDesc = {};
+            attrDesc[0] = { 0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0 };
+            attrDesc[1] = { 1, 0, VK_FORMAT_R32G32B32_SFLOAT, sizeof(float) * 3 };
+            attrDesc[2] = { 2, 0, VK_FORMAT_R32G32_SFLOAT, sizeof(float) * 6 };
+            attrDesc[3] = { 3, 0, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(float) * 8 };
+
+            VkPipelineVertexInputStateCreateInfo vertexInput = {};
+            vertexInput.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+            vertexInput.vertexBindingDescriptionCount = static_cast<uint32_t>(bindingDesc.size());
+            vertexInput.pVertexBindingDescriptions = bindingDesc.data();
+            vertexInput.vertexAttributeDescriptionCount = static_cast<uint32_t>(attrDesc.size());
+            vertexInput.pVertexAttributeDescriptions = attrDesc.data();
+
+            VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
+            inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+            inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+
+            VkPipelineViewportStateCreateInfo viewportState = {};
+            viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+            viewportState.viewportCount = 1;
+            viewportState.scissorCount = 1;
+
+            VkPipelineRasterizationStateCreateInfo rasterizer = {};
+            rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+            rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+            rasterizer.lineWidth = 1.0f;
+            // The camera is inside both of these -- they are domes drawn around the player -- and the
+            // cloud mesh is additionally rotated to the current storm direction, so which way a
+            // triangle winds on screen depends on the weather. Culling either face takes out most of
+            // the sky for most of the game.
+            rasterizer.cullMode = VK_CULL_MODE_NONE;
+
+            VkPipelineMultisampleStateCreateInfo multisampling = {};
+            multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+            multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+            // No depth attachment in this pass; skymesh.frag samples the G-buffer depth and draws only
+            // where nothing else was, the same rule sky.frag uses. It matters more here: these domes
+            // sit a few thousand units from the camera, which is nearer than half the terrain in an
+            // exterior, so a real depth test would put the cloud layer in front of distant mountains.
+            VkPipelineDepthStencilStateCreateInfo depthStencil = {};
+            depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+            depthStencil.depthTestEnable = VK_FALSE;
+            depthStencil.depthWriteEnable = VK_FALSE;
+
+            // The authored blend, unmodified. The sky's render bin switches GL_BLEND on and leaves the
+            // default factors (sky.cpp line 366), and neither CloudUpdater nor AtmosphereNightUpdater
+            // overrides them -- only the moons do. So unlike the billboard pipeline there is nothing
+            // to fold here, and skymesh.frag emits straight alpha rather than premultiplied.
+            VkPipelineColorBlendAttachmentState blend = {};
+            blend.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT
+                | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+            blend.blendEnable = VK_TRUE;
+            blend.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+            blend.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+            blend.colorBlendOp = VK_BLEND_OP_ADD;
+            blend.srcAlphaBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+            blend.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+            blend.alphaBlendOp = VK_BLEND_OP_ADD;
+
+            VkPipelineColorBlendStateCreateInfo colorBlending = {};
+            colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+            colorBlending.attachmentCount = 1;
+            colorBlending.pAttachments = &blend;
+
+            VkGraphicsPipelineCreateInfo pipelineInfo = {};
+            pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+            pipelineInfo.stageCount = static_cast<uint32_t>(stages.size());
+            pipelineInfo.pStages = stages.data();
+            pipelineInfo.pVertexInputState = &vertexInput;
+            pipelineInfo.pInputAssemblyState = &inputAssembly;
+            pipelineInfo.pViewportState = &viewportState;
+            pipelineInfo.pRasterizationState = &rasterizer;
+            pipelineInfo.pMultisampleState = &multisampling;
+            pipelineInfo.pDepthStencilState = &depthStencil;
+            pipelineInfo.pColorBlendState = &colorBlending;
+            pipelineInfo.pDynamicState = &dynamicState;
+            pipelineInfo.layout = mSkyMeshPipelineLayout;
+            pipelineInfo.renderPass = mCompositeRenderPass;
+            pipelineInfo.subpass = 0;
+
+            VK_CHECK(vkCreateGraphicsPipelines(
+                mDevice->handle(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &mSkyMeshPipeline));
+        }
+
         // Composite pipeline
         {
             std::array<VkPipelineShaderStageCreateInfo, 2> stages = {
@@ -2439,6 +2564,12 @@ namespace Vk
                 vkCmdDraw(cmd, 3, 1, 0, 0);
             }
 
+            // The night sky, before the sun and the moons. That is where OpenMW puts it: the star
+            // dome goes into the sky group at sky.cpp line 307 and the moons at 324-327, and an OSG
+            // render bin draws in graph order. The other way round, the dome's opaque texels sit on
+            // top of a moon and dim it -- which reads as the moon being wrong rather than the order.
+            drawSkyMeshes(cmd, false);
+
             // The sun disc and the two moons, read out of the live OSG sky graph -- see
             // MWRender::SkyReader for why they are read rather than recomputed.
             //
@@ -2465,6 +2596,12 @@ namespace Vk
                     vkCmdDraw(cmd, 6, 1, 0, 0);
                 }
             }
+
+            // And the cloud layer, after them, for the same reason: SkyManager adds the cloud group to
+            // the sky last (sky.cpp lines 329-330). This is what lets an overcast sky hide the moons,
+            // and it is the whole difference between weather that covers the sky and weather that
+            // hangs behind it.
+            drawSkyMeshes(cmd, true);
 
             // The water surface. After the composite and the sky, before the particles, and all
             // three of those are load-bearing.
@@ -2695,6 +2832,52 @@ namespace Vk
         // in the frame and read again when the command buffer is recorded, and three structs of 112
         // bytes is not worth turning that gap into a lifetime question.
         mSkyElements = elements;
+    }
+
+    void Renderer::updateSkyMeshes(const std::vector<SkyMeshDraw>& meshes)
+    {
+        // Copied, like the billboards, and for the same reason. What is copied is a few buffer handles
+        // and their push constants -- the geometry behind them belongs to MWRender::SkyMeshCache, was
+        // uploaded once and is not touched here.
+        mSkyMeshes = meshes;
+    }
+
+    void Renderer::drawSkyMeshes(VkCommandBuffer cmd, bool overBodies)
+    {
+        if (mSkyMeshPipeline == VK_NULL_HANDLE || mSkyMeshes.empty())
+            return;
+
+        bool bound = false;
+
+        for (const SkyMeshDraw& mesh : mSkyMeshes)
+        {
+            if (mesh.overBodies != overBodies || mesh.indexCount == 0)
+                continue;
+
+            // Bound on the first mesh that survives the filter rather than up front. Half of these
+            // calls have nothing to draw by construction -- there are no stars by day and no second
+            // cloud layer unless the weather is crossfading -- and this way that half costs a compare
+            // instead of a pipeline bind and two descriptor sets.
+            if (!bound)
+            {
+                std::array<VkDescriptorSet, 2> sets
+                    = { mSceneDescriptorSets[mCurrentFrame], mCompositeDescriptorSets[mCurrentFrame] };
+                vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mSkyMeshPipelineLayout, 0,
+                    static_cast<uint32_t>(sets.size()), sets.data(), 0, nullptr);
+                vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mSkyMeshPipeline);
+                bound = true;
+            }
+
+            const VkDeviceSize offset = 0;
+            vkCmdBindVertexBuffers(cmd, 0, 1, &mesh.vertexBuffer, &offset);
+            // 32-bit indices, which is what Vk::uploadGeometry writes and what the rest of the draw
+            // loop hardcodes.
+            vkCmdBindIndexBuffer(cmd, mesh.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+            vkCmdPushConstants(cmd, mSkyMeshPipelineLayout,
+                VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(SkyMeshPush),
+                &mesh.push);
+            vkCmdDrawIndexed(cmd, mesh.indexCount, 1, 0, 0, 0);
+        }
     }
 
     uint32_t Renderer::updateSkinMatrices(const float* matrices, uint32_t count)
@@ -3119,6 +3302,10 @@ namespace Vk
         if (mTextureSampler != VK_NULL_HANDLE)
             vkDestroySampler(dev, mTextureSampler, nullptr);
 
+        if (mSkyMeshPipeline != VK_NULL_HANDLE)
+            vkDestroyPipeline(dev, mSkyMeshPipeline, nullptr);
+        if (mSkyMeshPipelineLayout != VK_NULL_HANDLE)
+            vkDestroyPipelineLayout(dev, mSkyMeshPipelineLayout, nullptr);
         if (mSkyPipeline != VK_NULL_HANDLE)
             vkDestroyPipeline(dev, mSkyPipeline, nullptr);
         if (mSkyPipelineLayout != VK_NULL_HANDLE)

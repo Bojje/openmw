@@ -294,6 +294,59 @@ namespace Vk
     static_assert(offsetof(SkyElement, moonBlend) == 64, "SkyElement layout drifted from the shader");
     static_assert(offsetof(SkyElement, params) == 96, "SkyElement layout drifted from the shader");
 
+    // The push constant block skymesh.vert and skymesh.frag declare, for the two parts of the sky that
+    // are real geometry rather than a billboard: the cloud layer and the night sky dome.
+    //
+    // Separate from SkyElement rather than one block covering both, because the two share nothing. A
+    // billboard travels as a centre and two axes and needs no matrix at all; a mesh is drawn from its
+    // own vertex buffer and needs nothing but the matrix. Merging them would carry a mat4 the sun
+    // never reads and forty-eight bytes of moon parameters the clouds never read, and the result would
+    // not fit in 128 bytes.
+    //
+    // 112 bytes, inside the 128 maxPushConstantsSize Vulkan guarantees everywhere. Nothing at build
+    // time compares the three declarations of this layout, so the offsets are pinned individually
+    // below -- inserting a float before uvOffset would keep the size at 112 and silently shift
+    // everything after it.
+    struct SkyMeshPush
+    {
+        // Mesh to world, with the sky's camera-relative offset already added back in. Column-major,
+        // the same convention as every other matrix here.
+        Mat4 model;
+        // .rgb the mesh's material emission, already decoded to linear. For the clouds that is the
+        // weather's fog colour plus 0.13, which is what tints them at sunset and in an ash storm; the
+        // night sky does not use it. .a is the `opacity` uniform off the same stateset: the weather
+        // crossfade for a cloud layer, mNightFade * mGlareView for the stars.
+        float emission[4];
+        // .xy the translation on the mesh's texture matrix, which is how OpenMW scrolls the clouds.
+        // Zero for the night sky, which has no texture matrix. .zw unused.
+        float uvOffset[4];
+        // .x = slot in the sampler array. .y = the sky pass, 1 for the night sky and 2 for the clouds,
+        // matching skyutil.cpp's Pass enum. .zw unused.
+        uint32_t params[4];
+    };
+
+    static_assert(sizeof(SkyMeshPush) == 112, "sky mesh push constants must match skymesh.vert/.frag");
+    static_assert(sizeof(SkyMeshPush) <= 128, "exceeds the guaranteed maxPushConstantsSize");
+    static_assert(offsetof(SkyMeshPush, emission) == 64, "SkyMeshPush layout drifted from the shader");
+    static_assert(offsetof(SkyMeshPush, uvOffset) == 80, "SkyMeshPush layout drifted from the shader");
+    static_assert(offsetof(SkyMeshPush, params) == 96, "SkyMeshPush layout drifted from the shader");
+
+    // One sky mesh draw. The buffers belong to MWRender::SkyMeshCache and are uploaded once, on the
+    // first frame the sky is visible; only the push constants are rebuilt each frame.
+    struct SkyMeshDraw
+    {
+        VkBuffer vertexBuffer = VK_NULL_HANDLE;
+        VkBuffer indexBuffer = VK_NULL_HANDLE;
+        uint32_t indexCount = 0;
+        // Whether this belongs in front of the sun and the moons. True for the cloud layer, which
+        // SkyManager adds to the sky group after them and which therefore draws over them; false for
+        // the night sky, which is added before. The billboards and the meshes are two separate lists
+        // drawn by two pipelines, so nothing else preserves that ordering -- and losing it shows up as
+        // a full moon glowing through an overcast sky.
+        bool overBodies = false;
+        SkyMeshPush push;
+    };
+
     struct MeshSubmission
     {
         VkBuffer vertexBuffer = VK_NULL_HANDLE;
@@ -513,6 +566,15 @@ namespace Vk
         // The sky graph holds one sun and two moons and each is drawn straight from a push constant,
         // so the cost of the whole feature is three draw calls whether the list is full or empty.
         void updateSky(const std::vector<SkyElement>& elements);
+
+        // Uploads this frame's sky meshes -- the cloud layer and the night sky -- and draws them in
+        // the composite pass, on either side of the billboards above. Replaces the previous frame's
+        // set wholesale for the same reason updateSky does.
+        //
+        // Nothing here uploads geometry. The buffers arrive already on the device and the same ones
+        // come back frame after frame; what changes is the transform, the texture, the opacity and the
+        // UV scroll, all four of which fit in the push constant.
+        void updateSkyMeshes(const std::vector<SkyMeshDraw>& meshes);
 
         // Uploads this frame's bone palettes, as \a count column-major 4x4 matrices laid end to end.
         // A submission's boneOffset indexes this array, and its per-vertex bone indices are relative
@@ -760,6 +822,20 @@ namespace Vk
         VkPipeline mSkyPipeline = VK_NULL_HANDLE;
         VkPipelineLayout mSkyPipelineLayout = VK_NULL_HANDLE;
         std::vector<SkyElement> mSkyElements;
+
+        // The cloud layer and the night sky. A second pipeline rather than a second draw through the
+        // one above, and not by preference: these have a vertex buffer and the billboards have none,
+        // which is a different VkPipelineVertexInputStateCreateInfo and therefore necessarily a
+        // different pipeline. The blend differs too -- the sky bin's authored SRC_ALPHA /
+        // ONE_MINUS_SRC_ALPHA, where the billboards fold the sun into the moons' premultiplied form.
+        // Null if its shaders were missing, which costs the clouds and the stars and nothing else.
+        VkPipeline mSkyMeshPipeline = VK_NULL_HANDLE;
+        VkPipelineLayout mSkyMeshPipelineLayout = VK_NULL_HANDLE;
+        std::vector<SkyMeshDraw> mSkyMeshes;
+
+        // Records the half of mSkyMeshes on one side of the sun and the moons. Called twice from
+        // inside the composite pass, once before the billboards and once after.
+        void drawSkyMeshes(VkCommandBuffer cmd, bool overBodies);
 
         VkSampler mGBufferSampler = VK_NULL_HANDLE;
         // Separate from mGBufferSampler: scene textures want filtering and wrapping, whereas the

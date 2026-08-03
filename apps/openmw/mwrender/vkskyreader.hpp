@@ -5,6 +5,7 @@
 
 #include <cstddef>
 #include <functional>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -17,8 +18,10 @@ namespace osg
 
 namespace MWRender
 {
-    /// Collects the sun disc and the two moons out of the live OSG sky graph as billboards the
-    /// Vulkan renderer can draw.
+    class SkyMeshCache;
+
+    /// Collects the sun disc, the two moons, the cloud layer and the night sky out of the live OSG sky
+    /// graph as something the Vulkan renderer can draw.
     ///
     /// Read rather than recomputed, for the same reason ParticleReader reads osgParticle instead of
     /// simulating. The sky is a simulation too: WeatherManager drives the sun's arc, the moons' phase,
@@ -34,6 +37,20 @@ namespace MWRender
     /// unit 0. Reading that name is a lookup; redoing the arithmetic is a second implementation of the
     /// lunar calendar that can be a day out.
     ///
+    /// The clouds and the stars are the same argument again with more moving parts. The cloud layer is
+    /// two copies of one mesh crossfading between two weathers, each independently rotated to its own
+    /// storm direction, scrolling on a timer that optionally runs on the game clock rather than the
+    /// wall clock, tinted by the fog colour of the moment. Every one of those numbers is already
+    /// public on the graph -- the crossfade as the `opacity` uniform, the rotation as the transform's
+    /// attitude, the scroll as a texture matrix, the tint as a material emission -- and every one of
+    /// them is a thing WeatherManager can change at any time. The star field is a mesh rolled 360
+    /// degrees per four days by the same calendar the moons use.
+    ///
+    /// The atmosphere dome, pass 0, is deliberately NOT collected. It is a flat emission colour with a
+    /// vertical alpha ramp over a clear colour set to the fog colour, and files/shaders/vulkan/
+    /// composite.frag already paints exactly that as a lerp along the view ray -- so drawing the dome
+    /// as well would composite the sky colour on top of itself and lighten the whole upper sky.
+    ///
     /// Nothing here is verified against a running game -- it has not been built or run. What is
     /// verified is that it matches the graph the OSG backend builds, read out of skyutil.cpp and
     /// sky.cpp; every place where that reading is load-bearing carries a line reference.
@@ -41,32 +58,49 @@ namespace MWRender
     {
     public:
         /// \a resolveTexture maps an image file name to a slot in the renderer's sampler array. It is
-        /// the caller's texture loader, so the sun and moon images are cached, evicted and shared on
-        /// the same terms as everything else.
+        /// the caller's texture loader, so the sun, moon, cloud and star images are cached, evicted and
+        /// shared on the same terms as everything else.
         ///  resolveTexture returns the sampler slot to draw with and, through its out parameter, the
         /// storage index that slot came from -- the caller needs the second to keep the texture alive
         /// across eviction.
-        explicit SkyReader(std::function<uint32_t(const std::string&, std::size_t&)> resolveTexture);
+        ///
+        /// \a device and \a commandPool are only ever used to upload the two sky meshes, once each, on
+        /// the first frame the sky is visible. They are taken by reference because the renderer that
+        /// owns them outlives this: SkyReader is declared after it in VkRenderingManager and is
+        /// therefore destroyed first.
+        SkyReader(std::function<uint32_t(const std::string&, std::size_t&)> resolveTexture,
+            Vk::Device& device, Vk::CommandPool& commandPool);
+        ~SkyReader();
 
-        /// Walks \a sceneRoot and refills the element list. There are never more than three of these,
-        /// and the walk stops at any node the sky has hidden by clearing its mask, so this is cheap
-        /// enough to do every frame.
+        /// Walks \a sceneRoot and refills the element and mesh lists. The walk stops at any node the
+        /// sky has hidden by clearing its mask, and the per-node work below the sky is skipped
+        /// entirely for anything that is not under it, so this is cheap enough to do every frame.
         void collect(osg::Node* sceneRoot);
 
-        /// Emitted in graph order, which is the order OSG's sky render bin draws them in.
+        /// The billboards -- the sun disc and the two moons. Emitted in graph order, which is the
+        /// order OSG's sky render bin draws them in.
         const std::vector<Vk::SkyElement>& elements() const { return mElements; }
 
+        /// The cloud layer and the night sky, as draws against buffers this owns. Also in graph order;
+        /// each carries the flag that says whether it belongs in front of the sun and moons or behind
+        /// them, because the two lists are drawn separately and their relative order is lost.
+        const std::vector<Vk::SkyMeshDraw>& meshes() const { return mMeshes; }
+
         /// Storage indices of every texture referenced this frame, for the caller's live set. Without
-        /// this the eviction pass sees the sun and moon textures referenced by no mesh, no actor and
-        /// no terrain chunk, decides they are dead, and replaces them with the white fallback -- so
-        /// the sun and both moons draw as plain white squares. This is the same trap ParticleReader
-        /// documents, and it bites here harder: a white square in the sky is the most visible thing
-        /// on screen.
+        /// this the eviction pass sees the sun, moon, cloud and star textures referenced by no mesh, no
+        /// actor and no terrain chunk, decides they are dead, and replaces them with the white fallback
+        /// -- so the sun and both moons draw as plain white squares and the cloud layer becomes a solid
+        /// white sheet over the entire sky. This is the same trap ParticleReader documents, and it
+        /// bites here harder: a white square in the sky is the most visible thing on screen.
         const std::vector<std::size_t>& textureIndices() const { return mTextureIndices; }
 
     private:
         std::function<uint32_t(const std::string&, std::size_t&)> mResolveTexture;
+        // Owns the uploaded sky geometry, so it has to outlive every mMeshes entry pointing into it --
+        // which it does, both being members here and this one declared first.
+        std::unique_ptr<SkyMeshCache> mMeshCache;
         std::vector<Vk::SkyElement> mElements;
+        std::vector<Vk::SkyMeshDraw> mMeshes;
         std::vector<std::size_t> mTextureIndices;
     };
 }

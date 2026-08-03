@@ -309,7 +309,12 @@ namespace MWRender
             return slot;
         };
         mParticleReader = std::make_unique<ParticleReader>(resolveByName);
-        mSkyReader = std::make_unique<SkyReader>(resolveByName);
+        // The device and the command pool are for the two sky meshes, which the reader uploads
+        // once, on the first frame it sees them. Constructed here rather than lazily because there is
+        // nothing to defer: it allocates nothing until a sky actually turns up, and an interior never
+        // gives it one.
+        mSkyReader = std::make_unique<SkyReader>(
+            resolveByName, mRenderer->device(), mRenderer->commandPool());
         Log(Debug::Info) << "Vulkan renderer initialized";
     }
 
@@ -503,7 +508,15 @@ namespace MWRender
         // overlap need no depth order, and the two moons cross the sun only when the sky has already
         // faded them out.
         if (mSkyReader != nullptr)
+        {
             mRenderer->updateSky(mSkyReader->elements());
+            // The cloud layer and the night sky, in the same handover. Kept in graph order rather than
+            // sorted: each one already carries the flag that says which side of the sun and the moons
+            // it belongs on, which is the only ordering that matters and is not something a distance
+            // sort could recover -- the two cloud layers of a weather crossfade are the same mesh at
+            // the same distance.
+            mRenderer->updateSkyMeshes(mSkyReader->meshes());
+        }
 
         mRenderer->updateScene(scene);
 
