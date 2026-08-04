@@ -398,11 +398,18 @@ namespace MWRender
         // the controller comes back to it. The water ripples do this thirteen times a second.
         std::vector<uint64_t> mTextureLastUsed;
         uint64_t mTextureSyncCounter = 0;
-        // Long enough to cover any flipbook -- the fastest in the game swaps about every fifth frame
-        // -- and short enough that a cell walked out of still gives its slots back within a second.
-        // Slots are the scarce thing here, not VRAM: the sampler array is 512 and eviction is a
-        // separate, much lazier decision.
-        static constexpr uint64_t sTextureSlotGraceFrames = 60;
+        // Long enough to cover the whole of any flipbook's cycle, not just the gap between two of its
+        // frames. 60 was measured against the water ripples, which are four frames, and it is not
+        // enough: the enchanted glow's caustic is 32 frames at 16 fps, so each frame is bound for about
+        // four frames out of every 120 and every one of them fell out of the live set before its turn
+        // came round again. All 32 reported themselves as failing to load, and none of them was
+        // failing to load.
+        //
+        // 300 is five seconds at 60 fps, comfortably past the 2-second caustic cycle. Slots are the
+        // scarce thing rather than VRAM -- the sampler array is 1024 and eviction is a separate, much
+        // lazier decision -- so the cost of being generous here is small and the cost of being tight is
+        // a texture that reports itself broken while working perfectly.
+        static constexpr uint64_t sTextureSlotGraceFrames = 300;
         // Parallel to mTextures. An evicted slot keeps its name so getOrLoadTexture can reload into
         // the same index, which is what lets mMeshTextures and the terrain chunks keep holding plain
         // indices across an eviction instead of needing to be rewritten.

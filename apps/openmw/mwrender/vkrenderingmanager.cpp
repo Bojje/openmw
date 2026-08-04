@@ -298,14 +298,23 @@ namespace MWRender
             // frame that queues its upload, so it legitimately answers slot 0 once and resolves on the
             // next -- warning on that made every sky and effect texture in the game report itself
             // broken while they were all working.
+            // Consecutive, and the reset is the whole point. Without it this counts *cumulative*
+            // failures and eventually accuses a texture that works: every flipbook frame answers slot 0
+            // once per cycle, on the frame it first becomes live, because the slot is assigned by the
+            // compaction that runs later in the same frame. All 32 enchanted-glow caustics reported
+            // themselves broken after about a minute of standing still, and every one of them was fine.
+            static std::map<std::string, int, Misc::StringUtils::CiComp> failures;
             if (slot == 0)
             {
-                static std::map<std::string, int, Misc::StringUtils::CiComp> failures;
                 const int count = ++failures[std::string(stripped)];
                 if (count == 30)
                     Log(Debug::Warning) << "Vulkan: texture '" << stripped
-                                        << "' has failed to load " << count
-                                        << " times; it is drawing as a white square";
+                                        << "' has answered the white fallback " << count
+                                        << " times in a row; it is drawing as a white square";
+            }
+            else
+            {
+                failures.erase(std::string(stripped));
             }
 
             return slot;
@@ -1047,6 +1056,7 @@ namespace MWRender
             mGlowReader->beginFrame();
 
         const bool detached = refreshMovedObjects();
+
 
         // The TLAS is only rebuilt when the instance set actually changes, not every frame: a cell
         // load or unload, or the first time an object moves and therefore has to leave it. A swinging
