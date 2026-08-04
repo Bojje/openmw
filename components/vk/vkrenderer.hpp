@@ -323,11 +323,85 @@ namespace Vk
         uint32_t params[4];
     };
 
+    // What params.z of a SkyElement means. The sun and the moons already used 0 and 1; the
+    // flash and the glare are two more values of the same field rather than two more pipelines,
+    // which is what keeps this whole feature at zero new push constant ranges and zero new
+    // pipelines. See sky.vert for what each one draws.
+    enum class SkyMode : uint32_t
+    {
+        Sun = 0,
+        Moon = 1,
+        // The bright halo around the sun. Same quad machinery as the disc, 2.6 times the size,
+        // and it is deliberately NOT depth tested -- see sky.frag.
+        SunFlash = 2,
+        // The fullscreen additive wash. Uses none of position, right or up: sky.vert emits clip
+        // space corners directly for this one, because the camera OSG puts this quad under has
+        // an identity view and an identity projection (skyutil.cpp lines 839-841).
+        SunGlare = 3,
+    };
+
     static_assert(sizeof(SkyElement) == 112, "sky push constant layout must match sky.vert/sky.frag");
     static_assert(sizeof(SkyElement) <= 128, "exceeds the guaranteed maxPushConstantsSize");
     static_assert(offsetof(SkyElement, colour) == 48, "SkyElement layout drifted from the shader");
     static_assert(offsetof(SkyElement, moonBlend) == 64, "SkyElement layout drifted from the shader");
     static_assert(offsetof(SkyElement, params) == 96, "SkyElement layout drifted from the shader");
+
+    // How much of the sun disc the camera can actually see, and the disc to test against.
+    //
+    // This is the thing the OSG backend spends two GL occlusion queries on. Sun's constructor
+    // builds a colour-masked copy of the sun quad in its own render bin, wraps it in two
+    // osg::OcclusionQueryNodes -- one depth tested against the world, one not -- and
+    // OcclusionCallback::getVisibleRatio divides one pixel count by the other (skyutil.cpp
+    // lines 744-795 and 136-159). The counts come back from the driver at least a frame late,
+    // which is why that function also rate limits the result to a tenth of its range per
+    // second: it is hiding the latency, not smoothing anything real.
+    //
+    // A ray tracer answers the same question directly. Trace a stratified set of rays from the
+    // camera across the disc and count how many escape. That is measured in the frame it is
+    // used, is exact at the edge of an alpha-tested leaf rather than quantised by how many
+    // pixels the sun happens to cover, and needs no readback, no fence and no smoothing.
+    //
+    // It is a buffer and not a channel of SceneData because SceneData has none: sunParams.x is
+    // the shadow cone half-angle and .yzw are the water plane, and every offset from
+    // prevViewFromCurView on is pinned by a static_assert here and mirrored by hand in five
+    // shaders. The disc parameters ride in the same buffer rather than in a push constant
+    // because a raygen shader has no push constant range to receive them in -- the same
+    // constraint that put waterNormalMap in the UBO.
+    //
+    // Host visible and written straight through the mapping, like the light and particle
+    // buffers. The CPU writes discDir and params and zeroes the two counters in the same
+    // memcpy, which is why there is no vkCmdFillBuffer and no transfer barrier before the
+    // trace. std430; raygen.rgen, sky.vert and sky.frag all declare this block again and
+    // nothing cross-checks the four.
+    struct SunVisibility
+    {
+        // .xyz = unit direction from the camera to the centre of the sun disc.
+        // .w   = tangent of the disc's angular radius as seen from the camera.
+        //
+        // Both computed from the sun billboard the reader already collects, not from constants.
+        // Morrowind's sun is a 450-unit quad at a distance of 1000 -- CelestialBody's
+        // constructor, skyutil.cpp lines 646-647 -- but a mod that changes either number
+        // changes the billboard, and taking it from there means nothing here has to be told.
+        float discDir[4];
+        // .x = sampler array slot of the sun disc texture, .y = how many rays to spend on it,
+        // .zw unused. The texture is needed because the OSG query is not a plain quad coverage
+        // test: the query geometry runs through PASS_SUNFLASH_QUERY, which discards anything
+        // under 0.8 alpha (files/shaders/compatibility/sky.frag lines 75-81), so what is
+        // measured is the bright core of tx_sun_05.dds and not the transparent corners of its
+        // quad. Skipping that test makes the sun a 25-degree disc and the flash starts
+        // shrinking while the sun is still well clear of the horizon.
+        uint32_t params[4];
+        // Written only by atomicAdd in raygen.rgen, zeroed by the CPU each frame. Two counts
+        // rather than one ratio because the alpha test rejects some rays outright, so the
+        // denominator is not known until the rays have been taken.
+        uint32_t totalRays;
+        uint32_t visibleRays;
+        uint32_t sunVisPad[2];
+    };
+
+    static_assert(sizeof(SunVisibility) == 48, "must match the block in raygen.rgen and sky.vert");
+    static_assert(offsetof(SunVisibility, params) == 16, "SunVisibility layout drifted from the shaders");
+    static_assert(offsetof(SunVisibility, totalRays) == 32, "SunVisibility layout drifted from the shaders");
 
     // The push constant block skymesh.vert and skymesh.frag declare, for the two parts of the sky that
     // are real geometry rather than a billboard: the cloud layer and the night sky dome.
@@ -793,6 +867,20 @@ namespace Vk
         // UV scroll, all four of which fit in the push constant.
         void updateSkyMeshes(const std::vector<SkyMeshDraw>& meshes);
 
+        /// The sun flash, the sun glare, and the disc the visibility test traces against.
+        ///
+        /// All three together because all three are governed by the same conditions: no sun in
+        /// the sky means no flash, no glare and nothing to trace. Either element may be null,
+        /// which is how "not this frame" is said -- and it is said often, because the caller
+        /// works out everything except the occlusion and drops the draw when the answer is
+        /// already zero. That is the direct analogue of SunGlareCallback returning without
+        /// traversing (skyutil.cpp lines 277-281), and it is what keeps a fullscreen additive
+        /// pass off the bill at night, indoors, and whenever the sun is off to one side.
+        ///
+        /// \a disc is written even when both elements are null: a frame with no sun sets its
+        /// ray count to zero, which is what stops raygen tracing rays nothing will read.
+        void updateSunGlare(const SkyElement* flash, const SkyElement* glare, const SunVisibility& disc);
+
         // Uploads this frame's bone palettes, as \a count column-major 4x4 matrices laid end to end.
         // A submission's boneOffset indexes this array, and its per-vertex bone indices are relative
         // to that offset.
@@ -1084,6 +1172,24 @@ namespace Vk
         // Rebuilt every frame alongside mDrawCommands and cleared with it.
         std::vector<EmissiveMeshDraw> mEmissiveMeshes;
         std::vector<SkyMeshDraw> mSkyMeshes;
+
+        // The flash and the glare, each valid only when its flag is set. Plain values rather
+        // than an optional or a vector: they are 112 bytes each, there is exactly one of each,
+        // and they are pushed straight into the same pipeline the sun disc uses.
+        SkyElement mSunFlash = {};
+        SkyElement mSunGlare = {};
+        bool mHasSunFlash = false;
+        bool mHasSunGlare = false;
+
+        // The CPU half of the visibility contract, copied into this frame's buffer at record
+        // time. Kept here as well so the ray count can be read back without touching the mapped
+        // allocation, which is write-combined -- the same reason the composite push constants
+        // are built from mCurrentScene rather than from the mapped UBO.
+        SunVisibility mSunVisibility = {};
+        std::array<VkBuffer, maxFramesInFlight> mSunVisBuffers = {};
+        std::array<VmaAllocation, maxFramesInFlight> mSunVisMemory = {};
+        std::array<void*, maxFramesInFlight> mSunVisMapped = {};
+        void createSunVisibilityBuffers();
 
         // Records the half of mSkyMeshes on one side of the sun and the moons. Called twice from
         // inside the composite pass, once before the billboards and once after.

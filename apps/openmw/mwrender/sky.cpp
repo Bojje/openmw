@@ -905,6 +905,7 @@ namespace MWRender
 
     void SkyManager::setGlareTimeOfDayFade(float val)
     {
+        mGlareTimeOfDayFade = val;
         mSun->setGlareTimeOfDayFade(val);
     }
 

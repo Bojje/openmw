@@ -30,6 +30,16 @@
 #include <components/vfs/manager.hpp>
 #include <components/vfs/pathutil.hpp>
 #include <components/vk/vkbuffer.hpp>
+#include <algorithm>
+#include <cmath>
+
+// std::clamp and std::acos for the sun angle; osg::DegreesToRadians for the falloff, which
+// is the unit Weather_Sun_Glare_Fader_Angle_Max is authored in; osg::Vec4f because
+// Fallback::Map::getColour answers in one.
+#include <osg/Math>
+#include <osg/Vec4f>
+
+#include <components/fallback/fallback.hpp>
 #include <components/vk/vkmath.hpp>
 #include <components/vk/vkrenderer.hpp>
 #include <components/vk/vktexture.hpp>
@@ -578,6 +588,109 @@ namespace MWRender
         // Gathered in syncCells for the same reason and handed over unsorted: three quads that never
         // overlap need no depth order, and the two moons cross the sun only when the sky has already
         // faded them out.
+        // The sun flash, the sun glare and the disc the visibility test traces against.
+        //
+        // Everything except the occlusion is worked out here, on the CPU, and the draw is
+        // dropped outright when the answer is already zero. That is not an optimisation bolted
+        // on -- it is what SunGlareCallback and SunFlashCallback themselves do, returning
+        // without traversing when the fade or the scale comes out at zero (skyutil.cpp lines
+        // 201-205 and 277-281). It is also what keeps a fullscreen additive pass off the bill
+        // at night, indoors, and any time the sun is more than thirty degrees off the view
+        // axis, which between them is most of the game.
+        {
+            // The three ini constants, read once. SunGlareCallback reads exactly these three in
+            // its constructor (skyutil.cpp lines 249-251).
+            //
+            // From the Fallback map rather than off the graph, and that is not a shortcut. The
+            // glare's colour and its fade never reach the scene graph at all: the callback keeps
+            // them in private members and writes them onto a stateset it pushes at cull time
+            // (line 287), which a node visitor cannot see. Every other number in this renderer's
+            // sky is read off the graph because it is there to be read; these are not there.
+            static const osg::Vec4f sGlareColour = [] {
+                osg::Vec4f colour = Fallback::Map::getColour("Weather_Sun_Glare_Fader_Color");
+                // Replicating a design flaw in MW, in the words of the comment this copies. The
+                // colour was set on both the ambient and the emissive property, which doubles
+                // it, and the fixed function pipeline then clamped the result. With the stock
+                // ini only the red component clamps, so the wash comes out orange rather than
+                // red. Drop the doubling and the sun glare is a different colour from the one
+                // Morrowind has had since 2002.
+                colour *= 2;
+                for (int i = 0; i < 3; ++i)
+                    colour[i] = std::min(1.f, colour[i]);
+                return colour;
+            }();
+            static const float sGlareFaderMax = Fallback::Map::getFloat("Weather_Sun_Glare_Fader_Max");
+            static const float sGlareAngleMax = Fallback::Map::getFloat("Weather_Sun_Glare_Fader_Angle_Max");
+
+            Vk::SunVisibility disc = {};
+            const Vk::SkyElement* flash = nullptr;
+            Vk::SkyElement glare = {};
+            bool hasGlare = false;
+
+            if (mSkyReader != nullptr && mSkyReader->sunDiscTanRadius() > 0.f)
+            {
+                const osg::Vec3f& sunDir = mSkyReader->sunDiscDirection();
+                disc.discDir[0] = sunDir.x();
+                disc.discDir[1] = sunDir.y();
+                disc.discDir[2] = sunDir.z();
+                disc.discDir[3] = mSkyReader->sunDiscTanRadius();
+                disc.params[0] = mSkyReader->sunDiscTexture();
+                // Sixty-four rays: one RDNA2 wave, and one stratified sample per cell of the
+                // 8x8 grid raygen lays over the disc. Finer than the thresholds that read it --
+                // the flash's fade band is the bottom tenth, which is six of these -- and
+                // coarse enough that the whole test is lost in the noise of a frame that already
+                // traces a million shadow rays. Changing it means changing sGridSide in
+                // raygen.rgen to match; the two are one number written twice.
+                disc.params[1] = 64;
+
+                flash = mSkyReader->sunFlash();
+
+                // The angle between the view direction and the sun, exactly as
+                // SunGlareCallback::getAngleToSunInRadians takes it (skyutil.cpp lines 298-310):
+                // out of the view matrix by getLookAt, against the sun transform's own position.
+                // Taken from the same osg::Matrixf the renderer builds scene.view from, so there
+                // is no second convention here to get backwards -- and getting it backwards
+                // gives a glare that peaks when the sun is behind you, which looks like a
+                // brightness bug rather than a sign error.
+                osg::Vec3d eye, centre, up;
+                camera.getViewMatrix().getLookAt(eye, centre, up);
+                osg::Vec3d forward = centre - eye;
+                forward.normalize();
+                osg::Vec3d sun(sunDir.x(), sunDir.y(), sunDir.z());
+                const float angleRadians
+                    = static_cast<float>(std::acos(std::clamp(forward * sun, -1.0, 1.0)));
+
+                const float angleMaxRadians = osg::DegreesToRadians(sGlareAngleMax);
+                const float value = 1.f - std::min(1.f, angleRadians / angleMaxRadians);
+                // The three factors that are not the occlusion. mGlareView is the sun's own
+                // material alpha, read off the graph; mTimeOfDayFade came in on FrameLighting
+                // because there is nowhere on the graph it exists. The fourth factor, the
+                // visible ratio, is applied in the shader from a value that will not exist until
+                // the ray tracing pass has run.
+                const float fade = value * sGlareFaderMax
+                    * lighting.sunGlareTimeOfDayFade * mSkyReader->sunGlareView();
+
+                if (fade > 0.f)
+                {
+                    glare.params[2] = static_cast<uint32_t>(Vk::SkyMode::SunGlare);
+                    // Gamma, on purpose, and sky.frag depends on it. paintSunglare multiplies
+                    // this colour by the fade in gamma space against a gamma framebuffer, and
+                    // the product does not commute with the transfer function -- decoding here
+                    // and scaling the linear value there is a visibly different colour, not a
+                    // rounding difference. The one place in this renderer a colour is handed to
+                    // a shader undecoded, and the reason is written out at the branch that
+                    // consumes it.
+                    glare.colour[0] = sGlareColour.r();
+                    glare.colour[1] = sGlareColour.g();
+                    glare.colour[2] = sGlareColour.b();
+                    glare.colour[3] = fade;
+                    hasGlare = true;
+                }
+            }
+
+            mRenderer->updateSunGlare(flash, hasGlare ? &glare : nullptr, disc);
+        }
+
         if (mSkyReader != nullptr)
         {
             mRenderer->updateSky(mSkyReader->elements());

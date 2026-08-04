@@ -92,6 +92,12 @@ namespace MWRender
             /// Whether the player is in an interior cell. Changes what \a ambient means and therefore
             /// how it is occluded -- see SceneData::isInterior.
             bool isInterior = false;
+            /// SkyManager::getGlareTimeOfDayFade(). One of the four factors SunGlareCallback
+            /// multiplies into the glare's strength (skyutil.cpp line 275), and the only one
+            /// that is not readable off the sky graph -- it lives in a cull callback, which a
+            /// node visitor never sees. Zero outside daylight hours, which is what switches the
+            /// glare off at night without anything here knowing what night is.
+            float sunGlareTimeOfDayFade = 0.f;
         };
 
         void render(Camera& camera, const FrameLighting& lighting);

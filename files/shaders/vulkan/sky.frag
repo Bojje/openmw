@@ -24,6 +24,23 @@ layout(push_constant) uniform SkyPush {
     uvec4 params;
 } sky;
 
+// The same block sky.vert declares. See there for why the answer needs no smoothing.
+layout(set = 1, binding = 10) readonly buffer SunVisibilityBuffer {
+    vec4 discDir;
+    uvec4 params;
+    uint totalRays;
+    uint visibleRays;
+    uint sunVisPad0;
+    uint sunVisPad1;
+} sunVis;
+
+float visibleRatio() {
+    if (sunVis.totalRays == 0u)
+        return 1.0;
+
+    return float(sunVis.visibleRays) / float(sunVis.totalRays);
+}
+
 layout(location = 0) out vec4 outColor;
 
 // paintMoon below is a port of a shader that never leaves gamma space, and it has to be run there.
@@ -46,6 +63,67 @@ vec3 srgbDecode(vec3 c) {
 }
 
 void main() {
+    // The glare, and it comes first because it takes none of the rest of this shader: no
+    // texture, no UV, and above all no depth test.
+    //
+    // paintSunglare is two lines -- the colour is the material's emission and the alpha is its
+    // diffuse alpha (files/shaders/compatibility/sky.frag lines 69-73) -- blended SRC_ALPHA /
+    // ONE over the framebuffer. That is gamma-space arithmetic on a gamma-space framebuffer,
+    // and this attachment is _SRGB. So the product is formed in gamma exactly as upstream forms
+    // it, clamped exactly where upstream's fixed-function pipeline clamps it, and only then
+    // decoded for the attachment. sky.colour.rgb is deliberately still gamma when it arrives:
+    // the reader hands it over undecoded precisely so this multiply can happen on the right
+    // side of the transfer function. Decoding it on the CPU and scaling the linear value here
+    // is the mistake this comment exists to prevent -- it is a different colour, not a rounding
+    // difference, because the fade is the thing being multiplied in.
+    //
+    // The alpha written out is zero, and that is what makes the blend additive. The sky pipeline
+    // blends ONE / ONE_MINUS_SRC_ALPHA; a source alpha of zero turns the destination factor into
+    // one, so the result is dst + src. A second pipeline differing only in a blend factor is a
+    // second pipeline that has to be kept identical in every other respect, which the note on
+    // the moons' blend already says at more length.
+    //
+    // What this does NOT reproduce is the space the *blend* happens in. Upstream adds into a
+    // gamma framebuffer; an _SRGB attachment decodes, adds and re-encodes, so this add is
+    // linear. The two agree exactly over black and diverge as the destination brightens -- half
+    // strength over a mid-grey sky lands near 0.68 in display terms where upstream saturates to
+    // 1.0. Reproducing it exactly would mean reading the destination, which means an input
+    // attachment and a subpass self-dependency on the pixel the interface is about to draw over.
+    // That was not worth it: a linear add is also what light actually does, and the two things
+    // the task names as Morrowind behaviours -- the angle falloff and the doubled colour -- are
+    // reproduced exactly.
+    if (sky.params.z == 3u) {
+        float fade = sky.colour.a * visibleRatio();
+        outColor = vec4(srgbDecode(clamp(sky.colour.rgb * fade, 0.0, 1.0)), 0.0);
+        return;
+    }
+
+    // The sun flash. Also before the depth test, and for a reason worth stating: createSunFlash
+    // switches GL_DEPTH_TEST off (skyutil.cpp line 816) and puts the quad in RenderBin_SunGlare,
+    // so upstream draws this halo over the world rather than behind it. That is not an
+    // oversight -- it is what lets the flash stay a whole circle while the sun sinks behind a
+    // ridge, shrinking under SunFlashCallback's scale instead of being sliced in half by the
+    // ridge line. Give this the sun disc's "only where the depth is still cleared" test and the
+    // effect reads as broken exactly when it is supposed to be at its most dramatic.
+    if (sky.params.z == 2u) {
+        // The same two lines paintSun runs, because upstream draws the flash through the same
+        // PASS_SUN branch. No gamma work anywhere here: the texture is decoded by the sampler
+        // and both factors are scalars, so nothing mixes the two spaces.
+        vec4 flash = texture(textures[sky.params.x], fragUv) * sky.colour;
+
+        // SunFlashCallback's fade band, and it is the exact algebra of that callback rather
+        // than a lookalike. Below a tenth of the disc showing it overrides the material with an
+        // alpha of fade * mGlareView, where fade ramps 0 to 1 across that tenth; at or above a
+        // tenth it uses no override, so the alpha is the sun transform's own material diffuse
+        // alpha -- which is mGlareView again, and which the reader has already put in
+        // sky.colour.a. min(1, ratio * 10) is those two branches written as one expression.
+        flash.a *= clamp(visibleRatio() * 10.0, 0.0, 1.0);
+
+        // Premultiplied on the way out, like the sun disc, so the one pipeline covers both.
+        outColor = vec4(flash.rgb * flash.a, flash.a);
+        return;
+    }
+
     // Screen-space UV for the depth fetch. Vulkan's framebuffer origin is top-left and so is the depth
     // image's, so this needs no flip -- see trap 15, which is the same fact biting the other way round.
     vec2 screenUv = gl_FragCoord.xy / vec2(textureSize(gbufferDepth, 0));
@@ -62,7 +140,11 @@ void main() {
 
     vec4 colour;
 
-    if (sky.params.z != 0u) {
+    // Was `!= 0`, which was correct while 0 and 1 were the only values. params.z now carries
+    // four modes -- see Vk::SkyMode -- and the two above have already returned, so this could
+    // stay as it was and be right by accident. It is spelled out instead, because the next mode
+    // added is the one that turns a wrong sun into a moon.
+    if (sky.params.z == 1u) {
         vec4 phase = texture(textures[sky.params.x], fragUv);
         vec4 mask = texture(textures[sky.params.y], fragUv);
 

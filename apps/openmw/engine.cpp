@@ -82,6 +82,9 @@
 
 #include "mwrender/camera.hpp"
 #include "mwrender/renderingmanager.hpp"
+// For SkyManager itself and not just the pointer: renderingmanager.hpp only forward
+// declares it (line 96), and getGlareTimeOfDayFade is called on the object below.
+#include "mwrender/sky.hpp"
 #include "mwrender/vklightcollector.hpp"
 #include "mwrender/vkrenderingmanager.hpp"
 #endif
@@ -403,6 +406,10 @@ bool OMW::Engine::frame(unsigned frameNumber, float frametime)
 
                     MWRender::VkRenderingManager::FrameLighting lighting;
                     lighting.sunLightDir = osg::Vec3f(-sunPos.x(), -sunPos.y(), -sunPos.z());
+                    // Read back off the sky rather than recomputed. See FrameLighting for why
+                    // this one number cannot be collected with the rest of the sky state.
+                    if (MWRender::SkyManager* sky = mWorld->getRenderingManager()->getSkyManager())
+                        lighting.sunGlareTimeOfDayFade = sky->getGlareTimeOfDayFade();
                     lighting.sunDiffuse = mWorld->getSunLightDiffuse();
                     lighting.ambient = mWorld->getSunLightAmbient();
                     lighting.skyColour = mWorld->getSkyColour();

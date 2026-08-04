@@ -88,6 +88,16 @@ namespace MWRender
 
         void setGlareTimeOfDayFade(float val);
 
+        /// The value last handed to setGlareTimeOfDayFade.
+        ///
+        /// Kept because the Vulkan backend needs it and there is nowhere else to get it.
+        /// WeatherManager works it out from the hour and passes it straight through to a
+        /// private member of SunGlareCallback (skyutil.cpp line 246), which is cull-time
+        /// state -- invisible to the node visitor VkRenderingManager reads the sky with.
+        /// Recomputing it there would mean a second copy of the sunrise/nightfall
+        /// arithmetic that can disagree with the first one at dawn.
+        float getGlareTimeOfDayFade() const { return mGlareTimeOfDayFade; }
+
         /// Enable or disable the water plane (used to remove underwater weather particles)
         void setWaterEnabled(bool enabled);
 
@@ -155,6 +165,9 @@ namespace MWRender
         std::unique_ptr<PrecipitationOccluder> mPrecipitationOccluder;
 
         bool mCreated;
+
+        // Last value passed to setGlareTimeOfDayFade. See the getter for why it is kept.
+        float mGlareTimeOfDayFade = 0.f;
 
         bool mIsStorm;
 

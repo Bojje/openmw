@@ -65,10 +65,26 @@ namespace
     class Collector : public osg::NodeVisitor
     {
     public:
+        /// Everything the sun's two glare effects need that is not a billboard: where the disc
+        /// is, how wide it is, what image it is drawn with, and the fade the weather has put on
+        /// it. Filled in readSun, because that is the one place all four are in scope at once.
+        struct SunDisc
+        {
+            osg::Vec3f direction;
+            float tanRadius = 0.f;
+            uint32_t texture = 0;
+            float glareView = 0.f;
+            bool valid = false;
+        };
+
         Collector(std::vector<Vk::SkyElement>& out, std::vector<Vk::SkyMeshDraw>& meshes,
             std::vector<std::size_t>& textureIndices, MWRender::SkyMeshCache* meshCache,
-            const std::function<uint32_t(const std::string&, std::size_t&)>& resolveTexture)
+            const std::function<uint32_t(const std::string&, std::size_t&)>& resolveTexture,
+            Vk::SkyElement& sunFlash, bool& hasSunFlash, SunDisc& sunDisc)
             : osg::NodeVisitor(TRAVERSE_ALL_CHILDREN)
+            , mSunFlash(sunFlash)
+            , mHasSunFlash(hasSunFlash)
+            , mSunDisc(sunDisc)
             , mOut(out)
             , mMeshes(meshes)
             , mTextureIndices(textureIndices)
@@ -198,7 +214,11 @@ namespace
         /// the sun, the moons, the clouds and the stars all sit around the world origin, so from
         /// anywhere else in Vvardenfell the player is outside his own sky looking back at it. Adding
         /// the transform's own view point back puts it around him.
-        osg::Matrix computeLocalToWorld()
+        ///
+        /// \a cameraRelativeOriginOut, when given, receives the view point that was added back
+        /// in. The sun needs it to recover the transform's own position, which is what
+        /// SunGlareCallback measures its angle against -- see readSun.
+        osg::Matrix computeLocalToWorld(osg::Vec3f* cameraRelativeOriginOut = nullptr)
         {
             const osg::NodePath& path = getNodePath();
 
@@ -225,6 +245,9 @@ namespace
             if (cameraRelative)
                 matrix.postMultTranslate(cameraRelativeOrigin);
 
+            if (cameraRelativeOriginOut != nullptr)
+                *cameraRelativeOriginOut = cameraRelative ? cameraRelativeOrigin : osg::Vec3f();
+
             return matrix;
         }
 
@@ -247,8 +270,13 @@ namespace
                 {
                     if (pass == sPassSun)
                     {
+                        // Both quads carrying this pass are wanted now. isSunDisc still decides
+                        // which is which -- see its comment for why one step of the node path is
+                        // the whole difference -- but the flash is no longer thrown away.
                         if (isSunDisc())
                             readSun(geometry, *stateSet);
+                        else
+                            readSunFlash(geometry, *stateSet);
                         return;
                     }
 
@@ -320,6 +348,104 @@ namespace
             element.colour[3] = readMaterialAlpha();
 
             mOut.push_back(element);
+
+            // What the glare and the visibility test need, taken here because this is the only
+            // place the disc's world position, its extent, its texture and its fade are all in
+            // hand at once.
+            //
+            // The direction is the transform's local position, not the world centre above.
+            // SunGlareCallback measures its angle against mSunTransform->getPosition()
+            // (skyutil.cpp line 304), which under the camera-relative sky is the offset from the
+            // camera rather than a world point -- so subtracting the camera-relative origin back
+            // off gives exactly the vector upstream uses. Using the world centre instead would be
+            // right only while the sky's cached view point matched the camera, which is a frame
+            // behind whenever the player is moving.
+            osg::Vec3f cameraRelativeOrigin;
+            const osg::Matrix localToWorld = computeLocalToWorld(&cameraRelativeOrigin);
+            const osg::Vec3d centre = localToWorld.getTrans();
+            osg::Vec3f local(static_cast<float>(centre.x()) - cameraRelativeOrigin.x(),
+                static_cast<float>(centre.y()) - cameraRelativeOrigin.y(),
+                static_cast<float>(centre.z()) - cameraRelativeOrigin.z());
+
+            // slot != 0 for the same reason readSunFlash refuses slot 0, arriving at a different
+            // failure. The visibility test alpha-tests the disc texture at 0.8 to reproduce
+            // PASS_SUNFLASH_QUERY; the fallback is 1x1 white, whose alpha is 1 everywhere, so
+            // every one of the 64 rays would pass and the sun would be measured as the full 25
+            // degree quad instead of its bright core. That is not a missing effect, it is a
+            // wrong number -- the flash would shrink and the glare would dim while the sun was
+            // still well clear of the ridge, and nothing on screen would say why. Leaving the
+            // disc invalid sets the ray count to zero, which sky.vert reads as fully visible.
+            const float distance = local.normalize();
+            if (distance > 0.f && slot != 0)
+            {
+                mSunDisc.direction = local;
+                // The disc's half extent over its distance. element.right is that half extent as
+                // a world vector, so this needs no knowledge of the 450 in CelestialBody's
+                // constructor or the 1000 in mDistance -- and a mod that changes either is
+                // followed without anything here noticing.
+                const osg::Vec3f right(element.right[0], element.right[1], element.right[2]);
+                mSunDisc.tanRadius = right.length() / distance;
+                mSunDisc.texture = slot;
+                // The same alpha the disc fades by, which is also SunGlareCallback's mGlareView
+                // and SunFlashCallback's. See SkyReader::sunGlareView.
+                mSunDisc.glareView = element.colour[3];
+                mSunDisc.valid = true;
+            }
+        }
+
+        /// The sun flash: the halo whose size tracks how much of the sun is showing.
+        ///
+        /// Almost the sun disc again -- same quad geometry, same texture unit, same material one
+        /// level up -- with two differences that matter. It is 2.6 times the size, which
+        /// fillQuad picks up for free because createTexturedQuad bakes the scale into the
+        /// vertices (skyutil.cpp lines 809 and 53-58) and the extents are read off the bounding
+        /// box. And it carries SkyMode::SunFlash, which is what tells the shaders to skip the
+        /// depth test, scale by the traced visibility, and fade across the bottom tenth of it.
+        ///
+        /// Nothing here reproduces SunFlashCallback's scale or its fade. Both are cull-time
+        /// state -- a pushed model-view matrix and a pushed stateset (skyutil.cpp lines 215-217)
+        /// -- so a node visitor cannot see them and the graph always holds the unscaled quad at
+        /// full strength. They are recomputed in sky.vert and sky.frag from the traced ratio,
+        /// which is the one place in this file's whole design where something is recomputed
+        /// rather than read, and it is because there is nothing there to read.
+        void readSunFlash(osg::Geometry& geometry, const osg::StateSet& stateSet)
+        {
+            Vk::SkyElement element = {};
+            if (!fillQuad(geometry, element))
+                return;
+
+            const uint32_t slot = resolveUnit(stateSet, 0);
+
+            // Slot 0 is the 1x1 white fallback, and it is also what an unresolved or evicted
+            // texture answers. Refusing to draw the flash at all is the right response, and it
+            // is a much sharper rule here than it is for the sun disc: the disc is depth-gated
+            // to pixels where nothing was drawn, so a white fallback is a white square in the
+            // sky, whereas the flash is drawn with the depth test off at thirty degrees across.
+            // A white fallback there is a white sheet over most of the screen.
+            //
+            // This is not hypothetical. tx_sun_flash_grey_05.dds is a texture nothing else in
+            // the game references, so the first frame the sun is visible is the frame it is
+            // first requested -- and it only gets a sampler slot once SkyReader::collect has
+            // grown the texture list and the caller's sync has run. For one frame the honest
+            // answer is that there is no flash yet.
+            if (slot == 0)
+                return;
+
+            element.params[0] = slot;
+            element.params[1] = slot;
+            element.params[2] = static_cast<uint32_t>(Vk::SkyMode::SunFlash);
+
+            // paintSun tints by nothing, and the flash is drawn through paintSun. The alpha is
+            // the sun transform's material diffuse alpha, which is the same number the disc
+            // fades by and is also the mGlareView SunFlashCallback multiplies its own fade by --
+            // so one read covers both halves of the callback's arithmetic.
+            element.colour[0] = 1.0f;
+            element.colour[1] = 1.0f;
+            element.colour[2] = 1.0f;
+            element.colour[3] = readMaterialAlpha();
+
+            mSunFlash = element;
+            mHasSunFlash = true;
         }
 
         void readMoon(osg::Geometry& geometry, const osg::StateSet& stateSet)
@@ -570,6 +696,9 @@ namespace
             return slot;
         }
 
+        Vk::SkyElement& mSunFlash;
+        bool& mHasSunFlash;
+        SunDisc& mSunDisc;
         std::vector<Vk::SkyElement>& mOut;
         std::vector<Vk::SkyMeshDraw>& mMeshes;
         std::vector<std::size_t>& mTextureIndices;
@@ -605,11 +734,37 @@ namespace MWRender
         mElements.clear();
         mMeshes.clear();
         mTextureIndices.clear();
+        // Cleared with them, and this one matters more than the lists do. A stale flash is drawn
+        // with the depth test off over the whole world, so an interior would carry the last
+        // exterior's halo through the ceiling; a stale disc direction would keep the visibility
+        // test tracing rays at a sun that set an hour ago.
+        mHasSunFlash = false;
+        mSunDiscDirection.set(0.f, 0.f, 0.f);
+        mSunDiscTanRadius = 0.f;
+        mSunDiscTexture = 0;
+        mSunGlareView = 0.f;
         if (sceneRoot == nullptr)
             return;
 
-        Collector collector(mElements, mMeshes, mTextureIndices, mMeshCache.get(), mResolveTexture);
+        Collector::SunDisc disc;
+        Collector collector(mElements, mMeshes, mTextureIndices, mMeshCache.get(), mResolveTexture,
+            mSunFlash, mHasSunFlash, disc);
         sceneRoot->accept(collector);
+
+        if (disc.valid)
+        {
+            mSunDiscDirection = disc.direction;
+            mSunDiscTanRadius = disc.tanRadius;
+            mSunDiscTexture = disc.texture;
+            mSunGlareView = disc.glareView;
+        }
+        else
+        {
+            // No disc means no sun in the sky at all -- an interior, or below the horizon. The
+            // flash cannot outlive it: SunFlashCallback and the disc both hang off the same
+            // transform, and if the transform's mask is clear neither was reached.
+            mHasSunFlash = false;
+        }
     }
 }
 

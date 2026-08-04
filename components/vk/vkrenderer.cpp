@@ -85,6 +85,7 @@ namespace Vk
         createSkinBuffers();
         // And binding 3.
         createParticleBuffers();
+        createSunVisibilityBuffers();
         createUvScrollBuffers();
         createDescriptorSets();
         createGBufferPipeline();
@@ -754,7 +755,16 @@ namespace Vk
 
         // Composite layout: G-buffer textures + RT output + scene UBO
         {
-            std::array<VkDescriptorSetLayoutBinding, 10> bindings = {};
+            std::array<VkDescriptorSetLayoutBinding, 11> bindings = {};
+
+            // How much of the sun disc is unoccluded, written by raygen earlier in this same
+            // command buffer. VERTEX as well as FRAGMENT because the flash reads it to decide
+            // how big to be, not just how bright -- SunFlashCallback scales the quad
+            // (skyutil.cpp lines 210-217) and that is a vertex stage decision.
+            bindings[10].binding = 10;
+            bindings[10].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+            bindings[10].descriptorCount = 1;
+            bindings[10].stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 
             // Denoise history, for the per-pixel history length. composite runs a spatial fallback
             // filter over pixels the temporal accumulator has nothing for, and this is how it knows
@@ -836,7 +846,15 @@ namespace Vk
         // RT layout: TLAS + storage image + G-buffer samplers
         if (mDevice->rayTracingSupported())
         {
-            std::array<VkDescriptorSetLayoutBinding, 17> bindings = {};
+            std::array<VkDescriptorSetLayoutBinding, 18> bindings = {};
+
+            // The sun disc visibility block. The only binding in this layout that raygen both
+            // reads and writes: the CPU puts the disc in it and raygen accumulates the counts
+            // into it. See Vk::SunVisibility for why it is a buffer and not a UBO channel.
+            bindings[17].binding = 17;
+            bindings[17].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+            bindings[17].descriptorCount = 1;
+            bindings[17].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
 
             // The water surface's reflection, at half extent. Written by raygen only -- there is no
             // history to ping-pong, because a reflection off a wave that moves every frame does not
@@ -991,22 +1009,27 @@ namespace Vk
         {
             poolSizes.push_back({ VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, maxFramesInFlight });
             // The RT sets carry a second copy of the sampler array (binding 7) for the hit shaders,
-            // plus the geometry table.
-            poolSizes.push_back({ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, maxFramesInFlight });
+            // plus the geometry table and the sun visibility block -- two storage buffers each.
+            poolSizes.push_back({ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, maxFramesInFlight * 2 });
         }
 
-        // The composite sets each hold a point light buffer and the scene sets each hold a bone
-        // palette, particle quads and UV scroll offsets, whether or not ray tracing is available.
-        // Four per frame in flight. This count is exact rather than generous, so a fifth storage
-        // buffer added without touching this line fails vkAllocateDescriptorSets at startup with
-        // VK_ERROR_OUT_OF_POOL_MEMORY.
+        // The composite sets each hold a point light buffer and a sun disc visibility block;
+        // the scene sets each hold a bone palette, particle quads and UV scroll offsets. Five
+        // per frame in flight, whether or not ray tracing is available.
+        //
+        // It was four, and the fifth is the sun visibility block. The line above this one
+        // already warned that the count is exact rather than generous, and it was right: the UV
+        // scroll buffer and this one were added independently against a budget with no slack in
+        // it, which is the way two correct changes turn into VK_ERROR_OUT_OF_POOL_MEMORY out of
+        // vkAllocateDescriptorSets at startup -- a failure that reads as a driver problem rather
+        // than as an accounting one, because nothing about it mentions descriptors.
         {
             auto found = std::find_if(poolSizes.begin(), poolSizes.end(),
                 [](const VkDescriptorPoolSize& s) { return s.type == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; });
             if (found != poolSizes.end())
-                found->descriptorCount += maxFramesInFlight * 4;
+                found->descriptorCount += maxFramesInFlight * 5;
             else
-                poolSizes.push_back({ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, maxFramesInFlight * 4 });
+                poolSizes.push_back({ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, maxFramesInFlight * 5 });
         }
 
         if (mDevice->rayTracingSupported())
@@ -1161,7 +1184,24 @@ namespace Vk
                 lightInfo.offset = 0;
                 lightInfo.range = VK_WHOLE_SIZE;
 
-                std::array<VkWriteDescriptorSet, 2> writes = {};
+                VkDescriptorBufferInfo sunVisInfo = {};
+                sunVisInfo.buffer = mSunVisBuffers[i];
+                sunVisInfo.offset = 0;
+                sunVisInfo.range = VK_WHOLE_SIZE;
+
+                std::array<VkWriteDescriptorSet, 3> writes = {};
+
+                // Bound whether or not ray tracing is available, because every element of the
+                // layout has to be written before the set is used. Without ray tracing nothing
+                // ever writes the counters, they stay at zero, and sky.vert reads that as "the
+                // sun is fully visible" -- so the flash and the glare degrade to their
+                // unoccluded selves rather than disappearing.
+                writes[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                writes[2].dstSet = mCompositeDescriptorSets[i];
+                writes[2].dstBinding = 10;
+                writes[2].descriptorCount = 1;
+                writes[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+                writes[2].pBufferInfo = &sunVisInfo;
 
                 writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
                 writes[0].dstSet = mCompositeDescriptorSets[i];
@@ -1504,7 +1544,22 @@ namespace Vk
 
             const VkDescriptorImageInfo waterReflectInfo = makeStorageInfo(mWaterReflect.view);
 
-            std::array<VkWriteDescriptorSet, 14> writes = {};
+            VkDescriptorBufferInfo sunVisInfo = {};
+            sunVisInfo.buffer = mSunVisBuffers[frame];
+            sunVisInfo.offset = 0;
+            sunVisInfo.range = VK_WHOLE_SIZE;
+
+            std::array<VkWriteDescriptorSet, 15> writes = {};
+
+            // Binding 17: the sun disc visibility block. Indexed by `frame` and not by
+            // `prevFrame`: unlike every history binding around it, this is produced and
+            // consumed inside a single frame, so there is nothing to ping-pong.
+            writes[14].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            writes[14].dstSet = mRtDescriptorSets[frame];
+            writes[14].dstBinding = 17;
+            writes[14].descriptorCount = 1;
+            writes[14].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+            writes[14].pBufferInfo = &sunVisInfo;
 
             // Binding 16: the water surface's reflection. One image, not a ping-ponged pair: nothing
             // reads it back across frames, because there is no temporal history on this signal.
@@ -2967,8 +3022,29 @@ namespace Vk
                 barrier.subresourceRange.levelCount = 1;
                 barrier.subresourceRange.layerCount = 1;
 
+                // The sun disc counters travel with it, in the same barrier rather than one of
+                // their own: it is the same producer stage and the same consumer stage, and
+                // one vkCmdPipelineBarrier with two entries costs less than two with one.
+                //
+                // This is the whole synchronisation cost of replacing the occlusion queries.
+                // There is no readback, no fence to wait on and no ring of results to walk,
+                // because the value never leaves the device -- raygen writes it and the sky
+                // pipeline reads it a few hundred microseconds later in the same submission.
+                // The dstStageMask covers the vertex stage too, because the flash reads this
+                // to size its quad.
+                VkBufferMemoryBarrier sunVisBarrier = {};
+                sunVisBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+                sunVisBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+                sunVisBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+                sunVisBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+                sunVisBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+                sunVisBarrier.buffer = mSunVisBuffers[mCurrentFrame];
+                sunVisBarrier.offset = 0;
+                sunVisBarrier.size = VK_WHOLE_SIZE;
+
                 vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,
-                    VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+                    VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                    0, 0, nullptr, 1, &sunVisBarrier, 1, &barrier);
             }
         }
 
@@ -3209,6 +3285,56 @@ namespace Vk
                 }
             }
 
+            // The sun flash and the sun glare, last of everything in the world and immediately
+            // before the interface. This position is the whole of what makes them look right.
+            //
+            // Upstream puts both in RenderBin_SunGlare, which is 13 -- past RenderBin_Water at
+            // 9 and past every transparent bin (renderbin.hpp lines 10-16). So the glare washes
+            // over the sea, over the rain, over a candle's halo and over the enchanted item glow,
+            // exactly as it washes over the terrain. Anywhere earlier and the water would be the
+            // one thing on screen the sun does not blind you through, which is the single most
+            // visible way to get this wrong on a coastline.
+            //
+            // And before mOverlayCallback, which is not a detail. The glare is a fullscreen
+            // additive orange at up to half strength; run it after the interface and every menu,
+            // every health bar and every line of dialogue text is washed out in daylight. OSG
+            // gets this for free because MyGUI draws in a camera of its own after the scene; here
+            // the interface shares this render pass, so the ordering is this line and nothing
+            // else. The flash sits alongside it rather than back with the sun disc for the same
+            // reason: it is depth-test-off geometry in the same late bin.
+            //
+            // Both are drawn with the sky pipeline. No new pipeline, no new push constant range
+            // and no new blend state: the flash is premultiplied alpha like the sun disc, and the
+            // glare gets additive blending out of the same ONE / ONE_MINUS_SRC_ALPHA state by
+            // writing an alpha of zero -- see sky.frag.
+            if (mSkyPipeline != VK_NULL_HANDLE && (mHasSunFlash || mHasSunGlare))
+            {
+                std::array<VkDescriptorSet, 2> sets
+                    = { mSceneDescriptorSets[mCurrentFrame], mCompositeDescriptorSets[mCurrentFrame] };
+                vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mSkyPipelineLayout, 0,
+                    static_cast<uint32_t>(sets.size()), sets.data(), 0, nullptr);
+                vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mSkyPipeline);
+
+                // Flash first. Both are additive in effect so the order cannot change the
+                // result, but this is the order the two nodes appear in under the sun transform
+                // (skyutil.cpp lines 806 and 871) and there is no reason to differ from it.
+                if (mHasSunFlash)
+                {
+                    vkCmdPushConstants(cmd, mSkyPipelineLayout,
+                        VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
+                        sizeof(SkyElement), &mSunFlash);
+                    vkCmdDraw(cmd, 6, 1, 0, 0);
+                }
+
+                if (mHasSunGlare)
+                {
+                    vkCmdPushConstants(cmd, mSkyPipelineLayout,
+                        VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
+                        sizeof(SkyElement), &mSunGlare);
+                    vkCmdDraw(cmd, 6, 1, 0, 0);
+                }
+            }
+
             // The user interface draws here, sharing the composite pass rather than running one of its
             // own. It blends straight onto the tone mapped scene in the swapchain image, so there is no
             // second attachment, no extra layout transition and nothing to resolve. Outside the
@@ -3361,6 +3487,57 @@ namespace Vk
                 mParticleBuffers[i], mParticleMemory[i]);
             VK_CHECK(vmaMapMemory(mDevice->allocator(), mParticleMemory[i], &mParticleMapped[i]));
         }
+    }
+
+    void Renderer::createSunVisibilityBuffers()
+    {
+        // One per frame in flight, for the same reason the light and particle buffers are: the
+        // CPU writes this frame's copy while the GPU may still be reading the other one. The
+        // frame fence already covers that, but only because maxFramesInFlight is 2 -- indexing
+        // by mCurrentFrame says it outright instead of relying on it.
+        //
+        // Both a storage buffer (raygen writes it, the sky shaders read it) and host visible
+        // (the CPU writes the disc into it). Device-local plus a staging copy would be the
+        // usual answer for a buffer the GPU writes; it is the wrong answer for 48 bytes, where
+        // the copy command costs more than the traffic.
+        for (uint32_t i = 0; i < maxFramesInFlight; i++)
+        {
+            createBufferLocal(*mDevice, sizeof(SunVisibility), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                mSunVisBuffers[i], mSunVisMemory[i]);
+            VK_CHECK(vmaMapMemory(mDevice->allocator(), mSunVisMemory[i], &mSunVisMapped[i]));
+            // Zeroed at creation, so the very first frame -- before any caller has said
+            // anything about the sun -- reads a ray count of zero rather than uninitialised
+            // memory. A garbage ray count there would send raygen tracing an arbitrary number
+            // of rays down an arbitrary direction on frame one.
+            std::memset(mSunVisMapped[i], 0, sizeof(SunVisibility));
+        }
+    }
+
+    void Renderer::updateSunGlare(
+        const SkyElement* flash, const SkyElement* glare, const SunVisibility& disc)
+    {
+        mHasSunFlash = flash != nullptr;
+        if (mHasSunFlash)
+            mSunFlash = *flash;
+
+        mHasSunGlare = glare != nullptr;
+        if (mHasSunGlare)
+            mSunGlare = *glare;
+
+        // The counters are the GPU's half of the block and are deliberately zeroed here rather
+        // than left to a vkCmdFillBuffer. Doing it in the same host write that carries the disc
+        // is what keeps this off the command buffer entirely: no transfer submit, no
+        // TRANSFER -> RAY_TRACING barrier, and no way for a fill to be recorded without the
+        // parameters that go with it.
+        mSunVisibility = disc;
+        mSunVisibility.totalRays = 0;
+        mSunVisibility.visibleRays = 0;
+        mSunVisibility.sunVisPad[0] = 0;
+        mSunVisibility.sunVisPad[1] = 0;
+
+        if (mSunVisMapped[mCurrentFrame] != nullptr)
+            std::memcpy(mSunVisMapped[mCurrentFrame], &mSunVisibility, sizeof(SunVisibility));
     }
 
     void Renderer::updateParticles(
@@ -3900,6 +4077,17 @@ namespace Vk
                 mSkinBuffers[i] = VK_NULL_HANDLE;
                 mSkinMemory[i] = VK_NULL_HANDLE;
             }
+            if (mSunVisMapped[i])
+            {
+                vmaUnmapMemory(mDevice->allocator(), mSunVisMemory[i]);
+                mSunVisMapped[i] = nullptr;
+            }
+            if (mSunVisBuffers[i] != VK_NULL_HANDLE)
+            {
+                vmaDestroyBuffer(mDevice->allocator(), mSunVisBuffers[i], mSunVisMemory[i]);
+                mSunVisBuffers[i] = VK_NULL_HANDLE;
+            }
+
             if (mParticleMapped[i])
             {
                 vmaUnmapMemory(mDevice->allocator(), mParticleMemory[i]);
