@@ -15,6 +15,7 @@ layout(location = 1) in vec4 fragColour;
 layout(location = 2) flat in uint fragTexture;
 layout(location = 3) flat in uint fragAdditive;
 layout(location = 4) in vec3 fragWorldPos;
+layout(location = 5) in float fragSize;
 
 layout(set = 0, binding = 1) uniform sampler2D textures[1024];
 layout(set = 1, binding = 2) uniform sampler2D gbufferDepth;
@@ -43,6 +44,15 @@ layout(set = 1, binding = 4) uniform SceneUBO {
 } scene;
 
 layout(location = 0) out vec4 outColor;
+
+// Distance in front of the camera for a depth buffer value, in world units. Same derivation as
+// water.frag's: Vk::glToVulkanProjection leaves the bottom row alone so w_clip is -z_view, and
+// d = (P[2][2]*z + P[3][2]) / -z rearranges to this. Gives the near plane at d = 0 and the far plane
+// at d = 1.
+float viewDist(float d)
+{
+    return scene.projection[3][2] / (d + scene.projection[2][2]);
+}
 
 // The same response chain composite.frag puts the rest of the frame through, and it has to be repeated
 // here rather than shared because this draws after that shader has already run.
@@ -94,13 +104,28 @@ void main() {
     vec4 texel = texture(textures[fragTexture], fragUv);
 
     // Soft particles. A quad that intersects the ground would otherwise cut a hard straight line
-    // across it, which is the single thing that most makes billboards read as billboards. Fading
-    // over the last stretch of depth before the surface behind hides that entirely.
+    // across it, which is the single thing that most makes billboards read as billboards. Fading over
+    // the last stretch of depth before the surface behind hides that entirely.
     //
-    // The comparison is in non-linear depth, which is deliberately crude: it is far more sensitive
-    // near the camera, which is exactly where the artifact is visible and where the fade wants to be
-    // tightest. A view-space version would need the projection constants and would look worse.
-    float fade = clamp((sceneDepth - gl_FragCoord.z) * 4000.0, 0.0, 1.0);
+    // In LINEAR view depth and scaled by the particle's own size, which is what OSG does in
+    // files/shaders/lib/particle/soft.glsl -- its falloff is `size * 0.33` where size is the system's
+    // own particle size. The previous version compared raw depth buffer values against a fixed 4000,
+    // and it was wrong in a way that only showed up far from the camera.
+    //
+    // Non-linear depth differences shrink as the square of distance, so a fixed threshold demands
+    // clearance that grows as d^2: at 500 units it asked for half what OSG asks, at 2500 units it
+    // asked for twelve times as much. That is fine for a 40-unit flame at arm's length, which is what
+    // the 4000 was tuned against, and ruinous for an ash storm -- its cloud sprites are 400 units of
+    // half extent sitting a couple of thousand units out, and they were being faded to nothing. The
+    // symptom was a storm that tinted the scene red instead of obscuring it, because thin coverage
+    // blended linearly also skews the channel ratio toward red.
+    //
+    // The size term is the other half. Without it an 800-unit cloud and an 8-unit blizzard flake get
+    // the same curve, and only one of them can be right.
+    float sceneDist = viewDist(sceneDepth);
+    float particleDist = viewDist(gl_FragCoord.z);
+    float falloff = max(fragSize * 0.33, 1.0);
+    float fade = clamp((sceneDist - particleDist) / falloff, 0.0, 1.0);
 
     // Both sides of this are linear: the sampler decodes the texture because the loader gives it an
     // _SRGB format, and the reader decodes the particle colour on the way in.

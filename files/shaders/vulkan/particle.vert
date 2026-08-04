@@ -33,6 +33,9 @@ layout(location = 3) flat out uint fragAdditive;
 // For the underwater test in particle.frag. Already computed below for gl_Position, so carrying it
 // costs one interpolant and no arithmetic.
 layout(location = 4) out vec3 fragWorldPos;
+// The quad's half extent in world units, for the soft-particle fade. Without it the fragment shader
+// softens an 800-unit ash cloud on the same curve as an 8-unit blizzard flake -- see particle.frag.
+layout(location = 5) out float fragSize;
 
 void main() {
     ParticleQuad quad = particles.quads[gl_InstanceIndex];
@@ -65,6 +68,7 @@ void main() {
     fragColour = quad.colour;
     fragTexture = quad.params.x;
     fragAdditive = quad.params.y;
+    fragSize = quad.size;
     fragWorldPos = world;
     gl_Position = camera.projection * camera.view * vec4(world, 1.0);
 }
