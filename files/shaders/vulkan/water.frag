@@ -205,7 +205,30 @@ void main() {
     // reflection creeps up and to the left by that much. The shift puts the bilinear weights back over
     // the pixels the rays were actually fired from.
     vec2 halfResFix = 0.5 / vec2(textureSize(gbufferDepth, 0));
-    vec4 reflectSample = texture(waterReflection, screen + halfResFix);
+
+    // Four bilinear taps rather than one, on a half-texel rotated grid, which comes to a tent filter
+    // about one half-resolution texel wide.
+    //
+    // This is the second half of the reflection noise fix and it does the part the smoothed normal in
+    // raygen.rgen cannot. That change stops neighbouring rays pointing at different things; it cannot
+    // do anything about the fact that a reflected headland is a *sharp* image sampled at one point per
+    // 2x2 pixels and then stretched back up. Undersampled detail stays undersampled however cleanly it
+    // was traced, and on the shoreline it is what is left once the fine wave octaves are gone.
+    //
+    // Cheap because it needs no pass, no target and no descriptor: the image is already read through a
+    // linear sampler, so four fetches of it are four fetches. Blurring a reflection is also the right
+    // thing physically -- a reflection off a wave field is a low frequency signal, which is the same
+    // argument that justifies tracing it at half resolution in the first place.
+    //
+    // The alpha averages harmlessly. It is 1 across the whole image or 0 across the whole image, never
+    // part of one, so every tap agrees and the > 0.5 switch below sees the same value it always did.
+    vec2 reflectTexel = 1.0 / vec2(textureSize(waterReflection, 0));
+    vec2 reflectCentre = screen + halfResFix;
+    vec4 reflectSample = 0.25 * (
+          texture(waterReflection, reflectCentre + vec2(-0.5, -0.5) * reflectTexel)
+        + texture(waterReflection, reflectCentre + vec2( 0.5, -0.5) * reflectTexel)
+        + texture(waterReflection, reflectCentre + vec2(-0.5,  0.5) * reflectTexel)
+        + texture(waterReflection, reflectCentre + vec2( 0.5,  0.5) * reflectTexel));
 
     vec3 reflectDir = reflect(viewDir, normal);
 
@@ -215,6 +238,12 @@ void main() {
     // filtered to the pixel; they differ in filter width at distance. What matters is that the constants
     // and the octave chain match, because that is what keeps the reflection sitting on the waves you can
     // see rather than sliding across them.
+    //
+    // They also differ by one deliberate change: raygen fires its ray off the three coarse octaves plus
+    // a tapered share of the three fine ones, because at one ray per 2x2 pixels with no history the fine
+    // octaves only make neighbouring texels point at different things. The full normal stays here, where
+    // the Fresnel and the sun glitter want it -- those are per-pixel and cost no rays. Do not "restore"
+    // the match without reading the note in raygen.rgen; the sparkle it produces is the artifact.
 
     // .a is 1 wherever raygen ran and 0 otherwise -- and it is 0 for the whole image or for none of it,
     // because raygen writes every texel it launches over, including the ones with no water under them.
