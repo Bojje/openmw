@@ -1896,6 +1896,25 @@ namespace Vk
             VK_CHECK(vkCreateGraphicsPipelines(mDevice->handle(), VK_NULL_HANDLE, 1,
                 &twoSidedInfo, nullptr, &mGBufferPipelineTwoSided));
 
+            // And the rigid one once more with the *front* face culled, for mirrored instances.
+            //
+            // Morrowind ships no left-side body art. A left sleeve is the right sleeve scaled by -1
+            // in X, and SceneUtil::attach pairs that scale with a front-face flip because a negative
+            // scale reverses winding (attach.cpp:166-179, and its comment there on why it does not
+            // bother checking each mesh's authored winding first -- neither does Morrowind). Culling
+            // the front of reversed geometry is the same image as culling the back of unreversed
+            // geometry, so this is that flip expressed as a cull mode.
+            //
+            // Rigid only: attach applies the mirror on its non-skinned branch alone, so a skinned
+            // mirrored pipeline would never be bound.
+            VkPipelineRasterizationStateCreateInfo rasterizerMirrored = rasterizer;
+            rasterizerMirrored.cullMode = VK_CULL_MODE_FRONT_BIT;
+
+            VkGraphicsPipelineCreateInfo mirroredInfo = pipelineInfo;
+            mirroredInfo.pRasterizationState = &rasterizerMirrored;
+            VK_CHECK(vkCreateGraphicsPipelines(mDevice->handle(), VK_NULL_HANDLE, 1,
+                &mirroredInfo, nullptr, &mGBufferPipelineMirrored));
+
             if (mGBufferSkinnedPipeline != VK_NULL_HANDLE)
             {
                 std::array<VkPipelineShaderStageCreateInfo, 2> skinnedStages = {
@@ -2875,6 +2894,11 @@ namespace Vk
                     // only happens if pipeline creation itself failed. Drawing one face is the old
                     // behaviour and is survivable; a null pipeline is not.
                     VkPipeline wanted = skinned ? mGBufferSkinnedPipeline : mGBufferPipeline;
+                    // Mirrored first, so that two-sided still wins over it below: a shape that draws
+                    // both faces does not care which one would have been culled, and asking for
+                    // FRONT there would throw away the near face instead of nothing.
+                    if (drawCmd.mirrored && !skinned && mGBufferPipelineMirrored != VK_NULL_HANDLE)
+                        wanted = mGBufferPipelineMirrored;
                     if (drawCmd.twoSided)
                     {
                         const VkPipeline twoSided
@@ -3806,6 +3830,24 @@ namespace Vk
         std::memcpy(mUniformMapped[mCurrentFrame], &mCurrentScene, sizeof(SceneData));
     }
 
+    namespace
+    {
+        // Does this transform reverse handedness? Only the sign matters, so the 3x3 linear part is
+        // enough -- translation cannot flip winding.
+        //
+        // Indices 0,1,2 / 4,5,6 / 8,9,10 are that block whichever way round the matrix is stored,
+        // because the two conventions differ only in where the translation sits (12,13,14 against
+        // 3,7,11). And a determinant is invariant under transposition, so the sign is right either
+        // way without having to settle which convention Vk::Mat4 is in.
+        bool mirrors(const Mat4& m)
+        {
+            const float* d = m.data;
+            const float det = d[0] * (d[5] * d[10] - d[6] * d[9])
+                - d[1] * (d[4] * d[10] - d[6] * d[8]) + d[2] * (d[4] * d[9] - d[5] * d[8]);
+            return det < 0.0f;
+        }
+    }
+
     void Renderer::submitMesh(const MeshSubmission& submission)
     {
         // Only for meshes that will actually be drawn. The normal matrix is a 4x4 affine inverse and
@@ -3883,7 +3925,7 @@ namespace Vk
             submission.boneOffset,
             { submission.glowColour[0], submission.glowColour[1], submission.glowColour[2] },
             submission.glowTexture, submission.twoSided, submission.alphaTest, submission.alphaFunc,
-            submission.alphaThreshold, submission.uvScroll });
+            submission.alphaThreshold, submission.uvScroll, mirrors(submission.transform) });
     }
 
     void Renderer::uploadGeometryTable(const std::vector<GeometryRecord>& records)
@@ -4168,6 +4210,8 @@ namespace Vk
             vkDestroyPipelineLayout(dev, mGlowPipelineLayout, nullptr);
         if (mGBufferSkinnedPipelineTwoSided != VK_NULL_HANDLE)
             vkDestroyPipeline(dev, mGBufferSkinnedPipelineTwoSided, nullptr);
+        if (mGBufferPipelineMirrored != VK_NULL_HANDLE)
+            vkDestroyPipeline(dev, mGBufferPipelineMirrored, nullptr);
         if (mGBufferPipelineTwoSided != VK_NULL_HANDLE)
             vkDestroyPipeline(dev, mGBufferPipelineTwoSided, nullptr);
         if (mGBufferSkinnedPipeline != VK_NULL_HANDLE)

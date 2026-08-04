@@ -1645,6 +1645,37 @@ namespace MWRender
             float actorBone[16];
             Vk::multiplyMat4(objectTransform, boneMatrix, actorBone);
 
+            // Morrowind ships no left-side body art. Every left part is the right part mirrored in X,
+            // and SceneUtil::attach is where upstream does it -- a PositionAttitudeTransform with
+            // scale (-1, 1, 1) under the attach node, plus a front-face flip because a negative scale
+            // reverses triangle winding (attach.cpp:166-179). Neither half was here, so a left sleeve
+            // was the *right* sleeve, inside-out, with its faces pointing away from the camera; back
+            // face culling then removed exactly the surface that should have been visible and the
+            // garment came apart at the shoulder with the world showing through the gap.
+            //
+            // Matched to attach's placement, not merely to its value: the transform goes between the
+            // bone and the part's own local transform, because that is where the PAT sits in the
+            // graph. Putting it outside would mirror the bone's position too and move the whole limb
+            // across the body.
+            //
+            // The winding half is not here. Vk::Renderer::submitMesh derives it from the sign of the
+            // determinant of the finished transform, so it follows this automatically and cannot be
+            // forgotten -- see the mirrored pipeline in vkrenderer.cpp.
+            //
+            // Skinned parts are deliberately untouched, matching attach, which mirrors only on its
+            // non-skinned branch. A skinned part is posed by its palette off the real skeleton, and
+            // the skeleton already has genuine left bones.
+            if (std::strstr(boneName, "Left") != nullptr)
+            {
+                float mirror[16];
+                Vk::identityMat4(mirror);
+                mirror[0] = -1.0f;
+
+                float mirrored[16];
+                Vk::multiplyMat4(actorBone, mirror, mirrored);
+                std::copy(mirrored, mirrored + 16, actorBone);
+            }
+
             for (size_t meshIndex : *partMeshes)
             {
                 ActorInstance instance;
@@ -1696,6 +1727,22 @@ namespace MWRender
                             // is "leave these vertices where the file put them". A bone this skeleton
                             // does not have then costs its vertices nothing but the pose.
                             Vk::identityMat4(palette);
+
+                            // ...and that is a silent tear wherever the shape spans the boundary. The
+                            // vertices on the missing bone stay in bind pose while the ones beside them
+                            // are posed by the animation, so the surface is pulled apart along the
+                            // seam between them -- which on a garment means a hole with the world
+                            // visible through it, and no warning anywhere to say so.
+                            //
+                            // Reported once per name. This runs per bone, per instance, per frame.
+                            static std::set<std::string> sReported;
+                            if (sReported.insert(mesh.skinBones[bone]).second)
+                            {
+                                Log(Debug::Warning)
+                                    << "Vulkan: skin bone \"" << mesh.skinBones[bone]
+                                    << "\" did not resolve against the skeleton; its vertices stay in "
+                                       "bind pose";
+                            }
                         }
                         mSkinMatrices.insert(mSkinMatrices.end(), palette, palette + 16);
 

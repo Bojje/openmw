@@ -555,9 +555,21 @@ namespace Vk
         bool alphaTest;
         uint8_t alphaFunc;
         uint8_t alphaThreshold;
+        uint32_t uvScroll;
         // Newest field, and therefore last, for the reason stated at the top of this struct: the
         // push_back in submitMesh is a positional aggregate initialiser.
-        uint32_t uvScroll;
+        //
+        // Whether this instance's transform mirrors, meaning the determinant of its linear part is
+        // negative. Morrowind ships no left-side body art: a left sleeve *is* the right sleeve scaled
+        // by -1 in X, which SceneUtil::attach applies (attach.cpp:166-179) together with a front-face
+        // flip, because a negative scale reverses triangle winding. Without the second half the part
+        // draws inside-out and its faces point away from the camera, so back-face culling deletes
+        // exactly the surface that should be visible.
+        //
+        // Derived in submitMesh from the transform rather than plumbed down from the caller, so that
+        // anything else arriving negatively scaled is covered by the same line and cannot forget to
+        // set a flag.
+        bool mirrored;
     };
 
     // How the G-buffer's material word is packed: a sampler slot plus the alpha test the shape was
@@ -1069,6 +1081,14 @@ namespace Vk
         // share everything with the culled pair including the layout, so the choice is one bind.
         VkPipeline mGBufferPipelineTwoSided = VK_NULL_HANDLE;
         VkPipeline mGBufferSkinnedPipelineTwoSided = VK_NULL_HANDLE;
+        // And the rigid one again with the *front* face culled, for mirrored instances. Culling the
+        // front of reversed geometry is the same picture as culling the back of unreversed geometry,
+        // and it costs one more pipeline instead of a second index buffer per left-side part.
+        //
+        // Rigid only, deliberately. The mirror comes from SceneUtil::attach, which applies it on the
+        // non-skinned branch alone -- a skinned part goes through the Skeleton path and is posed by
+        // its palette, never mirrored -- so a skinned mirrored pipeline would have no draws in it.
+        VkPipeline mGBufferPipelineMirrored = VK_NULL_HANDLE;
         VkPipeline mCompositePipeline = VK_NULL_HANDLE;
         VkPipelineLayout mCompositePipelineLayout = VK_NULL_HANDLE;
 
