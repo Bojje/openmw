@@ -1511,11 +1511,112 @@ namespace MWRender
             return;
         }
 
+        // Creatures are skinned, and until 2026-08-04 this path ignored that completely: it set no
+        // bone palette, so instance.boneOffset stayed sNoBones and every shape drew through the rigid
+        // pipeline in whatever pose its vertices were stored in. A frozen bind pose, in other words.
+        // "meshes/r/rust rat.nif" is 13 skinned shapes out of 14, cliffracer 6 of 6, cavemudcrab 5 of
+        // 5 -- so essentially every animal in the game stood in its modelling pose and slid around the
+        // world without moving a limb. A quadruped rigged along an axis reads as *standing upright*,
+        // which is how this was reported.
+        //
+        // The difference from an NPC is only where the bones come from. An NPC hangs body parts off a
+        // shared skeleton file; a creature carries its own skeleton inside its own NIF, so the bind
+        // pose is read from the model itself. Everything after that -- live pose preferred, palette of
+        // boneWorld * inverseBind, posed bounds -- is what addNpcInstances already does.
+        SceneUtil::Skeleton* liveSkeleton = nullptr;
+        if (MWRender::Animation* animation = MWBase::Environment::get().getWorld()->getAnimation(ptr))
+            liveSkeleton = animation->getSkeleton();
+
+        const std::unordered_map<std::string, std::array<float, 16>>* bindBones
+            = getOrLoadSkeleton(std::string(model.value()));
+
+        const auto lookupBone = [&](const std::string& name, float out[16]) -> bool {
+            if (liveSkeleton != nullptr)
+            {
+                if (SceneUtil::Bone* bone = liveSkeleton->getBone(name))
+                {
+                    osgMatrixToMat4(bone->mMatrixInSkeletonSpace, *reinterpret_cast<Vk::Mat4*>(out));
+                    return true;
+                }
+            }
+            if (bindBones != nullptr)
+            {
+                const auto found = bindBones->find(name);
+                if (found != bindBones->end())
+                {
+                    std::copy(found->second.begin(), found->second.end(), out);
+                    return true;
+                }
+            }
+            return false;
+        };
+
+        float skinBoneMatrix[16];
+
         for (size_t meshIndex : *meshIndices)
         {
+            const NifVk::VulkanMesh& mesh = *mMeshes[meshIndex];
+
             ActorInstance instance;
             instance.meshIndex = meshIndex;
-            Vk::multiplyMat4(objectTransform, mMeshes[meshIndex]->transform, instance.transform);
+
+            if (mesh.skinBuffer != nullptr && !mesh.skinBones.empty()
+                && mSkinMatrices.size() / 16 + mesh.skinBones.size() <= Vk::maxSkinMatrices)
+            {
+                // Skinned vertices are in the skeleton's bind space, so the instance transform is the
+                // creature's placement and nothing else -- the pose is entirely in the palette.
+                std::copy(objectTransform, objectTransform + 16, instance.transform);
+                instance.boneOffset = static_cast<uint32_t>(mSkinMatrices.size() / 16);
+
+                for (size_t bone = 0; bone < mesh.skinBones.size(); ++bone)
+                {
+                    float boneWorld[16];
+                    float palette[16];
+                    if (lookupBone(mesh.skinBones[bone], boneWorld))
+                        Vk::multiplyMat4(boneWorld, mesh.skinInvBinds[bone].data(), palette);
+                    else
+                        Vk::identityMat4(palette);
+                    mSkinMatrices.insert(mSkinMatrices.end(), palette, palette + 16);
+
+                    // Posed bounds, unioned over the bones, for the same reason the NPC path computes
+                    // them here: a skinned shape culled on its unposed bounds is trap 37.
+                    Vk::Mat4 posed;
+                    Vk::multiplyMat4(objectTransform, palette, posed.data);
+
+                    float boneMin[3];
+                    float boneMax[3];
+                    Vk::transformBounds(posed, mesh.boundsMin, mesh.boundsMax, boneMin, boneMax);
+
+                    if (bone == 0)
+                    {
+                        std::copy(boneMin, boneMin + 3, instance.worldMin);
+                        std::copy(boneMax, boneMax + 3, instance.worldMax);
+                    }
+                    else
+                    {
+                        for (int axis = 0; axis < 3; ++axis)
+                        {
+                            instance.worldMin[axis] = std::min(instance.worldMin[axis], boneMin[axis]);
+                            instance.worldMax[axis] = std::max(instance.worldMax[axis], boneMax[axis]);
+                        }
+                    }
+                }
+            }
+            else if (mesh.skinned && !mesh.skinBone.empty() && lookupBone(mesh.skinBone, skinBoneMatrix))
+            {
+                // Skinned but no palette room: follow the dominant bone rigidly rather than sitting in
+                // bind pose. Same fallback the NPC path takes.
+                float actorSkinBone[16];
+                Vk::multiplyMat4(objectTransform, skinBoneMatrix, actorSkinBone);
+                Vk::multiplyMat4(actorSkinBone, mesh.skinInvBind, instance.transform);
+            }
+            else
+            {
+                // Genuinely unskinned -- "meshes/r/minescrib.nif" is 0 of 43 -- and positioned by its
+                // place in the NIF's node hierarchy, which is what mesh.transform holds.
+                Vk::multiplyMat4(objectTransform, mesh.transform, instance.transform);
+            }
+
             mActorInstances.push_back(instance);
         }
     }
