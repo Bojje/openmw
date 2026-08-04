@@ -6,6 +6,7 @@
 #include <map>
 #include <set>
 #include <cmath>
+#include <cstdlib>
 #include <cstring>
 #include <exception>
 
@@ -452,8 +453,27 @@ namespace MWRender
         const osg::Vec3f& sunLightDir = lighting.sunLightDir;
         Vk::SceneData scene = {};
 
-        const auto& viewMatrix = camera.getViewMatrix();
         const auto& projMatrix = camera.getProjectionMatrix();
+
+        // TEMPORARY INSTRUMENT -- see NEXT-SESSION. Offsets the camera in world Z by
+        // $OPENMW_VK_CAMERA_Z units, so that the underwater path can be rendered at all. The console
+        // cannot submerge the player: setpos z, moveworld and tcl have all been tried and all fail,
+        // and walking in only ever reaches water shallow enough to stand in. Nothing else in the
+        // engine knows this happened, so physics, the player and the OSG window are all unaffected and
+        // only what the Vulkan renderer draws moves.
+        //
+        // Read once. Zero by default, so the instrument is inert unless the variable is set.
+        static const float sCameraZOffset = []() -> float {
+            const char* raw = std::getenv("OPENMW_VK_CAMERA_Z");
+            return raw != nullptr ? std::strtof(raw, nullptr) : 0.0f;
+        }();
+
+        // A view matrix is the inverse of the camera's placement, so moving the eye by d is shifting
+        // the world by -d. OSG's row-vector convention applies the left operand first, which is why
+        // the translate goes on the left rather than the right.
+        osg::Matrix viewMatrix = camera.getViewMatrix();
+        if (sCameraZOffset != 0.0f)
+            viewMatrix = osg::Matrix::translate(0.0f, 0.0f, -sCameraZOffset) * viewMatrix;
 
         osgMatrixToMat4(viewMatrix, scene.view);
         osgMatrixToMat4(projMatrix, scene.projection);
@@ -547,7 +567,22 @@ namespace MWRender
         hasWater = hasWater && waterNormalSlot != 0u;
 
         scene.sunParams.y = static_cast<float>(mWaterSeconds);
-        scene.sunParams.z = waterHeight;
+
+        // TEMPORARY INSTRUMENT, paired with OPENMW_VK_CAMERA_Z above. Raises the water plane by
+        // $OPENMW_VK_WATER_Z units for the Vulkan renderer only.
+        //
+        // This is the better of the two ways to get under the surface and it is worth saying why.
+        // Lowering the camera puts the eye below the water plane and *inside the seabed*, because
+        // anywhere the player can stand, the ground is immediately under the water. Raising the water
+        // instead floods the scene around a camera that is still in open air, so the underwater branch
+        // renders with a clear line of sight and nothing buried. Physics, the player and the OSG window
+        // do not know it happened, which also makes the OSG capture a control for it.
+        static const float sWaterZOffset = []() -> float {
+            const char* raw = std::getenv("OPENMW_VK_WATER_Z");
+            return raw != nullptr ? std::strtof(raw, nullptr) : 0.0f;
+        }();
+
+        scene.sunParams.z = waterHeight + sWaterZOffset;
         scene.sunParams.w = hasWater ? 1.0f : 0.0f;
         // In the uniform block rather than a push constant on the water pipeline, because raygen.rgen
         // builds the same wave normal to aim the reflection ray and a raygen shader has no push
