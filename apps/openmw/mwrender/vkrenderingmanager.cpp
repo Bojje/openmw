@@ -1942,12 +1942,41 @@ namespace MWRender
         // And anything used recently, not only this frame. See mTextureLastUsed: without this, every
         // frame of an animated texture except the one currently bound looks dead, loses its slot and
         // draws as the white fallback the moment the controller swings back to it.
+        //
+        // The grace is a courtesy and it yields when the array is full, which is the whole reason this
+        // is two passes rather than one condition. A texture referenced *this frame* must have a slot:
+        // if it does not it draws as the white fallback, and a wall drawn white is not a smaller
+        // problem than a flipbook frame that has to be re-uploaded. So the frame's own references are
+        // counted first, and the grace only fills what is left.
+        //
+        // Without that ordering the two mechanisms fight and the newer one wins by accident. Walking
+        // twelve cells in quick succession put 1,292 textures in the live set against 1,023 slots --
+        // the grace holding five seconds of departed cells alive while the cell actually on screen was
+        // pushed past the end of the array. Tel Aruhn's tower came out as blank white walls, which is
+        // exactly the failure the array was grown from 512 to 1024 to fix.
+        size_t used = 0;
+        for (size_t i = 0; i < live.size(); ++i)
+            if (live[i])
+                ++used;
+
+        // Newest first, so what is dropped is the oldest thing nobody has asked for in a while.
+        std::vector<size_t> candidates;
         for (size_t i = 0; i < live.size(); ++i)
         {
             if (live[i] || mTextureLastUsed[i] == 0)
                 continue;
             if (mTextureSyncCounter - mTextureLastUsed[i] <= sTextureSlotGraceFrames)
-                live[i] = true;
+                candidates.push_back(i);
+        }
+        std::sort(candidates.begin(), candidates.end(),
+            [this](size_t a, size_t b) { return mTextureLastUsed[a] > mTextureLastUsed[b]; });
+
+        for (const size_t i : candidates)
+        {
+            if (used >= sTextureResidencyLimit)
+                break;
+            live[i] = true;
+            ++used;
         }
 
         return live;
