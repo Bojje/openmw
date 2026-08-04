@@ -31,7 +31,7 @@ layout(set = 0, binding = 0) uniform CameraUBO {
 // Fixed-size sampler array. The slot comes out of a push constant and is therefore uniform across
 // the draw call, so plain indexing is valid here: no nonuniformEXT and no descriptor indexing
 // extension. Slot 0 is a 1x1 white fallback used by untextured meshes.
-layout(set = 0, binding = 1) uniform sampler2D textures[512];
+layout(set = 0, binding = 1) uniform sampler2D textures[1024];
 
 layout(location = 0) out vec4 outAlbedo;
 layout(location = 1) out vec4 outNormal;

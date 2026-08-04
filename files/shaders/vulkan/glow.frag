@@ -4,7 +4,7 @@ layout(location = 0) in vec2 fragEnvUv;
 layout(location = 1) flat in vec3 fragColour;
 layout(location = 2) flat in uint fragTexture;
 
-layout(set = 0, binding = 1) uniform sampler2D textures[512];
+layout(set = 0, binding = 1) uniform sampler2D textures[1024];
 
 // The composite pass has no depth attachment, so this compares against the G-buffer's depth the
 // same way particle.frag does.

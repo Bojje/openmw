@@ -422,7 +422,19 @@ namespace MWRender
         // crossing is usually wanted on the next, so freeing eagerly trades VRAM for repeated
         // blocking staging uploads on the load path. Well above what a 3x3 exterior grid needs
         // (~230), so in practice this only fires after a long walk across varied regions.
-        static constexpr size_t sTextureResidencyLimit = 1024;
+        // Tied to the sampler array rather than chosen independently, and that coupling is the fix for
+        // a real bug: it was 1024 while the array held 512, so a texture-dense cell went past what the
+        // array could address and the excess rendered as the white fallback. Ghostgate's Tower of Dusk
+        // needs 709 and came out as blank white walls. Whatever these two are, the second must not
+        // exceed the first.
+        // Must not exceed Vk::maxSceneTextures - 1, and that is not a style note: it was 1024 while
+        // the sampler array held 512, so a texture-dense cell went past what the array could address
+        // and the excess rendered as the 1x1 white fallback. Ghostgate's Tower of Dusk needs 709
+        // resident and came out as blank white walls beside correctly textured arches.
+        //
+        // Spelled as a literal because this header does not include vkrenderer.hpp; a static_assert in
+        // the .cpp, which does, is what actually holds the two together.
+        static constexpr size_t sTextureResidencyLimit = 1023;
 
         std::unordered_map<const MWWorld::CellStore*, CellMeshes> mCellMeshes;
         std::unordered_map<const MWWorld::CellStore*, CellTerrain> mCellTerrain;

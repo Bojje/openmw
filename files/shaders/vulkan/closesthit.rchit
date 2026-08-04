@@ -29,7 +29,7 @@ layout(set = 0, binding = 6, std430) readonly buffer Geometries { GeometryRecord
 // Slot 0 is the 1x1 white fallback, so scene texture i lives at i + 1. Unlike gbuffer.frag, where the
 // index comes from a push constant, textureIndex here varies per hit within a subgroup and needs
 // nonuniformEXT at every use.
-layout(set = 0, binding = 7) uniform sampler2D textures[512];
+layout(set = 0, binding = 7) uniform sampler2D textures[1024];
 
 // Interleaved layout from vkgeometry.hpp: 12 floats per vertex, texcoord at floats 6 and 7.
 const uint floatsPerVertex = 12;

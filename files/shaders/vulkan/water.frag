@@ -46,7 +46,7 @@ layout(set = 0, binding = 0) uniform SceneUBO {
     uint waterNormalMap;
 } scene;
 
-layout(set = 0, binding = 1) uniform sampler2D textures[512];
+layout(set = 0, binding = 1) uniform sampler2D textures[1024];
 layout(set = 1, binding = 2) uniform sampler2D gbufferDepth;
 // Half resolution, written by raygen.rgen. .rgb is finished reflected radiance and .a says whether the
 // ray tracing pass ran at all. Bound on the composite set beside the G-buffer depth this shader

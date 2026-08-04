@@ -39,7 +39,18 @@ namespace Vk
     // a draw call, so plain array indexing in GLSL is legal and no extension is needed. Vulkan requires
     // every element of the array to be written with a valid view, so unused slots point at a 1x1 white
     // fallback texture. Slot 0 is permanently that fallback, so scene texture i lives in slot i + 1.
-    constexpr uint32_t maxSceneTextures = 512;
+    //
+    // 1024, not 512, and the 512 was a real bug rather than a conservative guess. Ghostgate's Tower of
+    // Dusk needs 709 resident textures; the excess got no slot, fell back to the 1x1 white fallback,
+    // and the whole corridor rendered as blank white walls next to correctly textured arches. Tel Mora
+    // did the same. It went unnoticed because the regression scenes are Balmora and the Bitter Coast,
+    // which peak around 505 -- just under the old limit.
+    //
+    // 1024 is the ceiling this can reach without more work: the slot travels in a 10-bit field of the
+    // material word, pinned by the static_assert on sMaterialSlotMask below. Past that the packing has
+    // to change. sTextureResidencyLimit in vkrenderingmanager.hpp is the other half of this and must
+    // not exceed it.
+    constexpr uint32_t maxSceneTextures = 1024;
 
     // Point lights visible to the composite pass in one frame. Morrowind interiors are dense with
     // torches and candles but the active cell set is small, so this is generous; the collector already

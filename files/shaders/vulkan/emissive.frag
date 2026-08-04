@@ -24,7 +24,7 @@ layout(push_constant) uniform PushConstants {
     layout(offset = 64) uvec4 params;
 } push;
 
-layout(set = 0, binding = 1) uniform sampler2D textures[512];
+layout(set = 0, binding = 1) uniform sampler2D textures[1024];
 layout(set = 1, binding = 2) uniform sampler2D gbufferDepth;
 
 // Only sunParams and viewInverse are read, but a uniform block has to be declared out to the last

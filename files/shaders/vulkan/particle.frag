@@ -16,7 +16,7 @@ layout(location = 2) flat in uint fragTexture;
 layout(location = 3) flat in uint fragAdditive;
 layout(location = 4) in vec3 fragWorldPos;
 
-layout(set = 0, binding = 1) uniform sampler2D textures[512];
+layout(set = 0, binding = 1) uniform sampler2D textures[1024];
 layout(set = 1, binding = 2) uniform sampler2D gbufferDepth;
 
 // Only sunParams and viewInverse are read, but a uniform block has to be declared out to the last

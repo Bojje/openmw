@@ -49,7 +49,7 @@ layout(set = 0, binding = 16, rgba16f) uniform writeonly image2D waterReflectOut
 // the UBO), so this needs no nonuniformEXT and no descriptor indexing feature. The binding's
 // stageFlags on the C++ side had to gain RAYGEN for this; declaring a binding in a stage that is not
 // in stageFlags is a validation error and undefined behaviour.
-layout(set = 0, binding = 7) uniform sampler2D textures[512];
+layout(set = 0, binding = 7) uniform sampler2D textures[1024];
 
 // Read from the scene UBO rather than push constants: two mat4 plus a vec4 is 144 bytes, over the
 // 128-byte maxPushConstantsSize that Vulkan guarantees on all implementations.

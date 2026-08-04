@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <map>
+#include <set>
 #include <cmath>
 #include <cstring>
 #include <exception>
@@ -1724,6 +1725,13 @@ namespace MWRender
         // in practice means it never fires while the player stays in one region.
         const size_t resident = static_cast<size_t>(
             std::count_if(mTextures.begin(), mTextures.end(), [](const auto& t) { return t != nullptr; }));
+        // The coupling vkrenderingmanager.hpp cannot express, because it does not include
+        // vkrenderer.hpp. A texture resident past the end of the sampler array gets no slot and draws
+        // as the white fallback -- which is what turned Ghostgate's Tower of Dusk into blank white
+        // walls when this limit was 1024 against an array of 512.
+        static_assert(sTextureResidencyLimit < Vk::maxSceneTextures,
+            "texture residency must stay inside the sampler array, or the excess renders white");
+
         const bool evictNow = resident > sTextureResidencyLimit;
 
         // Reload anything live that was evicted earlier. This is not a rare corner: a cell that is
@@ -1896,6 +1904,19 @@ namespace MWRender
         {
             Log(Debug::Warning) << "Vulkan: failed to load texture " << nifTextureName << ": " << e.what();
             result = sNoTexture;
+        }
+
+        // A name that resolves to nothing draws as the 1x1 white fallback and says nothing about why.
+        // The warning in resolveByName only covers the readers -- particles, sky, water, glow -- and
+        // this is the path every mesh in the world goes down, which is the one where a silent failure
+        // turns a room white. Warned once per name, on the load rather than on a repeat count, because
+        // unlike a sampler slot a load failure here is cached and never retried.
+        if (result == sNoTexture)
+        {
+            static std::set<std::string, Misc::StringUtils::CiComp> warnedMesh;
+            if (warnedMesh.insert(nifTextureName).second)
+                Log(Debug::Warning) << "Vulkan: mesh texture '" << nifTextureName
+                                    << "' did not load; every mesh using it draws white";
         }
 
         // Cache failures too, so an unloadable texture is not retried for every mesh that uses it.

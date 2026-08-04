@@ -13,7 +13,7 @@
 layout(location = 0) in vec2 fragUv;
 layout(location = 1) in float fragAlpha;
 
-layout(set = 0, binding = 1) uniform sampler2D textures[512];
+layout(set = 0, binding = 1) uniform sampler2D textures[1024];
 layout(set = 1, binding = 2) uniform sampler2D gbufferDepth;
 
 // Declared only as far as fogColor, which is all this needs, and declared identically in skymesh.vert
