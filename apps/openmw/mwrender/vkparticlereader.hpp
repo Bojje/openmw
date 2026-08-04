@@ -37,13 +37,16 @@ namespace MWRender
     class ParticleReader
     {
     public:
-        /// \a resolveTexture maps an image file name to a slot in the renderer's sampler array. It is
-        /// the caller's texture loader, so particle textures are cached, evicted and shared on the
+        /// \a resolveTexture maps an image file name to its storage index in the caller's texture
+        /// table, loading it if needed, so particle textures are cached, evicted and shared on the
         /// same terms as everything else.
-        ///  resolveTexture returns the sampler slot to draw with and, through its out parameter,
-        /// the storage index that slot came from -- the caller needs the second to keep the texture
-        /// alive across eviction.
-        explicit ParticleReader(std::function<uint32_t(const std::string&, std::size_t&)> resolveTexture);
+        ///
+        /// A storage index and not a sampler slot, which is the whole point. The slot is not settled
+        /// until the caller's texture sync has run, and that is later in the frame than this reader
+        /// runs; worse, the sync renumbers the array rather than appending to it, so a slot resolved
+        /// before it names a different texture on every frame a cell unloads. The index is stable
+        /// across all of that. See resolveTextureSlots for where it becomes a slot.
+        explicit ParticleReader(std::function<std::size_t(const std::string&)> resolveTexture);
 
         /// Walks \a sceneRoot and refills the quad list. Cheap enough to do every frame: the walk is
         /// over the loaded cell graph and the particle count is in the hundreds.
@@ -56,6 +59,20 @@ namespace MWRender
         /// frame is being rendered.
         void sortForCamera(const osg::Vec3f& cameraPosition);
 
+        /// Turns every quad's textureIndex from the storage index collect() left in it into the
+        /// sampler slot \a slotOf answers now. Call once per collect(), after the caller's texture
+        /// sync and before the quads are handed to the renderer.
+        ///
+        /// Once, and that is a real constraint rather than a caution: a second pass would read a
+        /// slot as though it were a storage index and resolve it again to something unrelated.
+        ///
+        /// In place rather than through a parallel array of indices, which is what the meshes use
+        /// and what SkyReader can afford. sortForCamera reorders the quads, so a parallel array
+        /// would have to be permuted along with them for no gain. The cost is that textureIndex
+        /// means one thing between collect() and this call and another after it, which is why this
+        /// is a step with a name rather than something folded quietly into the sort.
+        void resolveTextureSlots(const std::function<uint32_t(std::size_t)>& slotOf);
+
         const std::vector<Vk::ParticleQuad>& quads() const { return mQuads; }
         const std::vector<Vk::ParticleRun>& runs() const { return mRuns; }
 
@@ -66,7 +83,7 @@ namespace MWRender
         const std::vector<std::size_t>& textureIndices() const { return mTextureIndices; }
 
     private:
-        std::function<uint32_t(const std::string&, std::size_t&)> mResolveTexture;
+        std::function<std::size_t(const std::string&)> mResolveTexture;
         std::vector<Vk::ParticleQuad> mQuads;
         std::vector<Vk::ParticleRun> mRuns;
         std::vector<std::size_t> mTextureIndices;

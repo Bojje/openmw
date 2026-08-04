@@ -44,7 +44,7 @@ namespace
     {
     public:
         Collector(std::vector<Vk::ParticleQuad>& out, std::vector<std::size_t>& textureIndices,
-            const std::function<uint32_t(const std::string&, std::size_t&)>& resolveTexture)
+            const std::function<std::size_t(const std::string&)>& resolveTexture)
             : osg::NodeVisitor(TRAVERSE_ALL_CHILDREN)
             , mOut(out)
             , mTextureIndices(textureIndices)
@@ -112,7 +112,7 @@ namespace
 
         void readSystem(osgParticle::ParticleSystem& system)
         {
-            const uint32_t texture = resolveSystemTexture(system);
+            const std::size_t texture = resolveSystemTexture(system);
             const bool additive = resolveAdditive();
             const float brightness = resolveLightBrightness();
 
@@ -165,7 +165,17 @@ namespace
                 quad.colour[1] = srgbToLinear(colour.g()) * brightness;
                 quad.colour[2] = srgbToLinear(colour.b()) * brightness;
                 quad.colour[3] = alpha;
-                quad.textureIndex = texture;
+                // The *storage* index, not the sampler slot. render() rewrites this field through
+                // ParticleReader::resolveTextureSlots once the frame's texture sync has run.
+                // Resolving it here means resolving it before that sync, and the sync renumbers the
+                // whole sampler array instead of appending to it -- so on any frame a cell unloaded,
+                // every flame, spark and raindrop in the world drew with somebody else's texture.
+                //
+                // Truncating to 32 bits loses nothing that matters: the only value that does not
+                // survive it is the no-texture sentinel, and what it becomes -- 0xFFFFFFFF -- is
+                // past the end of the slot table, which resolves to the white fallback exactly as
+                // the sentinel asks for.
+                quad.textureIndex = static_cast<uint32_t>(texture);
                 quad.additive = additive ? 1u : 0u;
 
                 if (fixedAlignment)
@@ -285,7 +295,7 @@ namespace
         /// stateset has no texture on it and never will. Reading only the system gives every effect
         /// in the game the white fallback, which looks like a solid white square where the flame
         /// should be.
-        uint32_t resolveSystemTexture(osgParticle::ParticleSystem& system)
+        std::size_t resolveSystemTexture(osgParticle::ParticleSystem& system)
         {
             const osg::NodePath& path = getNodePath();
 
@@ -304,28 +314,31 @@ namespace
                 const std::string& name = texture->getImage()->getFileName();
                 if (!name.empty())
                 {
-                    std::size_t storageIndex = static_cast<std::size_t>(-1);
-                    const uint32_t slot = mResolveTexture(name, storageIndex);
+                    const std::size_t storageIndex = mResolveTexture(name);
                     if (storageIndex != static_cast<std::size_t>(-1))
                         mTextureIndices.push_back(storageIndex);
-                    return slot;
+                    return storageIndex;
                 }
             }
 
             (void)system;
-            return 0;
+            // All ones rather than 0. This used to be able to answer 0 safely only because it was
+            // answering a *slot*, and slot 0 is the white fallback; as a storage index 0 is a real
+            // texture -- whichever one the renderer loaded first -- so returning it here would give
+            // every untextured system a texture at random. The caller's textureSlot turns this into
+            // the same white fallback the old 0 meant.
+            return static_cast<std::size_t>(-1);
         }
 
         std::vector<Vk::ParticleQuad>& mOut;
         std::vector<std::size_t>& mTextureIndices;
-        const std::function<uint32_t(const std::string&, std::size_t&)>& mResolveTexture;
+        const std::function<std::size_t(const std::string&)>& mResolveTexture;
     };
 }
 
 namespace MWRender
 {
-    ParticleReader::ParticleReader(
-        std::function<uint32_t(const std::string&, std::size_t&)> resolveTexture)
+    ParticleReader::ParticleReader(std::function<std::size_t(const std::string&)> resolveTexture)
         : mResolveTexture(std::move(resolveTexture))
     {
     }
@@ -368,6 +381,19 @@ namespace MWRender
             ++run.count;
         }
         mRuns.push_back(run);
+    }
+
+    void ParticleReader::resolveTextureSlots(const std::function<uint32_t(std::size_t)>& slotOf)
+    {
+        // One pass over the frame's live quads and nothing else. The count is in the hundreds even
+        // in a torch-lit interior in bad weather, so this is a few microseconds on a Steam Deck and
+        // it does not grow with the size of the loaded cells -- unlike the collect() that filled the
+        // list, which walks the whole scene graph and is the part worth watching.
+        //
+        // The widening from uint32_t to std::size_t is what turns the no-texture sentinel back into
+        // something the caller answers the white fallback for; see where the field is written.
+        for (Vk::ParticleQuad& quad : mQuads)
+            quad.textureIndex = slotOf(quad.textureIndex);
     }
 
     void ParticleReader::collect(osg::Node* sceneRoot)

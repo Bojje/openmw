@@ -324,16 +324,29 @@ namespace MWRender
         mRenderer = std::make_unique<Vk::Renderer>(window, enableValidation);
         mMeshConverter
             = std::make_unique<NifVk::MeshConverter>(mRenderer->device(), mRenderer->commandPool());
-        // Particle and sky textures resolve through the ordinary loader, so they are cached and
-        // evicted with everything else. textureSlot maps a storage index to a live sampler slot; an
-        // unloaded texture becomes slot 0, the white fallback, rather than an out-of-range read.
+        // Particle, sky and glow textures resolve through the ordinary loader, so they are cached
+        // and evicted with everything else.
         //
-        // One resolver, shared by both readers. The sky finds its images exactly the way the particles
-        // do -- by the file name off a stateset -- so a second copy would be a second place to get the
-        // "textures/" strip below wrong, and getting it wrong is silent: the texture simply fails to
-        // load and everything that wanted it draws as a white square.
-        std::function<uint32_t(const std::string&, std::size_t&)> resolveByName
-            = [this](const std::string& name, std::size_t& storageIndex) {
+        // This answers the *storage* index in mTextures, not the sampler slot, and the direction
+        // matters more than it looks. It used to answer the slot and hand the index back through an
+        // out parameter, so every reader stored a slot it had resolved before this frame's
+        // syncTexturesToRenderer ran. That sync rebuilds the sampler array from the live set -- it
+        // compacts, it does not append -- so a texture dropping out shifts every slot above it down,
+        // and every number the readers were holding then named the wrong texture for the rest of the
+        // frame: a flame drawn with a moon, the sun drawn with a rock face. The meshes never had the
+        // bug because they keep mMeshTextures[i] and call textureSlot inside render(), after the
+        // sync. The readers now do the same, which leaves one number to carry and no out parameter
+        // left to carry it in.
+        //
+        // sNoTexture when the name cannot be loaded. textureSlot turns that into the white fallback
+        // at submit time, which is what it meant before.
+        //
+        // One resolver, shared by all three readers. The sky finds its images exactly the way the
+        // particles do -- by the file name off a stateset -- so a second copy would be a second place
+        // to get the "textures/" strip below wrong, and getting it wrong is silent: the texture simply
+        // fails to load and everything that wanted it draws as a white square.
+        std::function<std::size_t(const std::string&)> resolveByName
+            = [this](const std::string& name) -> std::size_t {
             // The leading "textures/" comes off first. These names arrive already resolved through
             // the VFS, whereas getOrLoadTexture expects a raw NIF reference and runs
             // correctTexturePath over it -- which prefixes "textures/" again and produces a path that
@@ -347,8 +360,13 @@ namespace MWRender
                 stripped.remove_prefix(prefix.size());
 
             const size_t index = getOrLoadTexture(std::string(stripped));
-            storageIndex = index;
-            const uint32_t slot = static_cast<uint32_t>(textureSlot(index));
+
+            // Resolved for the warning below and then thrown away. It is deliberately not what this
+            // function returns -- see the note above the lambda -- but it is still the right number
+            // to warn on: a name that never gets a slot is a name that draws white, and asking on
+            // this side of the frame's sync gives the same answer as the draw does on every frame
+            // but the first one a texture is wanted, which the consecutive counter already forgives.
+            const uint32_t slot = textureSlot(index);
 
             // Slot 0 is the 1x1 white fallback, so a name that lands there draws as a solid white
             // shape and says nothing about why. That has cost hours twice already -- once on the
@@ -379,7 +397,7 @@ namespace MWRender
                 failures.erase(std::string(stripped));
             }
 
-            return slot;
+            return index;
         };
         mParticleReader = std::make_unique<ParticleReader>(resolveByName);
         // The device and the command pool are for the two sky meshes, which the reader uploads
@@ -579,6 +597,13 @@ namespace MWRender
         // known until now.
         if (mParticleReader != nullptr)
         {
+            // And the sampler slots resolved here, for the same reason mMeshTextures is resolved in
+            // this function and not at cell load: syncTexturesToRenderer has run by now and cannot
+            // run again before the draw, so this is the last point at which a slot still means what
+            // it says. The quads have carried storage indices since collect(); this is where they
+            // stop. Ahead of the sort so that nothing downstream of it ever sees the other meaning.
+            mParticleReader->resolveTextureSlots(
+                [this](std::size_t index) { return textureSlot(index); });
             mParticleReader->sortForCamera(camera.getPosition());
             const std::vector<Vk::ParticleQuad>& quads = mParticleReader->quads();
             mRenderer->updateParticles(
@@ -588,6 +613,15 @@ namespace MWRender
         // Gathered in syncCells for the same reason and handed over unsorted: three quads that never
         // overlap need no depth order, and the two moons cross the sun only when the sky has already
         // faded them out.
+        //
+        // Their sampler slots are resolved first, and it has to be here rather than beside
+        // updateSky further down. This is also where the sky's two refusals are applied -- the flash
+        // that must not be drawn on the white fallback, and the visibility disc that must not be
+        // published on it -- and the second one clears sunDiscTanRadius(), which the block below
+        // reads to decide whether there is a sun at all.
+        if (mSkyReader != nullptr)
+            mSkyReader->resolveTextureSlots([this](std::size_t index) { return textureSlot(index); });
+
         // The sun flash, the sun glare and the disc the visibility test traces against.
         //
         // Everything except the occlusion is worked out here, on the CPU, and the draw is
@@ -772,7 +806,17 @@ namespace MWRender
                 submission.glowColour[0] = inst.glowColour[0];
                 submission.glowColour[1] = inst.glowColour[1];
                 submission.glowColour[2] = inst.glowColour[2];
-                submission.glowTexture = inst.glowTexture;
+                // Resolved here rather than where refreshMovedObjects read it, like every other
+                // texture on this submission. A caustic frame is bound for a sixteenth of a second
+                // and the sampler array is renumbered whenever a cell unloads, so a slot resolved
+                // during the read can name a different texture by the time it is drawn -- and the
+                // glow is added over the scene at full strength, so what that looks like is an
+                // object-shaped block of the wrong image rather than something subtly off.
+                //
+                // This is also where the glow's refusal to draw on the white fallback now happens:
+                // an unresolved index answers slot 0 and Renderer::render skips any submission whose
+                // glow slot is 0.
+                submission.glowTexture = textureSlot(inst.glowTextureIndex);
 
                 // Scrolling texture -- lava, a waterfall, a Ghostgate fence. A slot is taken only for
                 // the shapes that need one, so the table stays the length of what is actually moving
@@ -1303,8 +1347,12 @@ namespace MWRender
                 if (mGlowReader != nullptr && tracked.node != nullptr)
                 {
                     float glowColour[3] = { 0.0f, 0.0f, 0.0f };
-                    uint32_t glowTexture = 0;
-                    mGlowReader->read(*tracked.node, glowColour, glowTexture);
+                    // A storage index, not a slot, and all ones rather than 0 for "not glowing":
+                    // 0 is a real index into mTextures and would hang whichever texture loaded first
+                    // on every unenchanted crate in the cell. read() leaves it alone when there is
+                    // no glow, so the seed is the answer for almost everything here.
+                    std::size_t glowTextureIndex = static_cast<std::size_t>(-1);
+                    mGlowReader->read(*tracked.node, glowColour, glowTextureIndex);
 
                     // Written every frame, including the frame a temporary spell-cast glow expires
                     // and the read comes back false. Left unwritten, an Open spell would light a
@@ -1318,7 +1366,7 @@ namespace MWRender
                         instance.glowColour[0] = glowColour[0];
                         instance.glowColour[1] = glowColour[1];
                         instance.glowColour[2] = glowColour[2];
-                        instance.glowTexture = glowTexture;
+                        instance.glowTextureIndex = static_cast<uint32_t>(glowTextureIndex);
                     }
                 }
 

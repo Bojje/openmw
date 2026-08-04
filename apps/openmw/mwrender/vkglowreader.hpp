@@ -35,12 +35,16 @@ namespace MWRender
     class GlowReader
     {
     public:
-        /// \a resolveTexture maps an image file name to a slot in the renderer's sampler array. It
-        /// is the caller's texture loader, so the caustic frames are cached, evicted and shared on
-        /// the same terms as everything else. It returns the sampler slot to draw with and, through
-        /// its out parameter, the storage index that slot came from -- the caller needs the second
-        /// to keep the texture alive across eviction.
-        explicit GlowReader(std::function<uint32_t(const std::string&, std::size_t&)> resolveTexture);
+        /// \a resolveTexture maps an image file name to its storage index in the caller's texture
+        /// table, loading it if needed, so the caustic frames are cached, evicted and shared on the
+        /// same terms as everything else.
+        ///
+        /// A storage index and not a sampler slot. The slot is not settled until the caller's
+        /// texture sync has run, and that sync renumbers the whole array rather than appending to
+        /// it, so a slot resolved here names a different texture on any frame a cell unloads. The
+        /// caller turns the index into a slot when it submits the instance, which is where every
+        /// mesh's texture is resolved too.
+        explicit GlowReader(std::function<std::size_t(const std::string&)> resolveTexture);
 
         /// Call once at the start of each sweep, before any read().
         void beginFrame();
@@ -54,7 +58,13 @@ namespace MWRender
         /// Returns false for anything not glowing, which is the answer for all but a handful of
         /// references in the game, and it returns false cheaply: the common case costs one node
         /// mask test and one stateset pointer.
-        bool read(const osg::Node& objectBase, float outColour[3], uint32_t& outSlot);
+        ///
+        /// \a outTextureIndex receives the caustic frame's storage index, not its sampler slot, and
+        /// is left untouched when this returns false. The refusal to draw a glow on the white
+        /// fallback still exists but is made at the far end, where the caller resolves the index:
+        /// there is no slot to test here, because the texture sync that assigns slots runs later in
+        /// the frame than this does.
+        bool read(const osg::Node& objectBase, float outColour[3], std::size_t& outTextureIndex);
 
         /// Storage indices of every caustic frame this reader has resolved, or nothing at all when
         /// nothing in the loaded cells is enchanted this frame.
@@ -68,7 +78,7 @@ namespace MWRender
         const std::vector<std::size_t>& textureIndices() const;
 
     private:
-        std::function<uint32_t(const std::string&, std::size_t&)> mResolveTexture;
+        std::function<std::size_t(const std::string&)> mResolveTexture;
         // Every caustic storage index seen since startup. Never cleared: the set is at most 32
         // entries and they are wanted together or not at all.
         std::vector<std::size_t> mCausticIndices;

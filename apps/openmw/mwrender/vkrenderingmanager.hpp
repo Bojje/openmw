@@ -148,15 +148,23 @@ namespace MWRender
                 float transform[16];
 
                 // The enchanted glow this instance draws with, refreshed every frame by
-                // refreshMovedObjects. A glowTexture of 0 -- the white fallback slot -- means it
-                // does not glow, which is the case for all but a few hundred references in the
-                // game.
+                // refreshMovedObjects. This is the caustic frame's *storage* index in mTextures and
+                // not its sampler slot: render() puts it through textureSlot when it submits, the
+                // same way it resolves mMeshTextures. Holding the slot instead meant holding a
+                // number that syncTexturesToRenderer can renumber after the glow was read, so on
+                // any frame a cell unloaded the glow was drawn with some other cell's texture.
+                //
+                // 0xFFFFFFFF means "not glowing", which is all but a few hundred references in the
+                // game. It has to be that and not 0, because 0 is a perfectly good storage index --
+                // whichever texture happened to load first -- while 0 as a *slot* is the white
+                // fallback. Anything this far past the end of mTextureSlots resolves to slot 0,
+                // which is what the renderer already reads as "no glow".
                 //
                 // Per instance rather than per mesh, because the glow belongs to the *reference*
                 // and not to the model: two iron daggers on the same table share a mesh and only
                 // one of them is enchanted.
                 float glowColour[3] = { 0.0f, 0.0f, 0.0f };
-                uint32_t glowTexture = 0;
+                uint32_t glowTextureIndex = static_cast<uint32_t>(-1);
 
                 // This submesh's scrolled UV offset, refreshed every frame by refreshMovedObjects
                 // from the live osg::TexMat. Per instance for the same reason the glow is: it is
@@ -401,6 +409,19 @@ namespace MWRender
 
         // Storage index in mTextures to sampler array slot. Slot 0 is the white fallback, which is
         // also where the sNoTexture sentinel and any evicted texture land.
+        //
+        // Called late -- from render(), after this frame's syncTexturesToRenderer has run -- by
+        // everything that draws, and that is not a style choice. syncTexturesToRenderer rebuilds
+        // the array from the live set rather than appending to it, so a slot resolved earlier in
+        // the frame than the sync names a different texture afterwards on every frame a cell
+        // unloads. Storage indices survive that; slots do not. The readers each hold an index and
+        // hand it here at submit time for exactly this reason.
+        //
+        // An index that has been carried through a uint32_t field on the way here -- the readers'
+        // GPU structs, CellMeshes::Instance::glowTextureIndex -- arrives as 0xFFFFFFFF when it
+        // meant sNoTexture. That is no longer equal to sNoTexture once it widens back to size_t and
+        // it does not need to be: mTextures never reaches four billion entries, so the bounds test
+        // below answers 0 for it, which is the same white fallback the sentinel asks for.
         uint32_t textureSlot(size_t textureIndex) const
         {
             if (textureIndex == sNoTexture || textureIndex >= mTextureSlots.size())

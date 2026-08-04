@@ -72,14 +72,17 @@ namespace
         {
             osg::Vec3f direction;
             float tanRadius = 0.f;
-            uint32_t texture = 0;
+            // Storage index, turned into a slot by SkyReader::resolveTextureSlots once the caller's
+            // texture sync has run. All ones when there is none, which resolves to the white
+            // fallback and is what the disc's refusal keys on.
+            std::size_t textureIndex = static_cast<std::size_t>(-1);
             float glareView = 0.f;
             bool valid = false;
         };
 
         Collector(std::vector<Vk::SkyElement>& out, std::vector<Vk::SkyMeshDraw>& meshes,
             std::vector<std::size_t>& textureIndices, MWRender::SkyMeshCache* meshCache,
-            const std::function<uint32_t(const std::string&, std::size_t&)>& resolveTexture,
+            const std::function<std::size_t(const std::string&)>& resolveTexture,
             Vk::SkyElement& sunFlash, bool& hasSunFlash, SunDisc& sunDisc)
             : osg::NodeVisitor(TRAVERSE_ALL_CHILDREN)
             , mSunFlash(sunFlash)
@@ -326,11 +329,17 @@ namespace
             if (!fillQuad(geometry, element))
                 return;
 
-            const uint32_t slot = resolveUnit(stateSet, 0);
-            element.params[0] = slot;
+            // The storage index, not the slot. SkyReader::resolveTextureSlots turns it into one
+            // after the caller's texture sync; resolving it here resolves it before, and the sync
+            // renumbers the array rather than appending to it, so the number would name a different
+            // texture by the time the sun was drawn. Truncating to 32 bits loses only the
+            // no-texture sentinel, which comes out as 0xFFFFFFFF -- past the end of the slot table,
+            // so it resolves to the white fallback, which is what it meant.
+            const std::size_t textureIndex = resolveUnit(stateSet, 0);
+            element.params[0] = static_cast<uint32_t>(textureIndex);
             // The sun never samples the mask, but every index the shader could form has to be inside
             // the array whether or not the branch taking it runs.
-            element.params[1] = slot;
+            element.params[1] = element.params[0];
             element.params[2] = 0;
 
             // paintSun in files/shaders/compatibility/sky.frag is two lines: the colour is the texture
@@ -367,16 +376,19 @@ namespace
                 static_cast<float>(centre.y()) - cameraRelativeOrigin.y(),
                 static_cast<float>(centre.z()) - cameraRelativeOrigin.z());
 
-            // slot != 0 for the same reason readSunFlash refuses slot 0, arriving at a different
-            // failure. The visibility test alpha-tests the disc texture at 0.8 to reproduce
-            // PASS_SUNFLASH_QUERY; the fallback is 1x1 white, whose alpha is 1 everywhere, so
-            // every one of the 64 rays would pass and the sun would be measured as the full 25
-            // degree quad instead of its bright core. That is not a missing effect, it is a
-            // wrong number -- the flash would shrink and the glare would dim while the sun was
-            // still well clear of the ridge, and nothing on screen would say why. Leaving the
-            // disc invalid sets the ray count to zero, which sky.vert reads as fully visible.
+            // The slot half of this test has moved to SkyReader::resolveTextureSlots, because a
+            // slot is not knowable here any more. It has not gone away and it must not: the
+            // visibility test alpha-tests the disc texture at 0.8 to reproduce PASS_SUNFLASH_QUERY,
+            // the fallback is 1x1 white whose alpha is 1 everywhere, so every one of the 64 rays
+            // would pass and the sun would be measured as the full 25 degree quad instead of its
+            // bright core. That is not a missing effect, it is a wrong number -- the flash would
+            // shrink and the glare would dim while the sun was still well clear of the ridge, and
+            // nothing on screen would say why.
+            //
+            // What is left here is the half this function can still answer: a disc with no
+            // direction is no disc at all.
             const float distance = local.normalize();
-            if (distance > 0.f && slot != 0)
+            if (distance > 0.f)
             {
                 mSunDisc.direction = local;
                 // The disc's half extent over its distance. element.right is that half extent as
@@ -385,7 +397,7 @@ namespace
                 // followed without anything here noticing.
                 const osg::Vec3f right(element.right[0], element.right[1], element.right[2]);
                 mSunDisc.tanRadius = right.length() / distance;
-                mSunDisc.texture = slot;
+                mSunDisc.textureIndex = textureIndex;
                 // The same alpha the disc fades by, which is also SunGlareCallback's mGlareView
                 // and SunFlashCallback's. See SkyReader::sunGlareView.
                 mSunDisc.glareView = element.colour[3];
@@ -414,25 +426,23 @@ namespace
             if (!fillQuad(geometry, element))
                 return;
 
-            const uint32_t slot = resolveUnit(stateSet, 0);
-
-            // Slot 0 is the 1x1 white fallback, and it is also what an unresolved or evicted
-            // texture answers. Refusing to draw the flash at all is the right response, and it
-            // is a much sharper rule here than it is for the sun disc: the disc is depth-gated
-            // to pixels where nothing was drawn, so a white fallback is a white square in the
-            // sky, whereas the flash is drawn with the depth test off at thirty degrees across.
-            // A white fallback there is a white sheet over most of the screen.
+            // The storage index, resolved to a slot in SkyReader::resolveTextureSlots.
+            //
+            // The refusal to draw the flash on slot 0 has moved there with it, and it has to keep
+            // working. Slot 0 is the 1x1 white fallback and it is also what an unresolved or
+            // evicted texture answers, and this is a much sharper rule than the one for the sun
+            // disc: the disc is depth-gated to pixels where nothing was drawn, so a white fallback
+            // there is a white square in the sky, whereas the flash is drawn with the depth test
+            // off at thirty degrees across. A white fallback there is a white sheet over most of
+            // the screen.
             //
             // This is not hypothetical. tx_sun_flash_grey_05.dds is a texture nothing else in
             // the game references, so the first frame the sun is visible is the frame it is
             // first requested -- and it only gets a sampler slot once SkyReader::collect has
             // grown the texture list and the caller's sync has run. For one frame the honest
             // answer is that there is no flash yet.
-            if (slot == 0)
-                return;
-
-            element.params[0] = slot;
-            element.params[1] = slot;
+            element.params[0] = static_cast<uint32_t>(resolveUnit(stateSet, 0));
+            element.params[1] = element.params[0];
             element.params[2] = static_cast<uint32_t>(Vk::SkyMode::SunFlash);
 
             // paintSun tints by nothing, and the flash is drawn through paintSun. The alpha is
@@ -458,8 +468,12 @@ namespace
             // skyutil.cpp lines 337-338. Reading them by file name is what makes the phase free:
             // Moon::setPhase has already turned the calendar into one of eight names (line 948-987),
             // so there is no second implementation of the lunar cycle here to drift out of step.
-            element.params[0] = resolveUnit(stateSet, 0);
-            element.params[1] = resolveUnit(stateSet, 1);
+            // Storage indices; SkyReader::resolveTextureSlots turns both into sampler slots after
+            // the caller's texture sync. Resolving here would resolve before that sync, and a moon
+            // holding a stale slot through a cell unload is drawn with whatever texture landed on
+            // that number -- which in a night sky is the most visible wrong thing on screen.
+            element.params[0] = static_cast<uint32_t>(resolveUnit(stateSet, 0));
+            element.params[1] = static_cast<uint32_t>(resolveUnit(stateSet, 1));
             element.params[2] = 1;
 
             // Everything the composite needs beyond the two images, already folded by MoonUpdater:
@@ -539,7 +553,10 @@ namespace
             draw.push.uvOffset[0] = state.uvOffset.x();
             draw.push.uvOffset[1] = state.uvOffset.y();
 
-            draw.push.params[0] = resolveTextureSlot(state.texture);
+            // A storage index again, resolved in SkyReader::resolveTextureSlots. The cloud layer is
+            // the worst thing in this file to get wrong: it is a sheet across the whole upper sky,
+            // so a slot that has shifted is a wrong image over half the screen.
+            draw.push.params[0] = static_cast<uint32_t>(resolveTextureIndex(state.texture));
             draw.push.params[1] = static_cast<uint32_t>(state.pass);
 
             mMeshes.push_back(draw);
@@ -666,34 +683,46 @@ namespace
                 out = value;
         }
 
-        /// The texture on \a unit of \a stateSet, by file name, resolved through the caller's loader.
-        uint32_t resolveUnit(const osg::StateSet& stateSet, unsigned int unit)
+        /// The texture on \a unit of \a stateSet, by file name, resolved through the caller's loader
+        /// to its storage index.
+        std::size_t resolveUnit(const osg::StateSet& stateSet, unsigned int unit)
         {
-            return resolveTextureSlot(dynamic_cast<const osg::Texture2D*>(
+            return resolveTextureIndex(dynamic_cast<const osg::Texture2D*>(
                 stateSet.getTextureAttribute(unit, osg::StateAttribute::TEXTURE)));
         }
 
-        /// \a texture by file name, resolved through the caller's loader.
+        /// \a texture by file name, resolved through the caller's loader to its storage index.
         ///
         /// By name rather than by sharing OSG's texture object, because there is nothing to share: the
         /// OSG one is a GL texture in the other backend's context. ImageManager stamps the file name
         /// onto every image it loads, which is what makes this possible at all -- and for the moons it
         /// is also what carries the phase, and for the clouds the weather.
-        uint32_t resolveTextureSlot(const osg::Texture2D* texture)
+        ///
+        /// An index rather than the slot this used to answer, and it is named for what it returns
+        /// now: the slot is settled by the caller's texture sync, which runs later in the frame than
+        /// this does, so what came back here was a number that could stop meaning this texture
+        /// before the sky was drawn.
+        std::size_t resolveTextureIndex(const osg::Texture2D* texture)
         {
+            // All ones for "nothing here", not 0. Answering 0 was safe while this answered a slot,
+            // because slot 0 is the white fallback; as a storage index 0 is a real texture --
+            // whichever one the renderer loaded first -- so it would put an arbitrary image on
+            // anything the sky forgot to give a texture. The caller's textureSlot maps this back to
+            // the same white fallback the old 0 meant.
+            constexpr std::size_t noTexture = static_cast<std::size_t>(-1);
+
             if (texture == nullptr || texture->getImage() == nullptr)
-                return 0;
+                return noTexture;
 
             const std::string& name = texture->getImage()->getFileName();
             if (name.empty())
-                return 0;
+                return noTexture;
 
-            std::size_t storageIndex = static_cast<std::size_t>(-1);
-            const uint32_t slot = mResolveTexture(name, storageIndex);
-            if (storageIndex != static_cast<std::size_t>(-1))
+            const std::size_t storageIndex = mResolveTexture(name);
+            if (storageIndex != noTexture)
                 mTextureIndices.push_back(storageIndex);
 
-            return slot;
+            return storageIndex;
         }
 
         Vk::SkyElement& mSunFlash;
@@ -703,7 +732,7 @@ namespace
         std::vector<Vk::SkyMeshDraw>& mMeshes;
         std::vector<std::size_t>& mTextureIndices;
         MWRender::SkyMeshCache* mMeshCache;
-        const std::function<uint32_t(const std::string&, std::size_t&)>& mResolveTexture;
+        const std::function<std::size_t(const std::string&)>& mResolveTexture;
         // Empty everywhere except under the sky. Never more than a handful deep, so it is a vector
         // rather than anything cleverer.
         std::vector<SkyState> mSkyState;
@@ -712,7 +741,7 @@ namespace
 
 namespace MWRender
 {
-    SkyReader::SkyReader(std::function<uint32_t(const std::string&, std::size_t&)> resolveTexture,
+    SkyReader::SkyReader(std::function<std::size_t(const std::string&)> resolveTexture,
         Vk::Device& device, Vk::CommandPool& commandPool)
         : mResolveTexture(std::move(resolveTexture))
         , mMeshCache(std::make_unique<SkyMeshCache>(device, commandPool))
@@ -741,6 +770,7 @@ namespace MWRender
         mHasSunFlash = false;
         mSunDiscDirection.set(0.f, 0.f, 0.f);
         mSunDiscTanRadius = 0.f;
+        mSunDiscTextureIndex = static_cast<std::size_t>(-1);
         mSunDiscTexture = 0;
         mSunGlareView = 0.f;
         if (sceneRoot == nullptr)
@@ -755,7 +785,7 @@ namespace MWRender
         {
             mSunDiscDirection = disc.direction;
             mSunDiscTanRadius = disc.tanRadius;
-            mSunDiscTexture = disc.texture;
+            mSunDiscTextureIndex = disc.textureIndex;
             mSunGlareView = disc.glareView;
         }
         else
@@ -764,6 +794,68 @@ namespace MWRender
             // flash cannot outlive it: SunFlashCallback and the disc both hang off the same
             // transform, and if the transform's mask is clear neither was reached.
             mHasSunFlash = false;
+        }
+    }
+
+    void SkyReader::resolveTextureSlots(const std::function<uint32_t(std::size_t)>& slotOf)
+    {
+        // Everything collect() left behind is holding a storage index, and this is where all of it
+        // becomes a sampler slot. It runs after the caller's texture sync, which is the earliest
+        // point a slot means anything, and it must not run twice on one collect() -- the second
+        // pass would take a slot for an index and resolve it again to something unrelated.
+        //
+        // At most three billboards, at most three meshes, one flash and one disc, so the cost is a
+        // handful of vector lookups per frame. Nothing here grows with the size of the loaded cells.
+        for (Vk::SkyElement& element : mElements)
+        {
+            element.params[0] = slotOf(element.params[0]);
+            element.params[1] = slotOf(element.params[1]);
+        }
+
+        for (Vk::SkyMeshDraw& mesh : mMeshes)
+            mesh.push.params[0] = slotOf(mesh.push.params[0]);
+
+        // The flash's refusal, moved out of readSunFlash because this is the first point the answer
+        // exists. Slot 0 is the 1x1 white fallback, and the flash is drawn thirty degrees across
+        // with the depth test off -- a white sheet over most of the screen. Dropping it costs one
+        // frame of halo while the texture is given its slot, which is what it cost before.
+        if (mHasSunFlash)
+        {
+            const uint32_t flashSlot = slotOf(mSunFlash.params[0]);
+            if (flashSlot == 0)
+            {
+                mHasSunFlash = false;
+            }
+            else
+            {
+                mSunFlash.params[0] = flashSlot;
+                mSunFlash.params[1] = flashSlot;
+            }
+        }
+
+        // The disc's refusal, moved out of readSun. raygen.rgen alpha-tests this texture at 0.8 to
+        // reproduce PASS_SUNFLASH_QUERY, and the fallback's alpha is 1 everywhere, so all 64 rays
+        // would pass and the sun would measure as its whole quad instead of its bright core -- the
+        // flash would shrink and the glare would dim with the sun still well clear of the ridge.
+        //
+        // Clearing the tan radius is how it is refused, because that is already what the caller
+        // reads as "no sun to test": no new condition appears on that side of the handover.
+        const uint32_t discSlot = mSunDiscTanRadius > 0.f ? slotOf(mSunDiscTextureIndex) : 0u;
+        if (discSlot == 0)
+        {
+            mSunDiscDirection.set(0.f, 0.f, 0.f);
+            mSunDiscTanRadius = 0.f;
+            mSunDiscTexture = 0;
+            mSunGlareView = 0.f;
+            // And the flash goes with the disc. The read-time version did this by accident, through
+            // the one `valid` flag both hung off, and it is worth keeping on purpose: with no disc
+            // the ray count is zero and sky.vert reads that as fully visible, so a flash drawn on
+            // this frame would be drawn at full size on the one frame nothing measured the sun.
+            mHasSunFlash = false;
+        }
+        else
+        {
+            mSunDiscTexture = discSlot;
         }
     }
 }

@@ -84,7 +84,7 @@ namespace
 
 namespace MWRender
 {
-    GlowReader::GlowReader(std::function<uint32_t(const std::string&, std::size_t&)> resolveTexture)
+    GlowReader::GlowReader(std::function<std::size_t(const std::string&)> resolveTexture)
         : mResolveTexture(std::move(resolveTexture))
     {
     }
@@ -94,7 +94,7 @@ namespace MWRender
         mAnyGlowThisFrame = false;
     }
 
-    bool GlowReader::read(const osg::Node& objectBase, float outColour[3], uint32_t& outSlot)
+    bool GlowReader::read(const osg::Node& objectBase, float outColour[3], std::size_t& outTextureIndex)
     {
         const osg::StateSet* stateSet = findGlowStateSet(objectBase, 0);
         if (stateSet == nullptr)
@@ -123,7 +123,7 @@ namespace MWRender
         // int(simulationTime * 16) % 32 (util.cpp line 116), and repeating that here would be a
         // second clock: it would keep running while the game is paused, and it would drift from the
         // one OSG is using the moment either side changed its time source.
-        uint32_t slot = 0;
+        std::size_t textureIndex = static_cast<std::size_t>(-1);
         const osg::StateSet::TextureAttributeList& units = stateSet->getTextureAttributeList();
         for (unsigned int unit = 0; unit < units.size(); ++unit)
         {
@@ -136,13 +136,12 @@ namespace MWRender
             if (!isCausticFrame(name))
                 continue;
 
-            std::size_t storageIndex = static_cast<std::size_t>(-1);
-            slot = mResolveTexture(name, storageIndex);
-            if (storageIndex != static_cast<std::size_t>(-1)
-                && std::find(mCausticIndices.begin(), mCausticIndices.end(), storageIndex)
+            textureIndex = mResolveTexture(name);
+            if (textureIndex != static_cast<std::size_t>(-1)
+                && std::find(mCausticIndices.begin(), mCausticIndices.end(), textureIndex)
                     == mCausticIndices.end())
             {
-                mCausticIndices.push_back(storageIndex);
+                mCausticIndices.push_back(textureIndex);
             }
 
             // Set here, where the caustic is found, and not beside the successful return below.
@@ -152,22 +151,34 @@ namespace MWRender
             // different question and one that could never become true.
             //
             // It deadlocked, and this is why all 32 caustics answered the white fallback forever:
-            // textureIndices() reports nothing while the flag is clear, so the frames are never in
-            // the live set, so they are never given a sampler slot, so slot is 0, so read() returns
-            // false below and never sets the flag. Nothing about how often the texture sync runs
-            // could break that loop -- it is closed inside this class.
+            // textureIndices() reported nothing while the flag was clear, so the frames were never
+            // in the live set, so they were never given a sampler slot, so the slot came back 0, so
+            // read() returned false and never set the flag. Nothing about how often the texture
+            // sync ran could break that loop -- it was closed inside this class.
+            //
+            // The loop cannot form at all now, because nothing here tests a slot any more and the
+            // return below no longer depends on one. That is worth knowing before anyone moves this
+            // line back down: the flag is still what keeps the flipbook resident, which is reason
+            // enough for it to be set where the caustic is found rather than where a glow is drawn.
             mAnyGlowThisFrame = true;
             break;
         }
 
-        // Slot 0 is the white fallback, and drawing the glow with it would add a solid
-        // object-shaped block of the enchantment colour over the scene -- far more visible than the
-        // glow it stands in for. Better to report no glow for the frame or two it takes the loader
-        // to give the texture a slot.
-        if (slot == 0)
+        // The refusal to draw a glow on the white fallback is still in force -- it would add a
+        // solid object-shaped block of the enchantment colour over the scene, far more visible than
+        // the glow it stands in for -- but it cannot be made here any more, because no sampler slot
+        // exists until the caller's texture sync has run and that is later in the frame than this.
+        // It is made at the far end instead: the caller resolves this index to a slot when it
+        // submits the instance, and Renderer::render already skips any submission whose glow slot
+        // is 0. Moving it there also fixed the frame it used to be wrong on -- a slot resolved here
+        // and stored survived the sync's renumbering as a number naming a different texture.
+        //
+        // What is still refused here is the case that is knowable here: a caustic stateset was
+        // found, but its file could not be loaded at all.
+        if (textureIndex == static_cast<std::size_t>(-1))
             return false;
 
-        outSlot = slot;
+        outTextureIndex = textureIndex;
         return true;
     }
 
