@@ -1244,7 +1244,29 @@ namespace MWRender
         if (mGlowReader != nullptr)
             mGlowReader->beginFrame();
 
+        const size_t texturesBeforeGlow = mTextures.size();
+
         const bool detached = refreshMovedObjects();
+
+        // The glow's caustic frames are the one set of textures in this renderer first named on the
+        // far side of the sync above, and they have to be: the glow is read out of
+        // refreshMovedObjects, and refreshMovedObjects has to run after the cell adds. Without a
+        // sync on this side of it a caustic sits in mTextures with no sampler slot, textureSlot
+        // answers 0, GlowReader::read sees the white fallback and reports no glow -- and for a
+        // player standing still in a room, forever. All 32 frames of textures/magicitem/caust*.dds
+        // did exactly that.
+        //
+        // Gated on a texture having actually been loaded rather than run unconditionally, and the
+        // gate is the important half. Two seconds of flipbook is 32 first sightings and then no
+        // more, so this costs 32 syncs while an enchanted item is first in view and nothing at all
+        // afterwards. Running it every frame instead makes collectLiveTextures walk every instance
+        // of every loaded cell every frame, and -- far worse -- advances mTextureSyncCounter sixty
+        // times a second, so the 300-tick residency grace stops meaning five seconds of standing
+        // still and starts expiring the previous cell's whole texture set in one frame. Every one of
+        // those expiries is a renumbering. See syncTexturesToRenderer for what a renumbering does to
+        // the ray traced bounce; that is the measured room-brightening, not a cost.
+        if (mTextures.size() != texturesBeforeGlow)
+            syncTexturesToRenderer();
 
 
         // The TLAS is only rebuilt when the instance set actually changes, not every frame: a cell
@@ -2019,8 +2041,42 @@ namespace MWRender
         if (views == mUploadedTextureViews)
             return;
 
+        // Whether the slot numbers already handed out still mean what they meant.
+        //
+        // Slot s reads views[s - 1], so as long as the old list survives as a prefix of the new one,
+        // every number in circulation still names the texture it was issued for and all that has
+        // happened is that fresh slots appeared at the end. Anything else -- a texture dropping out
+        // of the live set, the list getting shorter -- packs the survivors down and shifts every
+        // slot above the gap.
+        const bool renumbered = mUploadedTextureViews.size() > views.size()
+            || !std::equal(mUploadedTextureViews.begin(), mUploadedTextureViews.end(), views.begin());
+
         mRenderer->setTextures(views);
         mUploadedTextureViews = views;
+
+        // The ray tracing side keeps its own copy of every slot and nothing in this function can
+        // reach it. Renderer::buildTlas fills the geometry table from one frame's draw commands, no
+        // other code ever rewrites it, and closesthit.rchit and anyhit.rahit index the sampler array
+        // with what they find there. So a renumbering that is not followed by a rebuild leaves the
+        // hit shaders on the previous numbering until something else happens to dirty the
+        // acceleration structure -- which, for a player standing still in a room, is never.
+        //
+        // That is not a cosmetic error, and it is the failure this whole function was suspected of.
+        // The closest-hit shader hands raygen the albedo of the bounce surface, and composite.frag
+        // divides by (1 - that albedo) to stand in for the bounces it does not trace. A slot that has
+        // shifted past the end of the now-shorter array reads the 1x1 white fallback: albedo 1,
+        // clamped to 0.85, which multiplies the indirect term by 6.7 where Morrowind's dark interior
+        // stone gives about 1.09. Meanwhile every texture in the image is still right, because the
+        // raster path resolves its slots fresh in render() -- so the room comes out three and a half
+        // times brighter than OSG's with nothing visibly untextured to explain it. Ghostgate's Tower
+        // of Dusk measured 86.5 mean luma against 24.3 that way.
+        //
+        // The two numberings stay in step today only because syncCells happens to rebuild the
+        // acceleration structure on the same condition it syncs textures on. That is a coincidence
+        // of two adjacent ifs, and it breaks the moment either one is allowed to fire on its own.
+        // This does not rely on it.
+        if (renumbered)
+            mRenderer->markTlasDirty();
 
         if (evicted > 0 || reloaded > 0)
         {

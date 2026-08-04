@@ -57,7 +57,7 @@ namespace MWRender
         bool read(const osg::Node& objectBase, float outColour[3], uint32_t& outSlot);
 
         /// Storage indices of every caustic frame this reader has resolved, or nothing at all when
-        /// no object glowed this frame.
+        /// nothing in the loaded cells is enchanted this frame.
         ///
         /// All 32 frames, not the one currently bound, and that is the point. A caustic frame is
         /// bound for 1/16 s and comes round again two seconds later; reported one at a time, the
@@ -72,9 +72,12 @@ namespace MWRender
         // Every caustic storage index seen since startup. Never cleared: the set is at most 32
         // entries and they are wanted together or not at all.
         std::vector<std::size_t> mCausticIndices;
-        // Returned empty when nothing glowed, so that walking out of the one room in the game with
-        // an enchanted dagger on the floor gives 32 sampler slots back.
+        // Returned empty when nothing in the cell is enchanted, so that walking out of the one room
+        // in the game with an enchanted dagger on the floor gives 32 sampler slots back.
         std::vector<std::size_t> mEmpty;
+        // "A caustic stateset was found this frame", not "a glow was drawn this frame". read() used
+        // to set it on the second reading, which could never become true: the frames this flag gates
+        // are the frames that have to be live before any of them can resolve to a slot at all.
         bool mAnyGlowThisFrame = false;
     };
 }

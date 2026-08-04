@@ -144,6 +144,19 @@ namespace MWRender
             {
                 mCausticIndices.push_back(storageIndex);
             }
+
+            // Set here, where the caustic is found, and not beside the successful return below.
+            // The flag means "something in the loaded cells is enchanted this frame", which is the
+            // question collectLiveTextures is asking when it decides whether to keep the flipbook
+            // resident. Setting it below made it mean "a glow was drawn this frame", which is a
+            // different question and one that could never become true.
+            //
+            // It deadlocked, and this is why all 32 caustics answered the white fallback forever:
+            // textureIndices() reports nothing while the flag is clear, so the frames are never in
+            // the live set, so they are never given a sampler slot, so slot is 0, so read() returns
+            // false below and never sets the flag. Nothing about how often the texture sync runs
+            // could break that loop -- it is closed inside this class.
+            mAnyGlowThisFrame = true;
             break;
         }
 
@@ -155,7 +168,6 @@ namespace MWRender
             return false;
 
         outSlot = slot;
-        mAnyGlowThisFrame = true;
         return true;
     }
 
