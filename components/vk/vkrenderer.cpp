@@ -85,6 +85,7 @@ namespace Vk
         createSkinBuffers();
         // And binding 3.
         createParticleBuffers();
+        createUvScrollBuffers();
         createDescriptorSets();
         createGBufferPipeline();
         createCompositePipeline();
@@ -701,7 +702,7 @@ namespace Vk
     {
         // Scene layout (set 0 for G-buffer pass): camera UBO + the scene texture array
         {
-            std::array<VkDescriptorSetLayoutBinding, 4> bindings = {};
+            std::array<VkDescriptorSetLayoutBinding, 5> bindings = {};
 
             bindings[0].binding = 0;
             bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -730,6 +731,18 @@ namespace Vk
             bindings[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
             bindings[3].descriptorCount = 1;
             bindings[3].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+            // Scrolled UV offsets, read by both G-buffer vertex stages and by the forward emissive
+            // one. On this set for the same reason the particle quads are: all three pipelines
+            // already bind it, so a scrolling shape needs no descriptor plumbing of its own.
+            //
+            // Vertex stage only. The offset is uniform across a shape, so applying it per vertex
+            // instead of per fragment is the same answer for a fraction of the work -- a lava pool
+            // filling the screen has four vertices and a million pixels.
+            bindings[4].binding = 4;
+            bindings[4].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+            bindings[4].descriptorCount = 1;
+            bindings[4].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
             VkDescriptorSetLayoutCreateInfo layoutInfo = {};
             layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -983,14 +996,17 @@ namespace Vk
         }
 
         // The composite sets each hold a point light buffer and the scene sets each hold a bone
-        // palette, whether or not ray tracing is available. Two per frame in flight.
+        // palette, particle quads and UV scroll offsets, whether or not ray tracing is available.
+        // Four per frame in flight. This count is exact rather than generous, so a fifth storage
+        // buffer added without touching this line fails vkAllocateDescriptorSets at startup with
+        // VK_ERROR_OUT_OF_POOL_MEMORY.
         {
             auto found = std::find_if(poolSizes.begin(), poolSizes.end(),
                 [](const VkDescriptorPoolSize& s) { return s.type == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; });
             if (found != poolSizes.end())
-                found->descriptorCount += maxFramesInFlight * 3;
+                found->descriptorCount += maxFramesInFlight * 4;
             else
-                poolSizes.push_back({ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, maxFramesInFlight * 3 });
+                poolSizes.push_back({ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, maxFramesInFlight * 4 });
         }
 
         if (mDevice->rayTracingSupported())
@@ -1063,7 +1079,12 @@ namespace Vk
                 particleInfo.offset = 0;
                 particleInfo.range = VK_WHOLE_SIZE;
 
-                std::array<VkWriteDescriptorSet, 3> writes = {};
+                VkDescriptorBufferInfo uvScrollInfo = {};
+                uvScrollInfo.buffer = mUvScrollBuffers[i];
+                uvScrollInfo.offset = 0;
+                uvScrollInfo.range = VK_WHOLE_SIZE;
+
+                std::array<VkWriteDescriptorSet, 4> writes = {};
 
                 writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
                 writes[0].dstSet = mSceneDescriptorSets[i];
@@ -1085,6 +1106,13 @@ namespace Vk
                 writes[2].descriptorCount = 1;
                 writes[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
                 writes[2].pBufferInfo = &particleInfo;
+
+                writes[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                writes[3].dstSet = mSceneDescriptorSets[i];
+                writes[3].dstBinding = 4;
+                writes[3].descriptorCount = 1;
+                writes[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+                writes[3].pBufferInfo = &uvScrollInfo;
 
                 vkUpdateDescriptorSets(
                     mDevice->handle(), static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
@@ -2821,7 +2849,7 @@ namespace Vk
                     // Slot plus the authored alpha test in one word -- see Vk::packMaterialBits
                     // for why they share it. drawCmd.textureIndex was already bounded by submitMesh.
                     pushData.materialBits = packMaterialBits(drawCmd.textureIndex, drawCmd.alphaTest,
-                        drawCmd.alphaFunc, drawCmd.alphaThreshold);
+                        drawCmd.alphaFunc, drawCmd.alphaThreshold, drawCmd.uvScroll);
                     pushData.roughness = drawCmd.roughness;
                     pushData.specularStrength = drawCmd.specularStrength;
                     pushData.boneOffset = skinned ? drawCmd.boneOffset : sNoBones;
@@ -3297,6 +3325,32 @@ namespace Vk
         }
     }
 
+    void Renderer::createUvScrollBuffers()
+    {
+        const VkDeviceSize size = sizeof(UvScroll) * maxUvScrolls;
+        for (uint32_t i = 0; i < maxFramesInFlight; i++)
+        {
+            createBufferLocal(*mDevice, size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                mUvScrollBuffers[i], mUvScrollMemory[i]);
+            VK_CHECK(vmaMapMemory(mDevice->allocator(), mUvScrollMemory[i], &mUvScrollMapped[i]));
+        }
+    }
+
+    void Renderer::updateUvScroll(const UvScroll* offsets, uint32_t count)
+    {
+        const uint32_t usable = std::min(count, maxUvScrolls);
+        if (count > usable && !mUvScrollOverflowWarned)
+        {
+            mUvScrollOverflowWarned = true;
+            Log(Debug::Warning) << "Vulkan: " << count << " scrolling surfaces exceed the " << maxUvScrolls
+                                << " one frame can hold; the rest draw static";
+        }
+
+        if (usable > 0 && offsets != nullptr && mUvScrollMapped[mCurrentFrame] != nullptr)
+            std::memcpy(mUvScrollMapped[mCurrentFrame], offsets, sizeof(UvScroll) * usable);
+    }
+
     void Renderer::createParticleBuffers()
     {
         const VkDeviceSize size = sizeof(ParticleQuad) * maxParticleQuads;
@@ -3637,7 +3691,7 @@ namespace Vk
                 draw.indexCount = submission.indexCount;
                 draw.push.model = submission.transform;
                 draw.push.params[0] = slot;
-                draw.push.params[1] = 0;
+                draw.push.params[1] = submission.uvScroll;
                 draw.push.params[2] = 0;
                 draw.push.params[3] = 0;
                 mEmissiveMeshes.push_back(draw);
@@ -3652,7 +3706,7 @@ namespace Vk
             submission.boneOffset,
             { submission.glowColour[0], submission.glowColour[1], submission.glowColour[2] },
             submission.glowTexture, submission.twoSided, submission.alphaTest, submission.alphaFunc,
-            submission.alphaThreshold });
+            submission.alphaThreshold, submission.uvScroll });
     }
 
     void Renderer::uploadGeometryTable(const std::vector<GeometryRecord>& records)
@@ -3856,6 +3910,17 @@ namespace Vk
                 vmaDestroyBuffer(mDevice->allocator(), mParticleBuffers[i], mParticleMemory[i]);
                 mParticleBuffers[i] = VK_NULL_HANDLE;
                 mParticleMemory[i] = VK_NULL_HANDLE;
+            }
+            if (mUvScrollMapped[i])
+            {
+                vmaUnmapMemory(mDevice->allocator(), mUvScrollMemory[i]);
+                mUvScrollMapped[i] = nullptr;
+            }
+            if (mUvScrollBuffers[i] != VK_NULL_HANDLE)
+            {
+                vmaDestroyBuffer(mDevice->allocator(), mUvScrollBuffers[i], mUvScrollMemory[i]);
+                mUvScrollBuffers[i] = VK_NULL_HANDLE;
+                mUvScrollMemory[i] = VK_NULL_HANDLE;
             }
             if (mUniformMapped[i])
             {

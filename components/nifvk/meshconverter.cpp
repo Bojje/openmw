@@ -6,6 +6,7 @@
 
 #include <components/debug/debuglog.hpp>
 #include <components/misc/strings/algorithm.hpp>
+#include <components/nif/base.hpp>
 #include <components/nif/data.hpp>
 #include <components/nif/niffile.hpp>
 #include <components/nif/node.hpp>
@@ -17,6 +18,29 @@
 
 namespace
 {
+
+    // Name of the node whose controller chain scrolls this shape's UVs, or empty if nothing does.
+    //
+    // Walks upward for the same reason findProperty does: in_lava_1024 hangs the controller off the
+    // NiTriShape itself, while several of the magic effect shells hang it off the NiNode above.
+    //
+    // The isActive() gate mirrors nifloader.cpp's. A controller with the flag clear is never
+    // instantiated there, so trusting it here would leave the renderer waiting every frame for a
+    // TexMat that nothing creates.
+    std::string findUvControllerNode(const Nif::NiAVObject* node)
+    {
+        for (const Nif::NiAVObject* cur = node; cur != nullptr;
+             cur = cur->mParents.empty() ? nullptr : static_cast<const Nif::NiAVObject*>(cur->mParents.front()))
+        {
+            for (const Nif::NiTimeController* ctrl = cur->mController.getPtr(); ctrl != nullptr;
+                 ctrl = ctrl->mNext.getPtr())
+            {
+                if (ctrl->mRecordType == Nif::RC_NiUVController && ctrl->isActive())
+                    return cur->mName;
+            }
+        }
+        return {};
+    }
 
     // Convert NiTransform (3x3 rotation + vec3 translation + float scale) to column-major 4x4
     void nifTransformToMat4(const Nif::NiTransform& t, float out[16])
@@ -541,6 +565,7 @@ namespace NifVk
     {
         VulkanMesh mesh;
         std::memcpy(mesh.transform, worldTransform, 16 * sizeof(float));
+        mesh.uvControllerNode = findUvControllerNode(geom);
         mesh.baseTexture = findBaseTexture(geom);
         mesh.renderState = findRenderState(geom);
         // What the BLAS needs from all of that: whether a ray may treat this surface as solid. A

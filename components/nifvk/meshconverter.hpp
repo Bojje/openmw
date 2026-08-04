@@ -206,6 +206,23 @@ namespace NifVk
         // Luminance of the material's emissive colour times its emissive multiplier. Not consumed by
         // the renderer yet; gbuffer.frag still writes a constant emission.
         float emissiveStrength = 0.0f;
+
+        // Name of the NIF node whose NiUVController scrolls this shape's texture, empty if none does.
+        // Non-empty is what marks the shape as animated.
+        //
+        // The name, not the curve. The curve stays where it already is, in NifOsg::UVController, and
+        // the renderer reads the osg::TexMat that evaluates from it every frame. Copying the keys
+        // here instead would mean a second implementation of a cubic Hermite spline plus its phase,
+        // its start/stop window and its extrapolation mode -- all four of which the shipped files
+        // actually use. The day the two implementations disagree, lava flows at one speed in the
+        // world and another in the ray traced reflection.
+        //
+        // The controller's node rather than the geometry's, because that is precisely where the
+        // matrix turns up: NifOsg::Loader hangs a CompositeStateSetUpdater on the node holding the
+        // controller. Recording the geometry's own name would fail for the files that put the
+        // controller on the NiNode above the shape, and it would fail by finding no TexMat and
+        // quietly not animating.
+        std::string uvControllerNode;
     };
 
     class MeshConverter

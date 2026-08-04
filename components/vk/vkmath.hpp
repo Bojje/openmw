@@ -11,6 +11,19 @@ namespace Vk
         float data[16];
     };
 
+    // A scrolled texture-coordinate offset, one per drawn shape that carries a NiUVController.
+    //
+    // Here rather than in vkrenderer.hpp because apps/openmw/mwrender/vkrenderingmanager.hpp holds a
+    // vector of these and includes only vkmath.hpp and vkgeometry.hpp -- pulling in vkrenderer.hpp for
+    // two floats would drag vulkan.h into every translation unit that touches a rendering manager.
+    struct UvScroll
+    {
+        float u;
+        float v;
+    };
+
+    static_assert(sizeof(UvScroll) == 8, "UvScroll must match the std430 vec2 array in the shaders");
+
     struct Vec3
     {
         float x, y, z;

@@ -32,6 +32,20 @@ layout(set = 0, binding = 0) uniform CameraUBO {
     vec4 sunColor;
 } camera;
 
+
+// Scrolled UV offsets for this frame, filled from the osg::TexMat that NifOsg::UVController is
+// already maintaining. Index 0 is permanently (0, 0), so a shape that does not scroll reads a
+// constant and needs no branch.
+layout(set = 0, binding = 4, std430) readonly buffer UvScrollBuffer {
+    vec2 offsets[];
+} uvScroll;
+
+// Rebuilds the index packMaterialBits split across bits 10-15 and 28-31. The split exists because
+// the push constant block is already at the 128-byte guaranteed limit and had no room for a word.
+uint uvScrollIndex(uint bits) {
+    return ((bits >> 10) & 0x3Fu) | ((bits >> 28) << 6);
+}
+
 layout(location = 0) out vec3 fragWorldPos;
 layout(location = 1) out vec3 fragNormal;
 layout(location = 2) out vec2 fragTexCoord;
@@ -41,7 +55,10 @@ void main() {
     vec4 worldPos = push.model * vec4(inPosition, 1.0);
     fragWorldPos = worldPos.xyz;
     fragNormal = normalize(push.normalMatrix * inNormal);
-    fragTexCoord = inTexCoord;
+    // Lava, waterfalls and the Ghostgate fences scroll their texture instead of moving. The sign
+    // convention -- U negated, V not -- was already applied on the CPU, where UVController::apply
+    // put it, so this is a plain add.
+    fragTexCoord = inTexCoord + uvScroll.offsets[uvScrollIndex(push.materialBits)];
     fragColor = inColor;
     gl_Position = camera.projection * camera.view * worldPos;
 }

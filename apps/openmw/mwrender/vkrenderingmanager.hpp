@@ -152,6 +152,11 @@ namespace MWRender
                 float glowColour[3] = { 0.0f, 0.0f, 0.0f };
                 uint32_t glowTexture = 0;
 
+                // This submesh's scrolled UV offset, refreshed every frame by refreshMovedObjects
+                // from the live osg::TexMat. Per instance for the same reason the glow is: it is
+                // read off a particular object in the world, not off the shared model.
+                float uvScroll[2] = { 0.0f, 0.0f };
+
                 // Whether this instance's BLAS goes into the acceleration structure.
                 //
                 // Cleared for good the first time the object it belongs to is seen to move, which is
@@ -195,6 +200,11 @@ namespace MWRender
 
                 uint32_t firstInstance = 0;
                 uint32_t instanceCount = 0;
+                // Whether any of this object's submeshes carries a NiUVController. Decided once at
+                // addCell so the per-frame sweep can skip the subgraph walk for everything else --
+                // which is all but 25 models in the game, and the walk is the only part of this
+                // feature that is not free.
+                bool uvAnimated = false;
                 // Whether this object has already left the acceleration structure. Latched, so the
                 // TLAS is rebuilt once per object rather than once per frame of its swing.
                 bool detached = false;
@@ -353,6 +363,12 @@ namespace MWRender
         // build instance transforms, and if only one of them knew about skinned statics a banner
         // would stand up when its cell loaded and fall flat the first time it was refreshed.
         std::vector<std::array<float, 16>> mMeshPlacements;
+
+        // This frame's scrolled UV offsets, in the order render() submitted them, uploaded to the
+        // renderer's storage buffer at the end of the frame. Seeded with a zero entry that never
+        // moves: index 0 is what every non-scrolling shape indexes, which is what lets the vertex
+        // shaders read it unconditionally instead of branching.
+        std::vector<Vk::UvScroll> mUvScrollTable = { { 0.0f, 0.0f } };
 
         // Rebuilds the renderer's sampler array from the textures the currently loaded cells actually
         // reference, and frees the ones none of them do.

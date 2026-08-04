@@ -254,6 +254,22 @@ namespace Vk
     // costs 48 bytes each.
     constexpr uint32_t maxParticleQuads = 8192;
 
+    // One scrolled UV offset, matching the std430 vec2 array in gbuffer.vert, gbuffer_skinned.vert
+    // and emissive.vert. Two floats and not four because not one of the 116 NiUVControllers in the
+    // three shipped archives populates a scale curve -- all 116 animate translation alone, so the
+    // scale-about-(0.5, 0.5) half of NifOsg::UVController::apply is the identity for every surface
+    // this will ever draw. A mod that ships a scale curve gets the offset and no scale, which is
+    // wrong in a way that is visible and bounded rather than silent.
+    // How many scrolling shapes one frame can draw. This is per visible instance, not per model: the
+    // sampler reads the live object, so two lava pools in different cells get an entry each even
+    // though they are phase-locked and will hold the same number. 512 is far past what any cell
+    // contains -- the whole game only places 2819 of these and they are spread over 41 cells.
+    //
+    // Overflow assigns index 0, which is the permanently-zero entry, so a shape past the limit draws
+    // static. That is exactly what it does today: the failure mode is the old bug returning for one
+    // surface, not a read off the end of the buffer.
+    constexpr uint32_t maxUvScrolls = 512;
+
     // Vertices in one water surface draw: a 40 x 40 grid of quads, six vertices each, generated from
     // gl_VertexIndex with no vertex buffer and no index buffer -- the same trick the particle
     // billboards use, and for the same reason. Every vertex is a lattice point on a horizontal plane
@@ -431,6 +447,9 @@ namespace Vk
         // takes it, and decoded there.
         float glowColour[3] = { 0.0f, 0.0f, 0.0f };
         uint32_t glowTexture = 0;
+        // Index into the uv scroll buffer, 0 for a shape whose texture does not move. The caller
+        // allocates these as it submits, so they are per visible instance and valid for one frame.
+        uint32_t uvScroll = 0;
     };
 
     struct MeshDrawCommand
@@ -462,6 +481,9 @@ namespace Vk
         bool alphaTest;
         uint8_t alphaFunc;
         uint8_t alphaThreshold;
+        // Newest field, and therefore last, for the reason stated at the top of this struct: the
+        // push_back in submitMesh is a positional aggregate initialiser.
+        uint32_t uvScroll;
     };
 
     // How the G-buffer's material word is packed: a sampler slot plus the alpha test the shape was
@@ -480,6 +502,20 @@ namespace Vk
     constexpr uint32_t sMaterialThresholdShift = 16;
     constexpr uint32_t sMaterialFuncShift = 24;
     constexpr uint32_t sMaterialAlphaTestBit = 1u << 27;
+    // The uv scroll index rides in the two gaps this word already had: bits 10-15 and bits 28-31.
+    // Split across two ranges because neither gap alone holds the 512 entries the table needs, and
+    // widening the word is not an option -- GBufferPushConstants is exactly at the 128-byte
+    // guaranteed limit, which is why the comment above says anything further has to go in a buffer.
+    // The buffer is the one at scene set binding 4; this is only the index into it.
+    constexpr uint32_t sMaterialUvLowShift = 10;
+    constexpr uint32_t sMaterialUvLowBits = 6;
+    constexpr uint32_t sMaterialUvLowMask = (1u << sMaterialUvLowBits) - 1u;
+    constexpr uint32_t sMaterialUvHighShift = 28;
+
+    // Ten bits total. If the table ever outgrows them the index would wrap into the slot field and a
+    // scrolling shape would sample somebody else's texture.
+    static_assert(maxUvScrolls <= (1u << (sMaterialUvLowBits + 4)),
+        "the uv scroll table outgrew the spare bits in the G-buffer material word");
 
     // The one way this packing can break silently. If the sampler array is ever enlarged past what
     // ten bits can name, high slots would alias onto the threshold field: a mesh would sample the
@@ -489,7 +525,8 @@ namespace Vk
 
     /// Builds that word. \a func and \a threshold are ignored unless \a alphaTest, so a shape with
     /// no authored test packs to exactly the slot number and the shader takes its default branch.
-    inline uint32_t packMaterialBits(uint32_t slot, bool alphaTest, uint32_t func, uint32_t threshold)
+    inline uint32_t packMaterialBits(
+        uint32_t slot, bool alphaTest, uint32_t func, uint32_t threshold, uint32_t uvScroll = 0)
     {
         uint32_t bits = slot & sMaterialSlotMask;
         if (alphaTest)
@@ -497,6 +534,13 @@ namespace Vk
             bits |= sMaterialAlphaTestBit;
             bits |= (func & 0x7u) << sMaterialFuncShift;
             bits |= (threshold & 0xFFu) << sMaterialThresholdShift;
+        }
+        // Defaulted so the ray tracing caller, which packs this word without a scroll index, did not
+        // have to change and still produces exactly the bits it produced before.
+        if (uvScroll != 0 && uvScroll < maxUvScrolls)
+        {
+            bits |= (uvScroll & sMaterialUvLowMask) << sMaterialUvLowShift;
+            bits |= (uvScroll >> sMaterialUvLowBits) << sMaterialUvHighShift;
         }
         return bits;
     }
@@ -550,8 +594,10 @@ namespace Vk
     struct EmissiveMeshPush
     {
         Mat4 model;
-        // .x = slot in the sampler array. .yzw unused, and present only because a push constant vec4
-        // has to be a vec4.
+        // .x = slot in the sampler array. .y = index into the uv scroll buffer, 0 for a shape that
+        // does not scroll -- this pass gets it whole because the words were spare, where the G-buffer
+        // has to split the same number across two leftover bit ranges. .zw unused, and present only
+        // because a push constant vec4 has to be a vec4.
         uint32_t params[4];
     };
 
@@ -722,6 +768,10 @@ namespace Vk
         // simulation that owns them is re-read every frame rather than tracked.
         //
         // Anything past maxParticleQuads is dropped with one warning.
+        /// Upload this frame's scrolled UV offsets. Entry 0 must be (0, 0): every shape that does
+        /// not scroll indexes it, which is what keeps the shaders branchless.
+        void updateUvScroll(const UvScroll* offsets, uint32_t count);
+
         void updateParticles(
             const ParticleQuad* quads, uint32_t count, const std::vector<ParticleRun>& runs);
 
@@ -976,6 +1026,16 @@ namespace Vk
         bool mParticleOverflowWarned = false;
 
         void createParticleBuffers();
+
+        // Scrolled UV offsets for this frame, per frame in flight and persistently mapped, for the
+        // same reason the particle quads are: rewritten every frame while the previous frame may
+        // still be reading.
+        std::array<VkBuffer, maxFramesInFlight> mUvScrollBuffers = {};
+        std::array<VmaAllocation, maxFramesInFlight> mUvScrollMemory = {};
+        std::array<void*, maxFramesInFlight> mUvScrollMapped = {};
+        bool mUvScrollOverflowWarned = false;
+
+        void createUvScrollBuffers();
 
         // Drawn inside the composite pass, after the tone mapped scene and before the interface.
         // Null if its shaders were missing, which costs the effects and nothing else.

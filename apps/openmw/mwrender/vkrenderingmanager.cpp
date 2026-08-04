@@ -18,6 +18,8 @@
 #include <components/debug/debuglog.hpp>
 #include <components/esm3/loadland.hpp>
 #include <components/misc/resourcehelpers.hpp>
+#include <osg/TexMat>
+
 #include <components/misc/strings/algorithm.hpp>
 #include <components/nif/niffile.hpp>
 #include <components/nifvk/meshconverter.hpp>
@@ -239,6 +241,56 @@ namespace
     ///    so the object keeps the placement it already has. That costs a door that will not swing --
     ///    the bug we started with -- and avoids the far worse failure where every tracked object in the
     ///    world jumps somewhere else the first time anything touches it.
+    // How deep the TexMat search walks from an object's base node. The animated NIFs are shallow --
+    // the controller sits on the NiTriShape or on the NiNode directly above it, under the loaded
+    // model's root -- and this is only ever paid by an object addCell already flagged as animated, so
+    // it is a bound against a pathological file rather than a performance knob.
+    constexpr int sMaxUvDepth = 6;
+
+    // Pull one named node's scrolled UV offset out of the live scene graph.
+    //
+    // This is the whole of the feature. NifOsg::UVController is a SceneUtil::StateSetUpdater: every
+    // frame it evaluates its curves and writes an osg::TexMat into the node's stateset. By the time
+    // this reads it, the cubic Hermite interpolation, the phase, the start/stop window and the
+    // extrapolation mode have all already been applied by the code that owns them.
+    //
+    // The stateset is deliberately not cached between frames. StateSetUpdater double-buffers two
+    // shallow copies and hands out a different one on alternate frames, so a cached pointer freezes
+    // on whichever copy it first caught -- the same hazard vkglowreader documents.
+    bool readUvScroll(const osg::Node& node, const std::string& name, int depth, float out[2])
+    {
+        if (node.getName() == name)
+        {
+            const osg::StateSet* stateset = node.getStateSet();
+            if (stateset == nullptr)
+                return false;
+            const osg::StateAttribute* attr
+                = stateset->getTextureAttribute(0, osg::StateAttribute::TEXMAT);
+            const auto* texMat = dynamic_cast<const osg::TexMat*>(attr);
+            if (texMat == nullptr)
+                return false;
+            // UVController::apply already negated U and left V alone when it built this matrix, so
+            // the translation comes out in the convention the shaders add directly.
+            const osg::Vec3f trans = texMat->getMatrix().getTrans();
+            out[0] = trans.x();
+            out[1] = trans.y();
+            return true;
+        }
+
+        if (depth <= 0)
+            return false;
+
+        const osg::Group* group = node.asGroup();
+        if (group == nullptr)
+            return false;
+        for (unsigned int i = 0; i < group->getNumChildren(); ++i)
+        {
+            if (readUvScroll(*group->getChild(i), name, depth - 1, out))
+                return true;
+        }
+        return false;
+    }
+
     const SceneUtil::PositionAttitudeTransform* trackableNode(
         const MWWorld::ConstPtr& ptr, const float bakedTransform[16])
     {
@@ -609,6 +661,15 @@ namespace MWRender
                 submission.glowColour[2] = inst.glowColour[2];
                 submission.glowTexture = inst.glowTexture;
 
+                // Scrolling texture -- lava, a waterfall, a Ghostgate fence. A slot is taken only for
+                // the shapes that need one, so the table stays the length of what is actually moving
+                // on screen rather than the length of the draw list.
+                if (!mesh->uvControllerNode.empty() && mUvScrollTable.size() < Vk::maxUvScrolls)
+                {
+                    submission.uvScroll = static_cast<uint32_t>(mUvScrollTable.size());
+                    mUvScrollTable.push_back({ inst.uvScroll[0], inst.uvScroll[1] });
+                }
+
                 mRenderer->submitMesh(submission);
             }
         }
@@ -725,6 +786,13 @@ namespace MWRender
                              << " are actor meshes";
         }
 
+        mRenderer->updateUvScroll(mUvScrollTable.data(), static_cast<uint32_t>(mUvScrollTable.size()));
+        // Reset here rather than at the top of the next frame so the table's whole lifetime is inside
+        // one function: everything that fills it is above, and nothing outside render() can be handed
+        // a stale entry. The zero at index 0 is what every non-scrolling shape reads.
+        mUvScrollTable.clear();
+        mUvScrollTable.push_back({ 0.0f, 0.0f });
+
         mRenderer->render();
     }
 
@@ -788,6 +856,14 @@ namespace MWRender
             {
                 CellMeshes::MovedObject tracked;
                 tracked.node = node;
+                for (size_t meshIndex : *meshIndices)
+                {
+                    if (!mMeshes[meshIndex]->uvControllerNode.empty())
+                    {
+                        tracked.uvAnimated = true;
+                        break;
+                    }
+                }
                 tracked.position = node->getPosition();
                 tracked.attitude = node->getAttitude();
                 tracked.scale = node->getScale();
@@ -1108,6 +1184,32 @@ namespace MWRender
                         instance.glowColour[1] = glowColour[1];
                         instance.glowColour[2] = glowColour[2];
                         instance.glowTexture = glowTexture;
+                    }
+                }
+
+                // The scrolled UV offset, read off the live object this frame.
+                //
+                // Rides in this sweep for the same reason the glow does: the list is already here and
+                // already being iterated, and it sits above the early-out below because a lava pool
+                // that never moves still has to flow. Gated on uvAnimated, decided at addCell, so an
+                // object that does not scroll costs one bool test -- without that gate every rock in
+                // the cell would pay for a subgraph walk to discover it has no TexMat.
+                if (tracked.uvAnimated && tracked.node != nullptr)
+                {
+                    for (uint32_t i = 0; i < tracked.instanceCount; ++i)
+                    {
+                        const uint32_t index = tracked.firstInstance + i;
+                        if (index >= cellMeshes.instances.size())
+                            break;
+                        CellMeshes::Instance& instance = cellMeshes.instances[index];
+                        const std::string& name = mMeshes[instance.meshIndex]->uvControllerNode;
+                        if (name.empty())
+                            continue;
+                        // Written every frame, including the frame the read fails: a stale offset
+                        // would leave the surface stopped at wherever it happened to be.
+                        instance.uvScroll[0] = 0.0f;
+                        instance.uvScroll[1] = 0.0f;
+                        readUvScroll(*tracked.node, name, sMaxUvDepth, instance.uvScroll);
                     }
                 }
 
