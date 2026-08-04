@@ -360,11 +360,16 @@ namespace NifVk
         // implementation of this era settled on. Morrowind's own parts rarely exceed two.
         mesh.skinAttributes.assign(static_cast<size_t>(mesh.vertexCount) * sSkinAttributeStride, 0);
 
+        uint32_t unweighted = 0;
+
         for (uint32_t v = 0; v < mesh.vertexCount; ++v)
         {
             auto& influences = perVertex[v];
             if (influences.empty())
+            {
+                ++unweighted;
                 continue;
+            }
 
             if (influences.size() > 4)
             {
@@ -403,6 +408,24 @@ namespace NifVk
                     assigned += clamped;
                 }
             }
+        }
+
+        // A vertex the NIF gave no influences at all does not collapse -- gbuffer_skinned.vert falls
+        // back to identity for it -- but identity means it stays in *bind pose* while every vertex
+        // around it is posed by the animation. On a garment that is a torn seam: the sleeve sits where
+        // the modeller left it while the torso moves, and the body underneath shows through the gap.
+        //
+        // It is silent by construction, so it needs saying out loud. The two ways to get here are a
+        // bone reference this loop skipped -- unnamed, or empty -- which takes every vertex weighted
+        // only to it with it, and mBones lists of unequal length between NiSkinData and NiSkinInstance,
+        // which drops the tail of the longer one.
+        if (unweighted > 0)
+        {
+            Log(Debug::Warning) << "Vulkan: skinned shape on bone \"" << mesh.skinBone << "\" has "
+                                << unweighted << " of " << mesh.vertexCount
+                                << " vertices with no bone influence; they stay in bind pose. "
+                                << data->mBones.size() << " skin data bones, " << skin->mBones.size()
+                                << " instance bones, " << mesh.skinBones.size() << " kept";
         }
     }
 
