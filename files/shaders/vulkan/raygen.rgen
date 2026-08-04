@@ -331,13 +331,22 @@ void traceWaterReflection(ivec2 pixelCoord, ivec2 launchSize, vec2 uv, float sce
     // The flat-plane sky reflection, which is what water.frag drew at every pixel before this existed.
     // It is the fallback, and it is written even for a texel with no water anywhere near it.
     //
+    // **Alpha is 0 on this path and 1 only where a ray was actually fired at the sea.** It is a
+    // per-texel "this is real water reflection" weight, not the whole-image "did this shader run"
+    // switch it used to be, and water.frag averages its taps by it. The reason is the shoreline: a
+    // water pixel next to a bank, a rock or a jetty post reads a 2x2 footprint that straddles texels
+    // whose view ray hit the bank rather than the sea, and blending the flat sky reflection stored
+    // there put a bright fringe along every waterline and a halo around everything standing in it.
+    // Weighted by alpha those neighbours contribute nothing, and a pixel with no water in its
+    // footprint at all still lands on the sky fallback, which is what the old scheme was protecting.
+    //
     // That last part is not padding. water.frag reads this image with a bilinear fetch, so along every
     // shoreline its 2x2 footprint straddles texels whose view ray never reached the sea. Zero in those
     // puts a dark fringe around every island and every rock in the water; this puts the old sky
     // reflection there instead, so the worst a shoreline can do is fall back to what it used to be.
     vec3 flatReflect = reflect(rayDir, vec3(0.0, 0.0, 1.0));
     vec4 result = vec4(
-        mix(camera.fogColor.rgb, camera.skyColor.rgb, clamp(flatReflect.z, 0.0, 1.0)), 1.0);
+        mix(camera.fogColor.rgb, camera.skyColor.rgb, clamp(flatReflect.z, 0.0, 1.0)), 0.0);
 
     float waterHeight = camera.sunParams.z;
 
@@ -530,9 +539,12 @@ void traceWaterReflection(ivec2 pixelCoord, ivec2 launchSize, vec2 uv, float sce
 
     // Written on every path. Nothing else touches this image, so a texel left alone keeps a reflection
     // of wherever the camera was standing when it was last written -- which after a fast turn is a
-    // slab of the wrong coastline sitting on the sea. The alpha is 1 here and 1 on the fallback path
-    // too, so it is 0 only when this shader did not run at all: for the whole image or none of it,
-    // never for part of one, which is what lets water.frag treat it as a switch instead of a blend.
+    // slab of the wrong coastline sitting on the sea.
+    //
+    // The rgb on the fallback path is still the flat sky reflection rather than zero, even though its
+    // alpha is now 0. That costs nothing and it means a pixel whose whole footprint misses the water
+    // degrades to the old sky-coloured answer instead of to black if anything ever reads this image
+    // unweighted.
     imageStore(waterReflectOut, pixelCoord >> 1, result);
 }
 

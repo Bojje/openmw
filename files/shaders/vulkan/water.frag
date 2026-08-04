@@ -220,15 +220,37 @@ void main() {
     // thing physically -- a reflection off a wave field is a low frequency signal, which is the same
     // argument that justifies tracing it at half resolution in the first place.
     //
-    // The alpha averages harmlessly. It is 1 across the whole image or 0 across the whole image, never
-    // part of one, so every tap agrees and the > 0.5 switch below sees the same value it always did.
+    // **Weighted by alpha, which raygen sets to 1 only where it actually fired a ray at the sea.**
+    // Widening the footprint without this put a bright fringe along every waterline and a halo around
+    // every post and rock standing in the water: a shoreline pixel's footprint straddles texels whose
+    // view ray hit the bank instead of the sea, and those hold a flat sky reflection. Averaging them in
+    // unweighted blends sky into the water exactly at the edge, which reads as the water not meeting
+    // the shore -- and it is worst at a low sun, when the sky stored there is brightest.
+    //
+    // The division is by the summed weight, so a pixel with only one water tap in its footprint gets
+    // that tap at full strength rather than a quarter of it plus three quarters of sky.
     vec2 reflectTexel = 1.0 / vec2(textureSize(waterReflection, 0));
     vec2 reflectCentre = screen + halfResFix;
-    vec4 reflectSample = 0.25 * (
-          texture(waterReflection, reflectCentre + vec2(-0.5, -0.5) * reflectTexel)
-        + texture(waterReflection, reflectCentre + vec2( 0.5, -0.5) * reflectTexel)
-        + texture(waterReflection, reflectCentre + vec2(-0.5,  0.5) * reflectTexel)
-        + texture(waterReflection, reflectCentre + vec2( 0.5,  0.5) * reflectTexel));
+    vec4 reflectTaps[4];
+    reflectTaps[0] = texture(waterReflection, reflectCentre + vec2(-0.5, -0.5) * reflectTexel);
+    reflectTaps[1] = texture(waterReflection, reflectCentre + vec2( 0.5, -0.5) * reflectTexel);
+    reflectTaps[2] = texture(waterReflection, reflectCentre + vec2(-0.5,  0.5) * reflectTexel);
+    reflectTaps[3] = texture(waterReflection, reflectCentre + vec2( 0.5,  0.5) * reflectTexel);
+
+    vec3 reflectSum = vec3(0.0);
+    float reflectWeight = 0.0;
+    for (int i = 0; i < 4; ++i)
+    {
+        reflectSum += reflectTaps[i].rgb * reflectTaps[i].a;
+        reflectWeight += reflectTaps[i].a;
+    }
+
+    // Whole footprint missed the water. Alpha 0 here sends the switch below to the sky fallback, which
+    // is the same answer the old scheme reached by storing sky in those texels -- so a shoreline can
+    // still never come out darker than it used to.
+    vec4 reflectSample = reflectWeight > 0.0
+        ? vec4(reflectSum / reflectWeight, 1.0)
+        : vec4(0.0);
 
     vec3 reflectDir = reflect(viewDir, normal);
 
@@ -245,11 +267,14 @@ void main() {
     // the Fresnel and the sun glitter want it -- those are per-pixel and cost no rays. Do not "restore"
     // the match without reading the note in raygen.rgen; the sparkle it produces is the artifact.
 
-    // .a is 1 wherever raygen ran and 0 otherwise -- and it is 0 for the whole image or for none of it,
-    // because raygen writes every texel it launches over, including the ones with no water under them.
-    // So this is a per-frame switch, not a per-pixel blend, and a bilinear fetch can never straddle the
-    // two. It covers the frames before the first cell has an acceleration structure, and any build or
-    // device without ray tracing at all.
+    // The .a above is the summed tap weight collapsed to a flag: 1 if any tap in the footprint was real
+    // water, 0 if none was. It used to be 1 across the whole image or 0 across the whole image, a
+    // per-frame switch for "did raygen run at all"; it is now per texel, and the weighted average is
+    // what keeps a bilinear footprint from straddling the two and smearing sky into the shoreline.
+    //
+    // The whole-frame case still works and is still covered: with no acceleration structure, or on a
+    // device without ray tracing, raygen never runs, every texel is zero, every weight is zero, and
+    // every pixel takes the fallback below -- which is exactly the old behaviour.
     //
     // The fallback is what this shader drew everywhere until now. composite.frag renders OpenMW's whole
     // atmosphere as one lerp between the fog colour and the sky colour along the vertical (lines
