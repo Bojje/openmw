@@ -94,7 +94,15 @@ namespace Render
                     throw std::runtime_error("Mesh batch contains an invalid index");
                 result.indices.push_back(index + vertexOffset);
             }
-            result.vertices.insert(result.vertices.end(), mesh.mesh.vertices.begin(), mesh.mesh.vertices.end());
+            for (const MeshVertex& source : mesh.mesh.vertices)
+            {
+                MeshVertex vertex = source;
+                vertex.color[0] *= mesh.mesh.material.diffuse.x;
+                vertex.color[1] *= mesh.mesh.material.diffuse.y;
+                vertex.color[2] *= mesh.mesh.material.diffuse.z;
+                vertex.color[3] *= mesh.mesh.material.diffuse.w;
+                result.vertices.push_back(vertex);
+            }
             result.draws.push_back(draw);
         }
         return result;

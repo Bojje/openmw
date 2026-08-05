@@ -33,8 +33,9 @@ events, but it no longer needs to be the only source of object transform state. 
 smoke path now resolves a cell snapshot through the cached NIF meshes, filters paged objects
 by neutral visibility, and composes object transforms with NIF node transforms before batching.
 NIF classic texture, diffuse/emissive, glossiness, and alpha properties now cross the
-renderer-neutral mesh boundary and survive batching, while Vulkan texture binding and
-material shading remain outstanding. Cell object lookup and removal are
+renderer-neutral mesh boundary and survive batching; the neutral batch applies diffuse
+and alpha to vertex color output, while Vulkan texture binding and full material shading
+remain outstanding. Cell object lookup and removal are
 owned by the renderer-neutral `WorldScene`/`CellScene` components rather than the OSG-facing
 manager; the manager now only translates engine lifecycle events into that component.
 

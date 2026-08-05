@@ -119,6 +119,8 @@ int main()
         throw std::runtime_error("renderer-neutral mesh batching returned the wrong layout");
     if (batch.draws.front().material.albedoTexture != "textures/synthetic.dds")
         throw std::runtime_error("renderer-neutral mesh batching dropped material data");
+    expectNear(batch.vertices.front().color[0], 0.25f, "batched material diffuse red");
+    expectNear(batch.vertices.front().color[3], 0.75f, "batched material alpha");
     expectNear(batch.draws[1].transform.data[12], 12.0f, "batched mesh translation");
 
     Render::WorldObject object{ 1, "synthetic.nif", {} };
