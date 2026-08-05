@@ -23,9 +23,9 @@ namespace
         using std::runtime_error::runtime_error;
     };
 
-    Vk::Mat4 identityMatrix()
+    Render::Mat4 identityMatrix()
     {
-        Vk::Mat4 result = {};
+        Render::Mat4 result = {};
         result.data[0] = 1.0f;
         result.data[5] = 1.0f;
         result.data[10] = 1.0f;
@@ -80,7 +80,7 @@ int main(int argc, char** argv)
             if (!renderer->loadShadersAndCreatePipelines(shaderDir))
                 throw std::runtime_error("Vulkan smoke test could not load the raster shaders");
 
-            Vk::SceneData scene = {};
+            Render::SceneData scene = {};
             scene.view = identityMatrix();
             scene.projection = identityMatrix();
             scene.viewInverse = identityMatrix();

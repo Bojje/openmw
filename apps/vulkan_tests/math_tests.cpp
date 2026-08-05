@@ -6,11 +6,14 @@
 #include <stdexcept>
 #include <string>
 
-#include <components/vk/vkmath.hpp>
+#include <components/render/math.hpp>
 
 namespace
 {
     constexpr float epsilon = 1e-5f;
+
+    static_assert(sizeof(Render::Mat4) == 64);
+    static_assert(sizeof(Render::SceneData) == 288);
 
     void expectNear(float actual, float expected, const std::string& label)
     {
@@ -19,14 +22,14 @@ namespace
                 + std::to_string(actual));
     }
 
-    void expectMatrixEntry(const Vk::Mat4& matrix, int index, float expected, const std::string& label)
+    void expectMatrixEntry(const Render::Mat4& matrix, int index, float expected, const std::string& label)
     {
         expectNear(matrix.data[index], expected, label + "[" + std::to_string(index) + "]");
     }
 
-    Vk::Mat4 makeAffineTransform()
+    Render::Mat4 makeAffineTransform()
     {
-        Vk::Mat4 transform = {};
+        Render::Mat4 transform = {};
         transform.data[0] = 2.0f;
         transform.data[5] = 3.0f;
         transform.data[10] = 4.0f;
@@ -39,11 +42,11 @@ namespace
 
     void testTranspose()
     {
-        Vk::Mat4 input = {};
+        Render::Mat4 input = {};
         for (int i = 0; i < 16; ++i)
             input.data[i] = static_cast<float>(i);
 
-        const Vk::Mat4 transposed = Vk::transposeMat4(input);
+        const Render::Mat4 transposed = Render::transposeMat4(input);
         expectMatrixEntry(transposed, 1, 4.0f, "transpose");
         expectMatrixEntry(transposed, 4, 1.0f, "transpose");
         expectMatrixEntry(transposed, 6, 9.0f, "transpose");
@@ -52,8 +55,8 @@ namespace
 
     void testAffineInverse()
     {
-        const Vk::Mat4 transform = makeAffineTransform();
-        const Vk::Mat4 inverse = Vk::invertAffine(transform);
+        const Render::Mat4 transform = makeAffineTransform();
+        const Render::Mat4 inverse = Render::invertAffine(transform);
 
         expectMatrixEntry(inverse, 0, 0.5f, "affine inverse");
         expectMatrixEntry(inverse, 5, 1.0f / 3.0f, "affine inverse");
@@ -63,14 +66,14 @@ namespace
         expectMatrixEntry(inverse, 14, -7.5f, "affine inverse");
         expectMatrixEntry(inverse, 15, 1.0f, "affine inverse");
 
-        const Vk::Mat4 fullInverse = Vk::invertMat4(transform);
+        const Render::Mat4 fullInverse = Render::invertMat4(transform);
         for (int i : { 0, 5, 10, 12, 13, 14, 15 })
             expectMatrixEntry(fullInverse, i, inverse.data[i], "full inverse");
     }
 
     void testNormalMatrix()
     {
-        const Vk::Mat4 normal = Vk::computeNormalMatrix(makeAffineTransform());
+        const Render::Mat4 normal = Render::computeNormalMatrix(makeAffineTransform());
         expectMatrixEntry(normal, 0, 0.5f, "normal matrix");
         expectMatrixEntry(normal, 5, 1.0f / 3.0f, "normal matrix");
         expectMatrixEntry(normal, 10, 0.25f, "normal matrix");
@@ -78,11 +81,11 @@ namespace
 
     void testSingularMatrices()
     {
-        Vk::Mat4 singular = {};
+        Render::Mat4 singular = {};
         singular.data[15] = 1.0f;
 
-        const Vk::Mat4 affineInverse = Vk::invertAffine(singular);
-        const Vk::Mat4 fullInverse = Vk::invertMat4(singular);
+        const Render::Mat4 affineInverse = Render::invertAffine(singular);
+        const Render::Mat4 fullInverse = Render::invertMat4(singular);
         for (int i = 0; i < 16; ++i)
         {
             expectMatrixEntry(affineInverse, i, 0.0f, "singular affine inverse");

@@ -522,10 +522,14 @@ add_component_dir(testing
     util
 )
 
+add_component_dir(render
+    scene
+    math
+)
+
 if (OPENMW_USE_VULKAN)
     add_component_dir (vk
         vkcommon
-        vkmath
         vkinstance
         vkdevice
         vkswapchain

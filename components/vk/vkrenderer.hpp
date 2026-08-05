@@ -10,7 +10,7 @@
 #include <vulkan/vulkan.h>
 
 #include "vkcommon.hpp"
-#include "vkmath.hpp"
+#include "../render/scene.hpp"
 
 struct SDL_Window;
 
@@ -22,16 +22,6 @@ namespace Vk
     class CommandPool;
     class FrameSync;
     class ShaderModule;
-
-    struct SceneData
-    {
-        Mat4 view;
-        Mat4 projection;
-        Mat4 viewInverse;
-        Mat4 projInverse;
-        Vec4 sunDirection;
-        Vec4 sunColor;
-    };
 
     struct GBufferAttachments
     {
@@ -68,7 +58,7 @@ namespace Vk
         void cleanup();
         bool loadShadersAndCreatePipelines(const std::string& shaderDir);
 
-        void updateScene(const SceneData& sceneData);
+        void updateScene(const Render::SceneData& sceneData);
 
     private:
         void createSurface();

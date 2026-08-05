@@ -595,7 +595,7 @@ namespace Vk
 
     void Renderer::createUniformBuffers()
     {
-        VkDeviceSize bufferSize = sizeof(SceneData);
+        VkDeviceSize bufferSize = sizeof(Render::SceneData);
 
         for (uint32_t i = 0; i < maxFramesInFlight; i++)
         {
@@ -630,7 +630,7 @@ namespace Vk
                 VkDescriptorBufferInfo bufferInfo = {};
                 bufferInfo.buffer = mUniformBuffers[i];
                 bufferInfo.offset = 0;
-                bufferInfo.range = sizeof(SceneData);
+                bufferInfo.range = sizeof(Render::SceneData);
 
                 VkWriteDescriptorSet write = {};
                 write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -669,7 +669,7 @@ namespace Vk
                 VkDescriptorBufferInfo bufferInfo = {};
                 bufferInfo.buffer = mUniformBuffers[i];
                 bufferInfo.offset = 0;
-                bufferInfo.range = sizeof(SceneData);
+                bufferInfo.range = sizeof(Render::SceneData);
 
                 VkWriteDescriptorSet write = {};
                 write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -691,7 +691,7 @@ namespace Vk
         VkPushConstantRange pushConstant = {};
         pushConstant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
         pushConstant.offset = 0;
-        pushConstant.size = sizeof(Mat4) * 2;
+        pushConstant.size = sizeof(Render::Mat4) * 2;
 
         VkPipelineLayoutCreateInfo layoutInfo = {};
         layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -713,7 +713,7 @@ namespace Vk
         VkPushConstantRange pushConstant = {};
         pushConstant.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
         pushConstant.offset = 0;
-        pushConstant.size = sizeof(Vec4) * 3;
+        pushConstant.size = sizeof(Render::Vec4) * 3;
         layoutInfo.pushConstantRangeCount = 1;
         layoutInfo.pPushConstantRanges = &pushConstant;
 
@@ -1072,16 +1072,16 @@ namespace Vk
                     0, 1, &mCompositeDescriptorSets[mCurrentFrame], 0, nullptr);
 
                 // Push sun direction, sun color, and camera position
-                const SceneData* sceneData = static_cast<const SceneData*>(mUniformMapped[mCurrentFrame]);
-                Vec4 cameraPos;
+                const Render::SceneData* sceneData = static_cast<const Render::SceneData*>(mUniformMapped[mCurrentFrame]);
+                Render::Vec4 cameraPos;
                 cameraPos.x = sceneData->viewInverse.data[12];
                 cameraPos.y = sceneData->viewInverse.data[13];
                 cameraPos.z = sceneData->viewInverse.data[14];
                 cameraPos.w = 1.0f;
 
-                std::array<Vec4, 3> compositePush = { sceneData->sunDirection, sceneData->sunColor, cameraPos };
+                std::array<Render::Vec4, 3> compositePush = { sceneData->sunDirection, sceneData->sunColor, cameraPos };
                 vkCmdPushConstants(cmd, mCompositePipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT,
-                    0, sizeof(Vec4) * 3, compositePush.data());
+                    0, sizeof(Render::Vec4) * 3, compositePush.data());
 
                 vkCmdDraw(cmd, 3, 1, 0, 0);
             }
@@ -1123,9 +1123,9 @@ namespace Vk
         writeCompositeDescriptor(3, mGBuffer.albedoView);
     }
 
-    void Renderer::updateScene(const SceneData& sceneData)
+    void Renderer::updateScene(const Render::SceneData& sceneData)
     {
-        std::memcpy(mUniformMapped[mCurrentFrame], &sceneData, sizeof(SceneData));
+        std::memcpy(mUniformMapped[mCurrentFrame], &sceneData, sizeof(Render::SceneData));
     }
 
     void Renderer::cleanup()

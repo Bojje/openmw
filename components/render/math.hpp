@@ -1,27 +1,13 @@
-#ifndef OPENMW_COMPONENTS_VK_VKMATH_H
-#define OPENMW_COMPONENTS_VK_VKMATH_H
+#ifndef OPENMW_COMPONENTS_RENDER_MATH_H
+#define OPENMW_COMPONENTS_RENDER_MATH_H
 
 #include <cmath>
 #include <cstring>
 
-namespace Vk
+#include "scene.hpp"
+
+namespace Render
 {
-    struct Mat4
-    {
-        float data[16];
-    };
-
-    struct Vec3
-    {
-        float x, y, z;
-    };
-
-    struct Vec4
-    {
-        float x, y, z, w;
-    };
-
-    // 4x4 matrix transpose. Data is column-major: data[col*4 + row].
     inline Mat4 transposeMat4(const Mat4& m)
     {
         Mat4 result;
@@ -31,9 +17,6 @@ namespace Vk
         return result;
     }
 
-    // Full 4x4 matrix inverse using Laplace expansion with 2x2 minors.
-    // Column-major layout: element at row r, col c is data[c*4 + r].
-    // Returns zero matrix if singular.
     inline Mat4 invertMat4(const Mat4& m)
     {
         Mat4 inv;
@@ -86,15 +69,10 @@ namespace Vk
         return inv;
     }
 
-    // Fast inverse for affine matrices (bottom row = [0,0,0,1]).
-    // Decomposes as: inv(R*S | t) = (inv(R*S) | -inv(R*S)*t).
-    // Only inverts the upper-left 3x3 block via cofactor/determinant,
-    // then transforms the translation component. Returns zero matrix if singular.
     inline Mat4 invertAffine(const Mat4& m)
     {
         const float* a = m.data;
 
-        // Upper-left 3x3 block elements (column-major)
         float a00 = a[0], a01 = a[4], a02 = a[8];
         float a10 = a[1], a11 = a[5], a12 = a[9];
         float a20 = a[2], a21 = a[6], a22 = a[10];
@@ -111,36 +89,29 @@ namespace Vk
         }
 
         float invDet = 1.0f / det;
-
         Mat4 r;
-        // Inverse of 3x3 block
-        r.data[0]  = (a11 * a22 - a12 * a21) * invDet;
-        r.data[1]  = (a12 * a20 - a10 * a22) * invDet;
-        r.data[2]  = (a10 * a21 - a11 * a20) * invDet;
-        r.data[4]  = (a02 * a21 - a01 * a22) * invDet;
-        r.data[5]  = (a00 * a22 - a02 * a20) * invDet;
-        r.data[6]  = (a01 * a20 - a00 * a21) * invDet;
-        r.data[8]  = (a01 * a12 - a02 * a11) * invDet;
-        r.data[9]  = (a02 * a10 - a00 * a12) * invDet;
+        r.data[0] = (a11 * a22 - a12 * a21) * invDet;
+        r.data[1] = (a12 * a20 - a10 * a22) * invDet;
+        r.data[2] = (a10 * a21 - a11 * a20) * invDet;
+        r.data[4] = (a02 * a21 - a01 * a22) * invDet;
+        r.data[5] = (a00 * a22 - a02 * a20) * invDet;
+        r.data[6] = (a01 * a20 - a00 * a21) * invDet;
+        r.data[8] = (a01 * a12 - a02 * a11) * invDet;
+        r.data[9] = (a02 * a10 - a00 * a12) * invDet;
         r.data[10] = (a00 * a11 - a01 * a10) * invDet;
 
-        // Translation: -inv(R*S) * t
         float tx = a[12], ty = a[13], tz = a[14];
         r.data[12] = -(r.data[0] * tx + r.data[4] * ty + r.data[8] * tz);
         r.data[13] = -(r.data[1] * tx + r.data[5] * ty + r.data[9] * tz);
         r.data[14] = -(r.data[2] * tx + r.data[6] * ty + r.data[10] * tz);
 
-        // Bottom row
         r.data[3] = 0.f;
         r.data[7] = 0.f;
         r.data[11] = 0.f;
         r.data[15] = 1.f;
-
         return r;
     }
 
-    // Compute the normal matrix for a model transform: transpose(inverse(model)).
-    // Uses the affine fast path since model transforms are always affine.
     inline Mat4 computeNormalMatrix(const Mat4& model)
     {
         return transposeMat4(invertAffine(model));
