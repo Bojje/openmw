@@ -512,12 +512,7 @@ namespace MWRender
         if (scene == mCellScenes.end())
             return nullptr;
 
-        for (Render::WorldObject& object : scene->second.objects)
-        {
-            if (object.id == location->second.id)
-                return &object;
-        }
-        return nullptr;
+        return scene->second.findObject(location->second.id);
     }
 
     void RenderingManager::removeNeutralObject(const MWWorld::Ptr& ptr)
@@ -531,13 +526,7 @@ namespace MWRender
 
         const auto scene = mCellScenes.find(location->second.cell);
         if (scene != mCellScenes.end())
-        {
-            auto& objects = scene->second.objects;
-            objects.erase(std::remove_if(objects.begin(), objects.end(), [&](const Render::WorldObject& object) {
-                              return object.id == location->second.id;
-                          }),
-                objects.end());
-        }
+            scene->second.eraseObject(location->second.id);
         mNeutralObjectLocations.erase(location);
     }
 
@@ -563,14 +552,14 @@ namespace MWRender
             return;
 
         auto& oldObjects = oldScene->second.objects;
-        const auto object = std::find_if(oldObjects.begin(), oldObjects.end(), [&](const Render::WorldObject& value) {
-            return value.id == location->second.id;
-        });
-        if (object == oldObjects.end())
+        Render::WorldObject* object = oldScene->second.findObject(location->second.id);
+        if (object == nullptr)
             return;
 
         Render::WorldObject moved = std::move(*object);
-        oldObjects.erase(object);
+        oldObjects.erase(std::find_if(oldObjects.begin(), oldObjects.end(), [&](const Render::WorldObject& value) {
+            return value.id == location->second.id;
+        }));
 
         const MWWorld::CellStore* newCell = updated.getCell();
         Render::CellScene& newScene = mCellScenes[newCell];

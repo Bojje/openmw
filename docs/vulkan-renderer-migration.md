@@ -30,7 +30,8 @@ cell snapshot: the scene lifecycle records model identity, position, orientation
 cell transfer, and removal independently of the OSG node tree. OSG still consumes the same
 events, but it no longer needs to be the only source of object transform state. The Vulkan
 smoke path now resolves a cell snapshot through the cached NIF meshes and composes object
-transforms with NIF node transforms before batching.
+transforms with NIF node transforms before batching. Cell object lookup and removal are
+owned by the neutral `CellScene` data type rather than the OSG-facing manager.
 
 The remaining migration is not a compatibility problem that can be solved by retaining
 both renderers in one execution path. Static-world transforms, materials, textures,

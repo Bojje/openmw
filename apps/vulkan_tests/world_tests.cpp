@@ -18,4 +18,7 @@ int main()
     const Render::Mat4 transform = Render::makeObjectTransformMatrix(scene.objects.front().transform);
     if (transform.data[12] != 0.f || transform.data[15] != 1.f)
         throw std::runtime_error("renderer-neutral object transform matrix is invalid");
+
+    if (scene.findObject(7) == nullptr || !scene.eraseObject(7) || scene.findObject(7) != nullptr)
+        throw std::runtime_error("renderer-neutral cell scene failed object ownership operations");
 }

@@ -1,6 +1,7 @@
 #ifndef OPENMW_COMPONENTS_RENDER_WORLD_H
 #define OPENMW_COMPONENTS_RENDER_WORLD_H
 
+#include <algorithm>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -32,6 +33,21 @@ namespace Render
         int gridX = 0;
         int gridY = 0;
         std::vector<WorldObject> objects;
+
+        WorldObject* findObject(uint64_t id)
+        {
+            const auto found = std::find_if(objects.begin(), objects.end(), [id](const WorldObject& object) {
+                return object.id == id;
+            });
+            return found == objects.end() ? nullptr : &*found;
+        }
+
+        bool eraseObject(uint64_t id)
+        {
+            const auto oldSize = objects.size();
+            std::erase_if(objects, [id](const WorldObject& object) { return object.id == id; });
+            return objects.size() != oldSize;
+        }
     };
 
     inline Mat4 makeObjectTransformMatrix(const ObjectTransform& transform)
