@@ -37,6 +37,7 @@ namespace Render
         bool exterior = false;
         int gridX = 0;
         int gridY = 0;
+        std::string worldspace;
         std::string name;
         std::vector<WorldObject> objects;
 
@@ -72,7 +73,8 @@ namespace Render
         std::unordered_map<const void*, ObjectLocation> mObjects;
         uint64_t mNextObjectId = 1;
 
-        CellScene& ensureCell(const void* cell, bool exterior, int gridX, int gridY, std::string_view name)
+        CellScene& ensureCell(const void* cell, bool exterior, int gridX, int gridY, std::string_view name,
+            std::string_view worldspace)
         {
             auto [iter, inserted] = mCells.try_emplace(cell);
             if (inserted)
@@ -83,6 +85,7 @@ namespace Render
             scene.exterior = exterior;
             scene.gridX = gridX;
             scene.gridY = gridY;
+            scene.worldspace = worldspace;
             scene.name = name;
             return scene;
         }
@@ -96,15 +99,17 @@ namespace Render
         }
 
     public:
-        void recordCell(const void* cellKey, bool exterior, int gridX, int gridY, std::string_view name)
+        void recordCell(const void* cellKey, bool exterior, int gridX, int gridY, std::string_view name,
+            std::string_view worldspace = {})
         {
             if (cellKey == nullptr)
                 return;
-            ensureCell(cellKey, exterior, gridX, gridY, name);
+            ensureCell(cellKey, exterior, gridX, gridY, name, worldspace);
         }
 
         void recordObject(const void* objectKey, const void* cellKey, bool exterior, int gridX, int gridY,
-            std::string_view cellName, std::string_view model, const ObjectTransform& transform, bool visible)
+            std::string_view cellName, std::string_view model, const ObjectTransform& transform, bool visible,
+            std::string_view worldspace = {})
         {
             if (objectKey == nullptr || cellKey == nullptr || model.empty())
             {
@@ -118,8 +123,9 @@ namespace Render
                 const ObjectLocation location = found->second;
                 if (location.cell != cellKey)
                 {
-                    if (updateObjectCell(objectKey, objectKey, cellKey, exterior, gridX, gridY, cellName))
-                        return recordObject(objectKey, cellKey, exterior, gridX, gridY, cellName, model, transform, visible);
+                    if (updateObjectCell(objectKey, objectKey, cellKey, exterior, gridX, gridY, cellName, worldspace))
+                        return recordObject(
+                            objectKey, cellKey, exterior, gridX, gridY, cellName, model, transform, visible, worldspace);
                     mObjects.erase(found);
                 }
                 else if (CellScene* scene = findCell(location.cell))
@@ -143,7 +149,7 @@ namespace Render
             object.model = model;
             object.transform = transform;
             object.visible = visible;
-            ensureCell(cellKey, exterior, gridX, gridY, cellName).objects.push_back(std::move(object));
+            ensureCell(cellKey, exterior, gridX, gridY, cellName, worldspace).objects.push_back(std::move(object));
             mObjects.emplace(objectKey, ObjectLocation{ cellKey, id });
         }
 
@@ -165,19 +171,21 @@ namespace Render
         // Cell insertion order is stable for the lifetime of a loaded cell.
         // Backends use this instead of iterating the unordered index so draw
         // order and image-comparison inputs remain deterministic.
-        std::vector<const CellScene*> cellsInOrder() const
+        std::vector<const CellScene*> cellsInOrder(std::string_view worldspace = {}) const
         {
             std::vector<const CellScene*> result;
             result.reserve(mCellOrder.size());
             for (const void* cellKey : mCellOrder)
             {
                 const auto found = mCells.find(cellKey);
-                if (found != mCells.end())
+                if (found != mCells.end() && (worldspace.empty() || found->second.worldspace == worldspace))
                     result.push_back(&found->second);
             }
             std::stable_sort(result.begin(), result.end(), [](const CellScene* lhs, const CellScene* rhs) {
                 if (lhs->exterior != rhs->exterior)
                     return lhs->exterior > rhs->exterior;
+                if (lhs->worldspace != rhs->worldspace)
+                    return lhs->worldspace < rhs->worldspace;
                 if (lhs->gridX != rhs->gridX)
                     return lhs->gridX < rhs->gridX;
                 if (lhs->gridY != rhs->gridY)
@@ -208,7 +216,7 @@ namespace Render
         }
 
         bool updateObjectCell(const void* oldKey, const void* newKey, const void* newCellKey, bool exterior, int gridX,
-            int gridY, std::string_view cellName = {})
+            int gridY, std::string_view cellName = {}, std::string_view worldspace = {})
         {
             if (oldKey == nullptr || newKey == nullptr || newCellKey == nullptr)
                 return false;
@@ -233,7 +241,7 @@ namespace Render
 
             WorldObject moved = std::move(*object);
             oldScene->second.eraseObject(location.id);
-            ensureCell(newCellKey, exterior, gridX, gridY, cellName).objects.push_back(std::move(moved));
+            ensureCell(newCellKey, exterior, gridX, gridY, cellName, worldspace).objects.push_back(std::move(moved));
 
             mObjects.erase(found);
             mObjects.emplace(newKey, ObjectLocation{ newCellKey, location.id });

@@ -139,10 +139,11 @@ namespace Render
     }
 
     template <class ResolveMeshes>
-    std::vector<MeshInstance> collectWorldMeshes(const WorldScene& world, ResolveMeshes&& resolveMeshes)
+    std::vector<MeshInstance> collectWorldMeshes(
+        const WorldScene& world, ResolveMeshes&& resolveMeshes, std::string_view worldspace = {})
     {
         std::vector<MeshInstance> result;
-        for (const CellScene* cell : world.cellsInOrder())
+        for (const CellScene* cell : world.cellsInOrder(worldspace))
         {
             std::vector<MeshInstance> cellMeshes = collectCellMeshes(*cell, resolveMeshes);
             result.insert(result.end(), std::make_move_iterator(cellMeshes.begin()),

@@ -20,6 +20,7 @@
 #include <cstdint>
 #include <memory>
 #include <span>
+#include <string>
 #include <string_view>
 #include <unordered_map>
 #include <vector>
@@ -347,6 +348,7 @@ namespace MWRender
         std::unordered_map<ESM::RefId, WorldspaceChunkMgr> mWorldspaceChunks;
         Render::WorldScene mWorldScene;
         std::unordered_map<const void*, Render::TerrainTile> mNeutralTerrainTiles;
+        std::string mActiveWorldspace;
         Terrain::World* mTerrain;
         std::unique_ptr<TerrainStorage> mTerrainStorage;
         ObjectPaging* mObjectPaging;

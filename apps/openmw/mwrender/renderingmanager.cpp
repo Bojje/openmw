@@ -481,7 +481,7 @@ namespace MWRender
         transform.scale = { scale.x(), scale.y(), scale.z() };
         mWorldScene.recordObject(static_cast<const void*>(ptr.mRef), static_cast<const void*>(cell),
             cell->getCell()->isExterior(), cell->getCell()->getGridX(), cell->getCell()->getGridY(),
-            cell->getCell()->getNameId(), model, transform, visible);
+            cell->getCell()->getNameId(), model, transform, visible, cell->getCell()->getWorldSpace().serializeText());
     }
 
     Render::SceneSubmission RenderingManager::getNeutralScene() const
@@ -513,11 +513,11 @@ namespace MWRender
                     iter->second = std::make_shared<const Resource::NifMeshManager::Meshes>();
             }
             return *iter->second;
-        });
+        }, mActiveWorldspace);
 
         if (mTerrain)
         {
-            for (const Render::CellScene* cell : mWorldScene.cellsInOrder())
+            for (const Render::CellScene* cell : mWorldScene.cellsInOrder(mActiveWorldspace))
             {
                 if (!cell->exterior)
                     continue;
@@ -689,7 +689,8 @@ namespace MWRender
         mWater->changeCell(store);
 
         mWorldScene.recordCell(static_cast<const void*>(store), store->getCell()->isExterior(),
-            store->getCell()->getGridX(), store->getCell()->getGridY(), store->getCell()->getNameId());
+            store->getCell()->getGridX(), store->getCell()->getGridY(), store->getCell()->getNameId(),
+            store->getCell()->getWorldSpace().serializeText());
 
         if (store->getCell()->isExterior())
         {
@@ -731,6 +732,7 @@ namespace MWRender
             mWater->setCullCallback(nullptr);
         else
         {
+            mActiveWorldspace = worldspace.serializeText();
             WorldspaceChunkMgr& newChunks = getWorldspaceChunkMgr(worldspace);
             if (newChunks.mTerrain.get() != mTerrain)
             {
@@ -1192,7 +1194,8 @@ namespace MWRender
             const MWWorld::CellStore* newCell = updated.getCell();
             mWorldScene.updateObjectCell(static_cast<const void*>(old.mRef), static_cast<const void*>(updated.mRef),
                 static_cast<const void*>(newCell), newCell->getCell()->isExterior(), newCell->getCell()->getGridX(),
-                newCell->getCell()->getGridY(), newCell->getCell()->getNameId());
+                newCell->getCell()->getGridY(), newCell->getCell()->getNameId(),
+                newCell->getCell()->getWorldSpace().serializeText());
         }
     }
 

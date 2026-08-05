@@ -154,16 +154,22 @@ int main()
 
     int worldObjectHandle = 0;
     int worldCellHandle = 0;
+    int foreignObjectHandle = 0;
+    int foreignCellHandle = 0;
     Render::WorldScene world;
-    world.recordObject(&worldObjectHandle, &worldCellHandle, true, 0, 0, "world", "synthetic.nif", object.transform, true);
+    world.recordObject(
+        &worldObjectHandle, &worldCellHandle, true, 0, 0, "world", "synthetic.nif", object.transform, true, "world-a");
+    world.recordObject(&foreignObjectHandle, &foreignCellHandle, true, 1, 0, "foreign", "synthetic.nif",
+        object.transform, true, "world-b");
     const std::vector<Render::MeshInstance> worldMeshes = Render::collectWorldMeshes(
         world, [&](std::string_view model) -> const Resource::NifMeshManager::Meshes& {
             if (model != "synthetic.nif")
                 throw std::runtime_error("world mesh collection resolved an unexpected model");
             return *cached;
-        });
-    if (worldMeshes.size() != 1)
-        throw std::runtime_error("world mesh collection did not consume loaded cells");
+        }, "world-a");
+    if (worldMeshes.size() != 1 || world.cellsInOrder("world-a").size() != 1
+        || world.cellsInOrder("world-b").size() != 1)
+        throw std::runtime_error("world mesh collection did not filter loaded worldspaces");
 
     Render::MeshInstance invalidBatch = instances.front();
     invalidBatch.mesh.indices = { 3 };
