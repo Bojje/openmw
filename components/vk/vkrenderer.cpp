@@ -1246,7 +1246,10 @@ namespace Vk
                     vkCmdBindVertexBuffers(cmd, 0, 1, &meshBuffers.vertex, &offset);
                     vkCmdBindIndexBuffer(cmd, meshBuffers.index, 0, VK_INDEX_TYPE_UINT32);
                     VkPipeline boundPipeline = VK_NULL_HANDLE;
-                    for (std::size_t drawIndex = 0; drawIndex < mMeshDraws.size(); ++drawIndex)
+                    const Render::Vec3 cameraPosition = { mSceneData.viewInverse.data[12],
+                        mSceneData.viewInverse.data[13], mSceneData.viewInverse.data[14] };
+                    const std::vector<std::size_t> drawOrder = Render::orderMeshDraws(mMeshDraws, cameraPosition);
+                    for (const std::size_t drawIndex : drawOrder)
                     {
                         const Render::MeshDraw& draw = mMeshDraws[drawIndex];
                         const VkPipeline pipeline = draw.material.terrainBlend

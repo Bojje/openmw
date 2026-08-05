@@ -161,6 +161,49 @@ namespace Render
         }
         return result;
     }
+
+    // Produce a deterministic draw order for a backend that uses a single
+    // depth-tested pass. Terrain layers are kept in submission order because
+    // their first/equal-depth pipelines encode legacy blending semantics;
+    // ordinary alpha-blended draws are sorted back-to-front.
+    inline std::vector<std::size_t> orderMeshDraws(
+        const std::vector<MeshDraw>& draws, const Vec3& cameraPosition)
+    {
+        std::vector<std::size_t> opaque;
+        std::vector<std::size_t> terrain;
+        std::vector<std::size_t> transparent;
+        opaque.reserve(draws.size());
+        terrain.reserve(draws.size());
+        transparent.reserve(draws.size());
+
+        for (std::size_t index = 0; index < draws.size(); ++index)
+        {
+            if (draws[index].material.terrainBlend)
+                terrain.push_back(index);
+            else if (draws[index].material.alphaBlend)
+                transparent.push_back(index);
+            else
+                opaque.push_back(index);
+        }
+
+        const auto distanceSquared = [&](std::size_t index) {
+            const MeshDraw& draw = draws[index];
+            const float dx = draw.transform.data[12] - cameraPosition.x;
+            const float dy = draw.transform.data[13] - cameraPosition.y;
+            const float dz = draw.transform.data[14] - cameraPosition.z;
+            return dx * dx + dy * dy + dz * dz;
+        };
+        std::stable_sort(transparent.begin(), transparent.end(), [&](std::size_t lhs, std::size_t rhs) {
+            return distanceSquared(lhs) > distanceSquared(rhs);
+        });
+
+        std::vector<std::size_t> result;
+        result.reserve(draws.size());
+        result.insert(result.end(), opaque.begin(), opaque.end());
+        result.insert(result.end(), terrain.begin(), terrain.end());
+        result.insert(result.end(), transparent.begin(), transparent.end());
+        return result;
+    }
 }
 
 #endif

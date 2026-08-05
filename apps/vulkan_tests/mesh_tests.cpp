@@ -185,5 +185,20 @@ int main()
     if (!rejectedInvalidBatchIndex)
         throw std::runtime_error("renderer-neutral mesh batching accepted an invalid index");
 
+    Render::MeshDraw opaqueDraw = {};
+    Render::MeshDraw terrainDraw = {};
+    Render::MeshDraw farTransparentDraw = {};
+    Render::MeshDraw nearTransparentDraw = {};
+    terrainDraw.material.terrainBlend = true;
+    terrainDraw.material.terrainFirstLayer = true;
+    farTransparentDraw.material.alphaBlend = true;
+    farTransparentDraw.transform.data[12] = 100.f;
+    nearTransparentDraw.material.alphaBlend = true;
+    nearTransparentDraw.transform.data[12] = 2.f;
+    const std::vector<std::size_t> drawOrder = Render::orderMeshDraws(
+        { opaqueDraw, terrainDraw, nearTransparentDraw, farTransparentDraw }, { 0.f, 0.f, 0.f });
+    if (drawOrder != std::vector<std::size_t>({ 0, 1, 3, 2 }))
+        throw std::runtime_error("renderer-neutral mesh draw ordering was not deterministic");
+
     std::cout << "NIF mesh conversion tests passed\n";
 }

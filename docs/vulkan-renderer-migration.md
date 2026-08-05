@@ -41,7 +41,9 @@ and the standalone Vulkan renderer uploads/caches indexed albedo textures and sa
 in the G-buffer (currently bounded to a 64-entry table). Vulkan now consumes neutral
 alpha-test state and thresholds in the G-buffer
 cutout path, and the standalone harness has a basic source-alpha pipeline for blended draws;
-deferred ordering, full material shading, and full-game resource hookup remain outstanding.
+ordinary alpha draws are now sorted back-to-front with stable ties, while ordered terrain
+layers retain their submission order; full material shading and full-game resource hookup
+remain outstanding.
 The Vulkan G-buffer now carries neutral roughness,
 ambient-occlusion,
 and emissive-strength channels into the composite pass. Cell object lookup and removal are
