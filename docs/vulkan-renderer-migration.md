@@ -38,7 +38,9 @@ and alpha to vertex color output, while Vulkan texture binding and full material
 remain outstanding. The Vulkan G-buffer now carries neutral roughness, ambient-occlusion,
 and emissive-strength channels into the composite pass. Cell object lookup and removal are
 owned by the renderer-neutral `WorldScene`/`CellScene` components rather than the OSG-facing
-manager; the manager now only translates engine lifecycle events into that component.
+manager; the manager now only translates engine lifecycle events into that component. The
+manager also exposes a renderer-neutral camera/inverse-matrix and directional-light snapshot
+for a future Vulkan frame consumer.
 
 The remaining migration is not a compatibility problem that can be solved by retaining
 both renderers in one execution path. Static-world transforms, materials, textures,
@@ -97,7 +99,7 @@ real replacement consumes its responsibility and the fast tests cover the bounda
 
 ### 5. Replace OSG scene ownership
 
-- Separate cell visibility, transforms, camera state, lighting, and material data from OSG scene nodes. Camera/light scene data, transform-preserving neutral mesh instances, updateable `WorldScene`/`CellScene` snapshots, explicit paged-reference visibility, neutral NIF material extraction, and a cached-mesh cell composition adapter are in place; Vulkan texture/shading consumption remains to be migrated.
+- Separate cell visibility, transforms, camera state, lighting, and material data from OSG scene nodes. Camera/light scene data now has an OSG-to-neutral snapshot source, alongside transform-preserving neutral mesh instances, updateable `WorldScene`/`CellScene` snapshots, explicit paged-reference visibility, neutral NIF material extraction, and a cached-mesh cell composition adapter; Vulkan texture/shading consumption remains to be migrated.
 - Feed both reference and Vulkan implementations from renderer-neutral scene data during the transition.
 - Delete OSG scene ownership once Vulkan consumes all required scene events.
 

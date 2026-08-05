@@ -94,6 +94,16 @@ namespace
             static_cast<float>(rotation.w()) };
     }
 
+    template <class Matrix>
+    Render::Mat4 toRenderMatrix(const Matrix& matrix)
+    {
+        Render::Mat4 result = {};
+        const auto* values = matrix.ptr();
+        for (int i = 0; i < 16; ++i)
+            result.data[i] = static_cast<float>(values[i]);
+        return result;
+    }
+
     osg::Quat getObjectRotation(const MWWorld::Ptr& ptr)
     {
         const auto& position = ptr.getRefData().getPosition();
@@ -474,6 +484,21 @@ namespace MWRender
     const Render::CellScene* RenderingManager::getCellScene(const MWWorld::CellStore* store) const
     {
         return mWorldScene.findCell(static_cast<const void*>(store));
+    }
+
+    Render::SceneData RenderingManager::getSceneData() const
+    {
+        Render::SceneData result = {};
+        result.view = toRenderMatrix(mViewer->getCamera()->getViewMatrix());
+        result.projection = toRenderMatrix(mViewer->getCamera()->getProjectionMatrix());
+        result.viewInverse = Render::invertMat4(result.view);
+        result.projInverse = Render::invertMat4(result.projection);
+
+        const osg::Vec4f sunPosition = mSunLight->getPosition();
+        result.sunDirection = { -sunPosition.x(), -sunPosition.y(), -sunPosition.z(), sunPosition.w() };
+        const osg::Vec4f sunColor = mSunLight->getDiffuse();
+        result.sunColor = { sunColor.x(), sunColor.y(), sunColor.z(), sunColor.w() };
+        return result;
     }
 
     Render::WorldObject* RenderingManager::findNeutralObject(const MWWorld::Ptr& ptr)

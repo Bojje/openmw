@@ -163,6 +163,9 @@ namespace MWRender
 
         const Render::CellScene* getCellScene(const MWWorld::CellStore* store) const;
 
+        /// Return the current camera and directional-light state for a backend consumer.
+        Render::SceneData getSceneData() const;
+
         void enableTerrain(bool enable, ESM::RefId worldspace);
 
         void updatePtr(const MWWorld::Ptr& old, const MWWorld::Ptr& updated);
