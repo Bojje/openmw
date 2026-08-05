@@ -104,6 +104,11 @@ int main()
         expect(!Render::makeOpaqueTerrainMesh(*tile).has_value(),
             "multi-layer terrain tile should wait for a terrain shader consumer");
 
+        Render::TerrainTile malformed = *opaqueTile;
+        malformed.indices.back() = static_cast<std::uint32_t>(malformed.vertices.size());
+        expect(!malformed.valid() && !Render::makeOpaqueTerrainMesh(malformed).has_value(),
+            "terrain validation should reject out-of-range indices");
+
         std::cout << "Vulkan terrain snapshot tests passed\n";
         return EXIT_SUCCESS;
     }
