@@ -9,6 +9,22 @@ if (BUILD_TESTING)
     add_test(NAME openmw-vulkan-math-tests COMMAND openmw-vulkan-math-tests)
 endif()
 
+add_executable(openmw-render-mesh-tests mesh_tests.cpp)
+
+target_include_directories(openmw-render-mesh-tests
+    PRIVATE
+    ${CMAKE_SOURCE_DIR}
+)
+
+target_link_libraries(openmw-render-mesh-tests
+    PRIVATE
+    components
+)
+
+if (BUILD_TESTING)
+    add_test(NAME openmw-render-mesh-tests COMMAND openmw-render-mesh-tests)
+endif()
+
 add_executable(openmw-vulkan-smoke renderer_smoke.cpp)
 
 target_link_libraries(openmw-vulkan-smoke

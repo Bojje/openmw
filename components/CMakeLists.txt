@@ -145,8 +145,8 @@ add_component_dir (sceneutil
     )
 
 add_component_dir (nif
-    base controller data effect extra niffile nifkey nifstream niftypes node parent particle physics property record recordptr texture
-    )
+    base controller data effect extra meshconverter niffile nifkey nifstream niftypes node parent particle physics property record recordptr texture
+)
 
 add_component_dir (nifosg
     autotransform nifloader controller particle matrixtransform fog
@@ -525,6 +525,7 @@ add_component_dir(testing
 add_component_dir(render
     scene
     math
+    mesh
 )
 
 if (OPENMW_USE_VULKAN)
