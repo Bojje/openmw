@@ -20,8 +20,8 @@ Completed reduction checkpoints include removal of the incomplete full-game Vulk
 the unused Vulkan mesh submission queue, inactive ray-tracing scaffolding, and unused
 buffer, descriptor, command-helper, compute, and transfer-queue paths. The current bridge
 also contains renderer-neutral scene/math data, a validated NIF triangle conversion path,
-NIF tree traversal for static mesh discovery, and a Vulkan draw of the resulting neutral
-mesh.
+transform-preserving NIF tree traversal for static mesh discovery, and a Vulkan draw of the
+resulting neutral mesh.
 
 The remaining migration is not a compatibility problem that can be solved by retaining
 both renderers in one execution path. Static-world transforms, materials, textures,
@@ -38,7 +38,7 @@ the game unplayable rather than reduce duplication safely.
 | Vulkan mesh submission queue | Removed | Complete |
 | Inactive raster ray-tracing scaffold | Removed | Reintroduce only with a complete RT pipeline |
 | Vulkan utility/queue helper paths | Removed | Complete |
-| NIF-to-neutral mesh conversion | Renderer-neutral NIF boundary | Add transforms, materials, skinning, and resource caching |
+| NIF-to-neutral mesh conversion | Renderer-neutral NIF boundary | Add materials, skinning, and resource caching |
 | GUI, loading screens, screenshots, and presentation | OSG/MyGUI path | Vulkan presentation and GUI coverage |
 
 This ledger is intentionally conservative: a subsystem is marked removable only after a
@@ -57,7 +57,7 @@ real replacement consumes its responsibility and the fast tests cover the bounda
 
 - Add a small test mode or executable that starts one renderer, loads a manifest of test scenes/cameras, renders multiple checkpoints, writes images, and exits. The current standalone smoke target covers one neutral mesh and multiple frame submissions; image capture and reference comparison remain pending until a Vulkan-capable presentation or offscreen test target is available.
 - Use fixed camera paths, time, weather, random seed, resolution, and content.
-- Add CPU-side tests for matrix conversion, NIF conversion, transforms, resource lookup, and scene snapshots.
+- Add CPU-side tests for matrix conversion, NIF conversion, transforms, resource lookup, and scene snapshots. The current fast tests cover matrix conversion, NIF conversion, parent-child transforms, and safe index handling.
 - Compare Vulkan output with OSG reference images using tolerances rather than exact pixel equality.
 
 ### 3. Remove the dual-renderer lifecycle
@@ -78,7 +78,7 @@ real replacement consumes its responsibility and the fast tests cover the bounda
 
 ### 5. Replace OSG scene ownership
 
-- Separate cell visibility, transforms, camera state, lighting, and material data from OSG scene nodes. Camera/light scene data and a neutral mesh boundary are in place; cell visibility, transforms, and materials remain to be migrated.
+- Separate cell visibility, transforms, camera state, lighting, and material data from OSG scene nodes. Camera/light scene data and transform-preserving neutral mesh instances are in place; cell visibility and materials remain to be migrated.
 - Feed both reference and Vulkan implementations from renderer-neutral scene data during the transition.
 - Delete OSG scene ownership once Vulkan consumes all required scene events.
 
