@@ -35,15 +35,6 @@ namespace Vk
         Vec4 sunColor;
     };
 
-    struct MeshDrawCommand
-    {
-        VkBuffer vertexBuffer;
-        VkBuffer indexBuffer;
-        uint32_t indexCount;
-        Mat4 transform;
-        Mat4 normalMatrix;
-    };
-
     struct GBufferAttachments
     {
         VkImage albedoImage = VK_NULL_HANDLE;
@@ -87,7 +78,6 @@ namespace Vk
         bool loadShadersAndCreatePipelines(const std::string& shaderDir);
 
         void updateScene(const SceneData& sceneData);
-        void submitMesh(VkBuffer vertexBuffer, VkBuffer indexBuffer, uint32_t indexCount, Mat4 transform);
 
     private:
         void createSurface();
@@ -158,7 +148,6 @@ namespace Vk
 
         std::unique_ptr<RayTracingPipeline> mRtPipeline;
 
-        std::vector<MeshDrawCommand> mDrawCommands;
         uint32_t mCurrentFrame = 0;
         uint32_t mCurrentImageIndex = 0;
         bool mRayTracingEnabled = false;

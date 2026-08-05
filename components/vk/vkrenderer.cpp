@@ -1168,19 +1168,6 @@ namespace Vk
                 vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mGBufferPipelineLayout,
                     0, 1, &mSceneDescriptorSets[mCurrentFrame], 0, nullptr);
 
-                for (const auto& drawCmd : mDrawCommands)
-                {
-                    struct { Mat4 model; Mat4 normalMatrix; } pushData = {
-                        drawCmd.transform, drawCmd.normalMatrix
-                    };
-                    vkCmdPushConstants(cmd, mGBufferPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT,
-                        0, sizeof(pushData), &pushData);
-
-                    VkDeviceSize offset = 0;
-                    vkCmdBindVertexBuffers(cmd, 0, 1, &drawCmd.vertexBuffer, &offset);
-                    vkCmdBindIndexBuffer(cmd, drawCmd.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
-                    vkCmdDrawIndexed(cmd, drawCmd.indexCount, 1, 0, 0, 0);
-                }
             }
 
             vkCmdEndRenderPass(cmd);
@@ -1253,8 +1240,6 @@ namespace Vk
             vkCmdEndRenderPass(cmd);
         }
 
-        mDrawCommands.clear();
-
         endFrame();
     }
 
@@ -1300,12 +1285,6 @@ namespace Vk
     void Renderer::updateScene(const SceneData& sceneData)
     {
         std::memcpy(mUniformMapped[mCurrentFrame], &sceneData, sizeof(SceneData));
-    }
-
-    void Renderer::submitMesh(VkBuffer vertexBuffer, VkBuffer indexBuffer, uint32_t indexCount, Mat4 transform)
-    {
-        Mat4 normalMatrix = computeNormalMatrix(transform);
-        mDrawCommands.push_back({ vertexBuffer, indexBuffer, indexCount, transform, normalMatrix });
     }
 
     void Renderer::cleanup()
