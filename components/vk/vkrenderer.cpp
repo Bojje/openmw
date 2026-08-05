@@ -938,6 +938,21 @@ namespace Vk
 
             VK_CHECK(vkCreateGraphicsPipelines(mDevice->handle(), VK_NULL_HANDLE, 1,
                 &pipelineInfo, nullptr, &mGBufferPipeline));
+
+            // Alpha-blended materials use a separate pipeline so opaque draws
+            // retain depth writes. The G-buffer blend is intentionally simple;
+            // final ordering and material composition remain migration work.
+            blendAttachments[0].blendEnable = VK_TRUE;
+            blendAttachments[0].srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+            blendAttachments[0].dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+            blendAttachments[0].colorBlendOp = VK_BLEND_OP_ADD;
+            blendAttachments[0].srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+            blendAttachments[0].dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+            blendAttachments[0].alphaBlendOp = VK_BLEND_OP_ADD;
+            depthStencil.depthWriteEnable = VK_FALSE;
+
+            VK_CHECK(vkCreateGraphicsPipelines(mDevice->handle(), VK_NULL_HANDLE, 1,
+                &pipelineInfo, nullptr, &mGBufferAlphaPipeline));
         }
 
         // Composite pipeline
@@ -1123,8 +1138,6 @@ namespace Vk
 
             if (mGBufferPipeline != VK_NULL_HANDLE)
             {
-                vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mGBufferPipeline);
-
                 VkViewport viewport = {};
                 viewport.width = static_cast<float>(extent.width);
                 viewport.height = static_cast<float>(extent.height);
@@ -1151,9 +1164,16 @@ namespace Vk
                     VkDeviceSize offset = 0;
                     vkCmdBindVertexBuffers(cmd, 0, 1, &mMeshVertexBuffer, &offset);
                     vkCmdBindIndexBuffer(cmd, mMeshIndexBuffer, 0, VK_INDEX_TYPE_UINT32);
+                    VkPipeline boundPipeline = VK_NULL_HANDLE;
                     for (std::size_t drawIndex = 0; drawIndex < mMeshDraws.size(); ++drawIndex)
                     {
                         const Render::MeshDraw& draw = mMeshDraws[drawIndex];
+                        const VkPipeline pipeline = draw.material.alphaBlend ? mGBufferAlphaPipeline : mGBufferPipeline;
+                        if (pipeline != boundPipeline)
+                        {
+                            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+                            boundPipeline = pipeline;
+                        }
                         const PushData pushData = {
                             draw.transform,
                             draw.normalMatrix,
@@ -1391,6 +1411,8 @@ namespace Vk
 
         if (mGBufferPipeline != VK_NULL_HANDLE)
             vkDestroyPipeline(dev, mGBufferPipeline, nullptr);
+        if (mGBufferAlphaPipeline != VK_NULL_HANDLE)
+            vkDestroyPipeline(dev, mGBufferAlphaPipeline, nullptr);
         if (mGBufferPipelineLayout != VK_NULL_HANDLE)
             vkDestroyPipelineLayout(dev, mGBufferPipelineLayout, nullptr);
         if (mCompositePipeline != VK_NULL_HANDLE)

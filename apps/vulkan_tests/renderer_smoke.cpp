@@ -86,8 +86,16 @@ namespace
                     throw std::runtime_error("Vulkan smoke scene referenced an uncached model");
                 return *cachedMeshes;
             });
-        for (Render::MeshInstance& mesh : result)
+        for (std::size_t i = 0; i < result.size(); ++i)
+        {
+            Render::MeshInstance& mesh = result[i];
             mesh.mesh.material.albedoTexture = "textures/vulkan-smoke.rgba";
+            if (i == 0)
+            {
+                mesh.mesh.material.alphaBlend = true;
+                mesh.mesh.material.diffuse.w = 0.75f;
+            }
+        }
         return std::make_shared<const Resource::NifMeshManager::Meshes>(std::move(result));
     }
 

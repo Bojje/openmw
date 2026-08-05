@@ -37,8 +37,9 @@ renderer-neutral mesh boundary and survive batching; the neutral batch applies d
 and alpha to vertex color output. Resource images can now cross into neutral RGBA8 data,
 and the standalone Vulkan renderer uploads/caches indexed albedo textures and samples them
 in the G-buffer. Vulkan now consumes neutral alpha-test state and thresholds in the G-buffer
-cutout path, while alpha blending, full material shading, and full-game resource hookup
-remain outstanding. The Vulkan G-buffer now carries neutral roughness,
+cutout path, and the standalone harness has a basic source-alpha pipeline for blended draws;
+deferred ordering, full material shading, and full-game resource hookup remain outstanding.
+The Vulkan G-buffer now carries neutral roughness,
 ambient-occlusion,
 and emissive-strength channels into the composite pass. Cell object lookup and removal are
 owned by the renderer-neutral `WorldScene`/`CellScene` components rather than the OSG-facing
