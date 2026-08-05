@@ -53,10 +53,11 @@ OSG-facing manager now also exposes neutral loaded-world mesh collection and RGB
 resolution backed by the existing resource caches, giving a future Vulkan consumer a concrete
 full-game input without exposing OSG objects.
 
-Against `openmw-vulkan`, this checkpoint changes 47 files, deleting 2,216 lines and adding
-1,864 lines (net `-352`). That is an audited intermediate reduction, not the speculative
-10k-line target; further deletions remain gated on replacing the remaining OSG-owned
-responsibilities.
+Against `openmw-vulkan`, the current checkpoint changes 50 files, deleting 2,233 lines and
+adding 2,261 lines (net `+28`). The earlier Vulkan-only cleanup remains a real deletion
+checkpoint, but the neutral resource groundwork currently offsets it; this is not the
+speculative 10k-line target, and further deletions remain gated on replacing the remaining
+OSG-owned responsibilities.
 
 The remaining migration is not a compatibility problem that can be solved by retaining
 both renderers in one execution path. Static-world transforms, materials, textures,
