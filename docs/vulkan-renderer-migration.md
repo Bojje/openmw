@@ -78,7 +78,8 @@ OSG-array/OSG-image storage contract into vertices, layer metadata, and RGBA8 bl
 opaque single-layer terrain retains an intentionally absent blendmap. Vulkan now consumes
 both opaque tiles and ordered multi-layer/blendmap tiles: blendmaps use the neutral alpha
 texture table, legacy-compatible UV transforms, and separate first-layer/equal-depth
-terrain pipelines. Normal/parallax maps, terrain paging/LOD, and complete terrain image
+terrain pipelines. Terrain normal maps now flow through the same neutral texture table and
+G-buffer normal path; parallax/specular maps, terrain paging/LOD, and complete terrain image
 coverage remain outstanding. `WorldScene` now records empty
 loaded cells as well as object-bearing cells, and `RenderingManager::getNeutralScene()`
 collects cached terrain tiles for loaded exterior cells in the active worldspace, so terrain
@@ -93,9 +94,9 @@ consumer to replace the remaining OSG-owned responsibilities.
 
 The latest reduction checkpoint also removed the remaining manager-only neutral-object
 lookup, removal, and cell-transfer wrappers. The lifecycle now calls `WorldScene`
-directly. The terrain adapter is now consumed for opaque and blendmap/multi-layer Vulkan
-terrain; its remaining owner boundary is terrain paging/LOD, richer terrain materials,
-and complete image coverage.
+directly. The terrain adapter is now consumed for opaque, normal-mapped, and blendmap/
+multi-layer Vulkan terrain; its remaining owner boundary is parallax/specular materials,
+terrain paging/LOD, and complete image coverage.
 
 The remaining migration is not a compatibility problem that can be solved by retaining
 both renderers in one execution path. Static-world transforms, materials, textures,
@@ -114,7 +115,7 @@ the game unplayable rather than reduce duplication safely.
 | Vulkan utility/queue helper paths | Removed | Complete |
 | Parsed NIF resource cache wrapper | Removed | Complete; cache now owns shared NIF files directly |
 | NIF-to-neutral mesh conversion | Renderer-neutral NIF boundary, material data, mesh cache, `SceneSubmission`, Vulkan mesh batch, standalone texture table, and full-game neutral resolver | Connect the handoff to the live full-game Vulkan frame loop, add material shading, skinning, and static-world submission |
-| Terrain geometry and layer data | Legacy OSG terrain storage/ChunkManager plus a tested neutral tile adapter and Vulkan opaque/blendmap layer consumer | Add Vulkan terrain paging/LOD policy, richer terrain materials, and terrain image coverage |
+| Terrain geometry and layer data | Legacy OSG terrain storage/ChunkManager plus a tested neutral tile adapter and Vulkan opaque/normal/blendmap layer consumer | Add Vulkan terrain paging/LOD policy, parallax/specular materials, and terrain image coverage |
 | Loaded-cell object identity, transforms, terrain snapshots, and paging state | Renderer-neutral `WorldScene`/`CellScene` snapshots updated by scene lifecycle; cell-lifecycle-cached terrain tiles flow into `SceneSubmission` | Consume snapshots from a backend and migrate visibility/paging policy |
 | GUI, loading screens, screenshots, and presentation | OSG/MyGUI path | Vulkan presentation and GUI coverage |
 
@@ -170,8 +171,8 @@ real replacement consumes its responsibility and the fast tests cover the bounda
 - Wire NIF loading and `MeshConverter` into resource management. The NIF converter now has a tested tree traversal and material boundary, `NifMeshManager` caches converted instances, image resources expose neutral RGBA8 data, and `RenderingManager` can collect a `SceneSubmission` containing static meshes and loaded exterior terrain without exposing OSG objects. The standalone Vulkan path consumes that submission and its resolved textures; a live full-game Vulkan frame consumer, shading, and complete static-world coverage are still outstanding.
 - Implement model caching, cell add/remove, transforms, textures, materials, terrain,
   interiors, and static objects. The terrain adapter now feeds opaque and ordered
-  blendmap/multi-layer Vulkan mesh consumers; terrain paging/LOD, richer terrain
-  materials, and full terrain image coverage remain.
+  blendmap/multi-layer Vulkan mesh consumers with normal-map sampling; terrain paging/LOD,
+  parallax/specular materials, and full terrain image coverage remain.
 - Reach a static playable scene without OSG rendering.
 
 ### 7. Port dynamic content and presentation

@@ -19,6 +19,7 @@ namespace Render
     struct MeshMaterial
     {
         std::string albedoTexture;
+        std::string normalTexture;
         Vec4 diffuse{ 1.f, 1.f, 1.f, 1.f };
         Vec4 emissive{};
         float glossiness = 0.f;
@@ -27,6 +28,7 @@ namespace Render
         uint8_t alphaTestThreshold = 0;
         bool terrainBlend = false;
         bool terrainFirstLayer = false;
+        bool terrainNormalMap = false;
         std::shared_ptr<const TextureData> alphaTexture;
     };
 

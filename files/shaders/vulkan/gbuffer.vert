@@ -33,6 +33,7 @@ layout(location = 5) flat out uint fragMaterialFlags;
 layout(location = 6) flat out uint fragAlbedoTextureIndex;
 layout(location = 7) flat out uint fragAlphaTextureIndex;
 layout(location = 8) out vec2 fragAlphaTexCoord;
+layout(location = 9) flat out uint fragNormalTextureIndex;
 
 void main() {
     vec4 worldPos = push.model * vec4(inPosition, 1.0);
@@ -44,6 +45,7 @@ void main() {
     fragMaterialFlags = push.materialFlags;
     fragAlbedoTextureIndex = push.textureIndices & 63u;
     fragAlphaTextureIndex = (push.textureIndices >> 6u) & 63u;
+    fragNormalTextureIndex = (push.textureIndices >> 12u) & 63u;
     fragAlphaTexCoord = inBlendTexCoord;
     gl_Position = camera.projection * camera.view * worldPos;
 }

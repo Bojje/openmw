@@ -155,6 +155,7 @@ namespace Vk
         std::unordered_map<std::string, uint32_t> mTextureIndices;
         std::vector<uint32_t> mMeshTextureIndices;
         std::vector<uint32_t> mMeshAlphaTextureIndices;
+        std::vector<uint32_t> mMeshNormalTextureIndices;
 
         struct MeshBuffers
         {

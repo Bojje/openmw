@@ -235,6 +235,7 @@ namespace Vk
             {
                 writeSceneTextureDescriptor(1, index, resource.view);
                 writeSceneTextureDescriptor(2, index, resource.view);
+                writeSceneTextureDescriptor(3, index, resource.view);
             }
             return index;
         }
@@ -644,7 +645,7 @@ namespace Vk
         // Scene layout (set 0 for G-buffer pass): camera UBO and indexed
         // albedo/terrain blendmap textures.
         {
-            std::array<VkDescriptorSetLayoutBinding, 3> bindings = {};
+            std::array<VkDescriptorSetLayoutBinding, 4> bindings = {};
             bindings[0].binding = 0;
             bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
             bindings[0].descriptorCount = 1;
@@ -659,6 +660,11 @@ namespace Vk
             bindings[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
             bindings[2].descriptorCount = maxTextures;
             bindings[2].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+            bindings[3].binding = 3;
+            bindings[3].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            bindings[3].descriptorCount = maxTextures;
+            bindings[3].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
             VkDescriptorSetLayoutCreateInfo layoutInfo = {};
             layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -718,7 +724,7 @@ namespace Vk
     {
         std::vector<VkDescriptorPoolSize> poolSizes = {
             { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, maxFramesInFlight * 2 },
-            { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, maxTextures * maxFramesInFlight * 2 + 16 + maxFramesInFlight },
+            { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, maxTextures * maxFramesInFlight * 3 + 16 + maxFramesInFlight },
             { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 2 },
         };
 
@@ -789,6 +795,7 @@ namespace Vk
             {
                 writeSceneTextureDescriptor(1, textureIndex, mTextures.front().view);
                 writeSceneTextureDescriptor(2, textureIndex, mTextures.front().view);
+                writeSceneTextureDescriptor(3, textureIndex, mTextures.front().view);
             }
         }
 
@@ -905,7 +912,7 @@ namespace Vk
             bindingDesc[0].stride = sizeof(Render::MeshVertex);
             bindingDesc[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
-            std::array<VkVertexInputAttributeDescription, 6> attrDesc = {};
+        std::array<VkVertexInputAttributeDescription, 6> attrDesc = {};
             attrDesc[0] = { 0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0 };
             attrDesc[1] = { 1, 0, VK_FORMAT_R32G32B32_SFLOAT, sizeof(float) * 3 };
             attrDesc[2] = { 2, 0, VK_FORMAT_R32G32_SFLOAT, sizeof(float) * 6 };
@@ -1256,11 +1263,14 @@ namespace Vk
                             : 0u;
                         if (draw.material.terrainBlend)
                             materialFlags |= 2u;
+                        if (draw.material.terrainNormalMap)
+                            materialFlags |= 4u;
                         const PushData pushData = {
                             draw.transform,
                             draw.normalMatrix,
                             materialFlags,
-                            mMeshTextureIndices[drawIndex] | (mMeshAlphaTextureIndices[drawIndex] << 6u),
+                            mMeshTextureIndices[drawIndex] | (mMeshAlphaTextureIndices[drawIndex] << 6u)
+                                | (mMeshNormalTextureIndices[drawIndex] << 12u),
                         };
                         vkCmdPushConstants(cmd, mGBufferPipelineLayout,
                             VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
@@ -1454,27 +1464,34 @@ namespace Vk
         Render::MeshBatch batch = Render::batchMeshes(meshes);
         std::vector<uint32_t> textureIndices;
         std::vector<uint32_t> alphaTextureIndices;
+        std::vector<uint32_t> normalTextureIndices;
         textureIndices.reserve(batch.draws.size());
         alphaTextureIndices.reserve(batch.draws.size());
-        for (const Render::MeshDraw& draw : batch.draws)
-        {
-            if (draw.material.albedoTexture.empty() || !textureResolver)
-            {
-                textureIndices.push_back(0);
-                continue;
-            }
+        normalTextureIndices.reserve(batch.draws.size());
 
-            const auto existing = mTextureIndices.find(draw.material.albedoTexture);
+        const auto resolveTexture = [&](std::string_view path) {
+            if (path.empty() || !textureResolver)
+                return uint32_t(0);
+
+            const std::string key(path);
+            const auto existing = mTextureIndices.find(key);
             if (existing != mTextureIndices.end())
-            {
-                textureIndices.push_back(existing->second);
-                continue;
-            }
+                return existing->second;
 
-            const std::shared_ptr<const Render::TextureData> texture = textureResolver(draw.material.albedoTexture);
+            const std::shared_ptr<const Render::TextureData> texture = textureResolver(path);
             const uint32_t textureIndex = texture && texture->valid() ? createTextureResource(*texture) : 0;
-            mTextureIndices.emplace(draw.material.albedoTexture, textureIndex);
-            textureIndices.push_back(textureIndex);
+            mTextureIndices.emplace(key, textureIndex);
+            return textureIndex;
+        };
+
+        for (Render::MeshDraw& draw : batch.draws)
+        {
+            textureIndices.push_back(resolveTexture(draw.material.albedoTexture));
+            const uint32_t normalTextureIndex = draw.material.terrainNormalMap
+                ? resolveTexture(draw.material.normalTexture)
+                : 0;
+            draw.material.terrainNormalMap = draw.material.terrainNormalMap && normalTextureIndex != 0;
+            normalTextureIndices.push_back(normalTextureIndex);
         }
 
         for (const Render::MeshDraw& draw : batch.draws)
@@ -1503,6 +1520,7 @@ namespace Vk
         mMeshIndices = std::move(batch.indices);
         mMeshTextureIndices = std::move(textureIndices);
         mMeshAlphaTextureIndices = std::move(alphaTextureIndices);
+        mMeshNormalTextureIndices = std::move(normalTextureIndices);
         ++mMeshRevision;
         if (mMeshRevision == 0)
             ++mMeshRevision;
@@ -1564,6 +1582,7 @@ namespace Vk
         mMeshIndices.clear();
         mMeshTextureIndices.clear();
         mMeshAlphaTextureIndices.clear();
+        mMeshNormalTextureIndices.clear();
     }
 
     void Renderer::destroyMesh(uint32_t frameIndex)

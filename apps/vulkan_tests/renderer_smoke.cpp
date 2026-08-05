@@ -130,16 +130,21 @@ namespace
 
     std::shared_ptr<const Render::TextureData> smokeTexture(std::string_view path)
     {
-        if (path != "textures/vulkan-smoke.rgba")
+        if (path != "textures/vulkan-smoke.rgba" && path != "textures/vulkan-smoke-normal.rgba")
             throw std::runtime_error("Vulkan smoke requested an unexpected texture");
 
         auto texture = std::make_shared<Render::TextureData>();
         texture->width = 2;
         texture->height = 2;
-        texture->pixels = {
-            255, 64, 64, 255, 64, 255, 64, 255,
-            64, 64, 255, 255, 255, 255, 255, 255,
-        };
+        texture->pixels = path == "textures/vulkan-smoke.rgba"
+            ? std::vector<uint8_t>{
+                  255, 64, 64, 255, 64, 255, 64, 255,
+                  64, 64, 255, 255, 255, 255, 255, 255,
+              }
+            : std::vector<uint8_t>{
+                  128, 128, 255, 255, 128, 128, 255, 255,
+                  128, 128, 255, 255, 128, 128, 255, 255,
+              };
         return texture;
     }
 
@@ -170,9 +175,11 @@ namespace
         };
         Render::TerrainLayer firstLayer;
         firstLayer.diffuseTexture = "textures/vulkan-smoke.rgba";
+        firstLayer.normalTexture = "textures/vulkan-smoke-normal.rgba";
         firstLayer.blendmap = std::move(firstBlendmap);
         Render::TerrainLayer secondLayer;
         secondLayer.diffuseTexture = "textures/vulkan-smoke.rgba";
+        secondLayer.normalTexture = "textures/vulkan-smoke-normal.rgba";
         secondLayer.blendmap = std::move(secondBlendmap);
         tile.layers = { std::move(firstLayer), std::move(secondLayer) };
         return tile;

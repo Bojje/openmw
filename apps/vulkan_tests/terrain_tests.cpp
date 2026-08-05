@@ -104,6 +104,8 @@ int main()
             "opaque terrain tile was not converted for Vulkan mesh submission");
         const auto blendedTerrainMeshes = Render::makeTerrainMeshes(*tile);
         expect(blendedTerrainMeshes.size() == 1 && blendedTerrainMeshes.front().mesh.material.terrainBlend
+                && blendedTerrainMeshes.front().mesh.material.terrainNormalMap
+                && blendedTerrainMeshes.front().mesh.material.normalTexture == "textures/grass_n.dds"
                 && blendedTerrainMeshes.front().mesh.material.alphaTexture
                 && blendedTerrainMeshes.front().mesh.material.alphaTexture->valid()
                 && blendedTerrainMeshes.front().mesh.vertices[3].texcoord[0] > 3.99f
