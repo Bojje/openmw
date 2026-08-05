@@ -102,12 +102,11 @@ namespace Render
                 const ObjectLocation location = found->second;
                 if (location.cell != cellKey)
                 {
-                    if (!updateObjectCell(objectKey, objectKey, cellKey, exterior, gridX, gridY))
-                        return;
-                    return recordObject(objectKey, cellKey, exterior, gridX, gridY, model, transform, visible);
+                    if (updateObjectCell(objectKey, objectKey, cellKey, exterior, gridX, gridY))
+                        return recordObject(objectKey, cellKey, exterior, gridX, gridY, model, transform, visible);
+                    mObjects.erase(found);
                 }
-
-                if (CellScene* scene = findCell(location.cell))
+                else if (CellScene* scene = findCell(location.cell))
                 {
                     if (WorldObject* object = scene->findObject(location.id))
                     {
