@@ -35,7 +35,8 @@ by neutral visibility, and composes object transforms with NIF node transforms b
 NIF classic texture, diffuse/emissive, glossiness, and alpha properties now cross the
 renderer-neutral mesh boundary and survive batching; the neutral batch applies diffuse
 and alpha to vertex color output, while Vulkan texture binding and full material shading
-remain outstanding. Cell object lookup and removal are
+remain outstanding. The Vulkan G-buffer now carries neutral roughness, ambient-occlusion,
+and emissive-strength channels into the composite pass. Cell object lookup and removal are
 owned by the renderer-neutral `WorldScene`/`CellScene` components rather than the OSG-facing
 manager; the manager now only translates engine lifecycle events into that component.
 

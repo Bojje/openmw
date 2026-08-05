@@ -2,6 +2,7 @@
 #define OPENMW_COMPONENTS_RENDER_MESH_H
 
 #include <cstdint>
+#include <algorithm>
 #include <limits>
 #include <stdexcept>
 #include <string>
@@ -29,9 +30,10 @@ namespace Render
         float normal[3];
         float texcoord[2];
         float color[4];
+        float material[4];
     };
 
-    static_assert(sizeof(MeshVertex) == sizeof(float) * 12);
+    static_assert(sizeof(MeshVertex) == sizeof(float) * 16);
 
     struct MeshData
     {
@@ -101,6 +103,11 @@ namespace Render
                 vertex.color[1] *= mesh.mesh.material.diffuse.y;
                 vertex.color[2] *= mesh.mesh.material.diffuse.z;
                 vertex.color[3] *= mesh.mesh.material.diffuse.w;
+                vertex.material[0] = std::clamp(1.f - mesh.mesh.material.glossiness / 128.f, 0.f, 1.f);
+                vertex.material[1] = 0.f;
+                vertex.material[2] = 1.f;
+                vertex.material[3] = std::max({ mesh.mesh.material.emissive.x, mesh.mesh.material.emissive.y,
+                    mesh.mesh.material.emissive.z });
                 result.vertices.push_back(vertex);
             }
             result.draws.push_back(draw);

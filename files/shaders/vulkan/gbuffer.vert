@@ -4,6 +4,7 @@ layout(location = 0) in vec3 inPosition;
 layout(location = 1) in vec3 inNormal;
 layout(location = 2) in vec2 inTexCoord;
 layout(location = 3) in vec4 inColor;
+layout(location = 4) in vec4 inMaterial;
 
 layout(push_constant) uniform PushConstants {
     mat4 model;
@@ -23,6 +24,7 @@ layout(location = 0) out vec3 fragWorldPos;
 layout(location = 1) out vec3 fragNormal;
 layout(location = 2) out vec2 fragTexCoord;
 layout(location = 3) out vec4 fragColor;
+layout(location = 4) out vec4 fragMaterial;
 
 void main() {
     vec4 worldPos = push.model * vec4(inPosition, 1.0);
@@ -30,5 +32,6 @@ void main() {
     fragNormal = normalize(mat3(push.normalMatrix) * inNormal);
     fragTexCoord = inTexCoord;
     fragColor = inColor;
+    fragMaterial = inMaterial;
     gl_Position = camera.projection * camera.view * worldPos;
 }

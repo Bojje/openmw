@@ -121,6 +121,8 @@ int main()
         throw std::runtime_error("renderer-neutral mesh batching dropped material data");
     expectNear(batch.vertices.front().color[0], 0.25f, "batched material diffuse red");
     expectNear(batch.vertices.front().color[3], 0.75f, "batched material alpha");
+    expectNear(batch.vertices.front().material[0], 1.f - 42.f / 128.f, "batched material roughness");
+    expectNear(batch.vertices.front().material[3], 0.6f, "batched material emission");
     expectNear(batch.draws[1].transform.data[12], 12.0f, "batched mesh translation");
 
     Render::WorldObject object{ 1, "synthetic.nif", {} };

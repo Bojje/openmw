@@ -36,6 +36,7 @@ vec3 acesFilmic(vec3 x) {
 void main() {
     vec4 albedoSample = texture(gbufferAlbedo, fragTexCoord);
     vec4 normalSample = texture(gbufferNormal, fragTexCoord);
+    vec4 materialSample = texture(gbufferMaterial, fragTexCoord);
     float depthSample = texture(gbufferDepth, fragTexCoord).r;
 
     if (depthSample >= 1.0) {
@@ -56,7 +57,10 @@ void main() {
     float shadow = 1.0;
     vec3 reflectionColor = vec3(0.0);
 
-    vec3 ambient = albedo * 0.15;
+    float roughness = clamp(materialSample.r, 0.05, 1.0);
+    float ao = materialSample.b;
+    float emission = max(materialSample.a, 0.0);
+    vec3 ambient = albedo * 0.15 * ao;
     vec3 diffuse = albedo * sunCol * NdotL * shadow;
 
     // Reconstruct world position from depth and inverse matrices
@@ -67,13 +71,13 @@ void main() {
     vec4 worldPos4 = scene.viewInverse * viewPos;
     vec3 worldPos = worldPos4.xyz;
 
-    float specularStrength = 0.3;
+    float specularStrength = 0.3 * (1.0 - roughness);
     vec3 V = normalize(push.cameraPosition.xyz - worldPos);
     vec3 H = normalize(L + V);
-    float spec = pow(max(dot(N, H), 0.0), 32.0);
+    float spec = pow(max(dot(N, H), 0.0), mix(128.0, 1.0, roughness));
     vec3 specular = sunCol * spec * specularStrength * shadow;
 
-    vec3 color = ambient + diffuse + specular + reflectionColor;
+    vec3 color = ambient + diffuse + specular + reflectionColor + albedo * emission;
 
     color = acesFilmic(color);
     color = pow(color, vec3(1.0 / 2.2));

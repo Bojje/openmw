@@ -73,6 +73,11 @@ namespace Nif
                     vertex.color[2] = 1.0f;
                     vertex.color[3] = 1.0f;
                 }
+
+                vertex.material[0] = 1.0f;
+                vertex.material[1] = 0.0f;
+                vertex.material[2] = 1.0f;
+                vertex.material[3] = 0.0f;
             }
 
             return result;

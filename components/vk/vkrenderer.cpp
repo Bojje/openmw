@@ -737,14 +737,15 @@ namespace Vk
 
             std::array<VkVertexInputBindingDescription, 1> bindingDesc = {};
             bindingDesc[0].binding = 0;
-            bindingDesc[0].stride = sizeof(float) * (3 + 3 + 2 + 4);
+            bindingDesc[0].stride = sizeof(Render::MeshVertex);
             bindingDesc[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
-            std::array<VkVertexInputAttributeDescription, 4> attrDesc = {};
+            std::array<VkVertexInputAttributeDescription, 5> attrDesc = {};
             attrDesc[0] = { 0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0 };
             attrDesc[1] = { 1, 0, VK_FORMAT_R32G32B32_SFLOAT, sizeof(float) * 3 };
             attrDesc[2] = { 2, 0, VK_FORMAT_R32G32_SFLOAT, sizeof(float) * 6 };
             attrDesc[3] = { 3, 0, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(float) * 8 };
+            attrDesc[4] = { 4, 0, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(float) * 12 };
 
             VkPipelineVertexInputStateCreateInfo vertexInput = {};
             vertexInput.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
