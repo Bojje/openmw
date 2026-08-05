@@ -94,5 +94,19 @@ int main()
         throw std::runtime_error("renderer-neutral mesh batching returned the wrong layout");
     expectNear(batch.draws[1].transform.data[12], 12.0f, "batched mesh translation");
 
+    Render::MeshInstance invalidBatch = instances.front();
+    invalidBatch.mesh.indices = { 3 };
+    bool rejectedInvalidBatchIndex = false;
+    try
+    {
+        Render::batchMeshes({ invalidBatch });
+    }
+    catch (const std::runtime_error&)
+    {
+        rejectedInvalidBatchIndex = true;
+    }
+    if (!rejectedInvalidBatchIndex)
+        throw std::runtime_error("renderer-neutral mesh batching accepted an invalid index");
+
     std::cout << "NIF mesh conversion tests passed\n";
 }
