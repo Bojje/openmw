@@ -21,7 +21,8 @@ the unused Vulkan mesh submission queue, inactive ray-tracing scaffolding, and u
 buffer, descriptor, command-helper, compute, and transfer-queue paths. The current bridge
 also contains renderer-neutral scene/math data, a validated NIF triangle conversion path,
 transform-preserving NIF tree traversal for static mesh discovery, and a Vulkan draw of the
-resulting neutral mesh.
+resulting neutral mesh. Parsed NIF resources now use a shared-pointer cache instead of an
+OSG object wrapper.
 
 The remaining migration is not a compatibility problem that can be solved by retaining
 both renderers in one execution path. Static-world transforms, materials, textures,
@@ -38,6 +39,7 @@ the game unplayable rather than reduce duplication safely.
 | Vulkan mesh submission queue | Removed | Complete |
 | Inactive raster ray-tracing scaffold | Removed | Reintroduce only with a complete RT pipeline |
 | Vulkan utility/queue helper paths | Removed | Complete |
+| Parsed NIF resource cache wrapper | Removed | Complete; cache now owns shared NIF files directly |
 | NIF-to-neutral mesh conversion | Renderer-neutral NIF boundary | Add materials, skinning, and resource caching |
 | GUI, loading screens, screenshots, and presentation | OSG/MyGUI path | Vulkan presentation and GUI coverage |
 
