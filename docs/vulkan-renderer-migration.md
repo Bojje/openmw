@@ -62,7 +62,7 @@ OSG-array/OSG-image storage contract into vertices, layer metadata, and RGBA8 bl
 opaque single-layer terrain retains an intentionally absent blendmap.
 
 Against the actual PR base `origin/openmw-vulkan` (PR #5), the current checkpoint changes
-42 files, deleting 246 lines and adding 2,659 lines (net `+2,413`). The larger Vulkan-only
+42 files, deleting 246 lines and adding 2,664 lines (net `+2,418`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
