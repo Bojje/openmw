@@ -31,12 +31,14 @@ namespace Render
         int lod = 0;
         float size = 0.f;
         std::array<float, 2> center{};
+        std::uint32_t verticesPerSide = 0;
         std::vector<TerrainVertex> vertices;
         std::vector<TerrainLayer> layers;
 
         bool valid() const
         {
-            return lod >= 0 && size > 0.f && !vertices.empty();
+            return lod >= 0 && size > 0.f && verticesPerSide > 1
+                && vertices.size() == static_cast<std::size_t>(verticesPerSide) * verticesPerSide;
         }
     };
 }

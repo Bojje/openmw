@@ -1,6 +1,7 @@
 #include "storage.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <optional>
 
 #include <osg/Image>
@@ -58,6 +59,15 @@ namespace Terrain
         tile.lod = lodLevel;
         tile.size = size;
         tile.center = { center.x(), center.y() };
+        tile.verticesPerSide = static_cast<std::uint32_t>(
+            std::sqrt(static_cast<double>(positions->size())));
+        while (static_cast<std::size_t>(tile.verticesPerSide + 1) * (tile.verticesPerSide + 1)
+               <= positions->size())
+            ++tile.verticesPerSide;
+        while (static_cast<std::size_t>(tile.verticesPerSide) * tile.verticesPerSide > positions->size())
+            --tile.verticesPerSide;
+        if (static_cast<std::size_t>(tile.verticesPerSide) * tile.verticesPerSide != positions->size())
+            return std::nullopt;
         tile.vertices.resize(positions->size());
         for (std::size_t i = 0; i < positions->size(); ++i)
         {
