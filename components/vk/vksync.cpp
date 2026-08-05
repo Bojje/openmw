@@ -47,12 +47,14 @@ namespace Vk
                 vkDestroySemaphore(mDevice.handle(), semaphore, nullptr);
         }
         mRenderFinished.clear();
+        mImagesInFlight.clear();
     }
 
     void FrameSync::resizeRenderFinished(uint32_t swapchainImageCount)
     {
         destroyRenderFinished();
         mRenderFinished.resize(swapchainImageCount, VK_NULL_HANDLE);
+        mImagesInFlight.resize(swapchainImageCount, VK_NULL_HANDLE);
 
         VkSemaphoreCreateInfo semaphoreInfo = {};
         semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
@@ -64,6 +66,21 @@ namespace Vk
     {
         VK_CHECK(vkWaitForFences(
             mDevice.handle(), 1, &mInFlightFences[frameIndex], VK_TRUE, std::numeric_limits<uint64_t>::max()));
+    }
+
+    void FrameSync::waitForImage(uint32_t imageIndex, uint32_t frameIndex)
+    {
+        if (imageIndex >= mImagesInFlight.size())
+            throw std::out_of_range("Vulkan swapchain image index is out of range");
+
+        const VkFence imageFence = mImagesInFlight[imageIndex];
+        if (imageFence != VK_NULL_HANDLE && imageFence != mInFlightFences[frameIndex])
+        {
+            VK_CHECK(vkWaitForFences(mDevice.handle(), 1, &imageFence, VK_TRUE,
+                std::numeric_limits<uint64_t>::max()));
+        }
+
+        mImagesInFlight[imageIndex] = mInFlightFences[frameIndex];
     }
 
     void FrameSync::resetFrame(uint32_t frameIndex)

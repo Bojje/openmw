@@ -10,6 +10,40 @@ This plan deliberately prioritizes removal of duplicate renderer code. OpenScene
 4. A deletion checkpoint must compile, pass fast tests, and pass the deterministic renderer smoke test before the next subsystem is removed.
 5. Visual parity is the minimum bar; performance and visual improvements come after parity.
 
+## Current checkpoint
+
+The experiment is currently isolated on the `openmw-vulkan` branch. The full game remains
+OSG-only, and the Vulkan renderer is exercised by the standalone smoke target; this keeps
+the process lifecycle single-backend while the scene bridge is incomplete.
+
+Completed reduction checkpoints include removal of the incomplete full-game Vulkan bridge,
+the unused Vulkan mesh submission queue, inactive ray-tracing scaffolding, and unused
+buffer, descriptor, command-helper, compute, and transfer-queue paths. The current bridge
+also contains renderer-neutral scene/math data, a validated NIF triangle conversion path,
+NIF tree traversal for static mesh discovery, and a Vulkan draw of the resulting neutral
+mesh.
+
+The remaining migration is not a compatibility problem that can be solved by retaining
+both renderers in one execution path. Static-world transforms, materials, textures,
+terrain, dynamic content, GUI, and presentation still have OSG ownership. Those are the
+next deletion prerequisites; deleting OSG before they have Vulkan consumers would leave
+the game unplayable rather than reduce duplication safely.
+
+### Deletion ledger
+
+| Responsibility | Current owner | Deletion condition |
+| --- | --- | --- |
+| Full-game scene graph and world rendering | OSG | Vulkan static and dynamic scene consumers reach parity |
+| Vulkan validation renderer | Vulkan standalone smoke target | Retained as the migration test harness |
+| Vulkan mesh submission queue | Removed | Complete |
+| Inactive raster ray-tracing scaffold | Removed | Reintroduce only with a complete RT pipeline |
+| Vulkan utility/queue helper paths | Removed | Complete |
+| NIF-to-neutral mesh conversion | Renderer-neutral NIF boundary | Add transforms, materials, skinning, and resource caching |
+| GUI, loading screens, screenshots, and presentation | OSG/MyGUI path | Vulkan presentation and GUI coverage |
+
+This ledger is intentionally conservative: a subsystem is marked removable only after a
+real replacement consumes its responsibility and the fast tests cover the boundary.
+
 ## Stages
 
 ### 1. Freeze the reference and establish measurements
@@ -21,7 +55,7 @@ This plan deliberately prioritizes removal of duplicate renderer code. OpenScene
 
 ### 2. Create a deterministic renderer-test foundation
 
-- Add a small test mode or executable that starts one renderer, loads a manifest of test scenes/cameras, renders multiple checkpoints, writes images, and exits.
+- Add a small test mode or executable that starts one renderer, loads a manifest of test scenes/cameras, renders multiple checkpoints, writes images, and exits. The current standalone smoke target covers one neutral mesh and multiple frame submissions; image capture and reference comparison remain pending until a Vulkan-capable presentation or offscreen test target is available.
 - Use fixed camera paths, time, weather, random seed, resolution, and content.
 - Add CPU-side tests for matrix conversion, NIF conversion, transforms, resource lookup, and scene snapshots.
 - Compare Vulkan output with OSG reference images using tolerances rather than exact pixel equality.
@@ -37,20 +71,20 @@ This plan deliberately prioritizes removal of duplicate renderer code. OpenScene
 
 ### 4. Make Vulkan frame infrastructure correct
 
-- Correct acquire/present semaphore ownership.
+- Correct acquire/present semaphore ownership. The standalone renderer now uses per-frame acquire semaphores, per-swapchain-image presentation semaphores, and per-image in-flight fence ownership.
 - Keep acquire semaphores and fences per frame-in-flight, but presentation semaphores per swapchain image.
 - Handle minimized windows and zero drawable sizes without recreating a zero-sized swapchain.
 - Make swapchain recreation, image layout transitions, validation layers, and resource lifetime testable.
 
 ### 5. Replace OSG scene ownership
 
-- Separate cell visibility, transforms, camera state, lighting, and material data from OSG scene nodes.
+- Separate cell visibility, transforms, camera state, lighting, and material data from OSG scene nodes. Camera/light scene data and a neutral mesh boundary are in place; cell visibility, transforms, and materials remain to be migrated.
 - Feed both reference and Vulkan implementations from renderer-neutral scene data during the transition.
 - Delete OSG scene ownership once Vulkan consumes all required scene events.
 
 ### 6. Port static world rendering
 
-- Wire NIF loading and `MeshConverter` into resource management.
+- Wire NIF loading and `MeshConverter` into resource management. The NIF converter now has a tested tree traversal boundary, but resource-manager caching and static-world submission are still outstanding.
 - Implement model caching, cell add/remove, transforms, textures, materials, terrain, interiors, and static objects.
 - Reach a static playable scene without OSG rendering.
 

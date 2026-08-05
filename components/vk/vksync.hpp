@@ -23,6 +23,7 @@ namespace Vk
         FrameSync& operator=(const FrameSync&) = delete;
 
         void waitForFrame(uint32_t frameIndex);
+        void waitForImage(uint32_t imageIndex, uint32_t frameIndex);
         void resetFrame(uint32_t frameIndex);
 
         VkSemaphore imageAvailable(uint32_t frameIndex) const { return mImageAvailable[frameIndex]; }
@@ -37,6 +38,7 @@ namespace Vk
         Device& mDevice;
         std::array<VkSemaphore, maxFramesInFlight> mImageAvailable = {};
         std::vector<VkSemaphore> mRenderFinished;
+        std::vector<VkFence> mImagesInFlight;
         std::array<VkFence, maxFramesInFlight> mInFlightFences = {};
     };
 }

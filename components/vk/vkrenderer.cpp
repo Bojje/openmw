@@ -908,6 +908,7 @@ namespace Vk
         if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
             VK_CHECK(result);
 
+        mFrameSync->waitForImage(mCurrentImageIndex, mCurrentFrame);
         mFrameSync->resetFrame(mCurrentFrame);
 
         VkCommandBuffer cmd = mCommandBuffers[mCurrentFrame];
