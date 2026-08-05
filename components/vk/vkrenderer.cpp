@@ -1119,14 +1119,18 @@ namespace Vk
         VkResult result = vkQueuePresentKHR(mDevice->presentQueue(), &presentInfo);
         if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR)
         {
+            mHasSubmittedFrame = false;
             int w, h;
             SDL_Vulkan_GetDrawableSize(mWindow, &w, &h);
             resize(static_cast<uint32_t>(w), static_cast<uint32_t>(h));
         }
-
-        mLastSubmittedFrame = mCurrentFrame;
-        mLastSubmittedImage = mCurrentImageIndex;
-        mHasSubmittedFrame = true;
+        else
+        {
+            VK_CHECK(result);
+            mLastSubmittedFrame = mCurrentFrame;
+            mLastSubmittedImage = mCurrentImageIndex;
+            mHasSubmittedFrame = true;
+        }
         mCurrentFrame = (mCurrentFrame + 1) % maxFramesInFlight;
     }
 
