@@ -46,8 +46,6 @@ namespace Vk
     {
         std::optional<uint32_t> graphics;
         std::optional<uint32_t> present;
-        std::optional<uint32_t> compute;
-        std::optional<uint32_t> transfer;
 
         bool isComplete() const { return graphics.has_value() && present.has_value(); }
     };

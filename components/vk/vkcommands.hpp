@@ -21,10 +21,6 @@ namespace Vk
 
         VkCommandBuffer allocate();
         std::vector<VkCommandBuffer> allocateMultiple(uint32_t count);
-        VkCommandBuffer beginSingleTime();
-        void endSingleTime(VkCommandBuffer commandBuffer, VkQueue queue);
-
-        VkCommandPool handle() const { return mPool; }
 
     private:
         Device& mDevice;

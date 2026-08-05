@@ -27,7 +27,6 @@ namespace Vk
         QueueFamilyIndices indices() const { return mQueueFamilyIndices; }
         VkQueue graphicsQueue() const { return mGraphicsQueue; }
         VkQueue presentQueue() const { return mPresentQueue; }
-        VkQueue computeQueue() const { return mComputeQueue; }
 
         uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) const;
 
@@ -44,7 +43,6 @@ namespace Vk
         QueueFamilyIndices mQueueFamilyIndices;
         VkQueue mGraphicsQueue = VK_NULL_HANDLE;
         VkQueue mPresentQueue = VK_NULL_HANDLE;
-        VkQueue mComputeQueue = VK_NULL_HANDLE;
 
         static const std::vector<const char*> sRequiredExtensions;
     };
