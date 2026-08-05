@@ -21,8 +21,6 @@ namespace Vk
     class Swapchain;
     class CommandPool;
     class FrameSync;
-    class RayTracingPipeline;
-    class AccelerationStructure;
     class ShaderModule;
 
     struct SceneData
@@ -33,15 +31,6 @@ namespace Vk
         Mat4 projInverse;
         Vec4 sunDirection;
         Vec4 sunColor;
-    };
-
-    struct MeshDrawCommand
-    {
-        VkBuffer vertexBuffer;
-        VkBuffer indexBuffer;
-        uint32_t indexCount;
-        Mat4 transform;
-        Mat4 normalMatrix;
     };
 
     struct GBufferAttachments
@@ -63,13 +52,6 @@ namespace Vk
         VkImageView depthView = VK_NULL_HANDLE;
     };
 
-    struct RtOutputImage
-    {
-        VkImage image = VK_NULL_HANDLE;
-        VkDeviceMemory memory = VK_NULL_HANDLE;
-        VkImageView view = VK_NULL_HANDLE;
-    };
-
     class Renderer
     {
     public:
@@ -87,7 +69,6 @@ namespace Vk
         bool loadShadersAndCreatePipelines(const std::string& shaderDir);
 
         void updateScene(const SceneData& sceneData);
-        void submitMesh(VkBuffer vertexBuffer, VkBuffer indexBuffer, uint32_t indexCount, Mat4 transform);
 
     private:
         void createSurface();
@@ -105,9 +86,6 @@ namespace Vk
         void createDescriptorSets();
         void createUniformBuffers();
         void createGBufferSampler();
-        void createRtOutput();
-        void destroyRtOutput();
-        void createRtDescriptorSets();
         void writeCompositeDescriptor(uint32_t binding, VkImageView view);
 
         void createImage(uint32_t width, uint32_t height, VkFormat format, VkImageUsageFlags usage,
@@ -127,7 +105,6 @@ namespace Vk
         std::unique_ptr<FrameSync> mFrameSync;
 
         GBufferAttachments mGBuffer;
-        RtOutputImage mRtOutput;
 
         VkRenderPass mGBufferRenderPass = VK_NULL_HANDLE;
         VkRenderPass mCompositeRenderPass = VK_NULL_HANDLE;
@@ -142,11 +119,9 @@ namespace Vk
 
         VkDescriptorSetLayout mSceneDescriptorLayout = VK_NULL_HANDLE;
         VkDescriptorSetLayout mCompositeDescriptorLayout = VK_NULL_HANDLE;
-        VkDescriptorSetLayout mRtDescriptorLayout = VK_NULL_HANDLE;
         VkDescriptorPool mDescriptorPool = VK_NULL_HANDLE;
         std::array<VkDescriptorSet, maxFramesInFlight> mSceneDescriptorSets = {};
         std::array<VkDescriptorSet, maxFramesInFlight> mCompositeDescriptorSets = {};
-        VkDescriptorSet mRtDescriptorSet = VK_NULL_HANDLE;
 
         std::array<VkBuffer, maxFramesInFlight> mUniformBuffers = {};
         std::array<VkDeviceMemory, maxFramesInFlight> mUniformMemory = {};
@@ -156,12 +131,8 @@ namespace Vk
 
         std::vector<VkCommandBuffer> mCommandBuffers;
 
-        std::unique_ptr<RayTracingPipeline> mRtPipeline;
-
-        std::vector<MeshDrawCommand> mDrawCommands;
         uint32_t mCurrentFrame = 0;
         uint32_t mCurrentImageIndex = 0;
-        bool mRayTracingEnabled = false;
     };
 }
 

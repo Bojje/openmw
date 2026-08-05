@@ -534,7 +534,6 @@ if (OPENMW_USE_VULKAN)
         vkbuffer
         vkdescriptors
         vkshader
-        vkraytracing
         vkrenderer
         )
 

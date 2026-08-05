@@ -13,7 +13,6 @@
 #include "vkcommands.hpp"
 #include "vkdevice.hpp"
 #include "vkinstance.hpp"
-#include "vkraytracing.hpp"
 #include "vkshader.hpp"
 #include "vkswapchain.hpp"
 #include "vksync.hpp"
@@ -87,15 +86,6 @@ namespace Vk
         createGBufferPipeline();
         createCompositePipeline();
 
-        if (mDevice->rayTracingSupported())
-        {
-            loadRayTracingFunctions(mDevice->handle());
-            createRtOutput();
-            createRtDescriptorSets();
-            mRayTracingEnabled = true;
-
-            writeCompositeDescriptor(3, mRtOutput.view);
-        }
     }
 
     Renderer::~Renderer()
@@ -578,48 +568,6 @@ namespace Vk
             VK_CHECK(vkCreateDescriptorSetLayout(mDevice->handle(), &layoutInfo, nullptr, &mCompositeDescriptorLayout));
         }
 
-        // RT layout: TLAS + storage image + G-buffer samplers
-        if (mDevice->rayTracingSupported())
-        {
-            std::array<VkDescriptorSetLayoutBinding, 5> bindings = {};
-
-            // TLAS
-            bindings[0].binding = 0;
-            bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
-            bindings[0].descriptorCount = 1;
-            bindings[0].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
-
-            // Output storage image
-            bindings[1].binding = 1;
-            bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-            bindings[1].descriptorCount = 1;
-            bindings[1].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
-
-            // G-buffer albedo
-            bindings[2].binding = 2;
-            bindings[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-            bindings[2].descriptorCount = 1;
-            bindings[2].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
-
-            // G-buffer normal
-            bindings[3].binding = 3;
-            bindings[3].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-            bindings[3].descriptorCount = 1;
-            bindings[3].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
-
-            // G-buffer depth
-            bindings[4].binding = 4;
-            bindings[4].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-            bindings[4].descriptorCount = 1;
-            bindings[4].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
-
-            VkDescriptorSetLayoutCreateInfo layoutInfo = {};
-            layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-            layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
-            layoutInfo.pBindings = bindings.data();
-
-            VK_CHECK(vkCreateDescriptorSetLayout(mDevice->handle(), &layoutInfo, nullptr, &mRtDescriptorLayout));
-        }
     }
 
     // Descriptor pool
@@ -633,12 +581,6 @@ namespace Vk
         };
 
         uint32_t maxSets = maxFramesInFlight * 2 + 4;
-
-        if (mDevice->rayTracingSupported())
-        {
-            poolSizes.push_back({ VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 1 });
-            maxSets += 2;
-        }
 
         VkDescriptorPoolCreateInfo poolInfo = {};
         poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -741,90 +683,6 @@ namespace Vk
             }
         }
     }
-
-    // RT output image
-
-    void Renderer::createRtOutput()
-    {
-        VkExtent2D extent = mSwapchain->extent();
-
-        createImage(extent.width, extent.height, VK_FORMAT_R16G16B16A16_SFLOAT,
-            VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-            mRtOutput.image, mRtOutput.memory);
-        mRtOutput.view = createImageView(mRtOutput.image, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_ASPECT_COLOR_BIT);
-
-        VkCommandBuffer cmd = mCommandPool->beginSingleTime();
-        transitionImageLayout(cmd, mRtOutput.image, VK_IMAGE_LAYOUT_UNDEFINED,
-            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT);
-        mCommandPool->endSingleTime(cmd, mDevice->graphicsQueue());
-    }
-
-    void Renderer::destroyRtOutput()
-    {
-        VkDevice dev = mDevice->handle();
-        if (mRtOutput.view != VK_NULL_HANDLE) { vkDestroyImageView(dev, mRtOutput.view, nullptr); mRtOutput.view = VK_NULL_HANDLE; }
-        if (mRtOutput.image != VK_NULL_HANDLE) { vkDestroyImage(dev, mRtOutput.image, nullptr); mRtOutput.image = VK_NULL_HANDLE; }
-        if (mRtOutput.memory != VK_NULL_HANDLE) { vkFreeMemory(dev, mRtOutput.memory, nullptr); mRtOutput.memory = VK_NULL_HANDLE; }
-    }
-
-    void Renderer::createRtDescriptorSets()
-    {
-        if (mRtDescriptorSet == VK_NULL_HANDLE)
-        {
-            VkDescriptorSetAllocateInfo allocInfo = {};
-            allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-            allocInfo.descriptorPool = mDescriptorPool;
-            allocInfo.descriptorSetCount = 1;
-            allocInfo.pSetLayouts = &mRtDescriptorLayout;
-
-            VK_CHECK(vkAllocateDescriptorSets(mDevice->handle(), &allocInfo, &mRtDescriptorSet));
-        }
-
-        // Binding 1: storage image
-        VkDescriptorImageInfo storageImageInfo = {};
-        storageImageInfo.imageView = mRtOutput.view;
-        storageImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-
-        VkWriteDescriptorSet storageWrite = {};
-        storageWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        storageWrite.dstSet = mRtDescriptorSet;
-        storageWrite.dstBinding = 1;
-        storageWrite.descriptorCount = 1;
-        storageWrite.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-        storageWrite.pImageInfo = &storageImageInfo;
-
-        // Bindings 2-4: G-buffer samplers
-        auto makeImageInfo = [&](VkImageView view) {
-            VkDescriptorImageInfo info = {};
-            info.sampler = mGBufferSampler;
-            info.imageView = view;
-            info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            return info;
-        };
-
-        std::array<VkDescriptorImageInfo, 3> gbufferInfos = {
-            makeImageInfo(mGBuffer.albedoView),
-            makeImageInfo(mGBuffer.normalView),
-            makeImageInfo(mGBuffer.depthView)
-        };
-
-        std::array<VkWriteDescriptorSet, 4> writes = {};
-
-        writes[0] = storageWrite;
-
-        for (uint32_t i = 0; i < 3; i++)
-        {
-            writes[i + 1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            writes[i + 1].dstSet = mRtDescriptorSet;
-            writes[i + 1].dstBinding = 2 + i;
-            writes[i + 1].descriptorCount = 1;
-            writes[i + 1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-            writes[i + 1].pImageInfo = &gbufferInfos[i];
-        }
-
-        vkUpdateDescriptorSets(mDevice->handle(), static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
-    }
-
 
     // Pipelines
 
@@ -1168,42 +1026,12 @@ namespace Vk
                 vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mGBufferPipelineLayout,
                     0, 1, &mSceneDescriptorSets[mCurrentFrame], 0, nullptr);
 
-                for (const auto& drawCmd : mDrawCommands)
-                {
-                    struct { Mat4 model; Mat4 normalMatrix; } pushData = {
-                        drawCmd.transform, drawCmd.normalMatrix
-                    };
-                    vkCmdPushConstants(cmd, mGBufferPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT,
-                        0, sizeof(pushData), &pushData);
-
-                    VkDeviceSize offset = 0;
-                    vkCmdBindVertexBuffers(cmd, 0, 1, &drawCmd.vertexBuffer, &offset);
-                    vkCmdBindIndexBuffer(cmd, drawCmd.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
-                    vkCmdDrawIndexed(cmd, drawCmd.indexCount, 1, 0, 0, 0);
-                }
             }
 
             vkCmdEndRenderPass(cmd);
         }
 
-        // 2. Ray tracing pass (shadows + reflections)
-        if (mRayTracingEnabled && mRtPipeline)
-        {
-            transitionImageLayout(cmd, mRtOutput.image,
-                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL,
-                VK_IMAGE_ASPECT_COLOR_BIT);
-
-            mRtPipeline->bind(cmd);
-            vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
-                mRtPipeline->layout(), 0, 1, &mRtDescriptorSet, 0, nullptr);
-            mRtPipeline->traceRays(cmd, extent.width, extent.height);
-
-            transitionImageLayout(cmd, mRtOutput.image,
-                VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                VK_IMAGE_ASPECT_COLOR_BIT);
-        }
-
-        // 3. Composite pass
+        // 2. Composite pass
         {
             VkClearValue clearValue = {};
             clearValue.color = {{ 0.0f, 0.0f, 0.0f, 1.0f }};
@@ -1253,8 +1081,6 @@ namespace Vk
             vkCmdEndRenderPass(cmd);
         }
 
-        mDrawCommands.clear();
-
         endFrame();
     }
 
@@ -1270,9 +1096,6 @@ namespace Vk
         destroyCompositeFramebuffers();
         destroyGBuffer();
 
-        if (mRayTracingEnabled)
-            destroyRtOutput();
-
         mSwapchain->recreate(width, height);
         mFrameSync->resizeRenderFinished(mSwapchain->imageCount());
 
@@ -1280,32 +1103,17 @@ namespace Vk
         createGBufferFramebuffer();
         createCompositeFramebuffers();
 
-        if (mRayTracingEnabled)
-        {
-            createRtOutput();
-            createRtDescriptorSets();
-        }
-
         writeCompositeDescriptor(0, mGBuffer.albedoView);
         writeCompositeDescriptor(1, mGBuffer.normalView);
         writeCompositeDescriptor(2, mGBuffer.depthView);
         writeCompositeDescriptor(5, mGBuffer.materialView);
 
-        if (mRtOutput.view != VK_NULL_HANDLE)
-            writeCompositeDescriptor(3, mRtOutput.view);
-        else
-            writeCompositeDescriptor(3, mGBuffer.albedoView);
+        writeCompositeDescriptor(3, mGBuffer.albedoView);
     }
 
     void Renderer::updateScene(const SceneData& sceneData)
     {
         std::memcpy(mUniformMapped[mCurrentFrame], &sceneData, sizeof(SceneData));
-    }
-
-    void Renderer::submitMesh(VkBuffer vertexBuffer, VkBuffer indexBuffer, uint32_t indexCount, Mat4 transform)
-    {
-        Mat4 normalMatrix = computeNormalMatrix(transform);
-        mDrawCommands.push_back({ vertexBuffer, indexBuffer, indexCount, transform, normalMatrix });
     }
 
     void Renderer::cleanup()
@@ -1316,11 +1124,6 @@ namespace Vk
         vkDeviceWaitIdle(mDevice->handle());
 
         VkDevice dev = mDevice->handle();
-
-        mRtPipeline.reset();
-
-        if (mRayTracingEnabled)
-            destroyRtOutput();
 
         for (uint32_t i = 0; i < maxFramesInFlight; i++)
         {
@@ -1341,9 +1144,6 @@ namespace Vk
             vkDestroyDescriptorSetLayout(dev, mSceneDescriptorLayout, nullptr);
         if (mCompositeDescriptorLayout != VK_NULL_HANDLE)
             vkDestroyDescriptorSetLayout(dev, mCompositeDescriptorLayout, nullptr);
-        if (mRtDescriptorLayout != VK_NULL_HANDLE)
-            vkDestroyDescriptorSetLayout(dev, mRtDescriptorLayout, nullptr);
-
         if (mGBufferSampler != VK_NULL_HANDLE)
             vkDestroySampler(dev, mGBufferSampler, nullptr);
 

@@ -28,9 +28,7 @@ namespace Vk
         VkQueue graphicsQueue() const { return mGraphicsQueue; }
         VkQueue presentQueue() const { return mPresentQueue; }
         VkQueue computeQueue() const { return mComputeQueue; }
-        bool rayTracingSupported() const { return mRayTracingSupported; }
 
-        VkPhysicalDeviceRayTracingPipelinePropertiesKHR rayTracingProperties() const;
         uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) const;
 
     private:
@@ -47,10 +45,8 @@ namespace Vk
         VkQueue mGraphicsQueue = VK_NULL_HANDLE;
         VkQueue mPresentQueue = VK_NULL_HANDLE;
         VkQueue mComputeQueue = VK_NULL_HANDLE;
-        bool mRayTracingSupported = false;
 
         static const std::vector<const char*> sRequiredExtensions;
-        static const std::vector<const char*> sRayTracingExtensions;
     };
 }
 
