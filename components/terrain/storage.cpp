@@ -69,6 +69,20 @@ namespace Terrain
         if (static_cast<std::size_t>(tile.verticesPerSide) * tile.verticesPerSide != positions->size())
             return std::nullopt;
         tile.vertices.resize(positions->size());
+        tile.indices.reserve(static_cast<std::size_t>(tile.verticesPerSide - 1)
+            * (tile.verticesPerSide - 1) * 6);
+        for (std::uint32_t y = 0; y + 1 < tile.verticesPerSide; ++y)
+        {
+            for (std::uint32_t x = 0; x + 1 < tile.verticesPerSide; ++x)
+            {
+                const std::uint32_t topLeft = y * tile.verticesPerSide + x;
+                const std::uint32_t topRight = topLeft + 1;
+                const std::uint32_t bottomLeft = topLeft + tile.verticesPerSide;
+                const std::uint32_t bottomRight = bottomLeft + 1;
+                tile.indices.insert(tile.indices.end(), { topLeft, bottomLeft, topRight,
+                    topRight, bottomLeft, bottomRight });
+            }
+        }
         for (std::size_t i = 0; i < positions->size(); ++i)
         {
             tile.vertices[i].position = { (*positions)[i].x(), (*positions)[i].y(), (*positions)[i].z() };

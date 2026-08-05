@@ -77,7 +77,8 @@ int main()
         expect(tile.has_value() && tile->valid(), "terrain adapter returned an invalid tile");
         expect(tile->lod == 2 && tile->size == 4.f && tile->center[0] == 3.f && tile->center[1] == -2.f,
             "terrain tile metadata was not preserved");
-        expect(tile->verticesPerSide == 2 && tile->vertices.size() == 4 && tile->vertices[1].position[0] == 1.f
+        expect(tile->verticesPerSide == 2 && tile->vertices.size() == 4 && tile->indices.size() == 6
+                && tile->indices[0] == 0 && tile->indices[5] == 3 && tile->vertices[1].position[0] == 1.f
                 && tile->vertices[2].color[2] == 255,
             "terrain vertices were not converted");
         expect(tile->layers.size() == 1 && tile->layers[0].diffuseTexture == "textures/grass.dds"
