@@ -9,6 +9,8 @@
 #include <SDL.h>
 #include <SDL_vulkan.h>
 
+#include <components/nif/data.hpp>
+#include <components/resource/nifmeshmanager.hpp>
 #include <components/vk/vkrenderer.hpp>
 
 #ifndef OPENMW_VULKAN_SHADER_DIR
@@ -43,6 +45,23 @@ namespace
         if (end == argv[2] || *end != '\0' || parsed < 1 || parsed > 100)
             throw std::runtime_error("frame count must be an integer from 1 to 100");
         return static_cast<unsigned int>(parsed);
+    }
+
+    std::shared_ptr<const Resource::NifMeshManager::Meshes> smokeMeshes()
+    {
+        auto file = std::make_shared<Nif::NIFFile>(VFS::Path::Normalized("vulkan-smoke.nif"));
+        auto data = std::make_unique<Nif::NiTriShapeData>();
+        data->mVertices = { { -0.5f, -0.5f, 0.0f }, { 0.5f, -0.5f, 0.0f }, { 0.0f, 0.5f, 0.0f } };
+        data->mTriangles = { 0, 1, 2 };
+
+        auto shape = std::make_unique<Nif::NiTriShape>();
+        shape->mData = data.get();
+        file->mRecords.push_back(std::move(data));
+        file->mRoots.push_back(shape.get());
+        file->mRecords.push_back(std::move(shape));
+
+        Resource::NifMeshManager meshManager(nullptr);
+        return meshManager.get(file);
     }
 }
 
@@ -88,15 +107,7 @@ int main(int argc, char** argv)
             scene.sunDirection = { 0.0f, -1.0f, 0.0f, 0.0f };
             scene.sunColor = { 1.0f, 1.0f, 1.0f, 1.0f };
 
-            Render::MeshInstance mesh = {};
-            mesh.mesh.vertices = {
-                { { -0.5f, -0.5f, 0.0f }, { 0.0f, 0.0f, 1.0f }, { 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
-                { { 0.5f, -0.5f, 0.0f }, { 0.0f, 0.0f, 1.0f }, { 1.0f, 0.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
-                { { 0.0f, 0.5f, 0.0f }, { 0.0f, 0.0f, 1.0f }, { 0.5f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
-            };
-            mesh.mesh.indices = { 0, 1, 2 };
-            mesh.transform = identityMatrix();
-            renderer->setMeshes({ mesh });
+            renderer->setMeshes(*smokeMeshes());
 
             unsigned int renderedFrames = 0;
             for (unsigned int frame = 0; frame < frames; ++frame)

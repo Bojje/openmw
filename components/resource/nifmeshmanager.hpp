@@ -35,6 +35,7 @@ namespace Resource
         double mExpiryDelay = 0.0;
         CacheStats mStats;
 
+    public:
         explicit NifMeshManager(NifFileManager* nifFileManager);
         ~NifMeshManager() override;
 

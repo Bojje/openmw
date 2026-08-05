@@ -24,7 +24,8 @@ transform-preserving NIF tree traversal for static mesh discovery, and a Vulkan 
 resulting neutral mesh. Vulkan now batches multiple neutral mesh instances with independent
 transforms. Parsed NIF resources now use a shared-pointer cache instead of an OSG object
 wrapper, and converted renderer-neutral NIF mesh instances have a separate path-keyed
-cache owned by `ResourceSystem`.
+cache owned by `ResourceSystem`. The smoke harness exercises that cache boundary before
+submitting its test mesh to Vulkan.
 
 The remaining migration is not a compatibility problem that can be solved by retaining
 both renderers in one execution path. Static-world transforms, materials, textures,
