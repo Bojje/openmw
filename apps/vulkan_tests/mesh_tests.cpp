@@ -4,6 +4,8 @@
 
 #include <components/nif/data.hpp>
 #include <components/nif/meshconverter.hpp>
+#include <components/nif/property.hpp>
+#include <components/nif/texture.hpp>
 #include <components/resource/nifmeshmanager.hpp>
 
 namespace
@@ -62,10 +64,29 @@ int main()
     Nif::NiTriShapeData treeData;
     treeData.mVertices = source.mVertices;
     treeData.mTriangles = { 0, 1, 2 };
+    Nif::NiSourceTexture texture;
+    texture.mFile = "textures/synthetic.dds";
+    Nif::NiTexturingProperty texturing;
+    texturing.mTextures.resize(1);
+    texturing.mTextures.front().mEnabled = true;
+    texturing.mTextures.front().mSourceTexture = &texture;
+    Nif::NiMaterialProperty material;
+    material.mDiffuse = { 0.25f, 0.5f, 0.75f };
+    material.mAlpha = 0.75f;
+    material.mEmissive = { 0.1f, 0.2f, 0.3f };
+    material.mEmissiveMult = 2.f;
+    material.mGlossiness = 42.f;
+    Nif::NiAlphaProperty alpha;
+    alpha.mFlags = Nif::NiAlphaProperty::Flag_Blending | Nif::NiAlphaProperty::Flag_Testing;
+    alpha.mThreshold = 128;
     Nif::NiTriShape shape;
     shape.mTransform = Nif::NiTransform::getIdentity();
     shape.mTransform.mTranslation.x() = 2.0f;
     shape.mData = &treeData;
+    shape.mShaderProperty = nullptr;
+    shape.mProperties.push_back(&texturing);
+    shape.mProperties.push_back(&material);
+    shape.mAlphaProperty = &alpha;
     Nif::NiNode root;
     root.mTransform = Nif::NiTransform::getIdentity();
     root.mTransform.mTranslation.x() = 10.0f;
@@ -77,6 +98,14 @@ int main()
     if (instances.size() != 1 || instances.front().mesh.indices.size() != 3)
         throw std::runtime_error("NIF scene traversal did not collect a mesh instance");
     expectNear(instances.front().transform.data[12], 12.0f, "composed mesh translation");
+    if (instances.front().mesh.material.albedoTexture != "textures/synthetic.dds"
+        || !instances.front().mesh.material.alphaBlend || !instances.front().mesh.material.alphaTest
+        || instances.front().mesh.material.alphaTestThreshold != 128)
+        throw std::runtime_error("NIF material conversion lost texture or alpha state");
+    expectNear(instances.front().mesh.material.diffuse.x, 0.25f, "material diffuse red");
+    expectNear(instances.front().mesh.material.diffuse.w, 0.75f, "material alpha");
+    expectNear(instances.front().mesh.material.emissive.z, 0.6f, "material emissive");
+    expectNear(instances.front().mesh.material.glossiness, 42.f, "material glossiness");
 
     Resource::NifMeshManager meshManager(nullptr);
     const auto cached = meshManager.get(file);
@@ -88,6 +117,8 @@ int main()
     if (batch.vertices.size() != 6 || batch.indices != std::vector<uint32_t>({ 0, 1, 2, 3, 4, 5 })
         || batch.draws.size() != 2 || batch.draws[1].firstIndex != 3 || batch.draws[1].vertexOffset != 3)
         throw std::runtime_error("renderer-neutral mesh batching returned the wrong layout");
+    if (batch.draws.front().material.albedoTexture != "textures/synthetic.dds")
+        throw std::runtime_error("renderer-neutral mesh batching dropped material data");
     expectNear(batch.draws[1].transform.data[12], 12.0f, "batched mesh translation");
 
     Render::WorldObject object{ 1, "synthetic.nif", {} };

@@ -1,9 +1,12 @@
 #include "meshconverter.hpp"
 
 #include <stdexcept>
+#include <utility>
 
 #include "data.hpp"
 #include "node.hpp"
+#include "property.hpp"
+#include "texture.hpp"
 #include <components/render/math.hpp>
 
 namespace Nif
@@ -80,6 +83,73 @@ namespace Nif
                 throw std::runtime_error("NIF triangle index is outside the vertex data");
             mesh.indices.push_back(index);
         }
+
+        void setShaderTexture(Render::MeshMaterial& material, const BSShaderTextureSetPtr& textureSet)
+        {
+            if (!textureSet.empty() && !textureSet->mTextures.empty())
+                material.albedoTexture = textureSet->mTextures.front();
+        }
+
+        Render::MeshMaterial convertMaterial(const NiGeometry& geometry)
+        {
+            Render::MeshMaterial result;
+
+            for (const auto& property : geometry.mProperties)
+            {
+                if (property.empty())
+                    continue;
+
+                if (const auto* texturing = dynamic_cast<const NiTexturingProperty*>(property.getPtr()))
+                {
+                    if (texturing->mTextures.size() > NiTexturingProperty::BaseTexture)
+                    {
+                        const NiTexturingProperty::Texture& texture
+                            = texturing->mTextures[NiTexturingProperty::BaseTexture];
+                        if (texture.mEnabled && !texture.mSourceTexture.empty())
+                            result.albedoTexture = texture.mSourceTexture->mFile;
+                    }
+                }
+                else if (const auto* material = dynamic_cast<const NiMaterialProperty*>(property.getPtr()))
+                {
+                    result.diffuse = { material->mDiffuse.x(), material->mDiffuse.y(), material->mDiffuse.z(),
+                        material->mAlpha };
+                    result.emissive = { material->mEmissive.x() * material->mEmissiveMult,
+                        material->mEmissive.y() * material->mEmissiveMult,
+                        material->mEmissive.z() * material->mEmissiveMult, 1.f };
+                    result.glossiness = material->mGlossiness;
+                }
+            }
+
+            if (!geometry.mAlphaProperty.empty())
+            {
+                const NiAlphaProperty& alpha = *geometry.mAlphaProperty.getPtr();
+                result.alphaBlend = alpha.useAlphaBlending();
+                result.alphaTest = alpha.useAlphaTesting();
+                result.alphaTestThreshold = alpha.mThreshold;
+            }
+
+            if (!geometry.mShaderProperty.empty())
+            {
+                const BSShaderProperty* shader = geometry.mShaderProperty.getPtr();
+                if (const auto* lighting = dynamic_cast<const BSLightingShaderProperty*>(shader))
+                {
+                    setShaderTexture(result, lighting->mTextureSet);
+                    result.diffuse.w = lighting->mAlpha;
+                    result.emissive = { lighting->mEmissive.x() * lighting->mEmissiveMult,
+                        lighting->mEmissive.y() * lighting->mEmissiveMult,
+                        lighting->mEmissive.z() * lighting->mEmissiveMult, 1.f };
+                    result.glossiness = lighting->mGlossiness;
+                }
+                else if (const auto* ppLighting = dynamic_cast<const BSShaderPPLightingProperty*>(shader))
+                {
+                    setShaderTexture(result, ppLighting->mTextureSet);
+                    result.emissive = { ppLighting->mEmissiveColor.x(), ppLighting->mEmissiveColor.y(),
+                        ppLighting->mEmissiveColor.z(), ppLighting->mEmissiveColor.w() };
+                }
+            }
+
+            return result;
+        }
     }
 
     Render::MeshData convertMesh(const NiTriShapeData& source)
@@ -154,9 +224,17 @@ namespace Nif
                 if (!geometry->mData.empty())
                 {
                     if (const auto* shapeData = dynamic_cast<const NiTriShapeData*>(&geometry->mData.get()))
-                        meshes.push_back({ convertMesh(*shapeData), transform });
+                    {
+                        Render::MeshData mesh = convertMesh(*shapeData);
+                        mesh.material = convertMaterial(*geometry);
+                        meshes.push_back({ std::move(mesh), transform });
+                    }
                     else if (const auto* stripsData = dynamic_cast<const NiTriStripsData*>(&geometry->mData.get()))
-                        meshes.push_back({ convertMesh(*stripsData), transform });
+                    {
+                        Render::MeshData mesh = convertMesh(*stripsData);
+                        mesh.material = convertMaterial(*geometry);
+                        meshes.push_back({ std::move(mesh), transform });
+                    }
                 }
             }
 

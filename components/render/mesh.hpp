@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <limits>
 #include <stdexcept>
+#include <string>
 #include <vector>
 
 #include "math.hpp"
@@ -11,6 +12,17 @@
 
 namespace Render
 {
+    struct MeshMaterial
+    {
+        std::string albedoTexture;
+        Vec4 diffuse{ 1.f, 1.f, 1.f, 1.f };
+        Vec4 emissive{};
+        float glossiness = 0.f;
+        bool alphaBlend = false;
+        bool alphaTest = false;
+        uint8_t alphaTestThreshold = 0;
+    };
+
     struct MeshVertex
     {
         float position[3];
@@ -25,6 +37,7 @@ namespace Render
     {
         std::vector<MeshVertex> vertices;
         std::vector<uint32_t> indices;
+        MeshMaterial material;
     };
 
     struct MeshInstance
@@ -40,6 +53,7 @@ namespace Render
         int32_t vertexOffset;
         Mat4 transform;
         Mat4 normalMatrix;
+        MeshMaterial material;
     };
 
     struct MeshBatch
@@ -71,6 +85,7 @@ namespace Render
                 static_cast<int32_t>(vertexOffset),
                 mesh.transform,
                 computeNormalMatrix(mesh.transform),
+                mesh.mesh.material,
             };
             for (uint32_t index : mesh.mesh.indices)
             {
