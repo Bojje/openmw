@@ -66,10 +66,12 @@ the local headless environment still skips before this runtime path. This makes 
 OSG/Vulkan captures diagnosable instead of reducing them to an opaque pixel mismatch.
 A neutral terrain tile snapshot adapter also converts the legacy
 OSG-array/OSG-image storage contract into vertices, layer metadata, and RGBA8 blendmaps;
-opaque single-layer terrain retains an intentionally absent blendmap.
+opaque single-layer terrain retains an intentionally absent blendmap. Vulkan now consumes
+that opaque form through the existing indexed mesh path, while multi-layer/blendmap tiles
+are explicitly deferred until a terrain shader exists.
 
 Against the actual PR base `origin/openmw-vulkan` (PR #5), the current checkpoint changes
-45 files, deleting 251 lines and adding 2,826 lines (net `+2,575`). The larger Vulkan-only
+46 files, deleting 251 lines and adding 2,927 lines (net `+2,676`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
@@ -96,7 +98,7 @@ the game unplayable rather than reduce duplication safely.
 | Vulkan utility/queue helper paths | Removed | Complete |
 | Parsed NIF resource cache wrapper | Removed | Complete; cache now owns shared NIF files directly |
 | NIF-to-neutral mesh conversion | Renderer-neutral NIF boundary, material data, mesh cache, `SceneSubmission`, Vulkan mesh batch, standalone texture table, and full-game neutral resolver | Connect the handoff to the live full-game Vulkan frame loop, add material shading, skinning, and static-world submission |
-| Terrain geometry and layer data | Legacy OSG terrain storage/ChunkManager plus a tested renderer-neutral tile snapshot adapter | Add a Vulkan terrain consumer, terrain paging/LOD policy, and terrain image/shader coverage |
+| Terrain geometry and layer data | Legacy OSG terrain storage/ChunkManager plus a tested neutral tile adapter and Vulkan opaque single-layer mesh consumer | Add Vulkan terrain paging/LOD policy, blendmap/layer shaders, and terrain image coverage |
 | Loaded-cell object identity, transforms, and paging state | Renderer-neutral `WorldScene`/`CellScene` snapshots updated by scene lifecycle | Consume snapshots from a backend and migrate visibility/paging policy |
 | GUI, loading screens, screenshots, and presentation | OSG/MyGUI path | Vulkan presentation and GUI coverage |
 
@@ -149,8 +151,9 @@ real replacement consumes its responsibility and the fast tests cover the bounda
 
 - Wire NIF loading and `MeshConverter` into resource management. The NIF converter now has a tested tree traversal and material boundary, `NifMeshManager` caches converted instances, image resources expose neutral RGBA8 data, and `RenderingManager` can collect a `SceneSubmission` without exposing OSG objects. The standalone Vulkan path consumes that submission and its resolved textures; a live full-game Vulkan frame consumer, shading, and a static-world consumer are still outstanding.
 - Implement model caching, cell add/remove, transforms, textures, materials, terrain,
-  interiors, and static objects. The terrain adapter is now the boundary for the
-  geometry/layer portion; Vulkan upload, terrain paging/LOD, and terrain shaders remain.
+  interiors, and static objects. The terrain adapter now feeds an opaque single-layer
+  Vulkan mesh consumer; terrain paging/LOD, blendmap/layer shaders, and full terrain
+  coverage remain.
 - Reach a static playable scene without OSG rendering.
 
 ### 7. Port dynamic content and presentation
