@@ -523,7 +523,13 @@ namespace MWRender
                     continue;
                 const auto tile = mNeutralTerrainTiles.find(cell->key);
                 if (tile != mNeutralTerrainTiles.end())
-                    result.terrainTiles.push_back(tile->second);
+                {
+                    const float cameraX = result.scene.viewInverse.data[12];
+                    const float cameraY = result.scene.viewInverse.data[13];
+                    if (const Render::TerrainTile* selected
+                        = Render::selectTerrainLod(tile->second, cameraX, cameraY))
+                        result.terrainTiles.push_back(*selected);
+                }
             }
         }
 
@@ -701,9 +707,21 @@ namespace MWRender
             {
                 const osg::Vec2f center(store->getCell()->getGridX() + 0.5f,
                     store->getCell()->getGridY() + 0.5f);
-                if (std::optional<Render::TerrainTile> tile = mTerrainStorage->getRenderTile(
-                        0, 1.f, center, store->getCell()->getWorldSpace()))
-                    mNeutralTerrainTiles[static_cast<const void*>(store)] = std::move(*tile);
+                const ESM::RefId worldspace = store->getCell()->getWorldSpace();
+                std::vector<Render::TerrainTile>& tiles = mNeutralTerrainTiles[static_cast<const void*>(store)];
+                tiles.clear();
+                const int cellVertices = mTerrainStorage->getCellVertices(worldspace);
+                int maxLod = 0;
+                for (int vertices = std::max(cellVertices - 1, 1); vertices > 1; vertices >>= 1)
+                    ++maxLod;
+                for (int lod = 0; lod <= maxLod; ++lod)
+                {
+                    if (std::optional<Render::TerrainTile> tile
+                        = mTerrainStorage->getRenderTile(lod, 1.f, center, worldspace))
+                        tiles.push_back(std::move(*tile));
+                    else
+                        break;
+                }
             }
         }
     }

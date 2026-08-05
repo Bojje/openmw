@@ -6,6 +6,7 @@
 #include <osg/Image>
 
 #include <components/terrain/storage.hpp>
+#include <components/render/terrainpaging.hpp>
 #include <components/render/terrainmesh.hpp>
 
 namespace
@@ -128,6 +129,16 @@ int main()
         malformed.indices.back() = static_cast<std::uint32_t>(malformed.vertices.size());
         expect(!malformed.valid() && Render::makeTerrainMeshes(malformed).empty(),
             "terrain validation should reject out-of-range indices");
+
+        Render::TerrainTile lodOne = *opaqueTile;
+        lodOne.lod = 1;
+        Render::TerrainTile lodTwo = *opaqueTile;
+        lodTwo.lod = 2;
+        const std::vector<Render::TerrainTile> lodTiles = { *opaqueTile, lodOne, lodTwo };
+        expect(Render::selectTerrainLod(lodTiles, 0.f, 0.f)->lod == 0
+                && Render::selectTerrainLod(lodTiles, 40.f, 0.f)->lod == 1
+                && Render::selectTerrainLod(lodTiles, 80.f, 0.f)->lod == 2,
+            "terrain LOD selection did not follow deterministic distance thresholds");
 
         std::cout << "Vulkan terrain snapshot tests passed\n";
         return EXIT_SUCCESS;

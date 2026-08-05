@@ -6,6 +6,7 @@
 #include "rendermode.hpp"
 
 #include <components/render/submission.hpp>
+#include <components/render/terrainpaging.hpp>
 #include <components/render/world.hpp>
 
 #include <components/settings/settings.hpp>
@@ -347,7 +348,7 @@ namespace MWRender
         std::unique_ptr<Water> mWater;
         std::unordered_map<ESM::RefId, WorldspaceChunkMgr> mWorldspaceChunks;
         Render::WorldScene mWorldScene;
-        std::unordered_map<const void*, Render::TerrainTile> mNeutralTerrainTiles;
+        std::unordered_map<const void*, std::vector<Render::TerrainTile>> mNeutralTerrainTiles;
         std::string mActiveWorldspace;
         Terrain::World* mTerrain;
         std::unique_ptr<TerrainStorage> mTerrainStorage;
