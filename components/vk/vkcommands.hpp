@@ -19,7 +19,6 @@ namespace Vk
         CommandPool(const CommandPool&) = delete;
         CommandPool& operator=(const CommandPool&) = delete;
 
-        VkCommandBuffer allocate();
         std::vector<VkCommandBuffer> allocateMultiple(uint32_t count);
 
     private:

@@ -22,19 +22,6 @@ namespace Vk
             vkDestroyCommandPool(mDevice.handle(), mPool, nullptr);
     }
 
-    VkCommandBuffer CommandPool::allocate()
-    {
-        VkCommandBufferAllocateInfo allocInfo = {};
-        allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-        allocInfo.commandPool = mPool;
-        allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-        allocInfo.commandBufferCount = 1;
-
-        VkCommandBuffer commandBuffer;
-        VK_CHECK(vkAllocateCommandBuffers(mDevice.handle(), &allocInfo, &commandBuffer));
-        return commandBuffer;
-    }
-
     std::vector<VkCommandBuffer> CommandPool::allocateMultiple(uint32_t count)
     {
         VkCommandBufferAllocateInfo allocInfo = {};
