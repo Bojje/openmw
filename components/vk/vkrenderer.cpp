@@ -1399,32 +1399,33 @@ namespace Vk
     void Renderer::setMeshes(const std::vector<Render::MeshInstance>& meshes, TextureResolver textureResolver)
     {
         Render::MeshBatch batch = Render::batchMeshes(meshes);
-        mMeshDraws = std::move(batch.draws);
-        mMeshVertices = std::move(batch.vertices);
-        mMeshIndices = std::move(batch.indices);
-        mMeshTextureIndices.clear();
-        mMeshTextureIndices.reserve(mMeshDraws.size());
-        for (const Render::MeshDraw& draw : mMeshDraws)
+        std::vector<uint32_t> textureIndices;
+        textureIndices.reserve(batch.draws.size());
+        for (const Render::MeshDraw& draw : batch.draws)
         {
             if (draw.material.albedoTexture.empty() || !textureResolver)
             {
-                mMeshTextureIndices.push_back(0);
+                textureIndices.push_back(0);
                 continue;
             }
 
             const auto existing = mTextureIndices.find(draw.material.albedoTexture);
             if (existing != mTextureIndices.end())
             {
-                mMeshTextureIndices.push_back(existing->second);
+                textureIndices.push_back(existing->second);
                 continue;
             }
 
             const std::shared_ptr<const Render::TextureData> texture = textureResolver(draw.material.albedoTexture);
             const uint32_t textureIndex = texture && texture->valid() ? createTextureResource(*texture) : 0;
             mTextureIndices.emplace(draw.material.albedoTexture, textureIndex);
-            mMeshTextureIndices.push_back(textureIndex);
+            textureIndices.push_back(textureIndex);
         }
 
+        mMeshDraws = std::move(batch.draws);
+        mMeshVertices = std::move(batch.vertices);
+        mMeshIndices = std::move(batch.indices);
+        mMeshTextureIndices = std::move(textureIndices);
         ++mMeshRevision;
         if (mMeshRevision == 0)
             ++mMeshRevision;
