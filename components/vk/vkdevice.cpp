@@ -17,7 +17,6 @@ namespace Vk
     };
 
     Device::Device(Instance& instance, VkSurfaceKHR surface)
-        : mSurface(surface)
     {
         selectPhysicalDevice(instance.handle(), surface);
         createLogicalDevice();
@@ -32,7 +31,6 @@ namespace Vk
     Device::Device(Device&& other) noexcept
         : mDevice(other.mDevice)
         , mPhysicalDevice(other.mPhysicalDevice)
-        , mSurface(other.mSurface)
         , mQueueFamilyIndices(other.mQueueFamilyIndices)
         , mGraphicsQueue(other.mGraphicsQueue)
         , mPresentQueue(other.mPresentQueue)
@@ -52,7 +50,6 @@ namespace Vk
 
             mDevice = other.mDevice;
             mPhysicalDevice = other.mPhysicalDevice;
-            mSurface = other.mSurface;
             mQueueFamilyIndices = other.mQueueFamilyIndices;
             mGraphicsQueue = other.mGraphicsQueue;
             mPresentQueue = other.mPresentQueue;
@@ -86,7 +83,7 @@ namespace Vk
             if (!checkDeviceExtensionSupport(device, sRequiredExtensions))
                 continue;
 
-            int score = rateDevice(device, surface);
+            int score = rateDevice(device);
 
             if (score > bestScore)
             {
@@ -201,7 +198,7 @@ namespace Vk
         return true;
     }
 
-    int Device::rateDevice(VkPhysicalDevice device, VkSurfaceKHR surface) const
+    int Device::rateDevice(VkPhysicalDevice device) const
     {
         VkPhysicalDeviceProperties props;
         vkGetPhysicalDeviceProperties(device, &props);
