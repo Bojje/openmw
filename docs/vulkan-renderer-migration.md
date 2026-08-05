@@ -21,8 +21,8 @@ the unused Vulkan mesh submission queue, inactive ray-tracing scaffolding, and u
 buffer, descriptor, command-helper, compute, and transfer-queue paths. The current bridge
 also contains renderer-neutral scene/math data, a validated NIF triangle conversion path,
 transform-preserving NIF tree traversal for static mesh discovery, and a Vulkan draw of the
-resulting neutral mesh. Vulkan now batches multiple neutral mesh instances with independent
-transforms. Parsed NIF resources now use a shared-pointer cache instead of an OSG object
+resulting neutral mesh. Renderer-neutral batching now flattens multiple mesh instances with
+independent transforms before the Vulkan backend uploads them. Parsed NIF resources now use a shared-pointer cache instead of an OSG object
 wrapper, and converted renderer-neutral NIF mesh instances have a separate path-keyed
 cache owned by `ResourceSystem`. The smoke harness exercises that cache boundary before
 submitting its test mesh to Vulkan.
@@ -62,7 +62,7 @@ real replacement consumes its responsibility and the fast tests cover the bounda
 
 - Add a small test mode or executable that starts one renderer, loads a manifest of test scenes/cameras, renders multiple checkpoints, writes images, and exits. The current standalone smoke target covers one neutral mesh and multiple frame submissions; image capture and reference comparison remain pending until a Vulkan-capable presentation or offscreen test target is available.
 - Use fixed camera paths, time, weather, random seed, resolution, and content.
-- Add CPU-side tests for matrix conversion, NIF conversion, transforms, resource lookup, and scene snapshots. The current fast tests cover matrix conversion, NIF conversion, parent-child transforms, and safe index handling.
+- Add CPU-side tests for matrix conversion, NIF conversion, transforms, resource lookup, and scene snapshots. The current fast tests cover matrix conversion, NIF conversion, parent-child transforms, safe index handling, cache reuse, and renderer-neutral batch layout.
 - Compare Vulkan output with OSG reference images using tolerances rather than exact pixel equality.
 
 ### 3. Remove the dual-renderer lifecycle

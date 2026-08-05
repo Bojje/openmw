@@ -1021,7 +1021,7 @@ namespace Vk
                     VkDeviceSize offset = 0;
                     vkCmdBindVertexBuffers(cmd, 0, 1, &mMeshVertexBuffer, &offset);
                     vkCmdBindIndexBuffer(cmd, mMeshIndexBuffer, 0, VK_INDEX_TYPE_UINT32);
-                    for (const MeshDraw& draw : mMeshDraws)
+                    for (const Render::MeshDraw& draw : mMeshDraws)
                     {
                         const PushData pushData = { draw.transform, draw.normalMatrix };
                         vkCmdPushConstants(cmd, mGBufferPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT,
@@ -1127,43 +1127,14 @@ namespace Vk
         vkDeviceWaitIdle(mDevice->handle());
         destroyMesh();
 
-        std::vector<Render::MeshVertex> vertices;
-        std::vector<uint32_t> indices;
-        std::vector<MeshDraw> draws;
-        for (const Render::MeshInstance& mesh : meshes)
-        {
-            if (mesh.mesh.vertices.empty() || mesh.mesh.indices.empty())
-                continue;
-
-            if (vertices.size() > static_cast<std::size_t>(std::numeric_limits<int32_t>::max()))
-                throw std::runtime_error("Vulkan mesh batch has too many vertices");
-            if (indices.size() > static_cast<std::size_t>(std::numeric_limits<uint32_t>::max())
-                || mesh.mesh.indices.size() > static_cast<std::size_t>(std::numeric_limits<uint32_t>::max()))
-                throw std::runtime_error("Vulkan mesh batch has too many indices");
-
-            const uint32_t vertexOffset = static_cast<uint32_t>(vertices.size());
-            MeshDraw draw = {
-                static_cast<uint32_t>(mesh.mesh.indices.size()),
-                static_cast<uint32_t>(indices.size()),
-                static_cast<int32_t>(vertexOffset),
-                mesh.transform,
-                Render::computeNormalMatrix(mesh.transform),
-            };
-            for (uint32_t index : mesh.mesh.indices)
-            {
-                if (index >= mesh.mesh.vertices.size()
-                    || static_cast<uint64_t>(index) + vertexOffset > std::numeric_limits<uint32_t>::max())
-                    throw std::runtime_error("Vulkan mesh batch contains an invalid index");
-                indices.push_back(index + vertexOffset);
-            }
-            vertices.insert(vertices.end(), mesh.mesh.vertices.begin(), mesh.mesh.vertices.end());
-            draws.push_back(draw);
-        }
+        Render::MeshBatch batch = Render::batchMeshes(meshes);
+        std::vector<Render::MeshVertex>& vertices = batch.vertices;
+        std::vector<uint32_t>& indices = batch.indices;
 
         if (vertices.empty() || indices.empty())
             return;
 
-        mMeshDraws = std::move(draws);
+        mMeshDraws = std::move(batch.draws);
 
         try
         {

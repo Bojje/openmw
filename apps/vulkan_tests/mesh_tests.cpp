@@ -88,5 +88,11 @@ int main()
     if (cached != cachedAgain || cached->size() != 1 || cached->front().mesh.indices.size() != 3)
         throw std::runtime_error("NIF mesh manager did not reuse the converted mesh");
 
+    const Render::MeshBatch batch = Render::batchMeshes({ instances.front(), instances.front() });
+    if (batch.vertices.size() != 6 || batch.indices != std::vector<uint32_t>({ 0, 1, 2, 3, 4, 5 })
+        || batch.draws.size() != 2 || batch.draws[1].firstIndex != 3 || batch.draws[1].vertexOffset != 3)
+        throw std::runtime_error("renderer-neutral mesh batching returned the wrong layout");
+    expectNear(batch.draws[1].transform.data[12], 12.0f, "batched mesh translation");
+
     std::cout << "NIF mesh conversion tests passed\n";
 }

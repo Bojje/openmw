@@ -127,15 +127,7 @@ namespace Vk
         VkBuffer mMeshIndexBuffer = VK_NULL_HANDLE;
         VkDeviceMemory mMeshIndexMemory = VK_NULL_HANDLE;
 
-        struct MeshDraw
-        {
-            uint32_t indexCount;
-            uint32_t firstIndex;
-            int32_t vertexOffset;
-            Render::Mat4 transform;
-            Render::Mat4 normalMatrix;
-        };
-        std::vector<MeshDraw> mMeshDraws;
+        std::vector<Render::MeshDraw> mMeshDraws;
 
         std::vector<VkCommandBuffer> mCommandBuffers;
 
