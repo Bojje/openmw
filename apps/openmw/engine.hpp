@@ -167,8 +167,6 @@ namespace OMW
 #ifdef OPENMW_USE_VULKAN
         SDL_Window* mVkWindow = nullptr;
         std::unique_ptr<MWRender::VkRenderingManager> mVkRenderingManager;
-        int mVkWidth = 0;
-        int mVkHeight = 0;
 #endif
 
         bool mSkipMenu;

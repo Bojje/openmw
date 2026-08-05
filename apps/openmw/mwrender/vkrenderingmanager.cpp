@@ -5,6 +5,8 @@
 #include <cmath>
 #include <cstring>
 
+#include <SDL_vulkan.h>
+
 #include <components/debug/debuglog.hpp>
 #include <components/nifvk/meshconverter.hpp>
 #include <components/vk/vkrenderer.hpp>
@@ -15,8 +17,10 @@
 namespace MWRender
 {
     VkRenderingManager::VkRenderingManager(SDL_Window* window, bool enableValidation)
+        : mWindow(window)
     {
         mRenderer = std::make_unique<Vk::Renderer>(window, enableValidation);
+        SDL_Vulkan_GetDrawableSize(mWindow, &mDrawableWidth, &mDrawableHeight);
         Log(Debug::Info) << "Vulkan renderer initialized";
     }
 
@@ -36,6 +40,19 @@ namespace MWRender
 
     void VkRenderingManager::render(Camera& camera, float sunAzimuth, float sunAltitude)
     {
+        int drawableWidth = 0;
+        int drawableHeight = 0;
+        SDL_Vulkan_GetDrawableSize(mWindow, &drawableWidth, &drawableHeight);
+        if (drawableWidth <= 0 || drawableHeight <= 0)
+            return;
+
+        if (drawableWidth != mDrawableWidth || drawableHeight != mDrawableHeight)
+        {
+            mRenderer->resize(static_cast<uint32_t>(drawableWidth), static_cast<uint32_t>(drawableHeight));
+            mDrawableWidth = drawableWidth;
+            mDrawableHeight = drawableHeight;
+        }
+
         Vk::SceneData scene = {};
 
         const auto& viewMatrix = camera.getViewMatrix();
@@ -80,11 +97,6 @@ namespace MWRender
     void VkRenderingManager::removeCell(const MWWorld::CellStore* store)
     {
         mCellMeshes.erase(store);
-    }
-
-    void VkRenderingManager::resize(uint32_t width, uint32_t height)
-    {
-        mRenderer->resize(width, height);
     }
 
     size_t VkRenderingManager::getOrLoadMesh(const std::string& /*model*/)

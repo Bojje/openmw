@@ -45,8 +45,6 @@ namespace MWRender
         void addCell(const MWWorld::CellStore* store);
         void removeCell(const MWWorld::CellStore* store);
 
-        void resize(uint32_t width, uint32_t height);
-
     private:
         struct CellMeshes
         {
@@ -60,8 +58,12 @@ namespace MWRender
 
         size_t getOrLoadMesh(const std::string& model);
 
+        SDL_Window* mWindow;
         std::unique_ptr<Vk::Renderer> mRenderer;
         std::unique_ptr<NifVk::MeshConverter> mMeshConverter;
+
+        int mDrawableWidth = 0;
+        int mDrawableHeight = 0;
 
         std::unordered_map<std::string, size_t> mMeshCache;
         std::vector<std::unique_ptr<NifVk::VulkanMesh>> mMeshes;

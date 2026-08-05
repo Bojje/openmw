@@ -13,10 +13,6 @@
 
 #include <SDL.h>
 
-#ifdef OPENMW_USE_VULKAN
-#include <SDL_vulkan.h>
-#endif
-
 #include <components/debug/debuglog.hpp>
 #include <components/debug/gldebug.hpp>
 
@@ -365,33 +361,20 @@ bool OMW::Engine::frame(unsigned frameNumber, float frametime)
     mViewer->renderingTraversals();
 
 #ifdef OPENMW_USE_VULKAN
-    if (mVkRenderingManager && mVkWindow)
+    if (mVkRenderingManager)
     {
         try
         {
-            int curW, curH;
-            SDL_Vulkan_GetDrawableSize(mVkWindow, &curW, &curH);
-            if (curW != mVkWidth || curH != mVkHeight)
+            MWRender::Camera* camera = mWorld->getCamera();
+            if (camera)
             {
-                mVkWidth = curW;
-                mVkHeight = curH;
-                if (mVkWidth > 0 && mVkHeight > 0)
-                    mVkRenderingManager->resize(static_cast<uint32_t>(mVkWidth), static_cast<uint32_t>(mVkHeight));
-            }
+                const osg::Vec4f& sunPos = mWorld->getSunLightPosition();
+                osg::Vec3f sunDir(sunPos.x(), sunPos.y(), sunPos.z());
+                sunDir.normalize();
+                float sunAltitude = std::asin(std::clamp(sunDir.z(), -1.0f, 1.0f));
+                float sunAzimuth = std::atan2(sunDir.x(), sunDir.y());
 
-            if (mVkWidth > 0 && mVkHeight > 0)
-            {
-                MWRender::Camera* camera = mWorld->getCamera();
-                if (camera)
-                {
-                    const osg::Vec4f& sunPos = mWorld->getSunLightPosition();
-                    osg::Vec3f sunDir(sunPos.x(), sunPos.y(), sunPos.z());
-                    sunDir.normalize();
-                    float sunAltitude = std::asin(std::clamp(sunDir.z(), -1.0f, 1.0f));
-                    float sunAzimuth = std::atan2(sunDir.x(), sunDir.y());
-
-                    mVkRenderingManager->render(*camera, sunAzimuth, sunAltitude);
-                }
+                mVkRenderingManager->render(*camera, sunAzimuth, sunAltitude);
             }
         }
         catch (const std::exception& e)
@@ -771,8 +754,6 @@ void OMW::Engine::createWindow()
         else
         {
             mVkRenderingManager = std::make_unique<MWRender::VkRenderingManager>(mVkWindow, true);
-            SDL_Vulkan_GetDrawableSize(mVkWindow, &mVkWidth, &mVkHeight);
-
             auto shaderDir = mResDir / "shaders" / "vulkan";
             if (mVkRenderingManager->loadShaders(shaderDir))
                 Log(Debug::Info) << "Vulkan renderer created with shaders from " << shaderDir;
