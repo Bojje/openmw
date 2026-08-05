@@ -58,7 +58,7 @@ This plan deliberately prioritizes removal of duplicate renderer code. OpenScene
 
 - Add actors, skinning, animation, particles, weather, water, spell effects, and post-processing.
 - Port GUI, fonts, loading screens, cursor handling, screenshots, and video presentation.
-- Keep ray tracing optional until TLAS creation and the ray-tracing pipeline are complete.
+- Reintroduce ray tracing only after TLAS creation and the ray-tracing pipeline are complete; do not carry an inactive RT scaffold in the raster path.
 
 ### 8. Compare and delete
 

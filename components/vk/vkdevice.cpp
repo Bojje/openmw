@@ -16,16 +16,6 @@ namespace Vk
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
     };
 
-    const std::vector<const char*> Device::sRayTracingExtensions = {
-        VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
-        VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME,
-        VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME,
-        VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME,
-        VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME,
-        VK_KHR_SPIRV_1_4_EXTENSION_NAME,
-        VK_KHR_SHADER_FLOAT_CONTROLS_EXTENSION_NAME,
-    };
-
     Device::Device(Instance& instance, VkSurfaceKHR surface)
         : mSurface(surface)
     {
@@ -47,7 +37,6 @@ namespace Vk
         , mGraphicsQueue(other.mGraphicsQueue)
         , mPresentQueue(other.mPresentQueue)
         , mComputeQueue(other.mComputeQueue)
-        , mRayTracingSupported(other.mRayTracingSupported)
     {
         other.mDevice = VK_NULL_HANDLE;
         other.mPhysicalDevice = VK_NULL_HANDLE;
@@ -70,7 +59,6 @@ namespace Vk
             mGraphicsQueue = other.mGraphicsQueue;
             mPresentQueue = other.mPresentQueue;
             mComputeQueue = other.mComputeQueue;
-            mRayTracingSupported = other.mRayTracingSupported;
 
             other.mDevice = VK_NULL_HANDLE;
             other.mPhysicalDevice = VK_NULL_HANDLE;
@@ -93,8 +81,6 @@ namespace Vk
 
         VkPhysicalDevice bestDevice = VK_NULL_HANDLE;
         int bestScore = -1;
-        bool bestHasRT = false;
-
         for (auto device : devices)
         {
             auto queueIndices = findQueueFamilies(device, surface);
@@ -104,21 +90,12 @@ namespace Vk
             if (!checkDeviceExtensionSupport(device, sRequiredExtensions))
                 continue;
 
-            bool hasRT = checkDeviceExtensionSupport(device, sRayTracingExtensions);
             int score = rateDevice(device, surface);
 
-            // Strongly prefer RT-capable devices
-            if (hasRT && !bestHasRT)
+            if (score > bestScore)
             {
                 bestDevice = device;
                 bestScore = score;
-                bestHasRT = true;
-            }
-            else if (hasRT == bestHasRT && score > bestScore)
-            {
-                bestDevice = device;
-                bestScore = score;
-                bestHasRT = hasRT;
             }
         }
 
@@ -126,13 +103,11 @@ namespace Vk
             throw std::runtime_error("No suitable Vulkan GPU found");
 
         mPhysicalDevice = bestDevice;
-        mRayTracingSupported = bestHasRT;
         mQueueFamilyIndices = findQueueFamilies(mPhysicalDevice, surface);
 
         VkPhysicalDeviceProperties props;
         vkGetPhysicalDeviceProperties(mPhysicalDevice, &props);
-        Log(Debug::Info) << "Selected GPU: " << props.deviceName
-                         << (mRayTracingSupported ? " (ray tracing supported)" : " (no ray tracing)");
+        Log(Debug::Info) << "Selected GPU: " << props.deviceName;
     }
 
     void Device::createLogicalDevice()
@@ -155,30 +130,7 @@ namespace Vk
             queueCreateInfos.push_back(queueCreateInfo);
         }
 
-        // Collect all required extensions
         std::vector<const char*> deviceExtensions(sRequiredExtensions);
-        if (mRayTracingSupported)
-            deviceExtensions.insert(deviceExtensions.end(), sRayTracingExtensions.begin(), sRayTracingExtensions.end());
-
-        // Feature chain for RT-capable devices
-        VkPhysicalDeviceBufferDeviceAddressFeaturesKHR bufferDeviceAddressFeatures = {};
-        bufferDeviceAddressFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES_KHR;
-        bufferDeviceAddressFeatures.bufferDeviceAddress = VK_TRUE;
-
-        VkPhysicalDeviceDescriptorIndexingFeatures descriptorIndexingFeatures = {};
-        descriptorIndexingFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES;
-        descriptorIndexingFeatures.runtimeDescriptorArray = VK_TRUE;
-        descriptorIndexingFeatures.descriptorBindingPartiallyBound = VK_TRUE;
-        descriptorIndexingFeatures.descriptorBindingVariableDescriptorCount = VK_TRUE;
-        descriptorIndexingFeatures.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
-
-        VkPhysicalDeviceAccelerationStructureFeaturesKHR accelStructFeatures = {};
-        accelStructFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;
-        accelStructFeatures.accelerationStructure = VK_TRUE;
-
-        VkPhysicalDeviceRayTracingPipelineFeaturesKHR rtPipelineFeatures = {};
-        rtPipelineFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR;
-        rtPipelineFeatures.rayTracingPipeline = VK_TRUE;
 
         VkPhysicalDeviceFeatures supportedFeatures;
         vkGetPhysicalDeviceFeatures(mPhysicalDevice, &supportedFeatures);
@@ -186,23 +138,6 @@ namespace Vk
         VkPhysicalDeviceFeatures2 deviceFeatures2 = {};
         deviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
         deviceFeatures2.features.samplerAnisotropy = supportedFeatures.samplerAnisotropy;
-
-        void** pNextChain = &deviceFeatures2.pNext;
-
-        if (mRayTracingSupported)
-        {
-            *pNextChain = &bufferDeviceAddressFeatures;
-            pNextChain = &bufferDeviceAddressFeatures.pNext;
-
-            *pNextChain = &descriptorIndexingFeatures;
-            pNextChain = &descriptorIndexingFeatures.pNext;
-
-            *pNextChain = &accelStructFeatures;
-            pNextChain = &accelStructFeatures.pNext;
-
-            *pNextChain = &rtPipelineFeatures;
-            pNextChain = &rtPipelineFeatures.pNext;
-        }
 
         VkDeviceCreateInfo createInfo = {};
         createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
@@ -302,19 +237,6 @@ namespace Vk
         score += static_cast<int>(props.limits.maxImageDimension2D);
 
         return score;
-    }
-
-    VkPhysicalDeviceRayTracingPipelinePropertiesKHR Device::rayTracingProperties() const
-    {
-        VkPhysicalDeviceRayTracingPipelinePropertiesKHR rtProperties = {};
-        rtProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR;
-
-        VkPhysicalDeviceProperties2 props2 = {};
-        props2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
-        props2.pNext = &rtProperties;
-
-        vkGetPhysicalDeviceProperties2(mPhysicalDevice, &props2);
-        return rtProperties;
     }
 
     uint32_t Device::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) const
