@@ -1,11 +1,14 @@
 #ifndef OPENMW_COMPONENTS_RESOURCE_IMAGEMANAGER_H
 #define OPENMW_COMPONENTS_RESOURCE_IMAGEMANAGER_H
 
+#include <memory>
+
 #include <osg/Image>
 #include <osg/Texture2D>
 #include <osg/ref_ptr>
 
 #include <components/vfs/pathutil.hpp>
+#include <components/render/texture.hpp>
 
 #include "resourcemanager.hpp"
 
@@ -28,6 +31,9 @@ namespace Resource
         /// Create or retrieve an Image
         /// Returns the dummy image if the given image is not found.
         osg::ref_ptr<osg::Image> getImage(VFS::Path::NormalizedView path, bool disableFlip = false);
+
+        /// Return a renderer-neutral RGBA8 copy of an image.
+        std::shared_ptr<const Render::TextureData> getRenderTexture(VFS::Path::NormalizedView path);
 
         osg::Image* getWarningImage();
 

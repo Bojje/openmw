@@ -6,6 +6,7 @@
 #include <components/nif/meshconverter.hpp>
 #include <components/nif/property.hpp>
 #include <components/nif/texture.hpp>
+#include <components/render/texture.hpp>
 #include <components/resource/nifmeshmanager.hpp>
 
 namespace
@@ -19,6 +20,15 @@ namespace
 
 int main()
 {
+    Render::TextureData invalidTexture;
+    if (invalidTexture.valid())
+        throw std::runtime_error("empty neutral texture was marked valid");
+    invalidTexture.width = 1;
+    invalidTexture.height = 1;
+    invalidTexture.pixels = { 255, 255, 255, 255 };
+    if (!invalidTexture.valid())
+        throw std::runtime_error("valid neutral texture was rejected");
+
     Nif::NiTriShapeData source;
     source.mVertices = { { 1.0f, 2.0f, 3.0f }, { 4.0f, 5.0f, 6.0f }, { 7.0f, 8.0f, 9.0f } };
     source.mNormals = { { 0.0f, 0.0f, 1.0f }, { 0.0f, 1.0f, 0.0f }, { 1.0f, 0.0f, 0.0f } };

@@ -1,6 +1,8 @@
 #include "imagemanager.hpp"
 
+#include <algorithm>
 #include <cassert>
+#include <memory>
 #include <osgDB/Registry>
 
 #include <components/debug/debuglog.hpp>
@@ -208,6 +210,33 @@ namespace Resource
             mCache->addEntryToObjectCache(path.value(), image);
             return image;
         }
+    }
+
+    std::shared_ptr<const Render::TextureData> ImageManager::getRenderTexture(VFS::Path::NormalizedView path)
+    {
+        const osg::ref_ptr<osg::Image> image = getImage(path);
+        if (!image || image->s() <= 0 || image->t() <= 0)
+            return nullptr;
+
+        auto texture = std::make_shared<Render::TextureData>();
+        texture->width = static_cast<uint32_t>(image->s());
+        texture->height = static_cast<uint32_t>(image->t());
+        texture->pixels.resize(static_cast<std::size_t>(texture->width) * texture->height * 4);
+
+        for (uint32_t y = 0; y < texture->height; ++y)
+        {
+            for (uint32_t x = 0; x < texture->width; ++x)
+            {
+                const osg::Vec4 color = image->getColor(static_cast<int>(x), static_cast<int>(y), 0);
+                const std::size_t offset = (static_cast<std::size_t>(y) * texture->width + x) * 4;
+                texture->pixels[offset] = static_cast<uint8_t>(std::clamp(color.r(), 0.f, 1.f) * 255.f + 0.5f);
+                texture->pixels[offset + 1] = static_cast<uint8_t>(std::clamp(color.g(), 0.f, 1.f) * 255.f + 0.5f);
+                texture->pixels[offset + 2] = static_cast<uint8_t>(std::clamp(color.b(), 0.f, 1.f) * 255.f + 0.5f);
+                texture->pixels[offset + 3] = static_cast<uint8_t>(std::clamp(color.a(), 0.f, 1.f) * 255.f + 0.5f);
+            }
+        }
+
+        return texture;
     }
 
     osg::Image* ImageManager::getWarningImage()

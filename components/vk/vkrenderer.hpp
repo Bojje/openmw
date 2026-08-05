@@ -3,8 +3,11 @@
 
 #include <array>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <string>
+#include <string_view>
+#include <unordered_map>
 #include <vector>
 
 #include <vulkan/vulkan.h>
@@ -12,6 +15,7 @@
 #include "vkcommon.hpp"
 #include "../render/mesh.hpp"
 #include "../render/scene.hpp"
+#include "../render/texture.hpp"
 
 struct SDL_Window;
 
@@ -46,6 +50,8 @@ namespace Vk
     class Renderer
     {
     public:
+        using TextureResolver = std::function<std::shared_ptr<const Render::TextureData>(std::string_view)>;
+
         Renderer(SDL_Window* window, bool enableValidation);
         ~Renderer();
 
@@ -60,9 +66,18 @@ namespace Vk
         bool loadShadersAndCreatePipelines(const std::string& shaderDir);
 
         void updateScene(const Render::SceneData& sceneData);
-        void setMeshes(const std::vector<Render::MeshInstance>& meshes);
+        void setMeshes(const std::vector<Render::MeshInstance>& meshes, TextureResolver textureResolver = {});
 
     private:
+        static constexpr uint32_t maxTextures = 64;
+
+        struct TextureResource
+        {
+            VkImage image = VK_NULL_HANDLE;
+            VkDeviceMemory memory = VK_NULL_HANDLE;
+            VkImageView view = VK_NULL_HANDLE;
+        };
+
         void createSurface();
         void createGBuffer();
         void destroyGBuffer();
@@ -79,6 +94,9 @@ namespace Vk
         void createUniformBuffers();
         void createGBufferSampler();
         void writeCompositeDescriptor(uint32_t binding, VkImageView view);
+        void writeSceneTextureDescriptor(uint32_t textureIndex, VkImageView view);
+        uint32_t createTextureResource(const Render::TextureData& texture);
+        void destroyTextures();
         void destroyMesh();
 
         void createImage(uint32_t width, uint32_t height, VkFormat format, VkImageUsageFlags usage,
@@ -121,6 +139,11 @@ namespace Vk
         std::array<void*, maxFramesInFlight> mUniformMapped = {};
 
         VkSampler mGBufferSampler = VK_NULL_HANDLE;
+
+        VkCommandBuffer mUploadCommandBuffer = VK_NULL_HANDLE;
+        std::vector<TextureResource> mTextures;
+        std::unordered_map<std::string, uint32_t> mTextureIndices;
+        std::vector<uint32_t> mMeshTextureIndices;
 
         VkBuffer mMeshVertexBuffer = VK_NULL_HANDLE;
         VkDeviceMemory mMeshVertexMemory = VK_NULL_HANDLE;

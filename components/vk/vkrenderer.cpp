@@ -75,6 +75,7 @@ namespace Vk
         mFrameSync = std::make_unique<FrameSync>(*mDevice, mSwapchain->imageCount());
 
         mCommandBuffers = mCommandPool->allocateMultiple(maxFramesInFlight);
+        mUploadCommandBuffer = mCommandPool->allocateMultiple(1).front();
 
         createGBufferRenderPass();
         createCompositeRenderPass();
@@ -82,6 +83,13 @@ namespace Vk
         createGBufferFramebuffer();
         createCompositeFramebuffers();
         createGBufferSampler();
+        Render::TextureData fallbackTexture;
+        fallbackTexture.width = 1;
+        fallbackTexture.height = 1;
+        fallbackTexture.pixels = { 255, 255, 255, 255 };
+        const uint32_t fallbackIndex = createTextureResource(fallbackTexture);
+        if (fallbackIndex != 0)
+            throw std::runtime_error("Vulkan fallback texture was not allocated at index zero");
         createDescriptorSetLayouts();
         createDescriptorPool();
         createUniformBuffers();
@@ -151,6 +159,85 @@ namespace Vk
         return view;
     }
 
+    uint32_t Renderer::createTextureResource(const Render::TextureData& texture)
+    {
+        if (!texture.valid())
+            throw std::invalid_argument("Cannot upload invalid Vulkan texture data");
+        if (mTextures.size() >= maxTextures)
+            throw std::runtime_error("Vulkan texture table is full");
+
+        VkBuffer stagingBuffer = VK_NULL_HANDLE;
+        VkDeviceMemory stagingMemory = VK_NULL_HANDLE;
+        TextureResource resource;
+        try
+        {
+            createBufferLocal(mDevice->handle(), mDevice->physical(), texture.pixels.size(),
+                VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                stagingBuffer, stagingMemory);
+
+            void* mapped = nullptr;
+            VK_CHECK(vkMapMemory(mDevice->handle(), stagingMemory, 0, texture.pixels.size(), 0, &mapped));
+            std::memcpy(mapped, texture.pixels.data(), texture.pixels.size());
+            vkUnmapMemory(mDevice->handle(), stagingMemory);
+
+            createImage(texture.width, texture.height, VK_FORMAT_R8G8B8A8_UNORM,
+                VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                resource.image, resource.memory);
+            resource.view = createImageView(resource.image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
+
+            VK_CHECK(vkResetCommandBuffer(mUploadCommandBuffer, 0));
+            VkCommandBufferBeginInfo beginInfo = {};
+            beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+            beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+            VK_CHECK(vkBeginCommandBuffer(mUploadCommandBuffer, &beginInfo));
+
+            transitionImageLayout(mUploadCommandBuffer, resource.image, VK_IMAGE_LAYOUT_UNDEFINED,
+                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT);
+
+            VkBufferImageCopy region = {};
+            region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            region.imageSubresource.layerCount = 1;
+            region.imageExtent = { texture.width, texture.height, 1 };
+            vkCmdCopyBufferToImage(mUploadCommandBuffer, stagingBuffer, resource.image,
+                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+
+            transitionImageLayout(mUploadCommandBuffer, resource.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT);
+            VK_CHECK(vkEndCommandBuffer(mUploadCommandBuffer));
+
+            VkSubmitInfo submitInfo = {};
+            submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+            submitInfo.commandBufferCount = 1;
+            submitInfo.pCommandBuffers = &mUploadCommandBuffer;
+            VK_CHECK(vkQueueSubmit(mDevice->graphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE));
+            VK_CHECK(vkQueueWaitIdle(mDevice->graphicsQueue()));
+
+            vkDestroyBuffer(mDevice->handle(), stagingBuffer, nullptr);
+            vkFreeMemory(mDevice->handle(), stagingMemory, nullptr);
+
+            const uint32_t index = static_cast<uint32_t>(mTextures.size());
+            mTextures.push_back(resource);
+            if (mSceneDescriptorSets[0] != VK_NULL_HANDLE)
+                writeSceneTextureDescriptor(index, resource.view);
+            return index;
+        }
+        catch (...)
+        {
+            if (stagingBuffer != VK_NULL_HANDLE)
+                vkDestroyBuffer(mDevice->handle(), stagingBuffer, nullptr);
+            if (stagingMemory != VK_NULL_HANDLE)
+                vkFreeMemory(mDevice->handle(), stagingMemory, nullptr);
+            if (resource.view != VK_NULL_HANDLE)
+                vkDestroyImageView(mDevice->handle(), resource.view, nullptr);
+            if (resource.image != VK_NULL_HANDLE)
+                vkDestroyImage(mDevice->handle(), resource.image, nullptr);
+            if (resource.memory != VK_NULL_HANDLE)
+                vkFreeMemory(mDevice->handle(), resource.memory, nullptr);
+            throw;
+        }
+    }
+
     void Renderer::transitionImageLayout(VkCommandBuffer cmd, VkImage image,
         VkImageLayout oldLayout, VkImageLayout newLayout, VkImageAspectFlags aspectMask)
     {
@@ -196,6 +283,20 @@ namespace Vk
             barrier.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
             barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
             srcStage = VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+            dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        }
+        else if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
+        {
+            barrier.srcAccessMask = 0;
+            barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            srcStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+            dstStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        }
+        else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+        {
+            barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+            srcStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
             dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
         }
         else
@@ -482,22 +583,52 @@ namespace Vk
         }
     }
 
+    void Renderer::writeSceneTextureDescriptor(uint32_t textureIndex, VkImageView view)
+    {
+        if (textureIndex >= maxTextures)
+            throw std::out_of_range("Vulkan texture descriptor index is out of range");
+
+        VkDescriptorImageInfo imageInfo = {};
+        imageInfo.sampler = mGBufferSampler;
+        imageInfo.imageView = view;
+        imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+        for (uint32_t i = 0; i < maxFramesInFlight; ++i)
+        {
+            VkWriteDescriptorSet write = {};
+            write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            write.dstSet = mSceneDescriptorSets[i];
+            write.dstBinding = 1;
+            write.dstArrayElement = textureIndex;
+            write.descriptorCount = 1;
+            write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            write.pImageInfo = &imageInfo;
+            vkUpdateDescriptorSets(mDevice->handle(), 1, &write, 0, nullptr);
+        }
+    }
+
     // Descriptor set layouts
 
     void Renderer::createDescriptorSetLayouts()
     {
-        // Scene layout (set 0 for G-buffer pass): camera UBO
+        // Scene layout (set 0 for G-buffer pass): camera UBO and an indexed
+        // table of neutral albedo textures.
         {
-            VkDescriptorSetLayoutBinding uboBinding = {};
-            uboBinding.binding = 0;
-            uboBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-            uboBinding.descriptorCount = 1;
-            uboBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+            std::array<VkDescriptorSetLayoutBinding, 2> bindings = {};
+            bindings[0].binding = 0;
+            bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+            bindings[0].descriptorCount = 1;
+            bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+
+            bindings[1].binding = 1;
+            bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            bindings[1].descriptorCount = maxTextures;
+            bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
             VkDescriptorSetLayoutCreateInfo layoutInfo = {};
             layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-            layoutInfo.bindingCount = 1;
-            layoutInfo.pBindings = &uboBinding;
+            layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+            layoutInfo.pBindings = bindings.data();
 
             VK_CHECK(vkCreateDescriptorSetLayout(mDevice->handle(), &layoutInfo, nullptr, &mSceneDescriptorLayout));
         }
@@ -552,7 +683,7 @@ namespace Vk
     {
         std::vector<VkDescriptorPoolSize> poolSizes = {
             { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, maxFramesInFlight * 2 },
-            { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 16 + maxFramesInFlight },
+            { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, maxTextures * maxFramesInFlight + 16 + maxFramesInFlight },
             { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 2 },
         };
 
@@ -618,6 +749,9 @@ namespace Vk
 
                 vkUpdateDescriptorSets(mDevice->handle(), 1, &write, 0, nullptr);
             }
+
+            for (uint32_t textureIndex = 0; textureIndex < maxTextures; ++textureIndex)
+                writeSceneTextureDescriptor(textureIndex, mTextures.front().view);
         }
 
         // Composite descriptor sets (per frame, for per-frame UBO binding)
@@ -666,7 +800,7 @@ namespace Vk
         VkPushConstantRange pushConstant = {};
         pushConstant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
         pushConstant.offset = 0;
-        pushConstant.size = sizeof(Render::Mat4) * 2 + sizeof(uint32_t);
+        pushConstant.size = sizeof(Render::Mat4) * 2 + sizeof(uint32_t) * 2;
 
         VkPipelineLayoutCreateInfo layoutInfo = {};
         layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -1011,19 +1145,22 @@ namespace Vk
                         Render::Mat4 model;
                         Render::Mat4 normalMatrix;
                         uint32_t materialFlags;
+                        uint32_t albedoTextureIndex;
                     };
 
                     VkDeviceSize offset = 0;
                     vkCmdBindVertexBuffers(cmd, 0, 1, &mMeshVertexBuffer, &offset);
                     vkCmdBindIndexBuffer(cmd, mMeshIndexBuffer, 0, VK_INDEX_TYPE_UINT32);
-                    for (const Render::MeshDraw& draw : mMeshDraws)
+                    for (std::size_t drawIndex = 0; drawIndex < mMeshDraws.size(); ++drawIndex)
                     {
+                        const Render::MeshDraw& draw = mMeshDraws[drawIndex];
                         const PushData pushData = {
                             draw.transform,
                             draw.normalMatrix,
                             draw.material.alphaTest
                                 ? 1u | (static_cast<uint32_t>(draw.material.alphaTestThreshold) << 8u)
                                 : 0u,
+                            mMeshTextureIndices[drawIndex],
                         };
                         vkCmdPushConstants(cmd, mGBufferPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT,
                             0, sizeof(pushData), &pushData);
@@ -1111,7 +1248,7 @@ namespace Vk
         std::memcpy(mUniformMapped[mCurrentFrame], &sceneData, sizeof(Render::SceneData));
     }
 
-    void Renderer::setMeshes(const std::vector<Render::MeshInstance>& meshes)
+    void Renderer::setMeshes(const std::vector<Render::MeshInstance>& meshes, TextureResolver textureResolver)
     {
         vkDeviceWaitIdle(mDevice->handle());
         destroyMesh();
@@ -1124,6 +1261,27 @@ namespace Vk
             return;
 
         mMeshDraws = std::move(batch.draws);
+        mMeshTextureIndices.reserve(mMeshDraws.size());
+        for (const Render::MeshDraw& draw : mMeshDraws)
+        {
+            if (draw.material.albedoTexture.empty() || !textureResolver)
+            {
+                mMeshTextureIndices.push_back(0);
+                continue;
+            }
+
+            const auto existing = mTextureIndices.find(draw.material.albedoTexture);
+            if (existing != mTextureIndices.end())
+            {
+                mMeshTextureIndices.push_back(existing->second);
+                continue;
+            }
+
+            const std::shared_ptr<const Render::TextureData> texture = textureResolver(draw.material.albedoTexture);
+            const uint32_t textureIndex = texture && texture->valid() ? createTextureResource(*texture) : 0;
+            mTextureIndices.emplace(draw.material.albedoTexture, textureIndex);
+            mMeshTextureIndices.push_back(textureIndex);
+        }
 
         try
         {
@@ -1175,6 +1333,26 @@ namespace Vk
         mMeshIndexBuffer = VK_NULL_HANDLE;
         mMeshIndexMemory = VK_NULL_HANDLE;
         mMeshDraws.clear();
+        mMeshTextureIndices.clear();
+    }
+
+    void Renderer::destroyTextures()
+    {
+        if (!mDevice)
+            return;
+
+        VkDevice dev = mDevice->handle();
+        for (TextureResource& texture : mTextures)
+        {
+            if (texture.view != VK_NULL_HANDLE)
+                vkDestroyImageView(dev, texture.view, nullptr);
+            if (texture.image != VK_NULL_HANDLE)
+                vkDestroyImage(dev, texture.image, nullptr);
+            if (texture.memory != VK_NULL_HANDLE)
+                vkFreeMemory(dev, texture.memory, nullptr);
+        }
+        mTextures.clear();
+        mTextureIndices.clear();
     }
 
     void Renderer::cleanup()
@@ -1207,6 +1385,7 @@ namespace Vk
             vkDestroyDescriptorSetLayout(dev, mSceneDescriptorLayout, nullptr);
         if (mCompositeDescriptorLayout != VK_NULL_HANDLE)
             vkDestroyDescriptorSetLayout(dev, mCompositeDescriptorLayout, nullptr);
+        destroyTextures();
         if (mGBufferSampler != VK_NULL_HANDLE)
             vkDestroySampler(dev, mGBufferSampler, nullptr);
 

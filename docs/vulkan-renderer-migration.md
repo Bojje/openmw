@@ -34,9 +34,11 @@ smoke path now resolves all loaded-cell snapshots through the cached NIF meshes,
 objects by neutral visibility, and composes object transforms with NIF node transforms before batching.
 NIF classic texture, diffuse/emissive, glossiness, and alpha properties now cross the
 renderer-neutral mesh boundary and survive batching; the neutral batch applies diffuse
-and alpha to vertex color output, while Vulkan texture binding, alpha blending, and full
-material shading remain outstanding. Vulkan now consumes neutral alpha-test state and
-thresholds in the G-buffer cutout path. The Vulkan G-buffer now carries neutral roughness,
+and alpha to vertex color output. Resource images can now cross into neutral RGBA8 data,
+and the standalone Vulkan renderer uploads/caches indexed albedo textures and samples them
+in the G-buffer. Vulkan now consumes neutral alpha-test state and thresholds in the G-buffer
+cutout path, while alpha blending, full material shading, and full-game resource hookup
+remain outstanding. The Vulkan G-buffer now carries neutral roughness,
 ambient-occlusion,
 and emissive-strength channels into the composite pass. Cell object lookup and removal are
 owned by the renderer-neutral `WorldScene`/`CellScene` components rather than the OSG-facing
@@ -68,7 +70,7 @@ the game unplayable rather than reduce duplication safely.
 | Inactive raster ray-tracing scaffold | Removed | Reintroduce only with a complete RT pipeline |
 | Vulkan utility/queue helper paths | Removed | Complete |
 | Parsed NIF resource cache wrapper | Removed | Complete; cache now owns shared NIF files directly |
-| NIF-to-neutral mesh conversion | Renderer-neutral NIF boundary, material data, mesh cache, and Vulkan mesh batch | Add texture binding, material shading, skinning, and static-world submission |
+| NIF-to-neutral mesh conversion | Renderer-neutral NIF boundary, material data, mesh cache, Vulkan mesh batch, and standalone texture table | Connect the resource resolver to the full game, add material shading, skinning, and static-world submission |
 | Loaded-cell object identity, transforms, and paging state | Renderer-neutral `WorldScene`/`CellScene` snapshots updated by scene lifecycle | Consume snapshots from a backend and migrate visibility/paging policy |
 | GUI, loading screens, screenshots, and presentation | OSG/MyGUI path | Vulkan presentation and GUI coverage |
 
@@ -115,7 +117,7 @@ real replacement consumes its responsibility and the fast tests cover the bounda
 
 ### 6. Port static world rendering
 
-- Wire NIF loading and `MeshConverter` into resource management. The NIF converter now has a tested tree traversal and material boundary, `NifMeshManager` caches converted instances, and the loaded-cell lifecycle records neutral model/transform state; Vulkan texture/shading consumption and a static-world consumer are still outstanding.
+- Wire NIF loading and `MeshConverter` into resource management. The NIF converter now has a tested tree traversal and material boundary, `NifMeshManager` caches converted instances, image resources expose neutral RGBA8 data, and the loaded-cell lifecycle records neutral model/transform state. The standalone Vulkan path consumes resolved textures; full-game hookup, shading, and a static-world consumer are still outstanding.
 - Implement model caching, cell add/remove, transforms, textures, materials, terrain, interiors, and static objects.
 - Reach a static playable scene without OSG rendering.
 

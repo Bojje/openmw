@@ -5,6 +5,7 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <utility>
 
 #include <SDL.h>
 #include <SDL_vulkan.h>
@@ -79,12 +80,30 @@ namespace
         Render::ObjectTransform transform;
         transform.position.x = 0.5f;
         world.recordObject(&objectHandle, &cellHandle, true, 0, 0, file->mPath.view(), transform, true);
-        return std::make_shared<const Resource::NifMeshManager::Meshes>(
-            Render::collectWorldMeshes(world, [&](std::string_view model) -> const Resource::NifMeshManager::Meshes& {
+        Resource::NifMeshManager::Meshes result = Render::collectWorldMeshes(
+            world, [&](std::string_view model) -> const Resource::NifMeshManager::Meshes& {
                 if (model != file->mPath.view())
                     throw std::runtime_error("Vulkan smoke scene referenced an uncached model");
                 return *cachedMeshes;
-            }));
+            });
+        for (Render::MeshInstance& mesh : result)
+            mesh.mesh.material.albedoTexture = "textures/vulkan-smoke.rgba";
+        return std::make_shared<const Resource::NifMeshManager::Meshes>(std::move(result));
+    }
+
+    std::shared_ptr<const Render::TextureData> smokeTexture(std::string_view path)
+    {
+        if (path != "textures/vulkan-smoke.rgba")
+            throw std::runtime_error("Vulkan smoke requested an unexpected texture");
+
+        auto texture = std::make_shared<Render::TextureData>();
+        texture->width = 2;
+        texture->height = 2;
+        texture->pixels = {
+            255, 64, 64, 255, 64, 255, 64, 255,
+            64, 64, 255, 255, 255, 255, 255, 255,
+        };
+        return texture;
     }
 }
 
@@ -131,7 +150,7 @@ int main(int argc, char** argv)
             scene.sunColor = { 1.0f, 1.0f, 1.0f, 1.0f };
             scene.ambientColor = { 0.15f, 0.15f, 0.15f, 1.0f };
 
-            renderer->setMeshes(*smokeMeshes());
+            renderer->setMeshes(*smokeMeshes(), smokeTexture);
 
             unsigned int renderedFrames = 0;
             for (unsigned int frame = 0; frame < frames; ++frame)
