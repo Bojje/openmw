@@ -3,7 +3,6 @@
 
 #include <array>
 #include <cstdint>
-#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -52,8 +51,6 @@ namespace Vk
     class Renderer
     {
     public:
-        using TextureResolver = Render::TextureResolver;
-
         Renderer(SDL_Window* window, bool enableValidation);
         ~Renderer();
 
@@ -99,7 +96,7 @@ namespace Vk
         void destroyMesh();
         void destroyMesh(uint32_t frameIndex);
         void uploadMesh(uint32_t frameIndex);
-        void setMeshes(const std::vector<Render::MeshInstance>& meshes, TextureResolver textureResolver);
+        void setMeshes(const std::vector<Render::MeshInstance>& meshes, Render::TextureResolver textureResolver);
 
         void createImage(uint32_t width, uint32_t height, VkFormat format, VkImageUsageFlags usage,
             VkImage& image, VkDeviceMemory& memory);

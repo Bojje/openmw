@@ -1463,7 +1463,7 @@ namespace Vk
         setMeshes(meshes, submission.textureResolver);
     }
 
-    void Renderer::setMeshes(const std::vector<Render::MeshInstance>& meshes, TextureResolver textureResolver)
+    void Renderer::setMeshes(const std::vector<Render::MeshInstance>& meshes, Render::TextureResolver textureResolver)
     {
         Render::MeshBatch batch = Render::batchMeshes(meshes);
         std::vector<uint32_t> textureIndices;
