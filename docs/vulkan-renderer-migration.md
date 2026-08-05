@@ -60,13 +60,16 @@ Vulkan call site is still intentionally absent until window, input, dynamic-cont
 services have a Vulkan owner.
 The fast test suite now also contains a backend-neutral RGBA8 image comparator with
 per-channel tolerance, differing-pixel count, maximum error, and mean error metrics.
-This makes future OSG/Vulkan captures diagnosable instead of reducing them to an opaque
-pixel mismatch. A neutral terrain tile snapshot adapter also converts the legacy
+The Vulkan smoke path now reads back rendered RGBA8/BGRA8 swapchain frames and compares
+consecutive captures with that comparator when a presentation-capable host is available;
+the local headless environment still skips before this runtime path. This makes future
+OSG/Vulkan captures diagnosable instead of reducing them to an opaque pixel mismatch.
+A neutral terrain tile snapshot adapter also converts the legacy
 OSG-array/OSG-image storage contract into vertices, layer metadata, and RGBA8 blendmaps;
 opaque single-layer terrain retains an intentionally absent blendmap.
 
 Against the actual PR base `origin/openmw-vulkan` (PR #5), the current checkpoint changes
-43 files, deleting 249 lines and adding 2,691 lines (net `+2,442`). The larger Vulkan-only
+45 files, deleting 250 lines and adding 2,817 lines (net `+2,567`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
@@ -111,13 +114,14 @@ real replacement consumes its responsibility and the fast tests cover the bounda
 
 ### 2. Create a deterministic renderer-test foundation
 
-- Add a small test mode or executable that starts one renderer, loads a manifest of test scenes/cameras, renders multiple checkpoints, writes images, and exits. The current standalone smoke target validates neutral mesh/cache/material setup before window creation, then covers one textured alpha-blended scene and multiple frame submissions when a Vulkan surface is available; image capture and reference comparison remain pending until a Vulkan-capable presentation or offscreen test target is available.
+- Add a small test mode or executable that starts one renderer, loads a manifest of test scenes/cameras, renders multiple checkpoints, writes images, and exits. The current standalone smoke target validates neutral mesh/cache/material setup before window creation, then covers one textured alpha-blended scene, reads back each rendered swapchain frame, and compares consecutive captures when a Vulkan surface is available; persistent image files and OSG reference comparison remain pending.
 - Use fixed camera paths, time, weather, random seed, resolution, and content.
 - Add CPU-side tests for matrix conversion, NIF conversion, transforms, resource lookup, and scene snapshots. The current fast tests cover matrix conversion, NIF conversion, parent-child transforms, safe index handling, cache reuse, cell-object transform composition, and renderer-neutral batch layout.
 - Compare Vulkan output with OSG reference images using the neutral image comparator's
-  tolerances and error metrics rather than exact pixel equality. Actual capture and
-  reference-image execution remain pending until a Vulkan-capable presentation or
-  offscreen test target is available.
+  tolerances and error metrics rather than exact pixel equality. Vulkan-to-Vulkan
+  capture comparison is now wired into smoke; OSG reference-image execution remains
+  pending until a presentation-capable validation host and reference capture workflow
+  are available.
 
 ### 3. Remove the dual-renderer lifecycle
 
