@@ -9,6 +9,17 @@ if (BUILD_TESTING)
     add_test(NAME openmw-vulkan-math-tests COMMAND openmw-vulkan-math-tests)
 endif()
 
+add_executable(openmw-render-world-tests world_tests.cpp)
+
+target_include_directories(openmw-render-world-tests
+    PRIVATE
+    ${CMAKE_SOURCE_DIR}
+)
+
+if (BUILD_TESTING)
+    add_test(NAME openmw-render-world-tests COMMAND openmw-render-world-tests)
+endif()
+
 add_executable(openmw-render-mesh-tests mesh_tests.cpp)
 
 target_include_directories(openmw-render-mesh-tests

@@ -1,5 +1,6 @@
 #include "renderingmanager.hpp"
 
+#include <algorithm>
 #include <cstdlib>
 
 #include <osg/ClipControl>
@@ -42,6 +43,7 @@
 #include <components/sceneutil/writescene.hpp>
 
 #include <components/misc/constants.hpp>
+#include <components/misc/convert.hpp>
 
 #include <components/terrain/quadtreeworld.hpp>
 #include <components/terrain/terraingrid.hpp>
@@ -86,6 +88,20 @@
 
 namespace
 {
+    Render::Quat toRenderQuat(const osg::Quat& rotation)
+    {
+        return { static_cast<float>(rotation.x()), static_cast<float>(rotation.y()), static_cast<float>(rotation.z()),
+            static_cast<float>(rotation.w()) };
+    }
+
+    osg::Quat getObjectRotation(const MWWorld::Ptr& ptr)
+    {
+        const auto& position = ptr.getRefData().getPosition();
+        if (ptr.getClass().isActor())
+            return osg::Quat(position.rot[2], osg::Vec3f(0, 0, -1));
+        return Misc::Convert::makeOsgQuat(position.rot);
+    }
+
     class LightManagerUpdateVisitor : public osg::NodeVisitor
     {
     public:
@@ -433,6 +449,141 @@ namespace MWRender
         return *mObjects.get();
     }
 
+    void RenderingManager::recordObject(const MWWorld::Ptr& ptr, std::string_view model)
+    {
+        if (ptr.isEmpty() || model.empty())
+        {
+            removeNeutralObject(ptr);
+            return;
+        }
+
+        if (Render::WorldObject* object = findNeutralObject(ptr))
+        {
+            object->model = model;
+            const auto& position = ptr.getRefData().getPosition();
+            object->transform.position = { position.pos[0], position.pos[1], position.pos[2] };
+            object->transform.rotation = toRenderQuat(getObjectRotation(ptr));
+            osg::Vec3f scale(ptr.getCellRef().getScale(), ptr.getCellRef().getScale(), ptr.getCellRef().getScale());
+            ptr.getClass().adjustScale(ptr, scale, true);
+            object->transform.scale = { scale.x(), scale.y(), scale.z() };
+            return;
+        }
+
+        const MWWorld::CellStore* cell = ptr.getCell();
+        Render::CellScene& scene = mCellScenes[cell];
+        scene.exterior = cell->getCell()->isExterior();
+        scene.gridX = cell->getCell()->getGridX();
+        scene.gridY = cell->getCell()->getGridY();
+
+        const auto& position = ptr.getRefData().getPosition();
+        osg::Vec3f scale(ptr.getCellRef().getScale(), ptr.getCellRef().getScale(), ptr.getCellRef().getScale());
+        ptr.getClass().adjustScale(ptr, scale, true);
+
+        Render::WorldObject object;
+        object.id = mNextNeutralObjectId++;
+        if (object.id == 0)
+            object.id = mNextNeutralObjectId++;
+        object.model = model;
+        object.transform.position = { position.pos[0], position.pos[1], position.pos[2] };
+        object.transform.rotation = toRenderQuat(getObjectRotation(ptr));
+        object.transform.scale = { scale.x(), scale.y(), scale.z() };
+
+        const uint64_t id = object.id;
+        scene.objects.push_back(std::move(object));
+        mNeutralObjectLocations.emplace(static_cast<const void*>(ptr.mRef), NeutralObjectLocation{ cell, id });
+    }
+
+    const Render::CellScene* RenderingManager::getCellScene(const MWWorld::CellStore* store) const
+    {
+        const auto found = mCellScenes.find(store);
+        return found == mCellScenes.end() ? nullptr : &found->second;
+    }
+
+    Render::WorldObject* RenderingManager::findNeutralObject(const MWWorld::Ptr& ptr)
+    {
+        if (ptr.isEmpty())
+            return nullptr;
+
+        const auto location = mNeutralObjectLocations.find(static_cast<const void*>(ptr.mRef));
+        if (location == mNeutralObjectLocations.end())
+            return nullptr;
+
+        auto scene = mCellScenes.find(location->second.cell);
+        if (scene == mCellScenes.end())
+            return nullptr;
+
+        for (Render::WorldObject& object : scene->second.objects)
+        {
+            if (object.id == location->second.id)
+                return &object;
+        }
+        return nullptr;
+    }
+
+    void RenderingManager::removeNeutralObject(const MWWorld::Ptr& ptr)
+    {
+        if (ptr.isEmpty())
+            return;
+
+        const auto location = mNeutralObjectLocations.find(static_cast<const void*>(ptr.mRef));
+        if (location == mNeutralObjectLocations.end())
+            return;
+
+        const auto scene = mCellScenes.find(location->second.cell);
+        if (scene != mCellScenes.end())
+        {
+            auto& objects = scene->second.objects;
+            objects.erase(std::remove_if(objects.begin(), objects.end(), [&](const Render::WorldObject& object) {
+                              return object.id == location->second.id;
+                          }),
+                objects.end());
+        }
+        mNeutralObjectLocations.erase(location);
+    }
+
+    void RenderingManager::updateNeutralObjectCell(const MWWorld::Ptr& old, const MWWorld::Ptr& updated)
+    {
+        if (old.isEmpty() || updated.isEmpty())
+            return;
+
+        const auto location = mNeutralObjectLocations.find(static_cast<const void*>(old.mRef));
+        if (location == mNeutralObjectLocations.end())
+            return;
+
+        if (location->second.cell == updated.getCell())
+        {
+            const NeutralObjectLocation updatedLocation = location->second;
+            mNeutralObjectLocations.erase(location);
+            mNeutralObjectLocations.emplace(static_cast<const void*>(updated.mRef), updatedLocation);
+            return;
+        }
+
+        auto oldScene = mCellScenes.find(location->second.cell);
+        if (oldScene == mCellScenes.end())
+            return;
+
+        auto& oldObjects = oldScene->second.objects;
+        const auto object = std::find_if(oldObjects.begin(), oldObjects.end(), [&](const Render::WorldObject& value) {
+            return value.id == location->second.id;
+        });
+        if (object == oldObjects.end())
+            return;
+
+        Render::WorldObject moved = std::move(*object);
+        oldObjects.erase(object);
+
+        const MWWorld::CellStore* newCell = updated.getCell();
+        Render::CellScene& newScene = mCellScenes[newCell];
+        newScene.exterior = newCell->getCell()->isExterior();
+        newScene.gridX = newCell->getCell()->getGridX();
+        newScene.gridY = newCell->getCell()->getGridY();
+        newScene.objects.push_back(std::move(moved));
+
+        const uint64_t id = location->second.id;
+        mNeutralObjectLocations.erase(location);
+        mNeutralObjectLocations.emplace(static_cast<const void*>(updated.mRef), NeutralObjectLocation{ newCell, id });
+    }
+
     Resource::ResourceSystem* RenderingManager::getResourceSystem()
     {
         return mResourceSystem;
@@ -604,6 +755,15 @@ namespace MWRender
         }
 
         mWater->removeCell(store);
+
+        for (auto iter = mNeutralObjectLocations.begin(); iter != mNeutralObjectLocations.end();)
+        {
+            if (iter->second.cell == store)
+                iter = mNeutralObjectLocations.erase(iter);
+            else
+                ++iter;
+        }
+        mCellScenes.erase(store);
     }
 
     void RenderingManager::enableTerrain(bool enable, ESM::RefId worldspace)
@@ -780,11 +940,17 @@ namespace MWRender
         }
 
         ptr.getRefData().getBaseNode()->setAttitude(rot);
+
+        if (Render::WorldObject* object = findNeutralObject(ptr))
+            object->transform.rotation = toRenderQuat(rot);
     }
 
     void RenderingManager::moveObject(const MWWorld::Ptr& ptr, const osg::Vec3f& pos)
     {
         ptr.getRefData().getBaseNode()->setPosition(pos);
+
+        if (Render::WorldObject* object = findNeutralObject(ptr))
+            object->transform.position = { pos.x(), pos.y(), pos.z() };
     }
 
     void RenderingManager::scaleObject(const MWWorld::Ptr& ptr, const osg::Vec3f& scale)
@@ -793,6 +959,9 @@ namespace MWRender
 
         if (ptr == mCamera->getTrackingPtr()) // update height of camera
             mCamera->processViewChange();
+
+        if (Render::WorldObject* object = findNeutralObject(ptr))
+            object->transform.scale = { scale.x(), scale.y(), scale.z() };
     }
 
     void RenderingManager::removeObject(const MWWorld::Ptr& ptr)
@@ -800,6 +969,7 @@ namespace MWRender
         mActorsPaths->remove(ptr);
         mObjects->removeObject(ptr);
         mWater->removeEmitter(ptr);
+        removeNeutralObject(ptr);
     }
 
     void RenderingManager::setWaterEnabled(bool enabled)
@@ -1057,6 +1227,7 @@ namespace MWRender
     {
         mObjects->updatePtr(old, updated);
         mActorsPaths->updatePtr(old, updated);
+        updateNeutralObjectCell(old, updated);
     }
 
     void RenderingManager::spawnEffect(VFS::Path::NormalizedView model, std::string_view texture,

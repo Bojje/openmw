@@ -3,12 +3,22 @@
 
 namespace Render
 {
+    struct Vec3
+    {
+        float x, y, z;
+    };
+
     struct Mat4
     {
         float data[16];
     };
 
     struct Vec4
+    {
+        float x, y, z, w;
+    };
+
+    struct Quat
     {
         float x, y, z, w;
     };

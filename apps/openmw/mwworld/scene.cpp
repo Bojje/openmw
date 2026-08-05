@@ -120,11 +120,14 @@ namespace
         const auto rotation = makeDirectNodeRotation(ptr);
 
         ESM::RefNum refnum = ptr.getCellRef().getRefNum();
-        if (!refnum.hasContentFile() || !std::binary_search(pagedRefs.begin(), pagedRefs.end(), refnum))
+        const bool isPaged = refnum.hasContentFile() && std::binary_search(pagedRefs.begin(), pagedRefs.end(), refnum);
+        if (!isPaged)
             ptr.getClass().insertObjectRendering(ptr, model, rendering);
         else
             ptr.getRefData().setBaseNode(pagedNode);
         setNodeRotation(ptr, rendering, rotation);
+        if (!isPaged)
+            rendering.recordObject(ptr, model.view());
 
         if (ptr.getClass().useAnim())
             MWBase::Environment::get().getMechanicsManager()->add(ptr);
@@ -320,8 +323,10 @@ namespace MWWorld
         {
             if (!ptr.getRefData().getBaseNode())
                 return;
-            ptr.getClass().insertObjectRendering(ptr, getModel(ptr), mRendering);
+            const VFS::Path::Normalized model = getModel(ptr);
+            ptr.getClass().insertObjectRendering(ptr, model, mRendering);
             setNodeRotation(ptr, mRendering, makeNodeRotation(ptr, RotationOrder::direct));
+            mRendering.recordObject(ptr, model.view());
             reloadTerrain();
         }
     }

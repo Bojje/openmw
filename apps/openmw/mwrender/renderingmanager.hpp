@@ -5,6 +5,8 @@
 #include "renderinginterface.hpp"
 #include "rendermode.hpp"
 
+#include <components/render/world.hpp>
+
 #include <components/settings/settings.hpp>
 #include <components/vfs/pathutil.hpp>
 
@@ -14,8 +16,10 @@
 #include <osgUtil/IncrementalCompileOperation>
 
 #include <deque>
+#include <cstdint>
 #include <memory>
 #include <span>
+#include <string_view>
 #include <unordered_map>
 
 namespace osg
@@ -79,6 +83,7 @@ namespace MWWorld
 {
     class GroundcoverStore;
     class Cell;
+    class CellStore;
 }
 
 namespace Debug
@@ -151,6 +156,12 @@ namespace MWRender
 
         void addCell(const MWWorld::CellStore* store);
         void removeCell(const MWWorld::CellStore* store);
+
+        /// Record an object after the world has accepted it for rendering.
+        /// This is the renderer-neutral scene source used by future backends.
+        void recordObject(const MWWorld::Ptr& ptr, std::string_view model);
+
+        const Render::CellScene* getCellScene(const MWWorld::CellStore* store) const;
 
         void enableTerrain(bool enable, ESM::RefId worldspace);
 
@@ -306,6 +317,16 @@ namespace MWRender
 
         void updateRecastMesh();
 
+        struct NeutralObjectLocation
+        {
+            const MWWorld::CellStore* cell;
+            uint64_t id;
+        };
+
+        Render::WorldObject* findNeutralObject(const MWWorld::Ptr& ptr);
+        void removeNeutralObject(const MWWorld::Ptr& ptr);
+        void updateNeutralObjectCell(const MWWorld::Ptr& old, const MWWorld::Ptr& updated);
+
         const bool mSkyBlending;
 
         osg::ref_ptr<osgUtil::IntersectionVisitor> getIntersectionVisitor(osgUtil::Intersector* intersector,
@@ -331,6 +352,9 @@ namespace MWRender
         std::unique_ptr<Objects> mObjects;
         std::unique_ptr<Water> mWater;
         std::unordered_map<ESM::RefId, WorldspaceChunkMgr> mWorldspaceChunks;
+        std::unordered_map<const MWWorld::CellStore*, Render::CellScene> mCellScenes;
+        std::unordered_map<const void*, NeutralObjectLocation> mNeutralObjectLocations;
+        uint64_t mNextNeutralObjectId = 1;
         Terrain::World* mTerrain;
         std::unique_ptr<TerrainStorage> mTerrainStorage;
         ObjectPaging* mObjectPaging;
