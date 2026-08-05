@@ -92,7 +92,7 @@ real replacement consumes its responsibility and the fast tests cover the bounda
 
 ### 2. Create a deterministic renderer-test foundation
 
-- Add a small test mode or executable that starts one renderer, loads a manifest of test scenes/cameras, renders multiple checkpoints, writes images, and exits. The current standalone smoke target covers one neutral mesh, multiple loaded-cell snapshots, stable collection order, and multiple frame submissions; image capture and reference comparison remain pending until a Vulkan-capable presentation or offscreen test target is available.
+- Add a small test mode or executable that starts one renderer, loads a manifest of test scenes/cameras, renders multiple checkpoints, writes images, and exits. The current standalone smoke target validates neutral mesh/cache/material setup before window creation, then covers one textured alpha-blended scene and multiple frame submissions when a Vulkan surface is available; image capture and reference comparison remain pending until a Vulkan-capable presentation or offscreen test target is available.
 - Use fixed camera paths, time, weather, random seed, resolution, and content.
 - Add CPU-side tests for matrix conversion, NIF conversion, transforms, resource lookup, and scene snapshots. The current fast tests cover matrix conversion, NIF conversion, parent-child transforms, safe index handling, cache reuse, cell-object transform composition, and renderer-neutral batch layout.
 - Compare Vulkan output with OSG reference images using tolerances rather than exact pixel equality.

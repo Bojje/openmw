@@ -59,8 +59,12 @@ namespace
 
         auto firstShape = std::make_unique<Nif::NiTriShape>();
         firstShape->mData = data.get();
+        firstShape->mShaderProperty = nullptr;
+        firstShape->mAlphaProperty = nullptr;
         auto secondShape = std::make_unique<Nif::NiTriShape>();
         secondShape->mData = data.get();
+        secondShape->mShaderProperty = nullptr;
+        secondShape->mAlphaProperty = nullptr;
         secondShape->mTransform.mTranslation.x() = 0.25f;
         auto root = std::make_unique<Nif::NiNode>();
         root->mChildren.push_back(firstShape.get());
@@ -128,6 +132,10 @@ int main(int argc, char** argv)
     try
     {
         const unsigned int frames = frameCount(argc, argv);
+        const auto meshes = smokeMeshes();
+        const auto texture = smokeTexture("textures/vulkan-smoke.rgba");
+        if (!texture || !texture->valid())
+            throw std::runtime_error("Vulkan smoke texture resolver returned invalid data");
 
         if (SDL_Init(SDL_INIT_VIDEO) != 0)
             throw EnvironmentUnavailable(std::string("SDL initialization failed: ") + SDL_GetError());
@@ -158,7 +166,7 @@ int main(int argc, char** argv)
             scene.sunColor = { 1.0f, 1.0f, 1.0f, 1.0f };
             scene.ambientColor = { 0.15f, 0.15f, 0.15f, 1.0f };
 
-            renderer->setMeshes(*smokeMeshes(), smokeTexture);
+            renderer->setMeshes(*meshes, smokeTexture);
 
             unsigned int renderedFrames = 0;
             for (unsigned int frame = 0; frame < frames; ++frame)
