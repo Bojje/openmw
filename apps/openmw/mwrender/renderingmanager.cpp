@@ -518,7 +518,13 @@ namespace MWRender
             -> const Resource::NifMeshManager::Meshes& {
             const auto [iter, inserted] = cache.try_emplace(std::string(model));
             if (inserted)
-                iter->second = mResourceSystem->getNifMeshManager()->get(VFS::Path::Normalized(model));
+            {
+                const VFS::Path::Normalized path(model);
+                if (path.extension().value() == "nif")
+                    iter->second = mResourceSystem->getNifMeshManager()->get(path);
+                else
+                    iter->second = std::make_shared<const Resource::NifMeshManager::Meshes>();
+            }
             return *iter->second;
         });
     }
