@@ -88,7 +88,7 @@ is part of the real full-game neutral handoff rather than only a test fixture; c
 happens on cell add/remove rather than on every frame export.
 
 Against the actual PR base `origin/openmw-vulkan` (PR #5), the current checkpoint changes
-47 files, deleting 261 lines and adding 3,435 lines (net `+3,174`). The larger Vulkan-only
+47 files, deleting 261 lines and adding 3,444 lines (net `+3,183`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
@@ -96,8 +96,8 @@ consumer to replace the remaining OSG-owned responsibilities.
 The latest reduction checkpoint also removed the remaining manager-only neutral-object
 lookup, removal, and cell-transfer wrappers. The lifecycle now calls `WorldScene`
 directly. The terrain adapter is now consumed for opaque, normal-mapped, parallax, and
-blendmap/multi-layer Vulkan terrain; its remaining owner boundary is specular materials,
-terrain paging/LOD, and complete image coverage.
+blendmap/multi-layer Vulkan terrain; its remaining owner boundary is terrain paging/LOD and
+complete image coverage.
 
 The remaining migration is not a compatibility problem that can be solved by retaining
 both renderers in one execution path. Static-world transforms, materials, textures,
@@ -116,7 +116,7 @@ the game unplayable rather than reduce duplication safely.
 | Vulkan utility/queue helper paths | Removed | Complete |
 | Parsed NIF resource cache wrapper | Removed | Complete; cache now owns shared NIF files directly |
 | NIF-to-neutral mesh conversion | Renderer-neutral NIF boundary, material data, mesh cache, `SceneSubmission`, Vulkan mesh batch, standalone texture table, and full-game neutral resolver | Connect the handoff to the live full-game Vulkan frame loop, add material shading, skinning, and static-world submission |
-| Terrain geometry and layer data | Legacy OSG terrain storage/ChunkManager plus a tested neutral tile adapter and Vulkan opaque/normal/parallax/blendmap layer consumer | Add Vulkan terrain paging/LOD policy, specular materials, and terrain image coverage |
+| Terrain geometry and layer data | Legacy OSG terrain storage/ChunkManager plus a tested neutral tile adapter and Vulkan opaque/normal/parallax/blendmap/specular layer consumer | Add Vulkan terrain paging/LOD policy and terrain image coverage |
 | Loaded-cell object identity, transforms, terrain snapshots, and paging state | Renderer-neutral `WorldScene`/`CellScene` snapshots updated by scene lifecycle; cell-lifecycle-cached terrain tiles flow into `SceneSubmission` | Consume snapshots from a backend and migrate visibility/paging policy |
 | GUI, loading screens, screenshots, and presentation | OSG/MyGUI path | Vulkan presentation and GUI coverage |
 
@@ -173,7 +173,8 @@ real replacement consumes its responsibility and the fast tests cover the bounda
 - Implement model caching, cell add/remove, transforms, textures, materials, terrain,
   interiors, and static objects. The terrain adapter now feeds opaque and ordered
   blendmap/multi-layer Vulkan mesh consumers with normal-map sampling and height-based
-  parallax; terrain paging/LOD, specular materials, and full terrain image coverage remain.
+  parallax and diffuse-alpha specular data; terrain paging/LOD and full terrain image coverage
+  remain.
 - Reach a static playable scene without OSG rendering.
 
 ### 7. Port dynamic content and presentation
