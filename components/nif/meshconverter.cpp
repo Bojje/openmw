@@ -8,6 +8,7 @@
 #include "property.hpp"
 #include "texture.hpp"
 #include <components/render/math.hpp>
+#include <components/vfs/pathutil.hpp>
 
 namespace Nif
 {
@@ -87,7 +88,7 @@ namespace Nif
         void setShaderTexture(Render::MeshMaterial& material, const BSShaderTextureSetPtr& textureSet)
         {
             if (!textureSet.empty() && !textureSet->mTextures.empty())
-                material.albedoTexture = textureSet->mTextures.front();
+                material.albedoTexture = VFS::Path::toNormalized(textureSet->mTextures.front()).value();
         }
 
         Render::MeshMaterial convertMaterial(const NiGeometry& geometry)
@@ -106,7 +107,7 @@ namespace Nif
                         const NiTexturingProperty::Texture& texture
                             = texturing->mTextures[NiTexturingProperty::BaseTexture];
                         if (texture.mEnabled && !texture.mSourceTexture.empty())
-                            result.albedoTexture = texture.mSourceTexture->mFile;
+                            result.albedoTexture = VFS::Path::toNormalized(texture.mSourceTexture->mFile).value();
                     }
                 }
                 else if (const auto* material = dynamic_cast<const NiMaterialProperty*>(property.getPtr()))

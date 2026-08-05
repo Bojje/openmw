@@ -65,7 +65,7 @@ int main()
     treeData.mVertices = source.mVertices;
     treeData.mTriangles = { 0, 1, 2 };
     Nif::NiSourceTexture texture;
-    texture.mFile = "textures/synthetic.dds";
+    texture.mFile = "textures\\synthetic.dds";
     Nif::NiTexturingProperty texturing;
     texturing.mTextures.resize(1);
     texturing.mTextures.front().mEnabled = true;
