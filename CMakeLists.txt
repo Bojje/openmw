@@ -259,6 +259,8 @@ if(MSVC)
     add_compile_options("/utf-8")
 endif()
 
+option(OPENMW_USE_VULKAN "Build with Vulkan rendering backend (requires Vulkan SDK)" OFF)
+
 # Dependencies
 if (APPLE)
     # Force CMake to use the installed version of OpenGL on macOS
@@ -269,6 +271,16 @@ if (APPLE)
     unset(_SAVE_CMAKE_FIND_FRAMEWORK)
 else()
     find_package(OpenGL REQUIRED)
+endif()
+
+if (OPENMW_USE_VULKAN)
+    find_package(Vulkan REQUIRED COMPONENTS glslangValidator)
+    message(STATUS "Vulkan found: ${Vulkan_LIBRARIES}")
+
+    include(CompileShaders)
+    set(VK_SHADER_OUTPUT_DIR "${CMAKE_BINARY_DIR}/resources/shaders/vulkan")
+    file(MAKE_DIRECTORY ${VK_SHADER_OUTPUT_DIR})
+    compile_vulkan_shaders(VulkanShaders "${CMAKE_SOURCE_DIR}/files/shaders/vulkan" ${VK_SHADER_OUTPUT_DIR})
 endif()
 
 find_package(LZ4 REQUIRED)

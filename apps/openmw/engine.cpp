@@ -1,7 +1,9 @@
 #include "engine.hpp"
 
+#include <algorithm>
 #include <cerrno>
 #include <chrono>
+#include <cmath>
 #include <future>
 #include <system_error>
 
@@ -10,6 +12,10 @@
 #include <osgViewer/ViewerEventHandlers>
 
 #include <SDL.h>
+
+#ifdef OPENMW_USE_VULKAN
+#include <SDL_vulkan.h>
+#endif
 
 #include <components/debug/debuglog.hpp>
 #include <components/debug/gldebug.hpp>
@@ -72,6 +78,11 @@
 #include "mwworld/worldimp.hpp"
 
 #include "mwrender/vismask.hpp"
+
+#ifdef OPENMW_USE_VULKAN
+#include "mwrender/camera.hpp"
+#include "mwrender/vkrenderingmanager.hpp"
+#endif
 
 #include "mwclass/classes.hpp"
 
@@ -353,6 +364,46 @@ bool OMW::Engine::frame(unsigned frameNumber, float frametime)
 
     mViewer->renderingTraversals();
 
+#ifdef OPENMW_USE_VULKAN
+    if (mVkRenderingManager && mVkWindow)
+    {
+        try
+        {
+            int curW, curH;
+            SDL_Vulkan_GetDrawableSize(mVkWindow, &curW, &curH);
+            if (curW != mVkWidth || curH != mVkHeight)
+            {
+                mVkWidth = curW;
+                mVkHeight = curH;
+                if (mVkWidth > 0 && mVkHeight > 0)
+                    mVkRenderingManager->resize(static_cast<uint32_t>(mVkWidth), static_cast<uint32_t>(mVkHeight));
+            }
+
+            if (mVkWidth > 0 && mVkHeight > 0)
+            {
+                MWRender::Camera* camera = mWorld->getCamera();
+                if (camera)
+                {
+                    const osg::Vec4f& sunPos = mWorld->getSunLightPosition();
+                    osg::Vec3f sunDir(sunPos.x(), sunPos.y(), sunPos.z());
+                    sunDir.normalize();
+                    float sunAltitude = std::asin(std::clamp(sunDir.z(), -1.0f, 1.0f));
+                    float sunAzimuth = std::atan2(sunDir.x(), sunDir.y());
+
+                    mVkRenderingManager->render(*camera, sunAzimuth, sunAltitude);
+                }
+            }
+        }
+        catch (const std::exception& e)
+        {
+            Log(Debug::Error) << "Vulkan render error: " << e.what();
+            mVkRenderingManager.reset();
+            SDL_DestroyWindow(mVkWindow);
+            mVkWindow = nullptr;
+        }
+    }
+#endif
+
     mLuaWorker->finishUpdate(frameStart, frameNumber, *stats);
 
     return true;
@@ -429,6 +480,15 @@ OMW::Engine::~Engine()
     mResourceSystem.reset();
 
     mEncoder = nullptr;
+
+#ifdef OPENMW_USE_VULKAN
+    mVkRenderingManager.reset();
+    if (mVkWindow)
+    {
+        SDL_DestroyWindow(mVkWindow);
+        mVkWindow = nullptr;
+    }
+#endif
 
     if (mWindow)
     {
@@ -693,6 +753,44 @@ void OMW::Engine::createWindow()
 
     mViewer->getEventQueue()->getCurrentEventState()->setWindowRectangle(
         0, 0, graphicsWindow->getTraits()->width, graphicsWindow->getTraits()->height);
+
+#ifdef OPENMW_USE_VULKAN
+    Log(Debug::Info) << "Attempting to create Vulkan window";
+    try
+    {
+        int vkW, vkH;
+        SDL_GetWindowSize(mWindow, &vkW, &vkH);
+        mVkWindow = SDL_CreateWindow("OpenMW Vulkan",
+            SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+            vkW, vkH,
+            SDL_WINDOW_VULKAN | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
+        if (!mVkWindow)
+        {
+            Log(Debug::Error) << "Failed to create Vulkan window: " << SDL_GetError();
+        }
+        else
+        {
+            mVkRenderingManager = std::make_unique<MWRender::VkRenderingManager>(mVkWindow, true);
+            SDL_Vulkan_GetDrawableSize(mVkWindow, &mVkWidth, &mVkHeight);
+
+            auto shaderDir = mResDir / "shaders" / "vulkan";
+            if (mVkRenderingManager->loadShaders(shaderDir))
+                Log(Debug::Info) << "Vulkan renderer created with shaders from " << shaderDir;
+            else
+                Log(Debug::Warning) << "Vulkan renderer created without shaders (not found at " << shaderDir << ")";
+        }
+    }
+    catch (const std::exception& e)
+    {
+        Log(Debug::Error) << "Vulkan initialization failed: " << e.what();
+        mVkRenderingManager.reset();
+        if (mVkWindow)
+        {
+            SDL_DestroyWindow(mVkWindow);
+            mVkWindow = nullptr;
+        }
+    }
+#endif
 }
 
 void OMW::Engine::setWindowIcon()

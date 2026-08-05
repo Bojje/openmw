@@ -24,6 +24,7 @@ add_openmw_dir (mwrender
     renderbin actoranimation landmanager navmesh actorspaths recastmesh fogmanager objectpaging groundcover
     postprocessor pingpongcull luminancecalculator pingpongcanvas transparentpass precipitationocclusion ripples
     actorutil distortion animationpriority bonegroup blendmask animblendcontroller
+    vkrenderingmanager
     )
 
 add_openmw_dir (mwinput
@@ -159,6 +160,10 @@ if(BUILD_OPENMW)
     # NOTE: it's unclear whether the broken behavior is spec-compliant
     if (CMAKE_CXX_COMPILER_ID STREQUAL Clang)
         set_target_properties(openmw PROPERTIES ENABLE_EXPORTS ON)
+    endif()
+
+    if (OPENMW_USE_VULKAN)
+        add_dependencies(openmw VulkanShaders)
     endif()
 endif()
 
