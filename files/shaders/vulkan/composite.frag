@@ -14,13 +14,8 @@ layout(set = 0, binding = 4) uniform SceneUBO {
     mat4 projInverse;
     vec4 sunDirection;
     vec4 sunColor;
+    vec4 ambientColor;
 } scene;
-
-layout(push_constant) uniform PushConstants {
-    vec4 sunDirection;
-    vec4 sunColor;
-    vec4 cameraPosition;
-} push;
 
 layout(location = 0) out vec4 outColor;
 
@@ -49,8 +44,8 @@ void main() {
 
     vec3 albedo = albedoSample.rgb;
     vec3 N = normalize(normalSample.rgb * 2.0 - 1.0);
-    vec3 L = normalize(-push.sunDirection.xyz);
-    vec3 sunCol = push.sunColor.rgb;
+    vec3 L = normalize(-scene.sunDirection.xyz);
+    vec3 sunCol = scene.sunColor.rgb;
 
     float NdotL = max(dot(N, L), 0.0);
 
@@ -60,7 +55,7 @@ void main() {
     float roughness = clamp(materialSample.r, 0.05, 1.0);
     float ao = materialSample.b;
     float emission = max(materialSample.a, 0.0);
-    vec3 ambient = albedo * 0.15 * ao;
+    vec3 ambient = albedo * scene.ambientColor.rgb * ao;
     vec3 diffuse = albedo * sunCol * NdotL * shadow;
 
     // Reconstruct world position from depth and inverse matrices
@@ -72,7 +67,7 @@ void main() {
     vec3 worldPos = worldPos4.xyz;
 
     float specularStrength = 0.3 * (1.0 - roughness);
-    vec3 V = normalize(push.cameraPosition.xyz - worldPos);
+    vec3 V = normalize(scene.viewInverse[3].xyz - worldPos);
     vec3 H = normalize(L + V);
     float spec = pow(max(dot(N, H), 0.0), mix(128.0, 1.0, roughness));
     vec3 specular = sunCol * spec * specularStrength * shadow;

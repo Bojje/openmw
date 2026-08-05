@@ -32,6 +32,7 @@ namespace Render
         Mat4 projInverse;
         Vec4 sunDirection;
         Vec4 sunColor;
+        Vec4 ambientColor;
     };
 }
 

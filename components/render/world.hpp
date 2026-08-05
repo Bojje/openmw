@@ -66,12 +66,17 @@ namespace Render
         };
 
         std::unordered_map<const void*, CellScene> mCells;
+        std::vector<const void*> mCellOrder;
         std::unordered_map<const void*, ObjectLocation> mObjects;
         uint64_t mNextObjectId = 1;
 
         CellScene& ensureCell(const void* cell, bool exterior, int gridX, int gridY)
         {
-            CellScene& scene = mCells[cell];
+            auto [iter, inserted] = mCells.try_emplace(cell);
+            if (inserted)
+                mCellOrder.push_back(cell);
+
+            CellScene& scene = iter->second;
             scene.exterior = exterior;
             scene.gridX = gridX;
             scene.gridY = gridY;
@@ -146,7 +151,21 @@ namespace Render
             return found == mCells.end() ? nullptr : &found->second;
         }
 
-        const std::unordered_map<const void*, CellScene>& cells() const { return mCells; }
+        // Cell insertion order is stable for the lifetime of a loaded cell.
+        // Backends use this instead of iterating the unordered index so draw
+        // order and image-comparison inputs remain deterministic.
+        std::vector<const CellScene*> cellsInOrder() const
+        {
+            std::vector<const CellScene*> result;
+            result.reserve(mCellOrder.size());
+            for (const void* cellKey : mCellOrder)
+            {
+                const auto found = mCells.find(cellKey);
+                if (found != mCells.end())
+                    result.push_back(&found->second);
+            }
+            return result;
+        }
 
         CellScene* findCell(const void* cellKey)
         {
@@ -213,6 +232,7 @@ namespace Render
                     ++iter;
             }
             mCells.erase(cellKey);
+            std::erase(mCellOrder, cellKey);
         }
     };
 

@@ -498,6 +498,8 @@ namespace MWRender
         result.sunDirection = { -sunPosition.x(), -sunPosition.y(), -sunPosition.z(), sunPosition.w() };
         const osg::Vec4f sunColor = mSunLight->getDiffuse();
         result.sunColor = { sunColor.x(), sunColor.y(), sunColor.z(), sunColor.w() };
+        const osg::Vec4f ambientColor = mSunLight->getAmbient();
+        result.ambientColor = { ambientColor.x(), ambientColor.y(), ambientColor.z(), ambientColor.w() };
         return result;
     }
 

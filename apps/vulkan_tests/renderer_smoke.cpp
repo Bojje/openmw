@@ -129,6 +129,7 @@ int main(int argc, char** argv)
             scene.projInverse = identityMatrix();
             scene.sunDirection = { 0.0f, -1.0f, 0.0f, 0.0f };
             scene.sunColor = { 1.0f, 1.0f, 1.0f, 1.0f };
+            scene.ambientColor = { 0.15f, 0.15f, 0.15f, 1.0f };
 
             renderer->setMeshes(*smokeMeshes());
 

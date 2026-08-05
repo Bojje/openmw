@@ -46,7 +46,17 @@ int main()
         || world.findObject(&objectHandle) != nullptr || world.findObject(&updatedObjectHandle) == nullptr
         || world.findCell(&firstCellHandle)->objects.size() != 0)
         throw std::runtime_error("renderer-neutral world scene failed to move an object");
+
+    int thirdCellHandle = 0;
+    world.recordObject(&objectHandle, &thirdCellHandle, false, 3, 4, "meshes/third.nif", objectTransform, true);
+    const auto orderedCells = world.cellsInOrder();
+    if (orderedCells.size() != 3 || orderedCells[0] != world.findCell(&firstCellHandle)
+        || orderedCells[1] != world.findCell(&secondCellHandle)
+        || orderedCells[2] != world.findCell(&thirdCellHandle))
+        throw std::runtime_error("renderer-neutral world scene lost stable cell insertion order");
+
     world.removeCell(&secondCellHandle);
-    if (world.findObject(&updatedObjectHandle) != nullptr || world.findCell(&secondCellHandle) != nullptr)
+    if (world.findObject(&updatedObjectHandle) != nullptr || world.findCell(&secondCellHandle) != nullptr
+        || world.cellsInOrder().size() != 2 || world.cellsInOrder()[1] != world.findCell(&thirdCellHandle))
         throw std::runtime_error("renderer-neutral world scene failed cell removal");
 }

@@ -685,13 +685,6 @@ namespace Vk
         layoutInfo.setLayoutCount = 1;
         layoutInfo.pSetLayouts = &mCompositeDescriptorLayout;
 
-        VkPushConstantRange pushConstant = {};
-        pushConstant.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-        pushConstant.offset = 0;
-        pushConstant.size = sizeof(Render::Vec4) * 3;
-        layoutInfo.pushConstantRangeCount = 1;
-        layoutInfo.pPushConstantRanges = &pushConstant;
-
         VK_CHECK(vkCreatePipelineLayout(mDevice->handle(), &layoutInfo, nullptr, &mCompositePipelineLayout));
     }
 
@@ -1067,18 +1060,6 @@ namespace Vk
 
                 vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mCompositePipelineLayout,
                     0, 1, &mCompositeDescriptorSets[mCurrentFrame], 0, nullptr);
-
-                // Push sun direction, sun color, and camera position
-                const Render::SceneData* sceneData = static_cast<const Render::SceneData*>(mUniformMapped[mCurrentFrame]);
-                Render::Vec4 cameraPos;
-                cameraPos.x = sceneData->viewInverse.data[12];
-                cameraPos.y = sceneData->viewInverse.data[13];
-                cameraPos.z = sceneData->viewInverse.data[14];
-                cameraPos.w = 1.0f;
-
-                std::array<Render::Vec4, 3> compositePush = { sceneData->sunDirection, sceneData->sunColor, cameraPos };
-                vkCmdPushConstants(cmd, mCompositePipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT,
-                    0, sizeof(Render::Vec4) * 3, compositePush.data());
 
                 vkCmdDraw(cmd, 3, 1, 0, 0);
             }

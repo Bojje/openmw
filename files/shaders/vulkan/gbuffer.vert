@@ -18,6 +18,7 @@ layout(set = 0, binding = 0) uniform CameraUBO {
     mat4 projInverse;
     vec4 sunDirection;
     vec4 sunColor;
+    vec4 ambientColor;
 } camera;
 
 layout(location = 0) out vec3 fragWorldPos;

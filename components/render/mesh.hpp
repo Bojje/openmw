@@ -142,9 +142,9 @@ namespace Render
     std::vector<MeshInstance> collectWorldMeshes(const WorldScene& world, ResolveMeshes&& resolveMeshes)
     {
         std::vector<MeshInstance> result;
-        for (const auto& [_, cell] : world.cells())
+        for (const CellScene* cell : world.cellsInOrder())
         {
-            std::vector<MeshInstance> cellMeshes = collectCellMeshes(cell, resolveMeshes);
+            std::vector<MeshInstance> cellMeshes = collectCellMeshes(*cell, resolveMeshes);
             result.insert(result.end(), std::make_move_iterator(cellMeshes.begin()),
                 std::make_move_iterator(cellMeshes.end()));
         }
