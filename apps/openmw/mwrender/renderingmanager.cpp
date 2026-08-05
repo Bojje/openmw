@@ -514,17 +514,15 @@ namespace MWRender
             return *iter->second;
         });
 
-        if (mTerrainStorage && mTerrain)
+        if (mTerrain)
         {
-            const ESM::RefId worldspace = mTerrain->getWorldspace();
             for (const Render::CellScene* cell : mWorldScene.cellsInOrder())
             {
                 if (!cell->exterior)
                     continue;
-                const osg::Vec2f center(cell->gridX + 0.5f, cell->gridY + 0.5f);
-                if (std::optional<Render::TerrainTile> tile
-                    = mTerrainStorage->getRenderTile(0, 1.f, center, worldspace))
-                    result.terrainTiles.push_back(std::move(*tile));
+                const auto tile = mNeutralTerrainTiles.find(cell->key);
+                if (tile != mNeutralTerrainTiles.end())
+                    result.terrainTiles.push_back(tile->second);
             }
         }
 
@@ -723,6 +721,15 @@ namespace MWRender
         {
             enableTerrain(true, store->getCell()->getWorldSpace());
             mTerrain->loadCell(store->getCell()->getGridX(), store->getCell()->getGridY());
+
+            if (mTerrainStorage && mTerrain)
+            {
+                const osg::Vec2f center(store->getCell()->getGridX() + 0.5f,
+                    store->getCell()->getGridY() + 0.5f);
+                if (std::optional<Render::TerrainTile> tile = mTerrainStorage->getRenderTile(
+                        0, 1.f, center, store->getCell()->getWorldSpace()))
+                    mNeutralTerrainTiles[static_cast<const void*>(store)] = std::move(*tile);
+            }
         }
     }
     void RenderingManager::removeCell(const MWWorld::CellStore* store)
@@ -736,6 +743,8 @@ namespace MWRender
             getWorldspaceChunkMgr(store->getCell()->getWorldSpace())
                 .mTerrain->unloadCell(store->getCell()->getGridX(), store->getCell()->getGridY());
         }
+
+        mNeutralTerrainTiles.erase(static_cast<const void*>(store));
 
         mWater->removeCell(store);
 

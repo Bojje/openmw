@@ -33,6 +33,7 @@ namespace Render
     // A cell snapshot is updated by the world lifecycle, not by a renderer.
     struct CellScene
     {
+        const void* key = nullptr;
         bool exterior = false;
         int gridX = 0;
         int gridY = 0;
@@ -78,6 +79,7 @@ namespace Render
                 mCellOrder.push_back(cell);
 
             CellScene& scene = iter->second;
+            scene.key = cell;
             scene.exterior = exterior;
             scene.gridX = gridX;
             scene.gridY = gridY;

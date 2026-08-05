@@ -350,6 +350,7 @@ namespace MWRender
         std::unique_ptr<Water> mWater;
         std::unordered_map<ESM::RefId, WorldspaceChunkMgr> mWorldspaceChunks;
         Render::WorldScene mWorldScene;
+        std::unordered_map<const void*, Render::TerrainTile> mNeutralTerrainTiles;
         Terrain::World* mTerrain;
         std::unique_ptr<TerrainStorage> mTerrainStorage;
         ObjectPaging* mObjectPaging;
