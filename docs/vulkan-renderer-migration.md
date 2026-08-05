@@ -70,11 +70,12 @@ opaque single-layer terrain retains an intentionally absent blendmap. Vulkan now
 that opaque form through the existing indexed mesh path, while multi-layer/blendmap tiles
 are explicitly deferred until a terrain shader exists. `WorldScene` now records empty
 loaded cells as well as object-bearing cells, and `RenderingManager::getNeutralScene()`
-collects terrain tiles for loaded exterior cells in the active worldspace, so terrain is
-part of the real full-game neutral handoff rather than only a test fixture.
+collects cached terrain tiles for loaded exterior cells in the active worldspace, so terrain
+is part of the real full-game neutral handoff rather than only a test fixture; conversion
+happens on cell add/remove rather than on every frame export.
 
 Against the actual PR base `origin/openmw-vulkan` (PR #5), the current checkpoint changes
-46 files, deleting 251 lines and adding 2,964 lines (net `+2,713`). The larger Vulkan-only
+46 files, deleting 251 lines and adding 2,976 lines (net `+2,725`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
@@ -102,7 +103,7 @@ the game unplayable rather than reduce duplication safely.
 | Parsed NIF resource cache wrapper | Removed | Complete; cache now owns shared NIF files directly |
 | NIF-to-neutral mesh conversion | Renderer-neutral NIF boundary, material data, mesh cache, `SceneSubmission`, Vulkan mesh batch, standalone texture table, and full-game neutral resolver | Connect the handoff to the live full-game Vulkan frame loop, add material shading, skinning, and static-world submission |
 | Terrain geometry and layer data | Legacy OSG terrain storage/ChunkManager plus a tested neutral tile adapter and Vulkan opaque single-layer mesh consumer | Add Vulkan terrain paging/LOD policy, blendmap/layer shaders, and terrain image coverage |
-| Loaded-cell object identity, transforms, terrain snapshots, and paging state | Renderer-neutral `WorldScene`/`CellScene` snapshots updated by scene lifecycle; `SceneSubmission` now includes loaded exterior terrain tiles | Consume snapshots from a backend and migrate visibility/paging policy |
+| Loaded-cell object identity, transforms, terrain snapshots, and paging state | Renderer-neutral `WorldScene`/`CellScene` snapshots updated by scene lifecycle; cell-lifecycle-cached terrain tiles flow into `SceneSubmission` | Consume snapshots from a backend and migrate visibility/paging policy |
 | GUI, loading screens, screenshots, and presentation | OSG/MyGUI path | Vulkan presentation and GUI coverage |
 
 This ledger is intentionally conservative: a subsystem is marked removable only after a
