@@ -478,8 +478,8 @@ namespace MWRender
         transform.rotation = toRenderQuat(getObjectRotation(ptr));
         transform.scale = { scale.x(), scale.y(), scale.z() };
         mWorldScene.recordObject(static_cast<const void*>(ptr.mRef), static_cast<const void*>(cell),
-            cell->getCell()->isExterior(), cell->getCell()->getGridX(), cell->getCell()->getGridY(), model, transform,
-            visible);
+            cell->getCell()->isExterior(), cell->getCell()->getGridX(), cell->getCell()->getGridY(),
+            cell->getCell()->getNameId(), model, transform, visible);
     }
 
     const Render::CellScene* RenderingManager::getCellScene(const MWWorld::CellStore* store) const
@@ -553,7 +553,7 @@ namespace MWRender
         const MWWorld::CellStore* newCell = updated.getCell();
         mWorldScene.updateObjectCell(static_cast<const void*>(old.mRef), static_cast<const void*>(updated.mRef),
             static_cast<const void*>(newCell), newCell->getCell()->isExterior(), newCell->getCell()->getGridX(),
-            newCell->getCell()->getGridY());
+            newCell->getCell()->getGridY(), newCell->getCell()->getNameId());
     }
 
     Resource::ResourceSystem* RenderingManager::getResourceSystem()

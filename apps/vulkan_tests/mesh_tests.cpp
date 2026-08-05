@@ -155,7 +155,7 @@ int main()
     int worldObjectHandle = 0;
     int worldCellHandle = 0;
     Render::WorldScene world;
-    world.recordObject(&worldObjectHandle, &worldCellHandle, true, 0, 0, "synthetic.nif", object.transform, true);
+    world.recordObject(&worldObjectHandle, &worldCellHandle, true, 0, 0, "world", "synthetic.nif", object.transform, true);
     const std::vector<Render::MeshInstance> worldMeshes = Render::collectWorldMeshes(
         world, [&](std::string_view model) -> const Resource::NifMeshManager::Meshes& {
             if (model != "synthetic.nif")

@@ -83,7 +83,7 @@ namespace
         Render::WorldScene world;
         Render::ObjectTransform transform;
         transform.position.x = 0.5f;
-        world.recordObject(&objectHandle, &cellHandle, true, 0, 0, file->mPath.view(), transform, true);
+        world.recordObject(&objectHandle, &cellHandle, true, 0, 0, "smoke", file->mPath.view(), transform, true);
         Resource::NifMeshManager::Meshes result = Render::collectWorldMeshes(
             world, [&](std::string_view model) -> const Resource::NifMeshManager::Meshes& {
                 if (model != file->mPath.view())

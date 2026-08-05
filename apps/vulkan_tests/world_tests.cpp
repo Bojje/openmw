@@ -30,25 +30,26 @@ int main()
     Render::WorldScene world;
     Render::ObjectTransform objectTransform;
     objectTransform.position.x = 4.f;
-    world.recordObject(&objectHandle, &firstCellHandle, true, 1, 2, "meshes/first.nif", objectTransform, false);
+    world.recordObject(&objectHandle, &firstCellHandle, true, 1, 2, "first", "meshes/first.nif", objectTransform, false);
     const Render::CellScene* firstCell = world.findCell(&firstCellHandle);
-    if (firstCell == nullptr || firstCell->objects.size() != 1 || firstCell->objects.front().visible)
+    if (firstCell == nullptr || firstCell->name != "first" || firstCell->objects.size() != 1
+        || firstCell->objects.front().visible)
         throw std::runtime_error("renderer-neutral world scene failed to record an object");
 
     objectTransform.position.x = 8.f;
-    world.recordObject(&objectHandle, &firstCellHandle, true, 1, 2, "meshes/updated.nif", objectTransform, true);
+    world.recordObject(&objectHandle, &firstCellHandle, true, 1, 2, "first", "meshes/updated.nif", objectTransform, true);
     Render::WorldObject* recorded = world.findObject(&objectHandle);
     if (recorded == nullptr || recorded->model != "meshes/updated.nif" || !recorded->visible
         || recorded->transform.position.x != 8.f)
         throw std::runtime_error("renderer-neutral world scene failed to update an object");
 
-    if (!world.updateObjectCell(&objectHandle, &updatedObjectHandle, &secondCellHandle, false, 0, 0)
+    if (!world.updateObjectCell(&objectHandle, &updatedObjectHandle, &secondCellHandle, false, 0, 0, "second")
         || world.findObject(&objectHandle) != nullptr || world.findObject(&updatedObjectHandle) == nullptr
         || world.findCell(&firstCellHandle)->objects.size() != 0)
         throw std::runtime_error("renderer-neutral world scene failed to move an object");
 
     int thirdCellHandle = 0;
-    world.recordObject(&objectHandle, &thirdCellHandle, false, 3, 4, "meshes/third.nif", objectTransform, true);
+    world.recordObject(&objectHandle, &thirdCellHandle, false, 3, 4, "third", "meshes/third.nif", objectTransform, true);
     const auto orderedCells = world.cellsInOrder();
     if (orderedCells.size() != 3 || orderedCells[0] != world.findCell(&firstCellHandle)
         || orderedCells[1] != world.findCell(&secondCellHandle)
