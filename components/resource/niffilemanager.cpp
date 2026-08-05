@@ -1,39 +1,12 @@
 #include "niffilemanager.hpp"
 
-#include <iostream>
-
-#include <osg/Object>
-
 #include <components/vfs/manager.hpp>
-
-#include "objectcache.hpp"
 
 namespace Resource
 {
 
-    class NifFileHolder : public osg::Object
-    {
-    public:
-        NifFileHolder(const Nif::NIFFilePtr& file)
-            : mNifFile(file)
-        {
-        }
-        NifFileHolder(const NifFileHolder& copy, const osg::CopyOp& copyop)
-            : mNifFile(copy.mNifFile)
-        {
-        }
-
-        NifFileHolder() = default;
-
-        META_Object(Resource, NifFileHolder)
-
-        Nif::NIFFilePtr mNifFile;
-    };
-
     NifFileManager::NifFileManager(const VFS::Manager* vfs, const ToUTF8::StatelessUtf8Encoder* encoder)
-        // NIF files aren't needed any more once the converted objects are cached in SceneManager / BulletShapeManager,
-        // so no point in using an expiry delay.
-        : ResourceManager(vfs, 0)
+        : mVFS(vfs)
         , mEncoder(encoder)
     {
     }
@@ -42,21 +15,59 @@ namespace Resource
 
     Nif::NIFFilePtr NifFileManager::get(VFS::Path::NormalizedView name)
     {
-        osg::ref_ptr<osg::Object> obj = mCache->getRefFromObjectCache(name);
-        if (obj != nullptr)
-            return static_cast<NifFileHolder*>(obj.get())->mNifFile;
+        {
+            std::lock_guard lock(mMutex);
+            ++mStats.mGet;
+            const auto found = mCache.find(name.value());
+            if (found != mCache.end())
+            {
+                ++mStats.mHit;
+                return found->second.mFile;
+            }
+        }
 
         auto file = std::make_shared<Nif::NIFFile>(name);
         Nif::Reader reader(*file, mEncoder);
         reader.parse(mVFS->get(name));
-        obj = new NifFileHolder(file);
-        mCache->addEntryToObjectCache(name.value(), obj);
-        return file;
+
+        std::lock_guard lock(mMutex);
+        const auto [it, inserted] = mCache.emplace(name.value(), CacheItem{ file });
+        return inserted ? file : it->second.mFile;
+    }
+
+    void NifFileManager::updateCache(double referenceTime)
+    {
+        std::lock_guard lock(mMutex);
+        const double expiryTime = referenceTime - mExpiryDelay;
+        std::erase_if(mCache, [&](auto& item) {
+            CacheItem& cacheItem = item.second;
+            if (cacheItem.mFile.use_count() > 1 || cacheItem.mLastUsage == 0.0)
+                cacheItem.mLastUsage = referenceTime;
+            if (cacheItem.mLastUsage > expiryTime)
+                return false;
+            ++mStats.mExpired;
+            return true;
+        });
+    }
+
+    void NifFileManager::clearCache()
+    {
+        std::lock_guard lock(mMutex);
+        mCache.clear();
+    }
+
+    void NifFileManager::setExpiryDelay(double expiryDelay)
+    {
+        std::lock_guard lock(mMutex);
+        mExpiryDelay = expiryDelay;
     }
 
     void NifFileManager::reportStats(unsigned int frameNumber, osg::Stats* stats) const
     {
-        Resource::reportStats("Nif", frameNumber, mCache->getStats(), *stats);
+        std::lock_guard lock(mMutex);
+        CacheStats statsCopy = mStats;
+        statsCopy.mSize = mCache.size();
+        Resource::reportStats("Nif", frameNumber, statsCopy, *stats);
     }
 
 }

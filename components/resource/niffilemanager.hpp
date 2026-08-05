@@ -1,8 +1,12 @@
 #ifndef OPENMW_COMPONENTS_RESOURCE_NIFFILEMANAGER_H
 #define OPENMW_COMPONENTS_RESOURCE_NIFFILEMANAGER_H
 
+#include <map>
+#include <mutex>
+
 #include <components/nif/niffile.hpp>
 
+#include "cachestats.hpp"
 #include "resourcemanager.hpp"
 
 namespace ToUTF8
@@ -15,20 +19,35 @@ namespace Resource
 
     /// @brief Handles caching of NIFFiles.
     /// @note May be used from any thread.
-    class NifFileManager : public ResourceManager
+    class NifFileManager : public BaseResourceManager
     {
+        struct CacheItem
+        {
+            Nif::NIFFilePtr mFile;
+            double mLastUsage = 0.0;
+        };
+
+        const VFS::Manager* mVFS;
         const ToUTF8::StatelessUtf8Encoder* mEncoder;
+        mutable std::mutex mMutex;
+        std::map<std::string, CacheItem, std::less<>> mCache;
+        double mExpiryDelay = 0.0;
+        CacheStats mStats;
 
     public:
         NifFileManager(const VFS::Manager* vfs, const ToUTF8::StatelessUtf8Encoder* encoder);
-        ~NifFileManager();
+        ~NifFileManager() override;
 
         /// Retrieve a NIF file from the cache, or load it from the VFS if not cached yet.
         /// @note For performance reasons the NifFileManager does not handle case folding, needs
         /// to be done in advance by other managers accessing the NifFileManager.
         Nif::NIFFilePtr get(VFS::Path::NormalizedView name);
 
+        void updateCache(double referenceTime) override;
+        void clearCache() override;
+        void setExpiryDelay(double expiryDelay) override;
         void reportStats(unsigned int frameNumber, osg::Stats* stats) const override;
+        void releaseGLObjects(osg::State*) override {}
     };
 
 }
