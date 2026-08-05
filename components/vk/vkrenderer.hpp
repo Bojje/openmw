@@ -97,6 +97,8 @@ namespace Vk
         uint32_t createTextureResource(const Render::TextureData& texture);
         void destroyTextures();
         void destroyMesh();
+        void destroyMesh(uint32_t frameIndex);
+        void uploadMesh(uint32_t frameIndex);
         void setMeshes(const std::vector<Render::MeshInstance>& meshes, TextureResolver textureResolver);
 
         void createImage(uint32_t width, uint32_t height, VkFormat format, VkImageUsageFlags usage,
@@ -151,10 +153,19 @@ namespace Vk
         std::unordered_map<std::string, uint32_t> mTextureIndices;
         std::vector<uint32_t> mMeshTextureIndices;
 
-        VkBuffer mMeshVertexBuffer = VK_NULL_HANDLE;
-        VkDeviceMemory mMeshVertexMemory = VK_NULL_HANDLE;
-        VkBuffer mMeshIndexBuffer = VK_NULL_HANDLE;
-        VkDeviceMemory mMeshIndexMemory = VK_NULL_HANDLE;
+        struct MeshBuffers
+        {
+            VkBuffer vertex = VK_NULL_HANDLE;
+            VkDeviceMemory vertexMemory = VK_NULL_HANDLE;
+            VkBuffer index = VK_NULL_HANDLE;
+            VkDeviceMemory indexMemory = VK_NULL_HANDLE;
+        };
+
+        std::array<MeshBuffers, maxFramesInFlight> mMeshBuffers = {};
+        std::vector<Render::MeshVertex> mMeshVertices;
+        std::vector<uint32_t> mMeshIndices;
+        uint64_t mMeshRevision = 1;
+        std::array<uint64_t, maxFramesInFlight> mUploadedMeshRevisions = {};
 
         std::vector<Render::MeshDraw> mMeshDraws;
 

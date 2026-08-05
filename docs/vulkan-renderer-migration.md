@@ -57,7 +57,10 @@ full-game input without exposing OSG objects.
 Those inputs can now be collected as one `Render::SceneSubmission`; `Vk::Renderer::setScene`
 consumes that handoff in the standalone path, and the smoke test exercises it. The full-game
 Vulkan call site is still intentionally absent until window, input, dynamic-content, and GUI
-services have a Vulkan owner.
+services have a Vulkan owner. Mesh submission no longer waits for the whole device or
+rebuilds one global buffer: neutral mesh data is retained on the CPU and uploaded into
+the current frame slot only after its fence is waited, so a future live frame loop can
+submit scene updates without the previous device-wide stall.
 The fast test suite now also contains a backend-neutral RGBA8 image comparator with
 per-channel tolerance, differing-pixel count, maximum error, and mean error metrics.
 The Vulkan smoke path now reads back rendered RGBA8/BGRA8 swapchain frames and compares

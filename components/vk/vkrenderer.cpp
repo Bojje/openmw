@@ -1049,6 +1049,9 @@ namespace Vk
         if (drawableWidth <= 0 || drawableHeight <= 0)
             return false;
 
+        if (mUploadedMeshRevisions[mCurrentFrame] != mMeshRevision)
+            uploadMesh(mCurrentFrame);
+
         VkResult result;
         for (;;)
         {
@@ -1176,7 +1179,8 @@ namespace Vk
                 vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mGBufferPipelineLayout,
                     0, 1, &mSceneDescriptorSets[mCurrentFrame], 0, nullptr);
 
-                if (mMeshVertexBuffer != VK_NULL_HANDLE && mMeshIndexBuffer != VK_NULL_HANDLE)
+                const MeshBuffers& meshBuffers = mMeshBuffers[mCurrentFrame];
+                if (meshBuffers.vertex != VK_NULL_HANDLE && meshBuffers.index != VK_NULL_HANDLE)
                 {
                     struct PushData
                     {
@@ -1187,8 +1191,8 @@ namespace Vk
                     };
 
                     VkDeviceSize offset = 0;
-                    vkCmdBindVertexBuffers(cmd, 0, 1, &mMeshVertexBuffer, &offset);
-                    vkCmdBindIndexBuffer(cmd, mMeshIndexBuffer, 0, VK_INDEX_TYPE_UINT32);
+                    vkCmdBindVertexBuffers(cmd, 0, 1, &meshBuffers.vertex, &offset);
+                    vkCmdBindIndexBuffer(cmd, meshBuffers.index, 0, VK_INDEX_TYPE_UINT32);
                     VkPipeline boundPipeline = VK_NULL_HANDLE;
                     for (std::size_t drawIndex = 0; drawIndex < mMeshDraws.size(); ++drawIndex)
                     {
@@ -1395,17 +1399,11 @@ namespace Vk
 
     void Renderer::setMeshes(const std::vector<Render::MeshInstance>& meshes, TextureResolver textureResolver)
     {
-        vkDeviceWaitIdle(mDevice->handle());
-        destroyMesh();
-
         Render::MeshBatch batch = Render::batchMeshes(meshes);
-        std::vector<Render::MeshVertex>& vertices = batch.vertices;
-        std::vector<uint32_t>& indices = batch.indices;
-
-        if (vertices.empty() || indices.empty())
-            return;
-
         mMeshDraws = std::move(batch.draws);
+        mMeshVertices = std::move(batch.vertices);
+        mMeshIndices = std::move(batch.indices);
+        mMeshTextureIndices.clear();
         mMeshTextureIndices.reserve(mMeshDraws.size());
         for (const Render::MeshDraw& draw : mMeshDraws)
         {
@@ -1428,32 +1426,49 @@ namespace Vk
             mMeshTextureIndices.push_back(textureIndex);
         }
 
+        ++mMeshRevision;
+        if (mMeshRevision == 0)
+            ++mMeshRevision;
+    }
+
+    void Renderer::uploadMesh(uint32_t frameIndex)
+    {
+        destroyMesh(frameIndex);
+
+        MeshBuffers& buffers = mMeshBuffers.at(frameIndex);
+        if (mMeshVertices.empty() || mMeshIndices.empty())
+        {
+            mUploadedMeshRevisions[frameIndex] = mMeshRevision;
+            return;
+        }
+
         try
         {
             createBufferLocal(mDevice->handle(), mDevice->physical(),
-                sizeof(Render::MeshVertex) * vertices.size(), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                sizeof(Render::MeshVertex) * mMeshVertices.size(), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                mMeshVertexBuffer, mMeshVertexMemory);
+                buffers.vertex, buffers.vertexMemory);
             createBufferLocal(mDevice->handle(), mDevice->physical(),
-                sizeof(uint32_t) * indices.size(), VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+                sizeof(uint32_t) * mMeshIndices.size(), VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                mMeshIndexBuffer, mMeshIndexMemory);
+                buffers.index, buffers.indexMemory);
 
             void* mapped = nullptr;
-            VK_CHECK(vkMapMemory(mDevice->handle(), mMeshVertexMemory, 0,
-                sizeof(Render::MeshVertex) * vertices.size(), 0, &mapped));
-            std::memcpy(mapped, vertices.data(), sizeof(Render::MeshVertex) * vertices.size());
-            vkUnmapMemory(mDevice->handle(), mMeshVertexMemory);
+            VK_CHECK(vkMapMemory(mDevice->handle(), buffers.vertexMemory, 0,
+                sizeof(Render::MeshVertex) * mMeshVertices.size(), 0, &mapped));
+            std::memcpy(mapped, mMeshVertices.data(), sizeof(Render::MeshVertex) * mMeshVertices.size());
+            vkUnmapMemory(mDevice->handle(), buffers.vertexMemory);
 
             mapped = nullptr;
-            VK_CHECK(vkMapMemory(mDevice->handle(), mMeshIndexMemory, 0,
-                sizeof(uint32_t) * indices.size(), 0, &mapped));
-            std::memcpy(mapped, indices.data(), sizeof(uint32_t) * indices.size());
-            vkUnmapMemory(mDevice->handle(), mMeshIndexMemory);
+            VK_CHECK(vkMapMemory(mDevice->handle(), buffers.indexMemory, 0,
+                sizeof(uint32_t) * mMeshIndices.size(), 0, &mapped));
+            std::memcpy(mapped, mMeshIndices.data(), sizeof(uint32_t) * mMeshIndices.size());
+            vkUnmapMemory(mDevice->handle(), buffers.indexMemory);
+            mUploadedMeshRevisions[frameIndex] = mMeshRevision;
         }
         catch (...)
         {
-            destroyMesh();
+            destroyMesh(frameIndex);
             throw;
         }
     }
@@ -1463,22 +1478,33 @@ namespace Vk
         if (!mDevice)
             return;
 
-        VkDevice dev = mDevice->handle();
-        if (mMeshVertexBuffer != VK_NULL_HANDLE)
-            vkDestroyBuffer(dev, mMeshVertexBuffer, nullptr);
-        if (mMeshVertexMemory != VK_NULL_HANDLE)
-            vkFreeMemory(dev, mMeshVertexMemory, nullptr);
-        if (mMeshIndexBuffer != VK_NULL_HANDLE)
-            vkDestroyBuffer(dev, mMeshIndexBuffer, nullptr);
-        if (mMeshIndexMemory != VK_NULL_HANDLE)
-            vkFreeMemory(dev, mMeshIndexMemory, nullptr);
-
-        mMeshVertexBuffer = VK_NULL_HANDLE;
-        mMeshVertexMemory = VK_NULL_HANDLE;
-        mMeshIndexBuffer = VK_NULL_HANDLE;
-        mMeshIndexMemory = VK_NULL_HANDLE;
+        vkDeviceWaitIdle(mDevice->handle());
+        for (uint32_t frameIndex = 0; frameIndex < maxFramesInFlight; ++frameIndex)
+            destroyMesh(frameIndex);
+        mUploadedMeshRevisions = {};
         mMeshDraws.clear();
+        mMeshVertices.clear();
+        mMeshIndices.clear();
         mMeshTextureIndices.clear();
+    }
+
+    void Renderer::destroyMesh(uint32_t frameIndex)
+    {
+        if (!mDevice)
+            return;
+
+        VkDevice dev = mDevice->handle();
+        MeshBuffers& buffers = mMeshBuffers.at(frameIndex);
+        if (buffers.vertex != VK_NULL_HANDLE)
+            vkDestroyBuffer(dev, buffers.vertex, nullptr);
+        if (buffers.vertexMemory != VK_NULL_HANDLE)
+            vkFreeMemory(dev, buffers.vertexMemory, nullptr);
+        if (buffers.index != VK_NULL_HANDLE)
+            vkDestroyBuffer(dev, buffers.index, nullptr);
+        if (buffers.indexMemory != VK_NULL_HANDLE)
+            vkFreeMemory(dev, buffers.indexMemory, nullptr);
+        buffers = {};
+        mUploadedMeshRevisions[frameIndex] = 0;
     }
 
     void Renderer::destroyTextures()
