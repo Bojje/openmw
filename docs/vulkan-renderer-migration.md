@@ -56,7 +56,7 @@ resolution backed by the existing resource caches, giving a future Vulkan consum
 full-game input without exposing OSG objects.
 
 Against the actual PR base `origin/openmw-vulkan` (PR #5), the current checkpoint changes
-36 files, deleting 244 lines and adding 2,140 lines (net `+1,896`). The larger Vulkan-only
+36 files, deleting 244 lines and adding 2,148 lines (net `+1,904`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
