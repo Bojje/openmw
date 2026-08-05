@@ -9,6 +9,7 @@ layout(location = 4) in vec4 inMaterial;
 layout(push_constant) uniform PushConstants {
     mat4 model;
     mat4 normalMatrix;
+    uint materialFlags;
 } push;
 
 layout(set = 0, binding = 0) uniform CameraUBO {
@@ -26,6 +27,7 @@ layout(location = 1) out vec3 fragNormal;
 layout(location = 2) out vec2 fragTexCoord;
 layout(location = 3) out vec4 fragColor;
 layout(location = 4) out vec4 fragMaterial;
+layout(location = 5) flat out uint fragMaterialFlags;
 
 void main() {
     vec4 worldPos = push.model * vec4(inPosition, 1.0);
@@ -34,5 +36,6 @@ void main() {
     fragTexCoord = inTexCoord;
     fragColor = inColor;
     fragMaterial = inMaterial;
+    fragMaterialFlags = push.materialFlags;
     gl_Position = camera.projection * camera.view * worldPos;
 }

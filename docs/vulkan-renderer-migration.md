@@ -34,8 +34,10 @@ smoke path now resolves all loaded-cell snapshots through the cached NIF meshes,
 objects by neutral visibility, and composes object transforms with NIF node transforms before batching.
 NIF classic texture, diffuse/emissive, glossiness, and alpha properties now cross the
 renderer-neutral mesh boundary and survive batching; the neutral batch applies diffuse
-and alpha to vertex color output, while Vulkan texture binding and full material shading
-remain outstanding. The Vulkan G-buffer now carries neutral roughness, ambient-occlusion,
+and alpha to vertex color output, while Vulkan texture binding, alpha blending, and full
+material shading remain outstanding. Vulkan now consumes neutral alpha-test state and
+thresholds in the G-buffer cutout path. The Vulkan G-buffer now carries neutral roughness,
+ambient-occlusion,
 and emissive-strength channels into the composite pass. Cell object lookup and removal are
 owned by the renderer-neutral `WorldScene`/`CellScene` components rather than the OSG-facing
 manager; the manager now only translates engine lifecycle events into that component. The

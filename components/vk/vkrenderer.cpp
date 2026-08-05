@@ -666,7 +666,7 @@ namespace Vk
         VkPushConstantRange pushConstant = {};
         pushConstant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
         pushConstant.offset = 0;
-        pushConstant.size = sizeof(Render::Mat4) * 2;
+        pushConstant.size = sizeof(Render::Mat4) * 2 + sizeof(uint32_t);
 
         VkPipelineLayoutCreateInfo layoutInfo = {};
         layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -1010,6 +1010,7 @@ namespace Vk
                     {
                         Render::Mat4 model;
                         Render::Mat4 normalMatrix;
+                        uint32_t materialFlags;
                     };
 
                     VkDeviceSize offset = 0;
@@ -1017,7 +1018,13 @@ namespace Vk
                     vkCmdBindIndexBuffer(cmd, mMeshIndexBuffer, 0, VK_INDEX_TYPE_UINT32);
                     for (const Render::MeshDraw& draw : mMeshDraws)
                     {
-                        const PushData pushData = { draw.transform, draw.normalMatrix };
+                        const PushData pushData = {
+                            draw.transform,
+                            draw.normalMatrix,
+                            draw.material.alphaTest
+                                ? 1u | (static_cast<uint32_t>(draw.material.alphaTestThreshold) << 8u)
+                                : 0u,
+                        };
                         vkCmdPushConstants(cmd, mGBufferPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT,
                             0, sizeof(pushData), &pushData);
                         vkCmdDrawIndexed(cmd, draw.indexCount, 1, draw.firstIndex, draw.vertexOffset, 0);
