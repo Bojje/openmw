@@ -60,7 +60,7 @@ namespace Vk
         bool loadShadersAndCreatePipelines(const std::string& shaderDir);
 
         void updateScene(const Render::SceneData& sceneData);
-        void setMesh(const Render::MeshData& mesh);
+        void setMesh(const Render::MeshInstance& mesh);
 
     private:
         void createSurface();
@@ -127,6 +127,8 @@ namespace Vk
         VkBuffer mMeshIndexBuffer = VK_NULL_HANDLE;
         VkDeviceMemory mMeshIndexMemory = VK_NULL_HANDLE;
         uint32_t mMeshIndexCount = 0;
+        Render::Mat4 mMeshTransform = {};
+        Render::Mat4 mMeshNormalMatrix = {};
 
         std::vector<VkCommandBuffer> mCommandBuffers;
 

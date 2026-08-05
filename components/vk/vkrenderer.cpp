@@ -10,6 +10,7 @@
 
 #include <components/debug/debuglog.hpp>
 
+#include "../render/math.hpp"
 #include "vkcommands.hpp"
 #include "vkdevice.hpp"
 #include "vkinstance.hpp"
@@ -1009,17 +1010,11 @@ namespace Vk
 
                 if (mMeshVertexBuffer != VK_NULL_HANDLE && mMeshIndexBuffer != VK_NULL_HANDLE)
                 {
-                    Render::Mat4 identity = {};
-                    identity.data[0] = 1.0f;
-                    identity.data[5] = 1.0f;
-                    identity.data[10] = 1.0f;
-                    identity.data[15] = 1.0f;
-
                     struct PushData
                     {
                         Render::Mat4 model;
                         Render::Mat4 normalMatrix;
-                    } pushData = { identity, identity };
+                    } pushData = { mMeshTransform, mMeshNormalMatrix };
                     vkCmdPushConstants(cmd, mGBufferPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT,
                         0, sizeof(pushData), &pushData);
 
@@ -1121,38 +1116,41 @@ namespace Vk
         std::memcpy(mUniformMapped[mCurrentFrame], &sceneData, sizeof(Render::SceneData));
     }
 
-    void Renderer::setMesh(const Render::MeshData& mesh)
+    void Renderer::setMesh(const Render::MeshInstance& mesh)
     {
         vkDeviceWaitIdle(mDevice->handle());
         destroyMesh();
 
-        if (mesh.vertices.empty() || mesh.indices.empty())
+        mMeshTransform = mesh.transform;
+        mMeshNormalMatrix = Render::computeNormalMatrix(mesh.transform);
+
+        if (mesh.mesh.vertices.empty() || mesh.mesh.indices.empty())
             return;
 
         try
         {
             createBufferLocal(mDevice->handle(), mDevice->physical(),
-                sizeof(Render::MeshVertex) * mesh.vertices.size(), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                sizeof(Render::MeshVertex) * mesh.mesh.vertices.size(), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                 mMeshVertexBuffer, mMeshVertexMemory);
             createBufferLocal(mDevice->handle(), mDevice->physical(),
-                sizeof(uint32_t) * mesh.indices.size(), VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+                sizeof(uint32_t) * mesh.mesh.indices.size(), VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                 mMeshIndexBuffer, mMeshIndexMemory);
 
             void* mapped = nullptr;
             VK_CHECK(vkMapMemory(mDevice->handle(), mMeshVertexMemory, 0,
-                sizeof(Render::MeshVertex) * mesh.vertices.size(), 0, &mapped));
-            std::memcpy(mapped, mesh.vertices.data(), sizeof(Render::MeshVertex) * mesh.vertices.size());
+                sizeof(Render::MeshVertex) * mesh.mesh.vertices.size(), 0, &mapped));
+            std::memcpy(mapped, mesh.mesh.vertices.data(), sizeof(Render::MeshVertex) * mesh.mesh.vertices.size());
             vkUnmapMemory(mDevice->handle(), mMeshVertexMemory);
 
             mapped = nullptr;
             VK_CHECK(vkMapMemory(mDevice->handle(), mMeshIndexMemory, 0,
-                sizeof(uint32_t) * mesh.indices.size(), 0, &mapped));
-            std::memcpy(mapped, mesh.indices.data(), sizeof(uint32_t) * mesh.indices.size());
+                sizeof(uint32_t) * mesh.mesh.indices.size(), 0, &mapped));
+            std::memcpy(mapped, mesh.mesh.indices.data(), sizeof(uint32_t) * mesh.mesh.indices.size());
             vkUnmapMemory(mDevice->handle(), mMeshIndexMemory);
 
-            mMeshIndexCount = static_cast<uint32_t>(mesh.indices.size());
+            mMeshIndexCount = static_cast<uint32_t>(mesh.mesh.indices.size());
         }
         catch (...)
         {
