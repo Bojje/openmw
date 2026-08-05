@@ -16,10 +16,37 @@ int main()
         || scene.objects.front().visible)
         throw std::runtime_error("renderer-neutral cell scene stored invalid object data");
 
-    const Render::Mat4 transform = Render::makeObjectTransformMatrix(scene.objects.front().transform);
-    if (transform.data[12] != 0.f || transform.data[15] != 1.f)
+    const Render::Mat4 matrix = Render::makeObjectTransformMatrix(scene.objects.front().transform);
+    if (matrix.data[12] != 0.f || matrix.data[15] != 1.f)
         throw std::runtime_error("renderer-neutral object transform matrix is invalid");
 
     if (scene.findObject(7) == nullptr || !scene.eraseObject(7) || scene.findObject(7) != nullptr)
         throw std::runtime_error("renderer-neutral cell scene failed object ownership operations");
+
+    int objectHandle = 0;
+    int updatedObjectHandle = 0;
+    int firstCellHandle = 0;
+    int secondCellHandle = 0;
+    Render::WorldScene world;
+    Render::ObjectTransform objectTransform;
+    objectTransform.position.x = 4.f;
+    world.recordObject(&objectHandle, &firstCellHandle, true, 1, 2, "meshes/first.nif", objectTransform, false);
+    const Render::CellScene* firstCell = world.findCell(&firstCellHandle);
+    if (firstCell == nullptr || firstCell->objects.size() != 1 || firstCell->objects.front().visible)
+        throw std::runtime_error("renderer-neutral world scene failed to record an object");
+
+    objectTransform.position.x = 8.f;
+    world.recordObject(&objectHandle, &firstCellHandle, true, 1, 2, "meshes/updated.nif", objectTransform, true);
+    Render::WorldObject* recorded = world.findObject(&objectHandle);
+    if (recorded == nullptr || recorded->model != "meshes/updated.nif" || !recorded->visible
+        || recorded->transform.position.x != 8.f)
+        throw std::runtime_error("renderer-neutral world scene failed to update an object");
+
+    if (!world.updateObjectCell(&objectHandle, &updatedObjectHandle, &secondCellHandle, false, 0, 0)
+        || world.findObject(&objectHandle) != nullptr || world.findObject(&updatedObjectHandle) == nullptr
+        || world.findCell(&firstCellHandle)->objects.size() != 0)
+        throw std::runtime_error("renderer-neutral world scene failed to move an object");
+    world.removeCell(&secondCellHandle);
+    if (world.findObject(&updatedObjectHandle) != nullptr || world.findCell(&secondCellHandle) != nullptr)
+        throw std::runtime_error("renderer-neutral world scene failed cell removal");
 }

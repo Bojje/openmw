@@ -35,7 +35,8 @@ by neutral visibility, and composes object transforms with NIF node transforms b
 NIF classic texture, diffuse/emissive, glossiness, and alpha properties now cross the
 renderer-neutral mesh boundary and survive batching, while Vulkan texture binding and
 material shading remain outstanding. Cell object lookup and removal are
-owned by the neutral `CellScene` data type rather than the OSG-facing manager.
+owned by the renderer-neutral `WorldScene`/`CellScene` components rather than the OSG-facing
+manager; the manager now only translates engine lifecycle events into that component.
 
 The remaining migration is not a compatibility problem that can be solved by retaining
 both renderers in one execution path. Static-world transforms, materials, textures,
@@ -54,7 +55,7 @@ the game unplayable rather than reduce duplication safely.
 | Vulkan utility/queue helper paths | Removed | Complete |
 | Parsed NIF resource cache wrapper | Removed | Complete; cache now owns shared NIF files directly |
 | NIF-to-neutral mesh conversion | Renderer-neutral NIF boundary, material data, mesh cache, and Vulkan mesh batch | Add texture binding, material shading, skinning, and static-world submission |
-| Loaded-cell object identity, transforms, and paging state | Renderer-neutral cell snapshots updated by scene lifecycle | Consume snapshots from a backend and migrate visibility/paging policy |
+| Loaded-cell object identity, transforms, and paging state | Renderer-neutral `WorldScene`/`CellScene` snapshots updated by scene lifecycle | Consume snapshots from a backend and migrate visibility/paging policy |
 | GUI, loading screens, screenshots, and presentation | OSG/MyGUI path | Vulkan presentation and GUI coverage |
 
 This ledger is intentionally conservative: a subsystem is marked removable only after a
@@ -94,7 +95,7 @@ real replacement consumes its responsibility and the fast tests cover the bounda
 
 ### 5. Replace OSG scene ownership
 
-- Separate cell visibility, transforms, camera state, lighting, and material data from OSG scene nodes. Camera/light scene data, transform-preserving neutral mesh instances, updateable loaded-cell object snapshots, explicit paged-reference visibility, neutral NIF material extraction, and a cached-mesh cell composition adapter are in place; Vulkan texture/shading consumption remains to be migrated.
+- Separate cell visibility, transforms, camera state, lighting, and material data from OSG scene nodes. Camera/light scene data, transform-preserving neutral mesh instances, updateable `WorldScene`/`CellScene` snapshots, explicit paged-reference visibility, neutral NIF material extraction, and a cached-mesh cell composition adapter are in place; Vulkan texture/shading consumption remains to be migrated.
 - Feed both reference and Vulkan implementations from renderer-neutral scene data during the transition.
 - Delete OSG scene ownership once Vulkan consumes all required scene events.
 

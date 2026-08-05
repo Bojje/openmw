@@ -317,12 +317,6 @@ namespace MWRender
 
         void updateRecastMesh();
 
-        struct NeutralObjectLocation
-        {
-            const MWWorld::CellStore* cell;
-            uint64_t id;
-        };
-
         Render::WorldObject* findNeutralObject(const MWWorld::Ptr& ptr);
         void removeNeutralObject(const MWWorld::Ptr& ptr);
         void updateNeutralObjectCell(const MWWorld::Ptr& old, const MWWorld::Ptr& updated);
@@ -352,9 +346,7 @@ namespace MWRender
         std::unique_ptr<Objects> mObjects;
         std::unique_ptr<Water> mWater;
         std::unordered_map<ESM::RefId, WorldspaceChunkMgr> mWorldspaceChunks;
-        std::unordered_map<const MWWorld::CellStore*, Render::CellScene> mCellScenes;
-        std::unordered_map<const void*, NeutralObjectLocation> mNeutralObjectLocations;
-        uint64_t mNextNeutralObjectId = 1;
+        Render::WorldScene mWorldScene;
         Terrain::World* mTerrain;
         std::unique_ptr<TerrainStorage> mTerrainStorage;
         ObjectPaging* mObjectPaging;

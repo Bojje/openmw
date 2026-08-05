@@ -4,6 +4,9 @@
 #include <algorithm>
 #include <cstdint>
 #include <string>
+#include <string_view>
+#include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "math.hpp"
@@ -48,6 +51,167 @@ namespace Render
             const auto oldSize = objects.size();
             std::erase_if(objects, [id](const WorldObject& object) { return object.id == id; });
             return objects.size() != oldSize;
+        }
+    };
+
+    // Renderer-neutral ownership for loaded cells and their object identity.
+    // The keys are opaque engine-owned handles; no renderer or game type leaks
+    // into this component.
+    class WorldScene
+    {
+        struct ObjectLocation
+        {
+            const void* cell;
+            uint64_t id;
+        };
+
+        std::unordered_map<const void*, CellScene> mCells;
+        std::unordered_map<const void*, ObjectLocation> mObjects;
+        uint64_t mNextObjectId = 1;
+
+        CellScene& ensureCell(const void* cell, bool exterior, int gridX, int gridY)
+        {
+            CellScene& scene = mCells[cell];
+            scene.exterior = exterior;
+            scene.gridX = gridX;
+            scene.gridY = gridY;
+            return scene;
+        }
+
+        void rekeyObject(const void* oldKey, const void* newKey, const ObjectLocation& location)
+        {
+            if (oldKey == newKey)
+                return;
+            mObjects.erase(oldKey);
+            mObjects.emplace(newKey, location);
+        }
+
+    public:
+        void recordObject(const void* objectKey, const void* cellKey, bool exterior, int gridX, int gridY,
+            std::string_view model, const ObjectTransform& transform, bool visible)
+        {
+            if (objectKey == nullptr || cellKey == nullptr || model.empty())
+            {
+                removeObject(objectKey);
+                return;
+            }
+
+            const auto found = mObjects.find(objectKey);
+            if (found != mObjects.end())
+            {
+                const ObjectLocation location = found->second;
+                if (location.cell != cellKey)
+                {
+                    if (!updateObjectCell(objectKey, objectKey, cellKey, exterior, gridX, gridY))
+                        return;
+                    return recordObject(objectKey, cellKey, exterior, gridX, gridY, model, transform, visible);
+                }
+
+                if (CellScene* scene = findCell(location.cell))
+                {
+                    if (WorldObject* object = scene->findObject(location.id))
+                    {
+                        object->model = model;
+                        object->transform = transform;
+                        object->visible = visible;
+                        return;
+                    }
+                }
+                mObjects.erase(found);
+            }
+
+            WorldObject object;
+            object.id = mNextObjectId++;
+            if (object.id == 0)
+                object.id = mNextObjectId++;
+            const uint64_t id = object.id;
+            object.model = model;
+            object.transform = transform;
+            object.visible = visible;
+            ensureCell(cellKey, exterior, gridX, gridY).objects.push_back(std::move(object));
+            mObjects.emplace(objectKey, ObjectLocation{ cellKey, id });
+        }
+
+        WorldObject* findObject(const void* objectKey)
+        {
+            const auto found = mObjects.find(objectKey);
+            if (found == mObjects.end())
+                return nullptr;
+            const auto scene = mCells.find(found->second.cell);
+            return scene == mCells.end() ? nullptr : scene->second.findObject(found->second.id);
+        }
+
+        const CellScene* findCell(const void* cellKey) const
+        {
+            const auto found = mCells.find(cellKey);
+            return found == mCells.end() ? nullptr : &found->second;
+        }
+
+        CellScene* findCell(const void* cellKey)
+        {
+            const auto found = mCells.find(cellKey);
+            return found == mCells.end() ? nullptr : &found->second;
+        }
+
+        void removeObject(const void* objectKey)
+        {
+            if (objectKey == nullptr)
+                return;
+
+            const auto found = mObjects.find(objectKey);
+            if (found == mObjects.end())
+                return;
+            const auto scene = mCells.find(found->second.cell);
+            if (scene != mCells.end())
+                scene->second.eraseObject(found->second.id);
+            mObjects.erase(found);
+        }
+
+        bool updateObjectCell(const void* oldKey, const void* newKey, const void* newCellKey, bool exterior, int gridX,
+            int gridY)
+        {
+            if (oldKey == nullptr || newKey == nullptr || newCellKey == nullptr)
+                return false;
+
+            const auto found = mObjects.find(oldKey);
+            if (found == mObjects.end())
+                return false;
+
+            const ObjectLocation location = found->second;
+            if (location.cell == newCellKey)
+            {
+                rekeyObject(oldKey, newKey, location);
+                return true;
+            }
+
+            auto oldScene = mCells.find(location.cell);
+            if (oldScene == mCells.end())
+                return false;
+            WorldObject* object = oldScene->second.findObject(location.id);
+            if (object == nullptr)
+                return false;
+
+            WorldObject moved = std::move(*object);
+            oldScene->second.eraseObject(location.id);
+            ensureCell(newCellKey, exterior, gridX, gridY).objects.push_back(std::move(moved));
+
+            mObjects.erase(found);
+            mObjects.emplace(newKey, ObjectLocation{ newCellKey, location.id });
+            return true;
+        }
+
+        void removeCell(const void* cellKey)
+        {
+            if (cellKey == nullptr)
+                return;
+            for (auto iter = mObjects.begin(); iter != mObjects.end();)
+            {
+                if (iter->second.cell == cellKey)
+                    iter = mObjects.erase(iter);
+                else
+                    ++iter;
+            }
+            mCells.erase(cellKey);
         }
     };
 
