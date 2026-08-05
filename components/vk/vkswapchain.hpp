@@ -24,6 +24,7 @@ namespace Vk
 
         VkExtent2D extent() const { return mExtent; }
         VkFormat format() const { return mFormat; }
+        VkImage image(uint32_t imageIndex) const { return mImages.at(imageIndex); }
         const std::vector<VkImageView>& imageViews() const { return mImageViews; }
         VkImageView depthImageView() const { return mDepthImageView; }
         uint32_t imageCount() const { return static_cast<uint32_t>(mImages.size()); }

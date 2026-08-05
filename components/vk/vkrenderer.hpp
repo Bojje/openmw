@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -60,6 +61,7 @@ namespace Vk
         Renderer& operator=(const Renderer&) = delete;
 
         bool render();
+        std::optional<Render::TextureData> captureFrame();
         void resize(uint32_t width, uint32_t height);
         bool loadShadersAndCreatePipelines(const std::string& shaderDir);
 
@@ -160,6 +162,9 @@ namespace Vk
 
         uint32_t mCurrentFrame = 0;
         uint32_t mCurrentImageIndex = 0;
+        uint32_t mLastSubmittedFrame = 0;
+        uint32_t mLastSubmittedImage = 0;
+        bool mHasSubmittedFrame = false;
     };
 }
 

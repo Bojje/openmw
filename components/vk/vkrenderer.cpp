@@ -299,6 +299,20 @@ namespace Vk
             srcStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
             dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
         }
+        else if (oldLayout == VK_IMAGE_LAYOUT_PRESENT_SRC_KHR && newLayout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)
+        {
+            barrier.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+            barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+            srcStage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+            dstStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        }
+        else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_PRESENT_SRC_KHR)
+        {
+            barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+            barrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+            srcStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+            dstStage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+        }
         else
         {
             barrier.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
@@ -1110,6 +1124,9 @@ namespace Vk
             resize(static_cast<uint32_t>(w), static_cast<uint32_t>(h));
         }
 
+        mLastSubmittedFrame = mCurrentFrame;
+        mLastSubmittedImage = mCurrentImageIndex;
+        mHasSubmittedFrame = true;
         mCurrentFrame = (mCurrentFrame + 1) % maxFramesInFlight;
     }
 
@@ -1238,10 +1255,94 @@ namespace Vk
         return true;
     }
 
+    std::optional<Render::TextureData> Renderer::captureFrame()
+    {
+        if (!mHasSubmittedFrame)
+            return std::nullopt;
+
+        const VkFormat format = mSwapchain->format();
+        const bool bgra = format == VK_FORMAT_B8G8R8A8_UNORM || format == VK_FORMAT_B8G8R8A8_SRGB;
+        const bool rgba = format == VK_FORMAT_R8G8B8A8_UNORM || format == VK_FORMAT_R8G8B8A8_SRGB;
+        if (!bgra && !rgba)
+            throw std::runtime_error("Vulkan frame capture requires an RGBA8 or BGRA8 swapchain");
+
+        mFrameSync->waitForFrame(mLastSubmittedFrame);
+        VK_CHECK(vkQueueWaitIdle(mDevice->graphicsQueue()));
+        VK_CHECK(vkQueueWaitIdle(mDevice->presentQueue()));
+
+        const VkExtent2D extent = mSwapchain->extent();
+        const VkDeviceSize byteSize = static_cast<VkDeviceSize>(extent.width) * extent.height * 4;
+        VkBuffer stagingBuffer = VK_NULL_HANDLE;
+        VkDeviceMemory stagingMemory = VK_NULL_HANDLE;
+        createBufferLocal(mDevice->handle(), mDevice->physical(), byteSize,
+            VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            stagingBuffer, stagingMemory);
+
+        try
+        {
+            VK_CHECK(vkResetCommandBuffer(mUploadCommandBuffer, 0));
+            VkCommandBufferBeginInfo beginInfo = {};
+            beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+            beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+            VK_CHECK(vkBeginCommandBuffer(mUploadCommandBuffer, &beginInfo));
+
+            const VkImage image = mSwapchain->image(mLastSubmittedImage);
+            transitionImageLayout(mUploadCommandBuffer, image, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT);
+
+            VkBufferImageCopy region = {};
+            region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            region.imageSubresource.layerCount = 1;
+            region.imageExtent = { extent.width, extent.height, 1 };
+            vkCmdCopyImageToBuffer(mUploadCommandBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                stagingBuffer, 1, &region);
+
+            transitionImageLayout(mUploadCommandBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_IMAGE_ASPECT_COLOR_BIT);
+            VK_CHECK(vkEndCommandBuffer(mUploadCommandBuffer));
+
+            VkSubmitInfo submitInfo = {};
+            submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+            submitInfo.commandBufferCount = 1;
+            submitInfo.pCommandBuffers = &mUploadCommandBuffer;
+            VK_CHECK(vkQueueSubmit(mDevice->graphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE));
+            VK_CHECK(vkQueueWaitIdle(mDevice->graphicsQueue()));
+
+            void* mapped = nullptr;
+            VK_CHECK(vkMapMemory(mDevice->handle(), stagingMemory, 0, byteSize, 0, &mapped));
+            const auto* source = static_cast<const std::uint8_t*>(mapped);
+            Render::TextureData result;
+            result.width = extent.width;
+            result.height = extent.height;
+            result.pixels.resize(static_cast<std::size_t>(byteSize));
+            for (std::size_t pixel = 0; pixel < result.pixels.size(); pixel += 4)
+            {
+                result.pixels[pixel + 0] = source[pixel + (bgra ? 2 : 0)];
+                result.pixels[pixel + 1] = source[pixel + 1];
+                result.pixels[pixel + 2] = source[pixel + (bgra ? 0 : 2)];
+                result.pixels[pixel + 3] = source[pixel + 3];
+            }
+            vkUnmapMemory(mDevice->handle(), stagingMemory);
+
+            vkDestroyBuffer(mDevice->handle(), stagingBuffer, nullptr);
+            vkFreeMemory(mDevice->handle(), stagingMemory, nullptr);
+            return result;
+        }
+        catch (...)
+        {
+            vkDestroyBuffer(mDevice->handle(), stagingBuffer, nullptr);
+            vkFreeMemory(mDevice->handle(), stagingMemory, nullptr);
+            throw;
+        }
+    }
+
     void Renderer::resize(uint32_t width, uint32_t height)
     {
         if (width == 0 || height == 0)
             return;
+
+        mHasSubmittedFrame = false;
 
         vkDeviceWaitIdle(mDevice->handle());
 

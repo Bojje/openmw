@@ -3,6 +3,7 @@
 #include <exception>
 #include <iostream>
 #include <memory>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -12,6 +13,7 @@
 
 #include <components/nif/data.hpp>
 #include <components/nif/node.hpp>
+#include <components/render/imagecomparison.hpp>
 #include <components/render/mesh.hpp>
 #include <components/resource/nifmeshmanager.hpp>
 #include <components/vk/vkrenderer.hpp>
@@ -173,11 +175,25 @@ int main(int argc, char** argv)
             renderer->setScene(submission);
 
             unsigned int renderedFrames = 0;
+            std::optional<Render::TextureData> previousCapture;
             for (unsigned int frame = 0; frame < frames; ++frame)
             {
                 SDL_PumpEvents();
                 if (renderer->render())
+                {
                     ++renderedFrames;
+                    const std::optional<Render::TextureData> capture = renderer->captureFrame();
+                    if (!capture || !capture->valid())
+                        throw std::runtime_error("Vulkan smoke could not capture its rendered frame");
+                    if (previousCapture)
+                    {
+                        const Render::ImageComparison comparison
+                            = Render::compareImages(*previousCapture, *capture, 1);
+                        if (!comparison.matches(1))
+                            throw std::runtime_error("Vulkan smoke frame capture was not deterministic");
+                    }
+                    previousCapture = *capture;
+                }
 
                 // Recreate the swapchain once without restarting the process. This
                 // covers the lifecycle that is most likely to expose ownership bugs.
