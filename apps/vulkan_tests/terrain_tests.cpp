@@ -75,7 +75,8 @@ int main()
         TestStorage storage;
         const auto tile = storage.getRenderTile(2, 4.f, osg::Vec2f(3.f, -2.f), ESM::RefId());
         expect(tile.has_value() && tile->valid(), "terrain adapter returned an invalid tile");
-        expect(tile->lod == 2 && tile->size == 4.f && tile->center[0] == 3.f && tile->center[1] == -2.f,
+        expect(tile->lod == 2 && tile->size == 4.f && tile->center[0] == 3.f && tile->center[1] == -2.f
+                && tile->cellWorldSize == 1.f,
             "terrain tile metadata was not preserved");
         expect(tile->verticesPerSide == 2 && tile->vertices.size() == 4 && tile->indices.size() == 6
                 && tile->indices[0] == 0 && tile->indices[5] == 3 && tile->vertices[1].position[0] == 1.f

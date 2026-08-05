@@ -31,6 +31,7 @@ namespace Render
         int lod = 0;
         float size = 0.f;
         std::array<float, 2> center{};
+        float cellWorldSize = 0.f;
         std::uint32_t verticesPerSide = 0;
         std::vector<TerrainVertex> vertices;
         std::vector<std::uint32_t> indices;
@@ -38,7 +39,7 @@ namespace Render
 
         bool valid() const
         {
-            return lod >= 0 && size > 0.f && verticesPerSide > 1
+            return lod >= 0 && size > 0.f && cellWorldSize > 0.f && verticesPerSide > 1
                 && vertices.size() == static_cast<std::size_t>(verticesPerSide) * verticesPerSide
                 && !indices.empty() && indices.size() % 3 == 0;
         }
