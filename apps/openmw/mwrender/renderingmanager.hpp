@@ -159,7 +159,7 @@ namespace MWRender
 
         /// Record an object after the world has accepted it for rendering.
         /// This is the renderer-neutral scene source used by future backends.
-        void recordObject(const MWWorld::Ptr& ptr, std::string_view model);
+        void recordObject(const MWWorld::Ptr& ptr, std::string_view model, bool visible = true);
 
         const Render::CellScene* getCellScene(const MWWorld::CellStore* store) const;
 

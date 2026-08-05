@@ -126,8 +126,8 @@ namespace
         else
             ptr.getRefData().setBaseNode(pagedNode);
         setNodeRotation(ptr, rendering, rotation);
-        if (!isPaged)
-            rendering.recordObject(ptr, model.view());
+        if (!model.empty())
+            rendering.recordObject(ptr, model.view(), !isPaged);
 
         if (ptr.getClass().useAnim())
             MWBase::Environment::get().getMechanicsManager()->add(ptr);
@@ -326,7 +326,7 @@ namespace MWWorld
             const VFS::Path::Normalized model = getModel(ptr);
             ptr.getClass().insertObjectRendering(ptr, model, mRendering);
             setNodeRotation(ptr, mRendering, makeNodeRotation(ptr, RotationOrder::direct));
-            mRendering.recordObject(ptr, model.view());
+            mRendering.recordObject(ptr, model.view(), true);
             reloadTerrain();
         }
     }

@@ -27,7 +27,8 @@ wrapper, and converted renderer-neutral NIF mesh instances have a separate path-
 cache owned by `ResourceSystem`. The smoke harness exercises that cache boundary before
 submitting its test mesh to Vulkan. Loaded world references now also have a renderer-neutral
 cell snapshot: the scene lifecycle records model identity, position, orientation, scale,
-cell transfer, and removal independently of the OSG node tree. OSG still consumes the same
+visibility, cell transfer, and removal independently of the OSG node tree. Paged references
+remain in the snapshot with `visible == false` until the scene activates them. OSG still consumes the same
 events, but it no longer needs to be the only source of object transform state. The Vulkan
 smoke path now resolves a cell snapshot through the cached NIF meshes and composes object
 transforms with NIF node transforms before batching. Cell object lookup and removal are
@@ -50,7 +51,7 @@ the game unplayable rather than reduce duplication safely.
 | Vulkan utility/queue helper paths | Removed | Complete |
 | Parsed NIF resource cache wrapper | Removed | Complete; cache now owns shared NIF files directly |
 | NIF-to-neutral mesh conversion | Renderer-neutral NIF boundary, mesh cache, and Vulkan mesh batch | Add materials, skinning, and static-world submission |
-| Loaded-cell object identity and transforms | Renderer-neutral cell snapshots updated by scene lifecycle | Consume snapshots from a backend and migrate visibility/paging policy |
+| Loaded-cell object identity, transforms, and paging state | Renderer-neutral cell snapshots updated by scene lifecycle | Consume snapshots from a backend and migrate visibility/paging policy |
 | GUI, loading screens, screenshots, and presentation | OSG/MyGUI path | Vulkan presentation and GUI coverage |
 
 This ledger is intentionally conservative: a subsystem is marked removable only after a
@@ -90,7 +91,7 @@ real replacement consumes its responsibility and the fast tests cover the bounda
 
 ### 5. Replace OSG scene ownership
 
-- Separate cell visibility, transforms, camera state, lighting, and material data from OSG scene nodes. Camera/light scene data, transform-preserving neutral mesh instances, updateable loaded-cell object snapshots, and a cached-mesh cell composition adapter are in place; backend consumption, paging visibility, and materials remain to be migrated.
+- Separate cell visibility, transforms, camera state, lighting, and material data from OSG scene nodes. Camera/light scene data, transform-preserving neutral mesh instances, updateable loaded-cell object snapshots, explicit paged-reference visibility, and a cached-mesh cell composition adapter are in place; backend consumption and materials remain to be migrated.
 - Feed both reference and Vulkan implementations from renderer-neutral scene data during the transition.
 - Delete OSG scene ownership once Vulkan consumes all required scene events.
 

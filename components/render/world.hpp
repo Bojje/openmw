@@ -24,6 +24,7 @@ namespace Render
         uint64_t id = 0;
         std::string model;
         ObjectTransform transform;
+        bool visible = true;
     };
 
     // A cell snapshot is updated by the world lifecycle, not by a renderer.

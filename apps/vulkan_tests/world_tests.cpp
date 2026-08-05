@@ -9,10 +9,11 @@ int main()
     scene.exterior = true;
     scene.gridX = 2;
     scene.gridY = -3;
-    scene.objects.push_back({ 7, "meshes/test.nif", {} });
+    scene.objects.push_back({ 7, "meshes/test.nif", {}, false });
 
     if (scene.objects.size() != 1 || scene.objects.front().id != 7 || scene.objects.front().model != "meshes/test.nif"
-        || scene.objects.front().transform.rotation.w != 1.f || scene.objects.front().transform.scale.x != 1.f)
+        || scene.objects.front().transform.rotation.w != 1.f || scene.objects.front().transform.scale.x != 1.f
+        || scene.objects.front().visible)
         throw std::runtime_error("renderer-neutral cell scene stored invalid object data");
 
     const Render::Mat4 transform = Render::makeObjectTransformMatrix(scene.objects.front().transform);

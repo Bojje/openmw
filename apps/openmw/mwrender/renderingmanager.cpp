@@ -449,7 +449,7 @@ namespace MWRender
         return *mObjects.get();
     }
 
-    void RenderingManager::recordObject(const MWWorld::Ptr& ptr, std::string_view model)
+    void RenderingManager::recordObject(const MWWorld::Ptr& ptr, std::string_view model, bool visible)
     {
         if (ptr.isEmpty() || model.empty())
         {
@@ -460,6 +460,7 @@ namespace MWRender
         if (Render::WorldObject* object = findNeutralObject(ptr))
         {
             object->model = model;
+            object->visible = visible;
             const auto& position = ptr.getRefData().getPosition();
             object->transform.position = { position.pos[0], position.pos[1], position.pos[2] };
             object->transform.rotation = toRenderQuat(getObjectRotation(ptr));
@@ -487,6 +488,7 @@ namespace MWRender
         object.transform.position = { position.pos[0], position.pos[1], position.pos[2] };
         object.transform.rotation = toRenderQuat(getObjectRotation(ptr));
         object.transform.scale = { scale.x(), scale.y(), scale.z() };
+        object.visible = visible;
 
         const uint64_t id = object.id;
         scene.objects.push_back(std::move(object));
