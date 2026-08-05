@@ -504,6 +504,14 @@ namespace MWRender
         return result;
     }
 
+    Render::SceneSubmission RenderingManager::getNeutralScene() const
+    {
+        Render::SceneSubmission result;
+        result.scene = getSceneData();
+        result.meshes = getNeutralMeshes();
+        return result;
+    }
+
     std::shared_ptr<const Render::TextureData> RenderingManager::getNeutralTexture(std::string_view path) const
     {
         if (path.empty())

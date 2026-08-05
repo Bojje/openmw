@@ -15,6 +15,7 @@
 #include "vkcommon.hpp"
 #include "../render/mesh.hpp"
 #include "../render/scene.hpp"
+#include "../render/submission.hpp"
 #include "../render/texture.hpp"
 
 struct SDL_Window;
@@ -66,6 +67,7 @@ namespace Vk
         bool loadShadersAndCreatePipelines(const std::string& shaderDir);
 
         void updateScene(const Render::SceneData& sceneData);
+        void setScene(const Render::SceneSubmission& submission, TextureResolver textureResolver = {});
         void setMeshes(const std::vector<Render::MeshInstance>& meshes, TextureResolver textureResolver = {});
 
     private:

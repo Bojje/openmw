@@ -54,6 +54,10 @@ sun push constants were removed, and ambient light is part of the neutral snapsh
 OSG-facing manager now also exposes neutral loaded-world mesh collection and RGBA8 texture
 resolution backed by the existing resource caches, giving a future Vulkan consumer a concrete
 full-game input without exposing OSG objects.
+Those inputs can now be collected as one `Render::SceneSubmission`; `Vk::Renderer::setScene`
+consumes that handoff in the standalone path, and the smoke test exercises it. The full-game
+Vulkan call site is still intentionally absent until window, input, dynamic-content, and GUI
+services have a Vulkan owner.
 The fast test suite now also contains a backend-neutral RGBA8 image comparator with
 per-channel tolerance, differing-pixel count, maximum error, and mean error metrics.
 This makes future OSG/Vulkan captures diagnosable instead of reducing them to an opaque
@@ -83,7 +87,7 @@ the game unplayable rather than reduce duplication safely.
 | Inactive raster ray-tracing scaffold | Removed | Reintroduce only with a complete RT pipeline |
 | Vulkan utility/queue helper paths | Removed | Complete |
 | Parsed NIF resource cache wrapper | Removed | Complete; cache now owns shared NIF files directly |
-| NIF-to-neutral mesh conversion | Renderer-neutral NIF boundary, material data, mesh cache, Vulkan mesh batch, standalone texture table, and full-game neutral resolver | Connect the resolver to a Vulkan frame consumer, add material shading, skinning, and static-world submission |
+| NIF-to-neutral mesh conversion | Renderer-neutral NIF boundary, material data, mesh cache, `SceneSubmission`, Vulkan mesh batch, standalone texture table, and full-game neutral resolver | Connect the handoff to the live full-game Vulkan frame loop, add material shading, skinning, and static-world submission |
 | Terrain geometry and layer data | Legacy OSG terrain storage/ChunkManager plus a tested renderer-neutral tile snapshot adapter | Add a Vulkan terrain consumer, terrain paging/LOD policy, and terrain image/shader coverage |
 | Loaded-cell object identity, transforms, and paging state | Renderer-neutral `WorldScene`/`CellScene` snapshots updated by scene lifecycle | Consume snapshots from a backend and migrate visibility/paging policy |
 | GUI, loading screens, screenshots, and presentation | OSG/MyGUI path | Vulkan presentation and GUI coverage |
@@ -128,13 +132,13 @@ real replacement consumes its responsibility and the fast tests cover the bounda
 
 ### 5. Replace OSG scene ownership
 
-- Separate cell visibility, transforms, camera state, lighting, and material data from OSG scene nodes. Camera/light scene data now has an OSG-to-neutral snapshot source, alongside transform-preserving neutral mesh instances, updateable `WorldScene`/`CellScene` snapshots, explicit paged-reference visibility, neutral NIF material extraction, a cached-mesh cell composition adapter, and standalone Vulkan texture/alpha consumption; full-game backend consumption and complete shading remain to be migrated.
+- Separate cell visibility, transforms, camera state, lighting, and material data from OSG scene nodes. Camera/light scene data now has an OSG-to-neutral snapshot source, alongside transform-preserving neutral mesh instances, updateable `WorldScene`/`CellScene` snapshots, explicit paged-reference visibility, neutral NIF material extraction, a cached-mesh cell composition adapter, a concrete `SceneSubmission` handoff, and standalone Vulkan texture/alpha consumption; the live full-game backend call site and complete shading remain to be migrated.
 - Feed both reference and Vulkan implementations from renderer-neutral scene data during the transition.
 - Delete OSG scene ownership once Vulkan consumes all required scene events.
 
 ### 6. Port static world rendering
 
-- Wire NIF loading and `MeshConverter` into resource management. The NIF converter now has a tested tree traversal and material boundary, `NifMeshManager` caches converted instances, image resources expose neutral RGBA8 data, and `RenderingManager` can collect loaded-cell meshes and resolve their textures without exposing OSG objects. The standalone Vulkan path consumes resolved textures; a live full-game Vulkan frame consumer, shading, and a static-world consumer are still outstanding.
+- Wire NIF loading and `MeshConverter` into resource management. The NIF converter now has a tested tree traversal and material boundary, `NifMeshManager` caches converted instances, image resources expose neutral RGBA8 data, and `RenderingManager` can collect a `SceneSubmission` without exposing OSG objects. The standalone Vulkan path consumes that submission and its resolved textures; a live full-game Vulkan frame consumer, shading, and a static-world consumer are still outstanding.
 - Implement model caching, cell add/remove, transforms, textures, materials, terrain,
   interiors, and static objects. The terrain adapter is now the boundary for the
   geometry/layer portion; Vulkan upload, terrain paging/LOD, and terrain shaders remain.

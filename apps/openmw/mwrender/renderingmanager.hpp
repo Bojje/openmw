@@ -6,6 +6,7 @@
 #include "rendermode.hpp"
 
 #include <components/render/mesh.hpp>
+#include <components/render/submission.hpp>
 #include <components/render/terrain.hpp>
 #include <components/render/texture.hpp>
 #include <components/render/world.hpp>
@@ -170,6 +171,9 @@ namespace MWRender
 
         /// Return the current camera and directional-light state for a backend consumer.
         Render::SceneData getSceneData() const;
+
+        /// Collect one backend-neutral static-scene submission for a renderer.
+        Render::SceneSubmission getNeutralScene() const;
 
         /// Resolve the current resource-system image into backend-neutral RGBA8 data.
         std::shared_ptr<const Render::TextureData> getNeutralTexture(std::string_view path) const;

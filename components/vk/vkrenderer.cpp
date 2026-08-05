@@ -1273,6 +1273,12 @@ namespace Vk
         std::memcpy(mUniformMapped[mCurrentFrame], &sceneData, sizeof(Render::SceneData));
     }
 
+    void Renderer::setScene(const Render::SceneSubmission& submission, TextureResolver textureResolver)
+    {
+        updateScene(submission.scene);
+        setMeshes(submission.meshes, std::move(textureResolver));
+    }
+
     void Renderer::setMeshes(const std::vector<Render::MeshInstance>& meshes, TextureResolver textureResolver)
     {
         vkDeviceWaitIdle(mDevice->handle());

@@ -166,7 +166,10 @@ int main(int argc, char** argv)
             scene.sunColor = { 1.0f, 1.0f, 1.0f, 1.0f };
             scene.ambientColor = { 0.15f, 0.15f, 0.15f, 1.0f };
 
-            renderer->setMeshes(*meshes, smokeTexture);
+            Render::SceneSubmission submission;
+            submission.scene = scene;
+            submission.meshes = *meshes;
+            renderer->setScene(submission, smokeTexture);
 
             unsigned int renderedFrames = 0;
             for (unsigned int frame = 0; frame < frames; ++frame)
