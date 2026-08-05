@@ -50,14 +50,20 @@ int main()
 
     int thirdCellHandle = 0;
     world.recordObject(&objectHandle, &thirdCellHandle, false, 3, 4, "third", "meshes/third.nif", objectTransform, true);
+    int fourthObjectHandle = 0;
+    int fourthCellHandle = 0;
+    world.recordObject(&fourthObjectHandle, &fourthCellHandle, false, -5, 1, "late", "meshes/late.nif", objectTransform,
+        true);
     const auto orderedCells = world.cellsInOrder();
-    if (orderedCells.size() != 3 || orderedCells[0] != world.findCell(&firstCellHandle)
-        || orderedCells[1] != world.findCell(&secondCellHandle)
-        || orderedCells[2] != world.findCell(&thirdCellHandle))
-        throw std::runtime_error("renderer-neutral world scene lost stable cell insertion order");
+    if (orderedCells.size() != 4 || orderedCells[0] != world.findCell(&firstCellHandle)
+        || orderedCells[1] != world.findCell(&fourthCellHandle)
+        || orderedCells[2] != world.findCell(&secondCellHandle)
+        || orderedCells[3] != world.findCell(&thirdCellHandle))
+        throw std::runtime_error("renderer-neutral world scene lost deterministic cell order");
 
     world.removeCell(&secondCellHandle);
     if (world.findObject(&updatedObjectHandle) != nullptr || world.findCell(&secondCellHandle) != nullptr
-        || world.cellsInOrder().size() != 2 || world.cellsInOrder()[1] != world.findCell(&thirdCellHandle))
+        || world.cellsInOrder().size() != 3 || world.cellsInOrder()[1] != world.findCell(&fourthCellHandle)
+        || world.cellsInOrder()[2] != world.findCell(&thirdCellHandle))
         throw std::runtime_error("renderer-neutral world scene failed cell removal");
 }
