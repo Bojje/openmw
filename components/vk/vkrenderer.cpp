@@ -1443,14 +1443,13 @@ namespace Vk
         writeCompositeDescriptor(5, mGBuffer.materialView);
     }
 
-    void Renderer::setScene(const Render::SceneSubmission& submission, TextureResolver textureResolver)
+    void Renderer::setScene(const Render::SceneSubmission& submission)
     {
         mSceneData = submission.scene;
         mHasSceneData = true;
-        TextureResolver resolver = textureResolver ? std::move(textureResolver) : submission.textureResolver;
         if (submission.terrainTiles.empty())
         {
-            setMeshes(submission.meshes, std::move(resolver));
+            setMeshes(submission.meshes, submission.textureResolver);
             return;
         }
 
@@ -1461,7 +1460,7 @@ namespace Vk
             meshes.insert(meshes.end(), std::make_move_iterator(terrain.begin()),
                 std::make_move_iterator(terrain.end()));
         }
-        setMeshes(meshes, std::move(resolver));
+        setMeshes(meshes, submission.textureResolver);
     }
 
     void Renderer::setMeshes(const std::vector<Render::MeshInstance>& meshes, TextureResolver textureResolver)

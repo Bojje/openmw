@@ -65,7 +65,7 @@ namespace Vk
         void resize(uint32_t width, uint32_t height);
         bool loadShadersAndCreatePipelines(const std::string& shaderDir);
 
-        void setScene(const Render::SceneSubmission& submission, TextureResolver textureResolver = {});
+        void setScene(const Render::SceneSubmission& submission);
 
     private:
         static constexpr uint32_t maxTextures = 64;
