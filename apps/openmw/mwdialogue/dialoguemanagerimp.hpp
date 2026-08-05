@@ -7,6 +7,7 @@
 #include <optional>
 #include <set>
 #include <unordered_map>
+#include <unordered_set>
 
 #include <components/compiler/streamerrorhandler.hpp>
 #include <components/esm3/loadinfo.hpp>
@@ -34,13 +35,13 @@ namespace MWDialogue
             const ESM::DialInfo* mInfo;
         };
 
-        std::set<ESM::RefId> mKnownTopics; // Those are the topics the player knows.
+        std::unordered_set<ESM::RefId> mKnownTopics; // Those are the topics the player knows.
 
         // Modified faction reactions. <Faction1, <Faction2, Difference> >
-        typedef std::map<ESM::RefId, std::map<ESM::RefId, int>> ModFactionReactionMap;
+        typedef std::unordered_map<ESM::RefId, std::unordered_map<ESM::RefId, int>> ModFactionReactionMap;
         ModFactionReactionMap mChangedFactionReaction;
 
-        std::map<ESM::RefId, ActorKnownTopicInfo> mActorKnownTopics;
+        std::unordered_map<ESM::RefId, ActorKnownTopicInfo> mActorKnownTopics;
 
         Translation::Storage& mTranslationDataStorage;
         mutable bool mKeywordSearchInitialized{ false };
@@ -131,7 +132,7 @@ namespace MWDialogue
         /// @return faction1's opinion of faction2
         int getFactionReaction(const ESM::RefId& faction1, const ESM::RefId& faction2) const override;
 
-        const std::map<ESM::RefId, int>* getFactionReactionOverrides(const ESM::RefId& faction) const override;
+        const std::unordered_map<ESM::RefId, int>* getFactionReactionOverrides(const ESM::RefId& faction) const override;
 
         /// Removes the last added topic response for the given actor from the journal
         void clearInfoActor(const MWWorld::Ptr& actor) const override;

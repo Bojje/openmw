@@ -732,6 +732,10 @@ namespace MWClass
             if (!statsAttacker.getHitAttemptActor().isSet()
                 && (statsAttacker.getAiSequence().isInCombat(ptr) || attacker == MWMechanics::getPlayer()))
                 statsAttacker.setHitAttemptActor(ptr.getCellRef().getRefNum());
+
+            // Record when the player attacked this actor, for hostility expiry
+            if (attacker == MWMechanics::getPlayer())
+                stats.setAggressionTime(MWBase::Environment::get().getWorld()->getTimeStamp());
         }
 
         if (!object.empty())
@@ -895,11 +899,12 @@ namespace MWClass
 
     float Npc::getMaxSpeed(const MWWorld::Ptr& ptr) const
     {
-        // TODO: This function is called several times per frame for each NPC.
-        // It would be better to calculate it only once per frame for each NPC and save the result in CreatureStats.
         const MWMechanics::NpcStats& stats = getNpcStats(ptr);
         if (stats.isParalyzed() || stats.getKnockedDown() || stats.isDead())
             return 0.f;
+
+        if (stats.hasValidSpeedCache())
+            return stats.getCachedMaxSpeed();
 
         const MWBase::World* world = MWBase::Environment::get().getWorld();
         const GMST& gmst = getGmst();
@@ -933,6 +938,7 @@ namespace MWClass
         if (stats.isWerewolf() && running && stats.getDrawState() == MWMechanics::DrawState::Nothing)
             moveSpeed *= gmst.fWereWolfRunMult->mValue.getFloat();
 
+        stats.setCachedMaxSpeed(moveSpeed);
         return moveSpeed;
     }
 

@@ -237,14 +237,18 @@ namespace MWLua
         }
         mQueuedAutoStartedScripts.clear();
 
-        std::erase_if(mActiveLocalScripts, [](const LuaUtil::ScriptsContainerWeakPtr& ptr) {
-            LocalScripts* l = asLocal(ptr);
-            return l == nullptr || l->getPtrOrEmpty().isEmpty() || l->getPtrOrEmpty().mRef->isDeleted();
-        });
-
         mGlobalScripts.statsNextFrame();
-        for (const LuaUtil::ScriptsContainerWeakPtr& ptr : mActiveLocalScripts)
-            asLocal(ptr)->statsNextFrame();
+        for (auto it = mActiveLocalScripts.begin(); it != mActiveLocalScripts.end();)
+        {
+            LocalScripts* scripts = asLocal(*it);
+            if (scripts == nullptr || scripts->getPtrOrEmpty().isEmpty() || scripts->getPtrOrEmpty().mRef->isDeleted())
+                it = mActiveLocalScripts.erase(it);
+            else
+            {
+                scripts->statsNextFrame();
+                ++it;
+            }
+        }
 
         mLuaEvents.finalizeEventBatch();
 

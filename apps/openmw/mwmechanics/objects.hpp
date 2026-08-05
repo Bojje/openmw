@@ -6,6 +6,7 @@
 #include <list>
 #include <map>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace osg
@@ -24,7 +25,7 @@ namespace MWMechanics
     class Objects
     {
         std::list<CharacterController> mObjects;
-        std::map<const MWWorld::LiveCellRefBase*, std::list<CharacterController>::iterator> mIndex;
+        std::unordered_map<const MWWorld::LiveCellRefBase*, std::list<CharacterController>::iterator> mIndex;
 
     public:
         void addObject(const MWWorld::Ptr& ptr);

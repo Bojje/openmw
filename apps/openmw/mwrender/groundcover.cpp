@@ -1,6 +1,7 @@
 #include "groundcover.hpp"
 
 #include <span>
+#include <unordered_map>
 
 #include <osg/AlphaFunc>
 #include <osg/BlendFunc>
@@ -391,7 +392,7 @@ namespace MWRender
                     continue;
 
                 calculator.reset();
-                std::map<ESM::RefNum, ESM::CellRef> refs;
+                std::unordered_map<ESM::RefNum, ESM::CellRef> refs;
                 for (size_t i = 0; i < cell.mContextList.size(); ++i)
                 {
                     const std::size_t index = static_cast<std::size_t>(cell.mContextList[i].index);

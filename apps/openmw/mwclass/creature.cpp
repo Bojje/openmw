@@ -384,6 +384,10 @@ namespace MWClass
             if (!statsAttacker.getHitAttemptActor().isSet()
                 && (statsAttacker.getAiSequence().isInCombat(ptr) || attacker == MWMechanics::getPlayer()))
                 statsAttacker.setHitAttemptActor(ptr.getCellRef().getRefNum());
+
+            // Record when the player attacked this actor, for hostility expiry
+            if (attacker == MWMechanics::getPlayer())
+                stats.setAggressionTime(MWBase::Environment::get().getWorld()->getTimeStamp());
         }
 
         if (!object.empty())
@@ -506,6 +510,9 @@ namespace MWClass
         if (stats.isParalyzed() || stats.getKnockedDown() || stats.isDead())
             return 0.f;
 
+        if (stats.hasValidSpeedCache())
+            return stats.getCachedMaxSpeed();
+
         const GMST& gmst = getGmst();
 
         const MWBase::World* world = MWBase::Environment::get().getWorld();
@@ -533,6 +540,7 @@ namespace MWClass
         else
             moveSpeed = getWalkSpeed(ptr);
 
+        stats.setCachedMaxSpeed(moveSpeed);
         return moveSpeed;
     }
 

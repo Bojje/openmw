@@ -169,10 +169,10 @@ namespace SceneUtil
         osg::Vec3Array* normalDst = static_cast<osg::Vec3Array*>(geom.getNormalArray());
         osg::Vec4Array* tangentDst = static_cast<osg::Vec4Array*>(geom.getTexCoordArray(7));
 
-        std::vector<osg::Matrixf> boneMatrices(mNodes.size());
+        mBoneMatrices.resize(mNodes.size());
         std::vector<Bone*>::const_iterator bone = mNodes.begin();
         std::vector<BoneInfo>::const_iterator boneInfo = mData->mBones.begin();
-        for (osg::Matrixf& boneMat : boneMatrices)
+        for (osg::Matrixf& boneMat : mBoneMatrices)
         {
             if (*bone != nullptr)
                 boneMat = boneInfo->mInvBindMatrix * (*bone)->mMatrixInSkeletonSpace;
@@ -194,7 +194,7 @@ namespace SceneUtil
             {
                 if (mNodes[index] == nullptr)
                     continue;
-                const float* boneMatPtr = boneMatrices[index].ptr();
+                const float* boneMatPtr = mBoneMatrices[index].ptr();
                 float* resultMatPtr = resultMat.ptr();
                 for (int i = 0; i < 16; ++i, ++resultMatPtr, ++boneMatPtr)
                     if (i % 4 != 3)

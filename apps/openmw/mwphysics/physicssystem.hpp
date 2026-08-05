@@ -306,11 +306,11 @@ namespace MWPhysics
         using ObjectMap = std::unordered_map<const MWWorld::LiveCellRefBase*, std::shared_ptr<Object>>;
         ObjectMap mObjects;
 
-        std::map<Object*, bool> mAnimatedObjects; // stores pointers to elements in mObjects
+        std::unordered_map<Object*, bool> mAnimatedObjects; // stores pointers to elements in mObjects
 
         ActorMap mActors;
 
-        using ProjectileMap = std::map<int, std::shared_ptr<Projectile>>;
+        using ProjectileMap = std::unordered_map<int, std::shared_ptr<Projectile>>;
         ProjectileMap mProjectiles;
 
         using HeightFieldMap = std::map<std::pair<int, int>, std::unique_ptr<HeightField>>;

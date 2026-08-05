@@ -107,6 +107,11 @@ namespace ESM
         if (esm.peekNextSub("DTIM"))
             mTimeOfDeath.load(esm, "DTIM");
 
+        mAggressionTime.mDay = 0;
+        mAggressionTime.mHour = 0;
+        if (esm.peekNextSub("AGTM"))
+            mAggressionTime.load(esm, "AGTM");
+
         mSpells.load(esm);
         mActiveSpells.load(esm);
         mAiSequence.load(esm);
@@ -261,6 +266,9 @@ namespace ESM
         if (mTimeOfDeath.mHour != 0 || mTimeOfDeath.mDay != 0)
             esm.writeHNT("DTIM", mTimeOfDeath);
 
+        if (mAggressionTime.mHour != 0 || mAggressionTime.mDay != 0)
+            esm.writeHNT("AGTM", mAggressionTime);
+
         mSpells.save(esm);
         mActiveSpells.save(esm);
         mAiSequence.save(esm);
@@ -307,6 +315,8 @@ namespace ESM
         mDrawState = 0;
         mDeathAnimation = -1;
         mLevel = 1;
+        mAggressionTime.mDay = 0;
+        mAggressionTime.mHour = 0;
         mCorprusSpells.clear();
         mMissingACDT = false;
     }

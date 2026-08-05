@@ -1293,7 +1293,12 @@ namespace MWSound
         getALError();
 
         mFreeSources.push_back(source);
-        mActiveSounds.erase(std::find(mActiveSounds.begin(), mActiveSounds.end(), sound));
+        auto it = std::find(mActiveSounds.begin(), mActiveSounds.end(), sound);
+        if (it != mActiveSounds.end())
+        {
+            *it = mActiveSounds.back();
+            mActiveSounds.pop_back();
+        }
     }
 
     bool OpenALOutput::isSoundPlaying(Sound* sound)

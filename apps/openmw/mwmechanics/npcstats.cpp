@@ -1,8 +1,7 @@
 #include "npcstats.hpp"
 
+#include <array>
 #include <cassert>
-#include <iomanip>
-#include <sstream>
 
 #include <components/esm3/loadclas.hpp>
 #include <components/esm3/loadfact.hpp>
@@ -83,7 +82,7 @@ void MWMechanics::NpcStats::setSkill(ESM::RefId id, const MWMechanics::SkillValu
     it->second = value;
 }
 
-const std::map<ESM::RefId, int>& MWMechanics::NpcStats::getFactionRanks() const
+const std::unordered_map<ESM::RefId, int>& MWMechanics::NpcStats::getFactionRanks() const
 {
     return mFactionRank;
 }
@@ -257,11 +256,11 @@ int MWMechanics::NpcStats::getLevelupAttributeMultiplier(ESM::Attribute::Attribu
         return 1;
     int num = std::min(10, it->second);
 
-    // iLevelUp01Mult - iLevelUp10Mult
-    std::stringstream gmst;
-    gmst << "iLevelUp" << std::setfill('0') << std::setw(2) << num << "Mult";
-
-    return MWBase::Environment::get().getESMStore()->get<ESM::GameSetting>().find(gmst.str())->mValue.getInteger();
+    static const std::array<std::string_view, 10> gmstIds = {
+        "iLevelUp01Mult", "iLevelUp02Mult", "iLevelUp03Mult", "iLevelUp04Mult", "iLevelUp05Mult",
+        "iLevelUp06Mult", "iLevelUp07Mult", "iLevelUp08Mult", "iLevelUp09Mult", "iLevelUp10Mult",
+    };
+    return MWBase::Environment::get().getESMStore()->get<ESM::GameSetting>().find(gmstIds[num - 1])->mValue.getInteger();
 }
 
 int MWMechanics::NpcStats::getSkillIncreasesForAttribute(ESM::Attribute::AttributeID attribute) const
@@ -417,7 +416,7 @@ void MWMechanics::NpcStats::writeState(ESM::CreatureStats& state) const
 
 void MWMechanics::NpcStats::writeState(ESM::NpcStats& state) const
 {
-    for (std::map<ESM::RefId, int>::const_iterator iter(mFactionRank.begin()); iter != mFactionRank.end(); ++iter)
+    for (auto iter(mFactionRank.begin()); iter != mFactionRank.end(); ++iter)
         state.mFactions[iter->first].mRank = iter->second;
 
     state.mDisposition = mDisposition;
@@ -442,7 +441,8 @@ void MWMechanics::NpcStats::writeState(ESM::NpcStats& state) const
     state.mWerewolfKills = mWerewolfKills;
     state.mLevelProgress = mLevelProgress;
 
-    state.mSkillIncrease = mSkillIncreases;
+    state.mSkillIncrease.clear();
+    state.mSkillIncrease.insert(mSkillIncreases.begin(), mSkillIncreases.end());
 
     for (size_t i = 0; i < state.mSpecIncreases.size(); ++i)
         state.mSpecIncreases[i] = mSpecIncreases[i];
@@ -487,7 +487,8 @@ void MWMechanics::NpcStats::readState(const ESM::NpcStats& state)
     mWerewolfKills = state.mWerewolfKills;
     mLevelProgress = state.mLevelProgress;
 
-    mSkillIncreases = state.mSkillIncrease;
+    mSkillIncreases.clear();
+    mSkillIncreases.insert(state.mSkillIncrease.begin(), state.mSkillIncrease.end());
 
     for (size_t i = 0; i < state.mSpecIncreases.size(); ++i)
         mSpecIncreases[i] = state.mSpecIncreases[i];

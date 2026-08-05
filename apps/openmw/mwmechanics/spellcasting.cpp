@@ -77,7 +77,7 @@ namespace MWMechanics
             }
             else
                 world->spawnEffect(Misc::ResourceHelpers::correctMeshPath(areaStatic->mModel.getNormalized()), texture,
-                    mHitPosition, static_cast<float>(effectInfo.mData.mArea * 2));
+                    mHitPosition, 1.0f);
 
             // Play explosion sound (make sure to use NoTrack, since we will delete the projectile now)
             {

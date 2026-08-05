@@ -59,22 +59,23 @@ namespace SceneUtil
 
     osg::StateSet* StateSetUpdater::getCvDependentStateset(osgUtil::CullVisitor* cv)
     {
-        auto it = mStateSetsCull.find(cv);
-        if (it == mStateSetsCull.end())
+        for (size_t i = 0; i < mStateSetsCullCount; ++i)
         {
-            osg::ref_ptr<osg::StateSet> stateset = new osg::StateSet;
-            mStateSetsCull.emplace(cv, stateset);
-            setDefaults(stateset);
-            return stateset;
+            if (mStateSetsCull[i].first == cv)
+                return mStateSetsCull[i].second;
         }
-        return it->second;
+        osg::ref_ptr<osg::StateSet> stateset = new osg::StateSet;
+        if (mStateSetsCullCount < sMaxCullVisitors)
+            mStateSetsCull[mStateSetsCullCount++] = { cv, stateset };
+        setDefaults(stateset);
+        return stateset;
     }
 
     void StateSetUpdater::reset()
     {
         mStateSetsUpdate[0] = nullptr;
         mStateSetsUpdate[1] = nullptr;
-        mStateSetsCull.clear();
+        mStateSetsCullCount = 0;
     }
 
     StateSetUpdater::StateSetUpdater() {}

@@ -2247,7 +2247,8 @@ namespace MWMechanics
                             float realHealthLost = healthLost * (1.0f - 0.25f * fatigueTerm);
                             health.setCurrent(health.getCurrent() - realHealthLost);
                             cls.getCreatureStats(mPtr).setHealth(health);
-                            sndMgr->playSound3D(mPtr, ESM::RefId::stringRefId("Health Damage"), 1.0f, 1.0f);
+                            static const auto sHealthDamage = ESM::RefId::stringRefId("Health Damage");
+                            sndMgr->playSound3D(mPtr, sHealthDamage, 1.0f, 1.0f);
                             if (isPlayer)
                                 MWBase::Environment::get().getWindowManager()->activateHitOverlay();
                         }
@@ -2268,15 +2269,17 @@ namespace MWMechanics
 
                     if (mPtr.getClass().isNpc())
                     {
-                        std::string_view sound;
+                        static const auto sDefaultLandWater = ESM::RefId::stringRefId("DefaultLandWater");
+                        static const auto sDefaultLand = ESM::RefId::stringRefId("DefaultLand");
                         osg::Vec3f pos(mPtr.getRefData().getPosition().asVec3());
+                        const ESM::RefId* sound = nullptr;
                         if (world->isUnderwater(mPtr.getCell(), pos) || world->isWalkingOnWater(mPtr))
-                            sound = "DefaultLandWater";
+                            sound = &sDefaultLandWater;
                         else if (onground)
-                            sound = "DefaultLand";
+                            sound = &sDefaultLand;
 
-                        if (!sound.empty())
-                            sndMgr->playSound3D(mPtr, ESM::RefId::stringRefId(sound), 1.f, 1.f, MWSound::Type::Foot,
+                        if (sound)
+                            sndMgr->playSound3D(mPtr, *sound, 1.f, 1.f, MWSound::Type::Foot,
                                 MWSound::PlayMode::NoPlayerLocal);
                     }
                 }

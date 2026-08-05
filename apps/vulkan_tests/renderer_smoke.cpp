@@ -1,0 +1,112 @@
+#include <cstdint>
+#include <cstdlib>
+#include <exception>
+#include <iostream>
+#include <memory>
+#include <stdexcept>
+#include <string>
+
+#include <SDL.h>
+#include <SDL_vulkan.h>
+
+#include <components/vk/vkrenderer.hpp>
+
+#ifndef OPENMW_VULKAN_SHADER_DIR
+#define OPENMW_VULKAN_SHADER_DIR ""
+#endif
+
+namespace
+{
+    Vk::Mat4 identityMatrix()
+    {
+        Vk::Mat4 result = {};
+        result.data[0] = 1.0f;
+        result.data[5] = 1.0f;
+        result.data[10] = 1.0f;
+        result.data[15] = 1.0f;
+        return result;
+    }
+
+    unsigned int frameCount(int argc, char** argv)
+    {
+        if (argc < 3)
+            return 3;
+
+        char* end = nullptr;
+        const long parsed = std::strtol(argv[2], &end, 10);
+        if (end == argv[2] || *end != '\0' || parsed < 1 || parsed > 100)
+            throw std::runtime_error("frame count must be an integer from 1 to 100");
+        return static_cast<unsigned int>(parsed);
+    }
+}
+
+int main(int argc, char** argv)
+{
+    const std::string shaderDir = argc >= 2 ? argv[1] : OPENMW_VULKAN_SHADER_DIR;
+    if (shaderDir.empty())
+    {
+        std::cerr << "Vulkan smoke test requires a shader output directory\n";
+        return EXIT_FAILURE;
+    }
+
+    SDL_Window* window = nullptr;
+    try
+    {
+        const unsigned int frames = frameCount(argc, argv);
+
+        if (SDL_Init(SDL_INIT_VIDEO) != 0)
+            throw std::runtime_error(std::string("SDL initialization failed: ") + SDL_GetError());
+
+        window = SDL_CreateWindow("OpenMW Vulkan smoke test",
+            SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 640, 480,
+            SDL_WINDOW_VULKAN | SDL_WINDOW_HIDDEN | SDL_WINDOW_ALLOW_HIGHDPI);
+        if (!window)
+            throw std::runtime_error(std::string("SDL Vulkan window creation failed: ") + SDL_GetError());
+
+        int drawableWidth = 0;
+        int drawableHeight = 0;
+        SDL_Vulkan_GetDrawableSize(window, &drawableWidth, &drawableHeight);
+        if (drawableWidth <= 0 || drawableHeight <= 0)
+            throw std::runtime_error("SDL returned an invalid Vulkan drawable size");
+
+        {
+            auto renderer = std::make_unique<Vk::Renderer>(window, true);
+            if (!renderer->loadShadersAndCreatePipelines(shaderDir))
+                throw std::runtime_error("Vulkan smoke test could not load the raster shaders");
+
+            Vk::SceneData scene = {};
+            scene.view = identityMatrix();
+            scene.projection = identityMatrix();
+            scene.viewInverse = identityMatrix();
+            scene.projInverse = identityMatrix();
+            scene.sunDirection = { 0.0f, -1.0f, 0.0f, 0.0f };
+            scene.sunColor = { 1.0f, 1.0f, 1.0f, 1.0f };
+
+            for (unsigned int frame = 0; frame < frames; ++frame)
+            {
+                SDL_PumpEvents();
+                renderer->updateScene(scene);
+                renderer->render();
+
+                // Recreate the swapchain once without restarting the process. This
+                // covers the lifecycle that is most likely to expose ownership bugs.
+                if (frame == 0 && frames > 1)
+                    renderer->resize(static_cast<uint32_t>(drawableWidth), static_cast<uint32_t>(drawableHeight));
+            }
+        }
+
+        SDL_DestroyWindow(window);
+        window = nullptr;
+        SDL_Quit();
+        std::cout << "Vulkan renderer smoke test passed (" << frames << " frames)\n";
+        return EXIT_SUCCESS;
+    }
+    catch (const std::exception& error)
+    {
+        if (window)
+            SDL_DestroyWindow(window);
+        SDL_Quit();
+        std::cerr << "Vulkan renderer smoke test failed: " << error.what() << '\n';
+        return EXIT_FAILURE;
+    }
+}

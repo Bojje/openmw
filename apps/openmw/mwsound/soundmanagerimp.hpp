@@ -69,7 +69,7 @@ namespace MWSound
             SoundBufferRefPairList mList;
         };
 
-        typedef std::map<const MWWorld::LiveCellRefBase*, ActiveSound> SoundMap;
+        typedef std::unordered_map<const MWWorld::LiveCellRefBase*, ActiveSound> SoundMap;
         SoundMap mActiveSounds;
 
         struct SaySound
@@ -78,7 +78,7 @@ namespace MWSound
             StreamPtr mStream;
         };
 
-        typedef std::map<const MWWorld::LiveCellRefBase*, SaySound> SaySoundMap;
+        typedef std::unordered_map<const MWWorld::LiveCellRefBase*, SaySound> SaySoundMap;
         SaySoundMap mSaySoundsQueue;
         SaySoundMap mActiveSaySounds;
 

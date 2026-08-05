@@ -103,6 +103,7 @@ namespace SceneUtil
         };
         osg::ref_ptr<InfluenceData> mData;
         std::vector<Bone*> mNodes;
+        std::vector<osg::Matrixf> mBoneMatrices;
 
         unsigned int mLastFrameNumber{ 0 };
         bool mBoundsFirstFrame{ true };

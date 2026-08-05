@@ -1,7 +1,7 @@
 #ifndef MWLUA_OBJECTLISTS_H
 #define MWLUA_OBJECTLISTS_H
 
-#include <set>
+#include <unordered_set>
 
 #include "object.hpp"
 
@@ -35,7 +35,7 @@ namespace MWLua
 
             bool mChanged = false;
             ObjectIdList mList = std::make_shared<std::vector<ObjectId>>();
-            std::set<ObjectId> mSet;
+            std::unordered_set<ObjectId> mSet;
         };
 
         ObjectGroup* chooseGroup(const MWWorld::Ptr& ptr);

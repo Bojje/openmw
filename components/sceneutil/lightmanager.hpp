@@ -261,7 +261,7 @@ namespace SceneUtil
         std::vector<LightSourceTransform> mLights;
 
         using LightSourceViewBoundCollection = std::vector<LightSourceViewBound>;
-        std::map<osg::observer_ptr<osg::Camera>, LightSourceViewBoundCollection> mLightsInViewSpace;
+        std::unordered_map<osg::Camera*, LightSourceViewBoundCollection> mLightsInViewSpace;
 
         size_t mLightingMask;
 
@@ -359,6 +359,9 @@ namespace SceneUtil
         size_t mLastFrameNumber;
         LightManager::LightList mLightList;
         std::set<SceneUtil::LightSource*> mIgnoredLightSources;
+        osg::ref_ptr<osg::StateSet> mCachedStateSet;
+        osg::ref_ptr<osg::Uniform> mCachedLightData;
+        osg::ref_ptr<osg::Uniform> mCachedLightCount;
     };
 
     void configureStateSetSunOverride(const osg::Light* light, osg::StateSet* stateset,

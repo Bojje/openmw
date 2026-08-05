@@ -1,0 +1,34 @@
+#version 460
+
+layout(location = 0) in vec3 inPosition;
+layout(location = 1) in vec3 inNormal;
+layout(location = 2) in vec2 inTexCoord;
+layout(location = 3) in vec4 inColor;
+
+layout(push_constant) uniform PushConstants {
+    mat4 model;
+    mat4 normalMatrix;
+} push;
+
+layout(set = 0, binding = 0) uniform CameraUBO {
+    mat4 view;
+    mat4 projection;
+    mat4 viewInverse;
+    mat4 projInverse;
+    vec4 sunDirection;
+    vec4 sunColor;
+} camera;
+
+layout(location = 0) out vec3 fragWorldPos;
+layout(location = 1) out vec3 fragNormal;
+layout(location = 2) out vec2 fragTexCoord;
+layout(location = 3) out vec4 fragColor;
+
+void main() {
+    vec4 worldPos = push.model * vec4(inPosition, 1.0);
+    fragWorldPos = worldPos.xyz;
+    fragNormal = normalize(mat3(push.normalMatrix) * inNormal);
+    fragTexCoord = inTexCoord;
+    fragColor = inColor;
+    gl_Position = camera.projection * camera.view * worldPos;
+}

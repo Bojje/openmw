@@ -754,6 +754,11 @@ namespace LuaUtil
 
     void ScriptsContainer::processTimers(double simulationTime, double gameTime)
     {
+        if (auto* data = std::get_if<LoadedData>(&mData))
+        {
+            if (data->mSimulationTimersQueue.empty() && data->mGameTimersQueue.empty())
+                return;
+        }
         mLua.protectedCall([&](LuaView& view) {
             LoadedData& data = ensureLoaded();
             updateTimerQueue(data.mSimulationTimersQueue, simulationTime);

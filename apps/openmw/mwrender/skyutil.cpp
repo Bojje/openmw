@@ -144,7 +144,7 @@ namespace MWRender
 
         float dt = MWBase::Environment::get().getFrameDuration();
 
-        float lastRatio = mLastRatio[osg::observer_ptr<osg::Camera>(camera)];
+        float lastRatio = mLastRatio[camera];
 
         float change = dt * 10;
 
@@ -153,7 +153,7 @@ namespace MWRender
         else
             visibleRatio = std::max(visibleRatio, lastRatio - change);
 
-        mLastRatio[osg::observer_ptr<osg::Camera>(camera)] = visibleRatio;
+        mLastRatio[camera] = visibleRatio;
 
         return visibleRatio;
     }
@@ -168,14 +168,17 @@ namespace MWRender
             osg::ref_ptr<osg::OcclusionQueryNode> oqnVisible, osg::ref_ptr<osg::OcclusionQueryNode> oqnTotal)
             : OcclusionCallback(std::move(oqnVisible), std::move(oqnTotal))
             , mGlareView(1.f)
+            , mFlashMaterial(createUnlitMaterial())
+            , mFlashStateSet(new osg::StateSet)
         {
+            mFlashStateSet->setAttributeAndModes(mFlashMaterial, osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE);
         }
 
         void operator()(osg::Node* node, osgUtil::CullVisitor* cv)
         {
             float visibleRatio = getVisibleRatio(cv->getCurrentCamera());
 
-            osg::ref_ptr<osg::StateSet> stateset;
+            bool useStateset = false;
 
             if (visibleRatio > 0.f)
             {
@@ -183,10 +186,8 @@ namespace MWRender
                 if (visibleRatio < fadeThreshold)
                 {
                     float fade = 1.f - (fadeThreshold - visibleRatio) / fadeThreshold;
-                    osg::ref_ptr<osg::Material> mat(createUnlitMaterial());
-                    mat->setDiffuse(osg::Material::FRONT_AND_BACK, osg::Vec4f(0, 0, 0, fade * mGlareView));
-                    stateset = new osg::StateSet;
-                    stateset->setAttributeAndModes(mat, osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE);
+                    mFlashMaterial->setDiffuse(osg::Material::FRONT_AND_BACK, osg::Vec4f(0, 0, 0, fade * mGlareView));
+                    useStateset = true;
                 }
                 else if (visibleRatio < 1.f)
                 {
@@ -210,8 +211,8 @@ namespace MWRender
 
                 modelView.preMultScale(osg::Vec3f(scale, scale, scale));
 
-                if (stateset)
-                    cv->pushStateSet(stateset);
+                if (useStateset)
+                    cv->pushStateSet(mFlashStateSet);
 
                 cv->pushModelViewMatrix(new osg::RefMatrix(modelView), osg::Transform::RELATIVE_RF);
 
@@ -219,7 +220,7 @@ namespace MWRender
 
                 cv->popModelViewMatrix();
 
-                if (stateset)
+                if (useStateset)
                     cv->popStateSet();
             }
         }
@@ -228,6 +229,8 @@ namespace MWRender
 
     private:
         float mGlareView;
+        osg::ref_ptr<osg::Material> mFlashMaterial;
+        osg::ref_ptr<osg::StateSet> mFlashStateSet;
     };
 
     /// SunGlareCallback controls a full-screen glare effect depending on occlusion query result and the angle between
@@ -253,6 +256,10 @@ namespace MWRender
             mColor *= 2;
             for (int i = 0; i < 3; ++i)
                 mColor[i] = std::min(1.f, mColor[i]);
+
+            mGlareMaterial = createUnlitMaterial();
+            mGlareStateSet = new osg::StateSet;
+            mGlareStateSet->setAttributeAndModes(mGlareMaterial);
         }
 
         void operator()(osg::Node* node, osgUtil::CullVisitor* cv)
@@ -274,16 +281,10 @@ namespace MWRender
             }
             else
             {
-                osg::ref_ptr<osg::StateSet> stateset = new osg::StateSet;
+                mGlareMaterial->setDiffuse(osg::Material::FRONT_AND_BACK, osg::Vec4f(0, 0, 0, fade));
+                mGlareMaterial->setEmission(osg::Material::FRONT_AND_BACK, mColor);
 
-                osg::ref_ptr<osg::Material> mat = createUnlitMaterial();
-
-                mat->setDiffuse(osg::Material::FRONT_AND_BACK, osg::Vec4f(0, 0, 0, fade));
-                mat->setEmission(osg::Material::FRONT_AND_BACK, mColor);
-
-                stateset->setAttributeAndModes(mat);
-
-                cv->pushStateSet(stateset);
+                cv->pushStateSet(mGlareStateSet);
                 traverse(node, cv);
                 cv->popStateSet();
             }
@@ -312,6 +313,8 @@ namespace MWRender
         float mTimeOfDayFade;
         float mGlareView;
         osg::Vec4f mColor;
+        osg::ref_ptr<osg::StateSet> mGlareStateSet;
+        osg::ref_ptr<osg::Material> mGlareMaterial;
         float mSunGlareFaderMax;
         float mSunGlareFaderAngleMax;
     };

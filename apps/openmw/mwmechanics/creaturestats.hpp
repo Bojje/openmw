@@ -5,6 +5,7 @@
 #include <set>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
 
 #include "activespells.hpp"
 #include "aisequence.hpp"
@@ -38,7 +39,7 @@ namespace MWMechanics
     ///
     class CreatureStats
     {
-        std::map<ESM::RefId, AttributeValue> mAttributes;
+        std::unordered_map<ESM::RefId, AttributeValue> mAttributes;
         DynamicStat<float> mDynamic[3]; // health, magicka, fatigue
         DrawState mDrawState = DrawState::Nothing;
         Spells mSpells;
@@ -81,11 +82,18 @@ namespace MWMechanics
 
         MWWorld::TimeStamp mTimeOfDeath;
 
+        // When player-initiated combat hostility began. Used to expire hostility after fCorpseClearDelay hours.
+        MWWorld::TimeStamp mAggressionTime;
+
     private:
         std::multimap<ESM::RefId, ESM::RefNum> mSummonedCreatures; // <Effect, Actor>
 
         float mAwarenessTimer = 0.f;
         int mAwarenessRoll = -1;
+
+        mutable float mCachedMaxSpeed = 0.f;
+        mutable unsigned int mCachedSpeedFrame = 0;
+        static unsigned int sCurrentFrame;
 
     protected:
         std::string mAttackType;
@@ -277,16 +285,24 @@ namespace MWMechanics
 
         MWWorld::TimeStamp getTimeOfDeath() const;
 
+        MWWorld::TimeStamp getAggressionTime() const;
+        void setAggressionTime(MWWorld::TimeStamp time);
+
         float getSideMovementAngle() const { return mSideMovementAngle; }
         void setSideMovementAngle(float angle) { mSideMovementAngle = angle; }
 
         bool wasTeleported() const { return mTeleported; }
         void setTeleported(bool v) { mTeleported = v; }
 
-        const std::map<ESM::RefId, AttributeValue>& getAttributes() const { return mAttributes; }
+        const std::unordered_map<ESM::RefId, AttributeValue>& getAttributes() const { return mAttributes; }
 
         void updateAwareness(float duration);
         int getAwarenessRoll();
+
+        static void advanceFrame() { ++sCurrentFrame; }
+        bool hasValidSpeedCache() const { return mCachedSpeedFrame == sCurrentFrame; }
+        float getCachedMaxSpeed() const { return mCachedMaxSpeed; }
+        void setCachedMaxSpeed(float speed) const { mCachedMaxSpeed = speed; mCachedSpeedFrame = sCurrentFrame; }
     };
 }
 

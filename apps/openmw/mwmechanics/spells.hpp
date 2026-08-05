@@ -4,6 +4,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 #include "../mwworld/timestamp.hpp"
@@ -29,6 +30,7 @@ namespace MWMechanics
     {
         std::shared_ptr<SpellList> mSpellList;
         std::vector<const ESM::Spell*> mSpells;
+        std::unordered_set<const ESM::Spell*> mSpellSet;
 
         // Note: this is the spell that's about to be cast, *not* the spell selected in the GUI (which may be different)
         ESM::RefId mSelectedSpell;

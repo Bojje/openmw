@@ -170,8 +170,9 @@ namespace MWMechanics
     {
         for (const auto& [key, params] : state.mEffects)
         {
-            mCollection[EffectKey(key)].setBase(params.first);
-            mCollection[EffectKey(key)].setModifier(params.second);
+            auto& effect = mCollection[EffectKey(key)];
+            effect.setBase(params.first);
+            effect.setModifier(params.second);
         }
     }
 

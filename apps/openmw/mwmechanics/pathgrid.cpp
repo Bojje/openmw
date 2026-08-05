@@ -58,6 +58,7 @@ namespace MWMechanics
         int mSCCId = 0;
         size_t mSCCIndex = 0;
         std::vector<size_t> mSCCStack;
+        std::vector<bool> mOnStack;
         std::vector<std::pair<size_t, size_t>> mSCCPoint; // first is index, second is lowlink
 
         // v is the pathgrid point index (some call them vertices)
@@ -67,6 +68,7 @@ namespace MWMechanics
             mSCCPoint[v].second = mSCCIndex; // lowlink
             mSCCIndex++;
             mSCCStack.push_back(v);
+            mOnStack[v] = true;
             size_t w;
 
             for (const auto& edge : mGraph[v].edges)
@@ -77,7 +79,7 @@ namespace MWMechanics
                     recursiveStrongConnect(w); // recurse
                     mSCCPoint[v].second = std::min(mSCCPoint[v].second, mSCCPoint[w].second);
                 }
-                else if (std::find(mSCCStack.begin(), mSCCStack.end(), w) != mSCCStack.end())
+                else if (mOnStack[w])
                     mSCCPoint[v].second = std::min(mSCCPoint[v].second, mSCCPoint[w].first);
             }
 
@@ -87,6 +89,7 @@ namespace MWMechanics
                 {
                     w = mSCCStack.back();
                     mSCCStack.pop_back();
+                    mOnStack[w] = false;
                     mGraph[w].componentId = mSCCId;
                 } while (w != v);
                 mSCCId++;
@@ -126,6 +129,7 @@ namespace MWMechanics
             size_t pointsSize = graph.mPathgrid->mPoints.size();
             mSCCPoint.resize(pointsSize, std::pair<size_t, size_t>(NoIndex, NoIndex));
             mSCCStack.reserve(pointsSize);
+            mOnStack.resize(pointsSize, false);
 
             for (size_t v = 0; v < pointsSize; ++v)
             {
@@ -251,39 +255,37 @@ namespace MWMechanics
         fScore[start] = costAStar(mPathgrid->mPoints[start], mPathgrid->mPoints[goal]);
 
         std::list<size_t> openset;
-        std::set<size_t> closedset;
+        std::vector<bool> inOpenSet(graphSize, false);
+        std::vector<bool> inClosedSet(graphSize, false);
         openset.push_back(start);
+        inOpenSet[start] = true;
 
         size_t current = start;
 
         while (!openset.empty())
         {
-            current = openset.front(); // front has the lowest cost
+            current = openset.front();
             openset.pop_front();
+            inOpenSet[current] = false;
 
             if (current == goal)
                 break;
 
-            closedset.insert(current); // remember we've been here
+            inClosedSet[current] = true;
 
-            // check all edges for the current point index
             for (const auto& edge : mGraph[current].edges)
             {
-                if (!closedset.contains(edge.index))
+                if (!inClosedSet[edge.index])
                 {
-                    // not in closedset - i.e. have not traversed this edge destination
                     size_t dest = edge.index;
                     float tentativeG = gScore[current] + edge.cost;
-                    bool isInOpenSet = std::find(openset.begin(), openset.end(), dest) != openset.end();
-                    if (!isInOpenSet || tentativeG < gScore[dest])
+                    if (!inOpenSet[dest] || tentativeG < gScore[dest])
                     {
                         graphParent[dest] = current;
                         gScore[dest] = tentativeG;
                         fScore[dest] = tentativeG + costAStar(mPathgrid->mPoints[dest], mPathgrid->mPoints[goal]);
-                        if (!isInOpenSet)
+                        if (!inOpenSet[dest])
                         {
-                            // add this edge to openset, lowest cost goes to the front
-                            // TODO: if this causes performance problems a hash table may help
                             auto it = openset.begin();
                             for (; it != openset.end(); ++it)
                             {
@@ -291,9 +293,10 @@ namespace MWMechanics
                                     break;
                             }
                             openset.insert(it, dest);
+                            inOpenSet[dest] = true;
                         }
                     }
-                } // if in closedset, i.e. traversed this edge already, try the next edge
+                }
             }
         }
 
