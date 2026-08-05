@@ -51,6 +51,13 @@ int main()
     if (!rejectedInvalidIndex)
         throw std::runtime_error("invalid NIF index was accepted");
 
+    Nif::NiTriStripsData strips;
+    strips.mVertices = source.mVertices;
+    strips.mStrips = { { 0, 1, 2 } };
+    const Render::MeshData stripMesh = Nif::convertMesh(strips);
+    if (stripMesh.indices != std::vector<uint32_t>({ 0, 1, 2 }))
+        throw std::runtime_error("NIF triangle strip conversion returned the wrong winding");
+
     Nif::NiTriShapeData treeData;
     treeData.mVertices = source.mVertices;
     treeData.mTriangles = { 0, 1, 2 };
