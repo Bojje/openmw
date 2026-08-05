@@ -53,7 +53,8 @@ void main() {
     vec3 reflectionColor = vec3(0.0);
 
     float roughness = clamp(materialSample.r, 0.05, 1.0);
-    float ao = materialSample.b;
+    bool terrainSpecular = materialSample.b > 1.5;
+    float ao = clamp(materialSample.b, 0.0, 1.0);
     float emission = max(materialSample.a, 0.0);
     vec3 ambient = albedo * scene.ambientColor.rgb * ao;
     vec3 diffuse = albedo * sunCol * NdotL * shadow;
@@ -66,7 +67,7 @@ void main() {
     vec4 worldPos4 = scene.viewInverse * viewPos;
     vec3 worldPos = worldPos4.xyz;
 
-    float specularStrength = 0.3 * (1.0 - roughness);
+    float specularStrength = terrainSpecular ? materialSample.g : 0.3 * (1.0 - roughness);
     vec3 V = normalize(scene.viewInverse[3].xyz - worldPos);
     vec3 H = normalize(L + V);
     float spec = pow(max(dot(N, H), 0.0), mix(128.0, 1.0, roughness));

@@ -77,4 +77,6 @@ void main() {
     outNormal = vec4(N * 0.5 + 0.5, 1.0);
 
     outMaterial = fragMaterial;
+    if (fragMaterial.b > 1.5)
+        outMaterial.g = albedoSample.a;
 }

@@ -30,6 +30,7 @@ namespace Render
         bool terrainFirstLayer = false;
         bool terrainNormalMap = false;
         bool terrainParallax = false;
+        bool terrainSpecular = false;
         std::shared_ptr<const TextureData> alphaTexture;
     };
 
@@ -115,7 +116,7 @@ namespace Render
                 vertex.color[3] *= mesh.mesh.material.diffuse.w;
                 vertex.material[0] = std::clamp(1.f - mesh.mesh.material.glossiness / 128.f, 0.f, 1.f);
                 vertex.material[1] = 0.f;
-                vertex.material[2] = 1.f;
+                vertex.material[2] = mesh.mesh.material.terrainSpecular ? 2.f : 1.f;
                 vertex.material[3] = std::max({ mesh.mesh.material.emissive.x, mesh.mesh.material.emissive.y,
                     mesh.mesh.material.emissive.z });
                 result.vertices.push_back(vertex);

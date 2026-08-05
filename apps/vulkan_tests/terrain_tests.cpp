@@ -106,6 +106,7 @@ int main()
         expect(blendedTerrainMeshes.size() == 1 && blendedTerrainMeshes.front().mesh.material.terrainBlend
                 && blendedTerrainMeshes.front().mesh.material.terrainNormalMap
                 && blendedTerrainMeshes.front().mesh.material.terrainParallax
+                && blendedTerrainMeshes.front().mesh.material.terrainSpecular
                 && blendedTerrainMeshes.front().mesh.material.normalTexture == "textures/grass_n.dds"
                 && blendedTerrainMeshes.front().mesh.material.alphaTexture
                 && blendedTerrainMeshes.front().mesh.material.alphaTexture->valid()

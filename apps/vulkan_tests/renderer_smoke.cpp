@@ -177,11 +177,13 @@ namespace
         firstLayer.diffuseTexture = "textures/vulkan-smoke.rgba";
         firstLayer.normalTexture = "textures/vulkan-smoke-normal.rgba";
         firstLayer.parallax = true;
+        firstLayer.specular = true;
         firstLayer.blendmap = std::move(firstBlendmap);
         Render::TerrainLayer secondLayer;
         secondLayer.diffuseTexture = "textures/vulkan-smoke.rgba";
         secondLayer.normalTexture = "textures/vulkan-smoke-normal.rgba";
         secondLayer.parallax = true;
+        secondLayer.specular = true;
         secondLayer.blendmap = std::move(secondBlendmap);
         tile.layers = { std::move(firstLayer), std::move(secondLayer) };
         return tile;
