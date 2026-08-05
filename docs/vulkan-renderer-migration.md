@@ -23,7 +23,8 @@ also contains renderer-neutral scene/math data, a validated NIF triangle convers
 transform-preserving NIF tree traversal for static mesh discovery, and a Vulkan draw of the
 resulting neutral mesh. Vulkan now batches multiple neutral mesh instances with independent
 transforms. Parsed NIF resources now use a shared-pointer cache instead of an OSG object
-wrapper.
+wrapper, and converted renderer-neutral NIF mesh instances have a separate path-keyed
+cache owned by `ResourceSystem`.
 
 The remaining migration is not a compatibility problem that can be solved by retaining
 both renderers in one execution path. Static-world transforms, materials, textures,
@@ -41,7 +42,7 @@ the game unplayable rather than reduce duplication safely.
 | Inactive raster ray-tracing scaffold | Removed | Reintroduce only with a complete RT pipeline |
 | Vulkan utility/queue helper paths | Removed | Complete |
 | Parsed NIF resource cache wrapper | Removed | Complete; cache now owns shared NIF files directly |
-| NIF-to-neutral mesh conversion | Renderer-neutral NIF boundary and Vulkan mesh batch | Add materials, skinning, and converted-mesh caching |
+| NIF-to-neutral mesh conversion | Renderer-neutral NIF boundary, mesh cache, and Vulkan mesh batch | Add materials, skinning, and static-world submission |
 | GUI, loading screens, screenshots, and presentation | OSG/MyGUI path | Vulkan presentation and GUI coverage |
 
 This ledger is intentionally conservative: a subsystem is marked removable only after a
@@ -87,7 +88,7 @@ real replacement consumes its responsibility and the fast tests cover the bounda
 
 ### 6. Port static world rendering
 
-- Wire NIF loading and `MeshConverter` into resource management. The NIF converter now has a tested tree traversal boundary, but resource-manager caching and static-world submission are still outstanding.
+- Wire NIF loading and `MeshConverter` into resource management. The NIF converter now has a tested tree traversal boundary and `NifMeshManager` caches converted instances; static-world submission is still outstanding.
 - Implement model caching, cell add/remove, transforms, textures, materials, terrain, interiors, and static objects.
 - Reach a static playable scene without OSG rendering.
 

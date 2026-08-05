@@ -7,6 +7,7 @@
 #include "imagemanager.hpp"
 #include "keyframemanager.hpp"
 #include "niffilemanager.hpp"
+#include "nifmeshmanager.hpp"
 #include "scenemanager.hpp"
 
 namespace Resource
@@ -17,6 +18,7 @@ namespace Resource
         : mVFS(vfs)
     {
         mNifFileManager = std::make_unique<NifFileManager>(vfs, encoder);
+        mNifMeshManager = std::make_unique<NifMeshManager>(mNifFileManager.get());
         mBgsmFileManager = std::make_unique<BgsmFileManager>(vfs, expiryDelay);
         mImageManager = std::make_unique<ImageManager>(vfs, expiryDelay);
         mSceneManager = std::make_unique<SceneManager>(
@@ -25,6 +27,7 @@ namespace Resource
         mAnimBlendRulesManager = std::make_unique<AnimBlendRulesManager>(vfs, expiryDelay);
 
         addResourceManager(mNifFileManager.get());
+        addResourceManager(mNifMeshManager.get());
         addResourceManager(mBgsmFileManager.get());
         addResourceManager(mKeyframeManager.get());
         // note, scene references images so add images afterwards for correct implementation of updateCache()
@@ -58,6 +61,11 @@ namespace Resource
     NifFileManager* ResourceSystem::getNifFileManager()
     {
         return mNifFileManager.get();
+    }
+
+    NifMeshManager* ResourceSystem::getNifMeshManager()
+    {
+        return mNifMeshManager.get();
     }
 
     KeyframeManager* ResourceSystem::getKeyframeManager()

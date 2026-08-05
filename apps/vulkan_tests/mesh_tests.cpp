@@ -4,6 +4,7 @@
 
 #include <components/nif/data.hpp>
 #include <components/nif/meshconverter.hpp>
+#include <components/resource/nifmeshmanager.hpp>
 
 namespace
 {
@@ -69,17 +70,23 @@ int main()
     root.mTransform = Nif::NiTransform::getIdentity();
     root.mTransform.mTranslation.x() = 10.0f;
     root.mChildren.push_back(&shape);
-    Nif::NIFFile file(VFS::Path::Normalized("synthetic.nif"));
-    file.mRoots.push_back(&root);
+    auto file = std::make_shared<Nif::NIFFile>(VFS::Path::Normalized("synthetic.nif"));
+    file->mRoots.push_back(&root);
 
-    const std::vector<Render::MeshData> meshes = Nif::collectMeshes(Nif::FileView(file));
+    const std::vector<Render::MeshData> meshes = Nif::collectMeshes(Nif::FileView(*file));
     if (meshes.size() != 1 || meshes.front().indices.size() != 3)
         throw std::runtime_error("NIF scene traversal did not collect the mesh");
 
-    const std::vector<Render::MeshInstance> instances = Nif::collectMeshInstances(Nif::FileView(file));
+    const std::vector<Render::MeshInstance> instances = Nif::collectMeshInstances(Nif::FileView(*file));
     if (instances.size() != 1 || instances.front().mesh.indices.size() != 3)
         throw std::runtime_error("NIF scene traversal did not collect a mesh instance");
     expectNear(instances.front().transform.data[12], 12.0f, "composed mesh translation");
+
+    Resource::NifMeshManager meshManager(nullptr);
+    const auto cached = meshManager.get(file);
+    const auto cachedAgain = meshManager.get(file);
+    if (cached != cachedAgain || cached->size() != 1 || cached->front().mesh.indices.size() != 3)
+        throw std::runtime_error("NIF mesh manager did not reuse the converted mesh");
 
     std::cout << "NIF mesh conversion tests passed\n";
 }
