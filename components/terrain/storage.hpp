@@ -93,9 +93,10 @@ namespace Terrain
         /// Get the number of texture tiles on one side per chunk (chunkSize 1.0 = 1 cell).
         virtual int getTextureTileCount(float chunkSize, ESM::RefId worldspace) = 0;
 
-        // Transitional adapter: the legacy storage providers still fill OSG
-        // buffers, but the migration boundary exposes an independent snapshot
-        // that a Vulkan terrain consumer can upload without owning OSG objects.
+        // Legacy storage providers still fill OSG buffers, but this boundary
+        // exposes an independent snapshot that a renderer can upload without
+        // owning OSG objects. Unsupported layer features remain explicit in
+        // the neutral tile instead of being silently discarded.
         std::optional<Render::TerrainTile> getRenderTile(
             int lodLevel, float size, const osg::Vec2f& center, ESM::RefId worldspace);
     };

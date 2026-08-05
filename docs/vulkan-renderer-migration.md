@@ -84,8 +84,8 @@ consumer to replace the remaining OSG-owned responsibilities.
 
 The latest reduction checkpoint also removed the remaining manager-only neutral-object
 lookup, removal, and cell-transfer wrappers. The lifecycle now calls `WorldScene`
-directly, while the terrain adapter remains available at `TerrainStorage`, where its
-conversion is directly tested, until a Vulkan terrain consumer gives it a real owner.
+directly. The terrain adapter is already consumed for opaque single-layer Vulkan terrain;
+its remaining owner boundary is the unsupported blendmap/multi-layer path.
 
 The remaining migration is not a compatibility problem that can be solved by retaining
 both renderers in one execution path. Static-world transforms, materials, textures,
