@@ -81,7 +81,9 @@ opaque single-layer terrain retains an intentionally absent blendmap. Vulkan now
 both opaque tiles and ordered multi-layer/blendmap tiles: blendmaps use the neutral alpha
 texture table, legacy-compatible UV transforms, and separate first-layer/equal-depth
 terrain pipelines. Terrain normal maps now flow through the same neutral texture table and
-G-buffer normal path; parallax offsetting now uses the normal-map height channel. Specular
+G-buffer normal path; parallax offsetting now uses the normal-map height channel. Scene
+textures use a separate linear-repeat sampler so terrain tiling is preserved, while G-buffer
+attachments remain clamped. Specular
 maps and complete terrain image coverage remain outstanding. The neutral cache now retains
 per-cell LOD snapshots and selects one deterministically by camera distance before handoff;
 quadtree-scale streaming and composite-image coverage remain outstanding. `WorldScene` now
@@ -92,7 +94,7 @@ is part of the real full-game neutral handoff rather than only a test fixture; c
 happens on cell add/remove rather than on every frame export.
 
 Against the actual PR base `origin/openmw-vulkan` (PR #5), the current checkpoint changes
-48 files, deleting 261 lines and adding 3,577 lines (net `+3,316`). The larger Vulkan-only
+48 files, deleting 263 lines and adding 3,589 lines (net `+3,326`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
