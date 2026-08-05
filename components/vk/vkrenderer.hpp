@@ -50,7 +50,7 @@ namespace Vk
     class Renderer
     {
     public:
-        using TextureResolver = std::function<std::shared_ptr<const Render::TextureData>(std::string_view)>;
+        using TextureResolver = Render::TextureResolver;
 
         Renderer(SDL_Window* window, bool enableValidation);
         ~Renderer();

@@ -5,6 +5,8 @@
 #include "renderinginterface.hpp"
 #include "rendermode.hpp"
 
+#include <components/render/mesh.hpp>
+#include <components/render/texture.hpp>
 #include <components/render/world.hpp>
 
 #include <components/settings/settings.hpp>
@@ -21,6 +23,7 @@
 #include <span>
 #include <string_view>
 #include <unordered_map>
+#include <vector>
 
 namespace osg
 {
@@ -165,6 +168,12 @@ namespace MWRender
 
         /// Return the current camera and directional-light state for a backend consumer.
         Render::SceneData getSceneData() const;
+
+        /// Resolve the current resource-system image into backend-neutral RGBA8 data.
+        std::shared_ptr<const Render::TextureData> getNeutralTexture(std::string_view path) const;
+
+        /// Collect visible meshes from the renderer-neutral loaded-cell snapshot.
+        std::vector<Render::MeshInstance> getNeutralMeshes() const;
 
         void enableTerrain(bool enable, ESM::RefId worldspace);
 

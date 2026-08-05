@@ -24,6 +24,7 @@
 
 #include <components/resource/imagemanager.hpp>
 #include <components/resource/keyframemanager.hpp>
+#include <components/resource/nifmeshmanager.hpp>
 #include <components/resource/resourcesystem.hpp>
 
 #include <components/shader/removedalphafunc.hpp>
@@ -501,6 +502,25 @@ namespace MWRender
         const osg::Vec4f ambientColor = mSunLight->getAmbient();
         result.ambientColor = { ambientColor.x(), ambientColor.y(), ambientColor.z(), ambientColor.w() };
         return result;
+    }
+
+    std::shared_ptr<const Render::TextureData> RenderingManager::getNeutralTexture(std::string_view path) const
+    {
+        if (path.empty())
+            return nullptr;
+        return mResourceSystem->getImageManager()->getRenderTexture(VFS::Path::Normalized(path));
+    }
+
+    std::vector<Render::MeshInstance> RenderingManager::getNeutralMeshes() const
+    {
+        std::unordered_map<std::string, std::shared_ptr<const Resource::NifMeshManager::Meshes>> cache;
+        return Render::collectWorldMeshes(mWorldScene, [&](std::string_view model)
+            -> const Resource::NifMeshManager::Meshes& {
+            const auto [iter, inserted] = cache.try_emplace(std::string(model));
+            if (inserted)
+                iter->second = mResourceSystem->getNifMeshManager()->get(VFS::Path::Normalized(model));
+            return *iter->second;
+        });
     }
 
     Render::WorldObject* RenderingManager::findNeutralObject(const MWWorld::Ptr& ptr)

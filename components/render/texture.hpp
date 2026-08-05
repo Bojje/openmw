@@ -3,6 +3,9 @@
 
 #include <cstdint>
 #include <cstddef>
+#include <functional>
+#include <memory>
+#include <string_view>
 #include <vector>
 
 namespace Render
@@ -20,6 +23,8 @@ namespace Render
             return width > 0 && height > 0 && pixels.size() == static_cast<std::size_t>(width) * height * 4;
         }
     };
+
+    using TextureResolver = std::function<std::shared_ptr<const TextureData>(std::string_view)>;
 }
 
 #endif
