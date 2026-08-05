@@ -27,6 +27,7 @@ namespace Render
         result.mesh.material.terrainBlend = layer.blendmap.valid();
         result.mesh.material.terrainFirstLayer = layerIndex == 0;
         result.mesh.material.terrainNormalMap = !layer.normalTexture.empty();
+        result.mesh.material.terrainParallax = result.mesh.material.terrainNormalMap && layer.parallax;
         if (layer.blendmap.valid())
         {
             result.mesh.material.alphaBlend = true;

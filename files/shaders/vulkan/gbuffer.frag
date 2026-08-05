@@ -30,7 +30,31 @@ layout(location = 1) out vec4 outNormal;
 layout(location = 2) out vec4 outMaterial;
 
 void main() {
-    vec4 albedoSample = texture(albedoTextures[fragAlbedoTextureIndex], fragTexCoord);
+    vec2 terrainTexCoord = fragTexCoord;
+    vec3 N = normalize(fragNormal);
+    vec3 tangent = vec3(0.0);
+    vec3 bitangent = vec3(0.0);
+    vec4 normalSample = vec4(0.5, 0.5, 1.0, 1.0);
+    if ((fragMaterialFlags & 4u) != 0u)
+    {
+        // Terrain has no authored tangent stream. Match the legacy terrain
+        // shader's fixed tangent basis and rebuild a stable world-space TBN.
+        tangent = normalize(vec3(1.0, 0.0, 0.0) - N * dot(N, vec3(1.0, 0.0, 0.0)));
+        if (dot(tangent, tangent) < 1e-6)
+            tangent = normalize(vec3(0.0, 1.0, 0.0) - N * dot(N, vec3(0.0, 1.0, 0.0)));
+        bitangent = normalize(cross(N, tangent));
+        normalSample = texture(normalTextures[fragNormalTextureIndex], terrainTexCoord);
+        if ((fragMaterialFlags & 8u) != 0u)
+        {
+            vec3 viewDirection = normalize(camera.viewInverse[3].xyz - fragWorldPos);
+            vec3 tangentViewDirection = vec3(dot(viewDirection, tangent), dot(viewDirection, bitangent),
+                dot(viewDirection, N));
+            terrainTexCoord += tangentViewDirection.xy * (normalSample.a * 0.04 - 0.02);
+            normalSample = texture(normalTextures[fragNormalTextureIndex], terrainTexCoord);
+        }
+    }
+
+    vec4 albedoSample = texture(albedoTextures[fragAlbedoTextureIndex], terrainTexCoord);
     vec4 albedo = fragColor * albedoSample;
 
     if ((fragMaterialFlags & 2u) != 0u)
@@ -45,17 +69,10 @@ void main() {
 
     outAlbedo = albedo;
 
-    vec3 N = normalize(fragNormal);
     if ((fragMaterialFlags & 4u) != 0u)
     {
-        // Terrain has no authored tangent stream. Match the legacy terrain
-        // shader's fixed tangent basis and rebuild a stable world-space TBN.
-        vec3 tangent = normalize(vec3(1.0, 0.0, 0.0) - N * dot(N, vec3(1.0, 0.0, 0.0)));
-        if (dot(tangent, tangent) < 1e-6)
-            tangent = normalize(vec3(0.0, 1.0, 0.0) - N * dot(N, vec3(0.0, 1.0, 0.0)));
-        vec3 bitangent = normalize(cross(N, tangent));
-        vec3 normalSample = texture(normalTextures[fragNormalTextureIndex], fragTexCoord).xyz * 2.0 - 1.0;
-        N = normalize(tangent * normalSample.x + bitangent * normalSample.y + N * normalSample.z);
+        vec3 sampledNormal = normalSample.xyz * 2.0 - 1.0;
+        N = normalize(tangent * sampledNormal.x + bitangent * sampledNormal.y + N * sampledNormal.z);
     }
     outNormal = vec4(N * 0.5 + 0.5, 1.0);
 

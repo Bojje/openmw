@@ -29,6 +29,7 @@ namespace Render
         bool terrainBlend = false;
         bool terrainFirstLayer = false;
         bool terrainNormalMap = false;
+        bool terrainParallax = false;
         std::shared_ptr<const TextureData> alphaTexture;
     };
 

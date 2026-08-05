@@ -1265,6 +1265,8 @@ namespace Vk
                             materialFlags |= 2u;
                         if (draw.material.terrainNormalMap)
                             materialFlags |= 4u;
+                        if (draw.material.terrainParallax)
+                            materialFlags |= 8u;
                         const PushData pushData = {
                             draw.transform,
                             draw.normalMatrix,
@@ -1491,6 +1493,7 @@ namespace Vk
                 ? resolveTexture(draw.material.normalTexture)
                 : 0;
             draw.material.terrainNormalMap = draw.material.terrainNormalMap && normalTextureIndex != 0;
+            draw.material.terrainParallax = draw.material.terrainParallax && draw.material.terrainNormalMap;
             normalTextureIndices.push_back(normalTextureIndex);
         }
 
