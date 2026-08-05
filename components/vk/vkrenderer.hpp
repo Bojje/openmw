@@ -66,9 +66,7 @@ namespace Vk
         void cleanup();
         bool loadShadersAndCreatePipelines(const std::string& shaderDir);
 
-        void updateScene(const Render::SceneData& sceneData);
         void setScene(const Render::SceneSubmission& submission, TextureResolver textureResolver = {});
-        void setMeshes(const std::vector<Render::MeshInstance>& meshes, TextureResolver textureResolver = {});
 
     private:
         static constexpr uint32_t maxTextures = 64;
@@ -100,6 +98,7 @@ namespace Vk
         uint32_t createTextureResource(const Render::TextureData& texture);
         void destroyTextures();
         void destroyMesh();
+        void setMeshes(const std::vector<Render::MeshInstance>& meshes, TextureResolver textureResolver);
 
         void createImage(uint32_t width, uint32_t height, VkFormat format, VkImageUsageFlags usage,
             VkImage& image, VkDeviceMemory& memory);

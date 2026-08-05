@@ -1266,16 +1266,11 @@ namespace Vk
         writeCompositeDescriptor(5, mGBuffer.materialView);
     }
 
-    void Renderer::updateScene(const Render::SceneData& sceneData)
-    {
-        mSceneData = sceneData;
-        mHasSceneData = true;
-        std::memcpy(mUniformMapped[mCurrentFrame], &sceneData, sizeof(Render::SceneData));
-    }
-
     void Renderer::setScene(const Render::SceneSubmission& submission, TextureResolver textureResolver)
     {
-        updateScene(submission.scene);
+        mSceneData = submission.scene;
+        mHasSceneData = true;
+        std::memcpy(mUniformMapped[mCurrentFrame], &submission.scene, sizeof(Render::SceneData));
         TextureResolver resolver = textureResolver ? std::move(textureResolver) : submission.textureResolver;
         setMeshes(submission.meshes, std::move(resolver));
     }

@@ -176,7 +176,6 @@ int main(int argc, char** argv)
             for (unsigned int frame = 0; frame < frames; ++frame)
             {
                 SDL_PumpEvents();
-                renderer->updateScene(scene);
                 if (renderer->render())
                     ++renderedFrames;
 
