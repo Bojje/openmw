@@ -487,43 +487,24 @@ namespace MWRender
         return mWorldScene.findCell(static_cast<const void*>(store));
     }
 
-    Render::SceneData RenderingManager::getSceneData() const
-    {
-        Render::SceneData result = {};
-        result.view = toRenderMatrix(mViewer->getCamera()->getViewMatrix());
-        result.projection = toRenderMatrix(mViewer->getCamera()->getProjectionMatrix());
-        result.viewInverse = Render::invertMat4(result.view);
-        result.projInverse = Render::invertMat4(result.projection);
-
-        const osg::Vec4f sunPosition = mSunLight->getPosition();
-        result.sunDirection = { -sunPosition.x(), -sunPosition.y(), -sunPosition.z(), sunPosition.w() };
-        const osg::Vec4f sunColor = mSunLight->getDiffuse();
-        result.sunColor = { sunColor.x(), sunColor.y(), sunColor.z(), sunColor.w() };
-        const osg::Vec4f ambientColor = mSunLight->getAmbient();
-        result.ambientColor = { ambientColor.x(), ambientColor.y(), ambientColor.z(), ambientColor.w() };
-        return result;
-    }
-
     Render::SceneSubmission RenderingManager::getNeutralScene() const
     {
         Render::SceneSubmission result;
-        result.scene = getSceneData();
-        result.meshes = getNeutralMeshes();
-        result.textureResolver = [this](std::string_view path) { return getNeutralTexture(path); };
-        return result;
-    }
+        result.scene = {};
+        result.scene.view = toRenderMatrix(mViewer->getCamera()->getViewMatrix());
+        result.scene.projection = toRenderMatrix(mViewer->getCamera()->getProjectionMatrix());
+        result.scene.viewInverse = Render::invertMat4(result.scene.view);
+        result.scene.projInverse = Render::invertMat4(result.scene.projection);
 
-    std::shared_ptr<const Render::TextureData> RenderingManager::getNeutralTexture(std::string_view path) const
-    {
-        if (path.empty())
-            return nullptr;
-        return mResourceSystem->getImageManager()->getRenderTexture(VFS::Path::Normalized(path));
-    }
+        const osg::Vec4f sunPosition = mSunLight->getPosition();
+        result.scene.sunDirection = { -sunPosition.x(), -sunPosition.y(), -sunPosition.z(), sunPosition.w() };
+        const osg::Vec4f sunColor = mSunLight->getDiffuse();
+        result.scene.sunColor = { sunColor.x(), sunColor.y(), sunColor.z(), sunColor.w() };
+        const osg::Vec4f ambientColor = mSunLight->getAmbient();
+        result.scene.ambientColor = { ambientColor.x(), ambientColor.y(), ambientColor.z(), ambientColor.w() };
 
-    std::vector<Render::MeshInstance> RenderingManager::getNeutralMeshes() const
-    {
         std::unordered_map<std::string, std::shared_ptr<const Resource::NifMeshManager::Meshes>> cache;
-        return Render::collectWorldMeshes(mWorldScene, [&](std::string_view model)
+        result.meshes = Render::collectWorldMeshes(mWorldScene, [&](std::string_view model)
             -> const Resource::NifMeshManager::Meshes& {
             const auto [iter, inserted] = cache.try_emplace(std::string(model));
             if (inserted)
@@ -536,6 +517,14 @@ namespace MWRender
             }
             return *iter->second;
         });
+
+        Resource::ResourceSystem* const resourceSystem = mResourceSystem;
+        result.textureResolver = [resourceSystem](std::string_view path) {
+            if (path.empty())
+                return std::shared_ptr<const Render::TextureData>();
+            return resourceSystem->getImageManager()->getRenderTexture(VFS::Path::Normalized(path));
+        };
+        return result;
     }
 
     std::optional<Render::TerrainTile> RenderingManager::getNeutralTerrainTile(

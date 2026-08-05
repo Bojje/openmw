@@ -169,17 +169,8 @@ namespace MWRender
 
         const Render::CellScene* getCellScene(const MWWorld::CellStore* store) const;
 
-        /// Return the current camera and directional-light state for a backend consumer.
-        Render::SceneData getSceneData() const;
-
         /// Collect one backend-neutral static-scene submission for a renderer.
         Render::SceneSubmission getNeutralScene() const;
-
-        /// Resolve the current resource-system image into backend-neutral RGBA8 data.
-        std::shared_ptr<const Render::TextureData> getNeutralTexture(std::string_view path) const;
-
-        /// Collect visible meshes from the renderer-neutral loaded-cell snapshot.
-        std::vector<Render::MeshInstance> getNeutralMeshes() const;
 
         /// Snapshot one terrain tile without exposing the OSG terrain graph or images.
         std::optional<Render::TerrainTile> getNeutralTerrainTile(
