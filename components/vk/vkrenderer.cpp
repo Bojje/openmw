@@ -731,11 +731,10 @@ namespace Vk
     {
         std::vector<VkDescriptorPoolSize> poolSizes = {
             { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, maxFramesInFlight * 2 },
-            { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, maxTextures * maxFramesInFlight * 3 + 16 + maxFramesInFlight },
-            { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 2 },
+            { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, maxTextures * maxFramesInFlight * 3 + maxFramesInFlight * 4 },
         };
 
-        uint32_t maxSets = maxFramesInFlight * 2 + 4;
+        const uint32_t maxSets = maxFramesInFlight * 2;
 
         VkDescriptorPoolCreateInfo poolInfo = {};
         poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
