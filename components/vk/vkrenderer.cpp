@@ -3,8 +3,10 @@
 #include <array>
 #include <cmath>
 #include <cstring>
+#include <limits>
 #include <fstream>
 #include <stdexcept>
+#include <utility>
 
 #include <SDL_vulkan.h>
 
@@ -1014,14 +1016,18 @@ namespace Vk
                     {
                         Render::Mat4 model;
                         Render::Mat4 normalMatrix;
-                    } pushData = { mMeshTransform, mMeshNormalMatrix };
-                    vkCmdPushConstants(cmd, mGBufferPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT,
-                        0, sizeof(pushData), &pushData);
+                    };
 
                     VkDeviceSize offset = 0;
                     vkCmdBindVertexBuffers(cmd, 0, 1, &mMeshVertexBuffer, &offset);
                     vkCmdBindIndexBuffer(cmd, mMeshIndexBuffer, 0, VK_INDEX_TYPE_UINT32);
-                    vkCmdDrawIndexed(cmd, mMeshIndexCount, 1, 0, 0, 0);
+                    for (const MeshDraw& draw : mMeshDraws)
+                    {
+                        const PushData pushData = { draw.transform, draw.normalMatrix };
+                        vkCmdPushConstants(cmd, mGBufferPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT,
+                            0, sizeof(pushData), &pushData);
+                        vkCmdDrawIndexed(cmd, draw.indexCount, 1, draw.firstIndex, draw.vertexOffset, 0);
+                    }
                 }
 
             }
@@ -1116,41 +1122,71 @@ namespace Vk
         std::memcpy(mUniformMapped[mCurrentFrame], &sceneData, sizeof(Render::SceneData));
     }
 
-    void Renderer::setMesh(const Render::MeshInstance& mesh)
+    void Renderer::setMeshes(const std::vector<Render::MeshInstance>& meshes)
     {
         vkDeviceWaitIdle(mDevice->handle());
         destroyMesh();
 
-        mMeshTransform = mesh.transform;
-        mMeshNormalMatrix = Render::computeNormalMatrix(mesh.transform);
+        std::vector<Render::MeshVertex> vertices;
+        std::vector<uint32_t> indices;
+        std::vector<MeshDraw> draws;
+        for (const Render::MeshInstance& mesh : meshes)
+        {
+            if (mesh.mesh.vertices.empty() || mesh.mesh.indices.empty())
+                continue;
 
-        if (mesh.mesh.vertices.empty() || mesh.mesh.indices.empty())
+            if (vertices.size() > static_cast<std::size_t>(std::numeric_limits<int32_t>::max()))
+                throw std::runtime_error("Vulkan mesh batch has too many vertices");
+            if (indices.size() > static_cast<std::size_t>(std::numeric_limits<uint32_t>::max())
+                || mesh.mesh.indices.size() > static_cast<std::size_t>(std::numeric_limits<uint32_t>::max()))
+                throw std::runtime_error("Vulkan mesh batch has too many indices");
+
+            const uint32_t vertexOffset = static_cast<uint32_t>(vertices.size());
+            MeshDraw draw = {
+                static_cast<uint32_t>(mesh.mesh.indices.size()),
+                static_cast<uint32_t>(indices.size()),
+                static_cast<int32_t>(vertexOffset),
+                mesh.transform,
+                Render::computeNormalMatrix(mesh.transform),
+            };
+            for (uint32_t index : mesh.mesh.indices)
+            {
+                if (index >= mesh.mesh.vertices.size()
+                    || static_cast<uint64_t>(index) + vertexOffset > std::numeric_limits<uint32_t>::max())
+                    throw std::runtime_error("Vulkan mesh batch contains an invalid index");
+                indices.push_back(index + vertexOffset);
+            }
+            vertices.insert(vertices.end(), mesh.mesh.vertices.begin(), mesh.mesh.vertices.end());
+            draws.push_back(draw);
+        }
+
+        if (vertices.empty() || indices.empty())
             return;
+
+        mMeshDraws = std::move(draws);
 
         try
         {
             createBufferLocal(mDevice->handle(), mDevice->physical(),
-                sizeof(Render::MeshVertex) * mesh.mesh.vertices.size(), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                sizeof(Render::MeshVertex) * vertices.size(), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                 mMeshVertexBuffer, mMeshVertexMemory);
             createBufferLocal(mDevice->handle(), mDevice->physical(),
-                sizeof(uint32_t) * mesh.mesh.indices.size(), VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+                sizeof(uint32_t) * indices.size(), VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                 mMeshIndexBuffer, mMeshIndexMemory);
 
             void* mapped = nullptr;
             VK_CHECK(vkMapMemory(mDevice->handle(), mMeshVertexMemory, 0,
-                sizeof(Render::MeshVertex) * mesh.mesh.vertices.size(), 0, &mapped));
-            std::memcpy(mapped, mesh.mesh.vertices.data(), sizeof(Render::MeshVertex) * mesh.mesh.vertices.size());
+                sizeof(Render::MeshVertex) * vertices.size(), 0, &mapped));
+            std::memcpy(mapped, vertices.data(), sizeof(Render::MeshVertex) * vertices.size());
             vkUnmapMemory(mDevice->handle(), mMeshVertexMemory);
 
             mapped = nullptr;
             VK_CHECK(vkMapMemory(mDevice->handle(), mMeshIndexMemory, 0,
-                sizeof(uint32_t) * mesh.mesh.indices.size(), 0, &mapped));
-            std::memcpy(mapped, mesh.mesh.indices.data(), sizeof(uint32_t) * mesh.mesh.indices.size());
+                sizeof(uint32_t) * indices.size(), 0, &mapped));
+            std::memcpy(mapped, indices.data(), sizeof(uint32_t) * indices.size());
             vkUnmapMemory(mDevice->handle(), mMeshIndexMemory);
-
-            mMeshIndexCount = static_cast<uint32_t>(mesh.mesh.indices.size());
         }
         catch (...)
         {
@@ -1178,7 +1214,7 @@ namespace Vk
         mMeshVertexMemory = VK_NULL_HANDLE;
         mMeshIndexBuffer = VK_NULL_HANDLE;
         mMeshIndexMemory = VK_NULL_HANDLE;
-        mMeshIndexCount = 0;
+        mMeshDraws.clear();
     }
 
     void Renderer::cleanup()

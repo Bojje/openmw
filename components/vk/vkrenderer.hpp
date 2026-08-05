@@ -60,7 +60,7 @@ namespace Vk
         bool loadShadersAndCreatePipelines(const std::string& shaderDir);
 
         void updateScene(const Render::SceneData& sceneData);
-        void setMesh(const Render::MeshInstance& mesh);
+        void setMeshes(const std::vector<Render::MeshInstance>& meshes);
 
     private:
         void createSurface();
@@ -126,9 +126,16 @@ namespace Vk
         VkDeviceMemory mMeshVertexMemory = VK_NULL_HANDLE;
         VkBuffer mMeshIndexBuffer = VK_NULL_HANDLE;
         VkDeviceMemory mMeshIndexMemory = VK_NULL_HANDLE;
-        uint32_t mMeshIndexCount = 0;
-        Render::Mat4 mMeshTransform = {};
-        Render::Mat4 mMeshNormalMatrix = {};
+
+        struct MeshDraw
+        {
+            uint32_t indexCount;
+            uint32_t firstIndex;
+            int32_t vertexOffset;
+            Render::Mat4 transform;
+            Render::Mat4 normalMatrix;
+        };
+        std::vector<MeshDraw> mMeshDraws;
 
         std::vector<VkCommandBuffer> mCommandBuffers;
 

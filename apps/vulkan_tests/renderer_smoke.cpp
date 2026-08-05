@@ -96,7 +96,7 @@ int main(int argc, char** argv)
             };
             mesh.mesh.indices = { 0, 1, 2 };
             mesh.transform = identityMatrix();
-            renderer->setMesh(mesh);
+            renderer->setMeshes({ mesh });
 
             unsigned int renderedFrames = 0;
             for (unsigned int frame = 0; frame < frames; ++frame)
