@@ -47,6 +47,11 @@ collected, making backend draw lists stable for image comparison and predictable
 The Vulkan composite pass now consumes that single scene-lighting UBO directly; duplicated
 sun push constants were removed, and ambient light is part of the neutral snapshot.
 
+Against `openmw-vulkan`, this checkpoint changes 47 files, deleting 2,216 lines and adding
+1,864 lines (net `-352`). That is an audited intermediate reduction, not the speculative
+10k-line target; further deletions remain gated on replacing the remaining OSG-owned
+responsibilities.
+
 The remaining migration is not a compatibility problem that can be solved by retaining
 both renderers in one execution path. Static-world transforms, materials, textures,
 terrain, dynamic content, GUI, and presentation still have OSG ownership. Those are the
