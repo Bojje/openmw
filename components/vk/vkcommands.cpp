@@ -1,7 +1,5 @@
 #include "vkcommands.hpp"
 
-#include <stdexcept>
-
 #include "vkcommon.hpp"
 #include "vkdevice.hpp"
 
@@ -50,30 +48,4 @@ namespace Vk
         return commandBuffers;
     }
 
-    VkCommandBuffer CommandPool::beginSingleTime()
-    {
-        VkCommandBuffer commandBuffer = allocate();
-
-        VkCommandBufferBeginInfo beginInfo = {};
-        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-        beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-
-        VK_CHECK(vkBeginCommandBuffer(commandBuffer, &beginInfo));
-        return commandBuffer;
-    }
-
-    void CommandPool::endSingleTime(VkCommandBuffer commandBuffer, VkQueue queue)
-    {
-        VK_CHECK(vkEndCommandBuffer(commandBuffer));
-
-        VkSubmitInfo submitInfo = {};
-        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-        submitInfo.commandBufferCount = 1;
-        submitInfo.pCommandBuffers = &commandBuffer;
-
-        VK_CHECK(vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE));
-        vkQueueWaitIdle(queue);
-
-        vkFreeCommandBuffers(mDevice.handle(), mPool, 1, &commandBuffer);
-    }
 }

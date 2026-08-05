@@ -531,8 +531,6 @@ if (OPENMW_USE_VULKAN)
         vkswapchain
         vkcommands
         vksync
-        vkbuffer
-        vkdescriptors
         vkshader
         vkrenderer
         )

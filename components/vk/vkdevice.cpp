@@ -36,13 +36,11 @@ namespace Vk
         , mQueueFamilyIndices(other.mQueueFamilyIndices)
         , mGraphicsQueue(other.mGraphicsQueue)
         , mPresentQueue(other.mPresentQueue)
-        , mComputeQueue(other.mComputeQueue)
     {
         other.mDevice = VK_NULL_HANDLE;
         other.mPhysicalDevice = VK_NULL_HANDLE;
         other.mGraphicsQueue = VK_NULL_HANDLE;
         other.mPresentQueue = VK_NULL_HANDLE;
-        other.mComputeQueue = VK_NULL_HANDLE;
     }
 
     Device& Device::operator=(Device&& other) noexcept
@@ -58,13 +56,11 @@ namespace Vk
             mQueueFamilyIndices = other.mQueueFamilyIndices;
             mGraphicsQueue = other.mGraphicsQueue;
             mPresentQueue = other.mPresentQueue;
-            mComputeQueue = other.mComputeQueue;
 
             other.mDevice = VK_NULL_HANDLE;
             other.mPhysicalDevice = VK_NULL_HANDLE;
             other.mGraphicsQueue = VK_NULL_HANDLE;
             other.mPresentQueue = VK_NULL_HANDLE;
-            other.mComputeQueue = VK_NULL_HANDLE;
         }
         return *this;
     }
@@ -115,8 +111,6 @@ namespace Vk
         std::set<uint32_t> uniqueFamilies;
         uniqueFamilies.insert(mQueueFamilyIndices.graphics.value());
         uniqueFamilies.insert(mQueueFamilyIndices.present.value());
-        if (mQueueFamilyIndices.compute.has_value())
-            uniqueFamilies.insert(mQueueFamilyIndices.compute.value());
 
         float queuePriority = 1.0f;
         std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
@@ -152,10 +146,6 @@ namespace Vk
         vkGetDeviceQueue(mDevice, mQueueFamilyIndices.graphics.value(), 0, &mGraphicsQueue);
         vkGetDeviceQueue(mDevice, mQueueFamilyIndices.present.value(), 0, &mPresentQueue);
 
-        if (mQueueFamilyIndices.compute.has_value())
-            vkGetDeviceQueue(mDevice, mQueueFamilyIndices.compute.value(), 0, &mComputeQueue);
-        else
-            vkGetDeviceQueue(mDevice, mQueueFamilyIndices.graphics.value(), 0, &mComputeQueue);
     }
 
     QueueFamilyIndices Device::findQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR surface) const
@@ -173,25 +163,14 @@ namespace Vk
             if (queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)
                 indices.graphics = i;
 
-            if (queueFamilies[i].queueFlags & VK_QUEUE_COMPUTE_BIT)
-                indices.compute = i;
-
-            if ((queueFamilies[i].queueFlags & VK_QUEUE_TRANSFER_BIT)
-                && !(queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT))
-                indices.transfer = i;
-
             VkBool32 presentSupport = VK_FALSE;
             vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &presentSupport);
             if (presentSupport)
                 indices.present = i;
 
-            if (indices.isComplete() && indices.compute.has_value())
+            if (indices.isComplete())
                 break;
         }
-
-        // Use graphics queue for transfer if no dedicated transfer queue exists
-        if (!indices.transfer.has_value() && indices.graphics.has_value())
-            indices.transfer = indices.graphics;
 
         return indices;
     }
