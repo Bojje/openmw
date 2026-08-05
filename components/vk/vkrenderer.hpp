@@ -61,9 +61,9 @@ namespace Vk
         Renderer(const Renderer&) = delete;
         Renderer& operator=(const Renderer&) = delete;
 
-        uint32_t beginFrame();
+        bool beginFrame();
         void endFrame();
-        void render();
+        bool render();
         void resize(uint32_t width, uint32_t height);
         void cleanup();
         bool loadShadersAndCreatePipelines(const std::string& shaderDir);

@@ -88,17 +88,22 @@ int main(int argc, char** argv)
             scene.sunDirection = { 0.0f, -1.0f, 0.0f, 0.0f };
             scene.sunColor = { 1.0f, 1.0f, 1.0f, 1.0f };
 
+            unsigned int renderedFrames = 0;
             for (unsigned int frame = 0; frame < frames; ++frame)
             {
                 SDL_PumpEvents();
                 renderer->updateScene(scene);
-                renderer->render();
+                if (renderer->render())
+                    ++renderedFrames;
 
                 // Recreate the swapchain once without restarting the process. This
                 // covers the lifecycle that is most likely to expose ownership bugs.
                 if (frame == 0 && frames > 1)
                     renderer->resize(static_cast<uint32_t>(drawableWidth), static_cast<uint32_t>(drawableHeight));
             }
+
+            if (renderedFrames == 0)
+                throw EnvironmentUnavailable("Vulkan drawable became unavailable before a frame was submitted");
         }
 
         SDL_DestroyWindow(window);

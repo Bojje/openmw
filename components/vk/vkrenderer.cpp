@@ -906,9 +906,15 @@ namespace Vk
 
     // Frame lifecycle
 
-    uint32_t Renderer::beginFrame()
+    bool Renderer::beginFrame()
     {
         mFrameSync->waitForFrame(mCurrentFrame);
+
+        int drawableWidth = 0;
+        int drawableHeight = 0;
+        SDL_Vulkan_GetDrawableSize(mWindow, &drawableWidth, &drawableHeight);
+        if (drawableWidth <= 0 || drawableHeight <= 0)
+            return false;
 
         VkResult result;
         for (;;)
@@ -918,9 +924,10 @@ namespace Vk
 
             if (result == VK_ERROR_OUT_OF_DATE_KHR)
             {
-                int w, h;
-                SDL_Vulkan_GetDrawableSize(mWindow, &w, &h);
-                resize(static_cast<uint32_t>(w), static_cast<uint32_t>(h));
+                SDL_Vulkan_GetDrawableSize(mWindow, &drawableWidth, &drawableHeight);
+                if (drawableWidth <= 0 || drawableHeight <= 0)
+                    return false;
+                resize(static_cast<uint32_t>(drawableWidth), static_cast<uint32_t>(drawableHeight));
                 continue;
             }
             break;
@@ -938,7 +945,7 @@ namespace Vk
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
         VK_CHECK(vkBeginCommandBuffer(cmd, &beginInfo));
 
-        return mCurrentFrame;
+        return true;
     }
 
     void Renderer::endFrame()
@@ -984,9 +991,10 @@ namespace Vk
         mCurrentFrame = (mCurrentFrame + 1) % maxFramesInFlight;
     }
 
-    void Renderer::render()
+    bool Renderer::render()
     {
-        beginFrame();
+        if (!beginFrame())
+            return false;
 
         VkCommandBuffer cmd = mCommandBuffers[mCurrentFrame];
         VkExtent2D extent = mSwapchain->extent();
@@ -1082,10 +1090,14 @@ namespace Vk
         }
 
         endFrame();
+        return true;
     }
 
     void Renderer::resize(uint32_t width, uint32_t height)
     {
+        if (width == 0 || height == 0)
+            return;
+
         vkDeviceWaitIdle(mDevice->handle());
 
         if (mGBufferFramebuffer != VK_NULL_HANDLE)
