@@ -465,7 +465,8 @@ namespace MWRender
     {
         if (ptr.isEmpty() || model.empty())
         {
-            removeNeutralObject(ptr);
+            if (!ptr.isEmpty())
+                mWorldScene.removeObject(static_cast<const void*>(ptr.mRef));
             return;
         }
 
@@ -533,33 +534,6 @@ namespace MWRender
             return resourceSystem->getImageManager()->getRenderTexture(VFS::Path::Normalized(path));
         };
         return result;
-    }
-
-    Render::WorldObject* RenderingManager::findNeutralObject(const MWWorld::Ptr& ptr)
-    {
-        if (ptr.isEmpty())
-            return nullptr;
-
-        return mWorldScene.findObject(static_cast<const void*>(ptr.mRef));
-    }
-
-    void RenderingManager::removeNeutralObject(const MWWorld::Ptr& ptr)
-    {
-        if (ptr.isEmpty())
-            return;
-
-        mWorldScene.removeObject(static_cast<const void*>(ptr.mRef));
-    }
-
-    void RenderingManager::updateNeutralObjectCell(const MWWorld::Ptr& old, const MWWorld::Ptr& updated)
-    {
-        if (old.isEmpty() || updated.isEmpty())
-            return;
-
-        const MWWorld::CellStore* newCell = updated.getCell();
-        mWorldScene.updateObjectCell(static_cast<const void*>(old.mRef), static_cast<const void*>(updated.mRef),
-            static_cast<const void*>(newCell), newCell->getCell()->isExterior(), newCell->getCell()->getGridX(),
-            newCell->getCell()->getGridY(), newCell->getCell()->getNameId());
     }
 
     Resource::ResourceSystem* RenderingManager::getResourceSystem()
@@ -926,7 +900,7 @@ namespace MWRender
 
         ptr.getRefData().getBaseNode()->setAttitude(rot);
 
-        if (Render::WorldObject* object = findNeutralObject(ptr))
+        if (Render::WorldObject* object = mWorldScene.findObject(static_cast<const void*>(ptr.mRef)))
             object->transform.rotation = toRenderQuat(rot);
     }
 
@@ -934,7 +908,7 @@ namespace MWRender
     {
         ptr.getRefData().getBaseNode()->setPosition(pos);
 
-        if (Render::WorldObject* object = findNeutralObject(ptr))
+        if (Render::WorldObject* object = mWorldScene.findObject(static_cast<const void*>(ptr.mRef)))
             object->transform.position = { pos.x(), pos.y(), pos.z() };
     }
 
@@ -945,7 +919,7 @@ namespace MWRender
         if (ptr == mCamera->getTrackingPtr()) // update height of camera
             mCamera->processViewChange();
 
-        if (Render::WorldObject* object = findNeutralObject(ptr))
+        if (Render::WorldObject* object = mWorldScene.findObject(static_cast<const void*>(ptr.mRef)))
             object->transform.scale = { scale.x(), scale.y(), scale.z() };
     }
 
@@ -954,7 +928,8 @@ namespace MWRender
         mActorsPaths->remove(ptr);
         mObjects->removeObject(ptr);
         mWater->removeEmitter(ptr);
-        removeNeutralObject(ptr);
+        if (!ptr.isEmpty())
+            mWorldScene.removeObject(static_cast<const void*>(ptr.mRef));
     }
 
     void RenderingManager::setWaterEnabled(bool enabled)
@@ -1212,7 +1187,13 @@ namespace MWRender
     {
         mObjects->updatePtr(old, updated);
         mActorsPaths->updatePtr(old, updated);
-        updateNeutralObjectCell(old, updated);
+        if (!old.isEmpty() && !updated.isEmpty())
+        {
+            const MWWorld::CellStore* newCell = updated.getCell();
+            mWorldScene.updateObjectCell(static_cast<const void*>(old.mRef), static_cast<const void*>(updated.mRef),
+                static_cast<const void*>(newCell), newCell->getCell()->isExterior(), newCell->getCell()->getGridX(),
+                newCell->getCell()->getGridY(), newCell->getCell()->getNameId());
+        }
     }
 
     void RenderingManager::spawnEffect(VFS::Path::NormalizedView model, std::string_view texture,

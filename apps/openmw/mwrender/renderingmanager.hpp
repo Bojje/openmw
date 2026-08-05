@@ -320,10 +320,6 @@ namespace MWRender
 
         void updateRecastMesh();
 
-        Render::WorldObject* findNeutralObject(const MWWorld::Ptr& ptr);
-        void removeNeutralObject(const MWWorld::Ptr& ptr);
-        void updateNeutralObjectCell(const MWWorld::Ptr& old, const MWWorld::Ptr& updated);
-
         const bool mSkyBlending;
 
         osg::ref_ptr<osgUtil::IntersectionVisitor> getIntersectionVisitor(osgUtil::Intersector* intersector,
