@@ -13,6 +13,7 @@
 #include <components/debug/debuglog.hpp>
 
 #include "../render/math.hpp"
+#include "../render/terrainmesh.hpp"
 #include "vkcommands.hpp"
 #include "vkdevice.hpp"
 #include "vkinstance.hpp"
@@ -1377,7 +1378,19 @@ namespace Vk
         mHasSceneData = true;
         std::memcpy(mUniformMapped[mCurrentFrame], &submission.scene, sizeof(Render::SceneData));
         TextureResolver resolver = textureResolver ? std::move(textureResolver) : submission.textureResolver;
-        setMeshes(submission.meshes, std::move(resolver));
+        if (submission.terrainTiles.empty())
+        {
+            setMeshes(submission.meshes, std::move(resolver));
+            return;
+        }
+
+        std::vector<Render::MeshInstance> meshes = submission.meshes;
+        for (const Render::TerrainTile& tile : submission.terrainTiles)
+        {
+            if (std::optional<Render::MeshInstance> terrain = Render::makeOpaqueTerrainMesh(tile))
+                meshes.push_back(std::move(*terrain));
+        }
+        setMeshes(meshes, std::move(resolver));
     }
 
     void Renderer::setMeshes(const std::vector<Render::MeshInstance>& meshes, TextureResolver textureResolver)

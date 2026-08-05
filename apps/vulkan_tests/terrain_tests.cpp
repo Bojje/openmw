@@ -6,6 +6,7 @@
 #include <osg/Image>
 
 #include <components/terrain/storage.hpp>
+#include <components/render/terrainmesh.hpp>
 
 namespace
 {
@@ -94,6 +95,14 @@ int main()
         expect(opaqueTile.has_value() && opaqueTile->valid() && opaqueTile->layers.size() == 1
                 && !opaqueTile->layers[0].blendmap.valid(),
             "opaque terrain layer should not require a blendmap");
+        const auto terrainMesh = Render::makeOpaqueTerrainMesh(*opaqueTile);
+        expect(terrainMesh.has_value() && terrainMesh->mesh.indices == opaqueTile->indices
+                && terrainMesh->mesh.material.albedoTexture == "textures/grass.dds"
+                && terrainMesh->transform.data[12] == 0.f && terrainMesh->mesh.vertices[3].texcoord[0] == 1.f
+                && terrainMesh->mesh.vertices[3].texcoord[1] == 1.f,
+            "opaque terrain tile was not converted for Vulkan mesh submission");
+        expect(!Render::makeOpaqueTerrainMesh(*tile).has_value(),
+            "multi-layer terrain tile should wait for a terrain shader consumer");
 
         std::cout << "Vulkan terrain snapshot tests passed\n";
         return EXIT_SUCCESS;

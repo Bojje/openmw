@@ -119,6 +119,23 @@ namespace
         };
         return texture;
     }
+
+    Render::TerrainTile smokeTerrain()
+    {
+        Render::TerrainTile tile;
+        tile.size = 1.f;
+        tile.cellWorldSize = 1.f;
+        tile.verticesPerSide = 2;
+        tile.vertices = {
+            { { -0.5f, -0.5f, -0.25f }, { 0.f, 0.f, 1.f }, { 255, 255, 255, 255 } },
+            { { 0.5f, -0.5f, -0.25f }, { 0.f, 0.f, 1.f }, { 255, 255, 255, 255 } },
+            { { -0.5f, 0.5f, -0.25f }, { 0.f, 0.f, 1.f }, { 255, 255, 255, 255 } },
+            { { 0.5f, 0.5f, -0.25f }, { 0.f, 0.f, 1.f }, { 255, 255, 255, 255 } },
+        };
+        tile.indices = { 0, 2, 1, 1, 2, 3 };
+        tile.layers.push_back({ "textures/vulkan-smoke.rgba", {}, false, false, {} });
+        return tile;
+    }
 }
 
 int main(int argc, char** argv)
@@ -171,6 +188,7 @@ int main(int argc, char** argv)
             Render::SceneSubmission submission;
             submission.scene = scene;
             submission.meshes = *meshes;
+            submission.terrainTiles.push_back(smokeTerrain());
             submission.textureResolver = smokeTexture;
             renderer->setScene(submission);
 
