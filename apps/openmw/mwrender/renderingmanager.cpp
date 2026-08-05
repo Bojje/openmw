@@ -509,6 +509,7 @@ namespace MWRender
         Render::SceneSubmission result;
         result.scene = getSceneData();
         result.meshes = getNeutralMeshes();
+        result.textureResolver = [this](std::string_view path) { return getNeutralTexture(path); };
         return result;
     }
 

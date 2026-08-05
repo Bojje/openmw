@@ -1276,7 +1276,8 @@ namespace Vk
     void Renderer::setScene(const Render::SceneSubmission& submission, TextureResolver textureResolver)
     {
         updateScene(submission.scene);
-        setMeshes(submission.meshes, std::move(textureResolver));
+        TextureResolver resolver = textureResolver ? std::move(textureResolver) : submission.textureResolver;
+        setMeshes(submission.meshes, std::move(resolver));
     }
 
     void Renderer::setMeshes(const std::vector<Render::MeshInstance>& meshes, TextureResolver textureResolver)

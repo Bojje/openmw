@@ -169,7 +169,8 @@ int main(int argc, char** argv)
             Render::SceneSubmission submission;
             submission.scene = scene;
             submission.meshes = *meshes;
-            renderer->setScene(submission, smokeTexture);
+            submission.textureResolver = smokeTexture;
+            renderer->setScene(submission);
 
             unsigned int renderedFrames = 0;
             for (unsigned int frame = 0; frame < frames; ++frame)

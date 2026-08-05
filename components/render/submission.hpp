@@ -5,6 +5,7 @@
 
 #include "mesh.hpp"
 #include "scene.hpp"
+#include "texture.hpp"
 
 namespace Render
 {
@@ -15,6 +16,7 @@ namespace Render
     {
         SceneData scene;
         std::vector<MeshInstance> meshes;
+        TextureResolver textureResolver;
     };
 }
 
