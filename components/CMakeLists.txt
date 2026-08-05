@@ -538,9 +538,6 @@ if (OPENMW_USE_VULKAN)
         vkrenderer
         )
 
-    add_component_dir (nifvk
-        meshconverter
-        )
 endif()
 
 if (USE_QT)
