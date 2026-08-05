@@ -1,9 +1,11 @@
 #include "meshconverter.hpp"
 
 #include <stdexcept>
+#include <utility>
 
 #include "data.hpp"
 #include "node.hpp"
+#include <components/render/math.hpp>
 
 namespace Nif
 {
@@ -84,14 +86,31 @@ namespace Nif
 
     namespace
     {
-        void collectMeshes(const NiAVObject& object, std::vector<Render::MeshData>& meshes)
+        Render::Mat4 toRenderMatrix(const NiTransform& transform)
         {
+            Render::Mat4 result = {};
+            for (int row = 0; row < 3; ++row)
+            {
+                for (int col = 0; col < 3; ++col)
+                    result.data[col * 4 + row] = transform.mRotation.mValues[row][col] * transform.mScale;
+            }
+            result.data[12] = transform.mTranslation.x();
+            result.data[13] = transform.mTranslation.y();
+            result.data[14] = transform.mTranslation.z();
+            result.data[15] = 1.0f;
+            return result;
+        }
+
+        void collectMeshInstances(const NiAVObject& object, const Render::Mat4& parentTransform,
+            std::vector<Render::MeshInstance>& meshes)
+        {
+            const Render::Mat4 transform = Render::multiply(parentTransform, toRenderMatrix(object.mTransform));
             if (const auto* geometry = dynamic_cast<const NiGeometry*>(&object))
             {
                 if (!geometry->mData.empty())
                 {
                     if (const auto* shapeData = dynamic_cast<const NiTriShapeData*>(&geometry->mData.get()))
-                        meshes.push_back(convertMesh(*shapeData));
+                        meshes.push_back({ convertMesh(*shapeData), transform });
                 }
             }
 
@@ -100,7 +119,7 @@ namespace Nif
                 for (const auto& child : node->mChildren)
                 {
                     if (!child.empty())
-                        collectMeshes(*child.getPtr(), meshes);
+                        collectMeshInstances(*child.getPtr(), transform, meshes);
                 }
             }
         }
@@ -109,10 +128,24 @@ namespace Nif
     std::vector<Render::MeshData> collectMeshes(FileView file)
     {
         std::vector<Render::MeshData> meshes;
+        for (Render::MeshInstance& instance : collectMeshInstances(file))
+            meshes.push_back(std::move(instance.mesh));
+        return meshes;
+    }
+
+    std::vector<Render::MeshInstance> collectMeshInstances(FileView file)
+    {
+        Render::Mat4 identity = {};
+        identity.data[0] = 1.0f;
+        identity.data[5] = 1.0f;
+        identity.data[10] = 1.0f;
+        identity.data[15] = 1.0f;
+
+        std::vector<Render::MeshInstance> meshes;
         for (std::size_t i = 0; i < file.numRoots(); ++i)
         {
             if (const auto* root = dynamic_cast<const NiAVObject*>(file.getRoot(i)))
-                collectMeshes(*root, meshes);
+                collectMeshInstances(*root, identity, meshes);
         }
         return meshes;
     }

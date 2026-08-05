@@ -8,6 +8,20 @@
 
 namespace Render
 {
+    inline Mat4 multiply(const Mat4& lhs, const Mat4& rhs)
+    {
+        Mat4 result = {};
+        for (int col = 0; col < 4; ++col)
+        {
+            for (int row = 0; row < 4; ++row)
+            {
+                for (int k = 0; k < 4; ++k)
+                    result.data[col * 4 + row] += lhs.data[k * 4 + row] * rhs.data[col * 4 + k];
+            }
+        }
+        return result;
+    }
+
     inline Mat4 transposeMat4(const Mat4& m)
     {
         Mat4 result;

@@ -4,6 +4,8 @@
 #include <cstdint>
 #include <vector>
 
+#include "scene.hpp"
+
 namespace Render
 {
     struct MeshVertex
@@ -20,6 +22,12 @@ namespace Render
     {
         std::vector<MeshVertex> vertices;
         std::vector<uint32_t> indices;
+    };
+
+    struct MeshInstance
+    {
+        MeshData mesh;
+        Mat4 transform;
     };
 }
 

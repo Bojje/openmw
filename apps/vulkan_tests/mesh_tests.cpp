@@ -55,8 +55,12 @@ int main()
     treeData.mVertices = source.mVertices;
     treeData.mTriangles = { 0, 1, 2 };
     Nif::NiTriShape shape;
+    shape.mTransform = Nif::NiTransform::getIdentity();
+    shape.mTransform.mTranslation.x() = 2.0f;
     shape.mData = &treeData;
     Nif::NiNode root;
+    root.mTransform = Nif::NiTransform::getIdentity();
+    root.mTransform.mTranslation.x() = 10.0f;
     root.mChildren.push_back(&shape);
     Nif::NIFFile file(VFS::Path::Normalized("synthetic.nif"));
     file.mRoots.push_back(&root);
@@ -64,6 +68,11 @@ int main()
     const std::vector<Render::MeshData> meshes = Nif::collectMeshes(Nif::FileView(file));
     if (meshes.size() != 1 || meshes.front().indices.size() != 3)
         throw std::runtime_error("NIF scene traversal did not collect the mesh");
+
+    const std::vector<Render::MeshInstance> instances = Nif::collectMeshInstances(Nif::FileView(file));
+    if (instances.size() != 1 || instances.front().mesh.indices.size() != 3)
+        throw std::runtime_error("NIF scene traversal did not collect a mesh instance");
+    expectNear(instances.front().transform.data[12], 12.0f, "composed mesh translation");
 
     std::cout << "NIF mesh conversion tests passed\n";
 }
