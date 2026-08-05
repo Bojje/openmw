@@ -37,7 +37,8 @@ NIF classic texture, diffuse/emissive, glossiness, and alpha properties now cros
 renderer-neutral mesh boundary and survive batching; the neutral batch applies diffuse
 and alpha to vertex color output. Resource images can now cross into neutral RGBA8 data,
 and the standalone Vulkan renderer uploads/caches indexed albedo textures and samples them
-in the G-buffer. Vulkan now consumes neutral alpha-test state and thresholds in the G-buffer
+in the G-buffer (currently bounded to a 64-entry table). Vulkan now consumes neutral
+alpha-test state and thresholds in the G-buffer
 cutout path, and the standalone harness has a basic source-alpha pipeline for blended draws;
 deferred ordering, full material shading, and full-game resource hookup remain outstanding.
 The Vulkan G-buffer now carries neutral roughness,
