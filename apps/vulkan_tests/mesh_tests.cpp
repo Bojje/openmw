@@ -51,5 +51,19 @@ int main()
     if (!rejectedInvalidIndex)
         throw std::runtime_error("invalid NIF index was accepted");
 
+    Nif::NiTriShapeData treeData;
+    treeData.mVertices = source.mVertices;
+    treeData.mTriangles = { 0, 1, 2 };
+    Nif::NiTriShape shape;
+    shape.mData = &treeData;
+    Nif::NiNode root;
+    root.mChildren.push_back(&shape);
+    Nif::NIFFile file(VFS::Path::Normalized("synthetic.nif"));
+    file.mRoots.push_back(&root);
+
+    const std::vector<Render::MeshData> meshes = Nif::collectMeshes(Nif::FileView(file));
+    if (meshes.size() != 1 || meshes.front().indices.size() != 3)
+        throw std::runtime_error("NIF scene traversal did not collect the mesh");
+
     std::cout << "NIF mesh conversion tests passed\n";
 }

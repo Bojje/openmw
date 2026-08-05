@@ -3,6 +3,7 @@
 #include <stdexcept>
 
 #include "data.hpp"
+#include "node.hpp"
 
 namespace Nif
 {
@@ -79,5 +80,40 @@ namespace Nif
         }
 
         return result;
+    }
+
+    namespace
+    {
+        void collectMeshes(const NiAVObject& object, std::vector<Render::MeshData>& meshes)
+        {
+            if (const auto* geometry = dynamic_cast<const NiGeometry*>(&object))
+            {
+                if (!geometry->mData.empty())
+                {
+                    if (const auto* shapeData = dynamic_cast<const NiTriShapeData*>(&geometry->mData.get()))
+                        meshes.push_back(convertMesh(*shapeData));
+                }
+            }
+
+            if (const auto* node = dynamic_cast<const NiNode*>(&object))
+            {
+                for (const auto& child : node->mChildren)
+                {
+                    if (!child.empty())
+                        collectMeshes(*child.getPtr(), meshes);
+                }
+            }
+        }
+    }
+
+    std::vector<Render::MeshData> collectMeshes(FileView file)
+    {
+        std::vector<Render::MeshData> meshes;
+        for (std::size_t i = 0; i < file.numRoots(); ++i)
+        {
+            if (const auto* root = dynamic_cast<const NiAVObject*>(file.getRoot(i)))
+                collectMeshes(*root, meshes);
+        }
+        return meshes;
     }
 }
