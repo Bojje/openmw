@@ -17,6 +17,12 @@
 
 namespace
 {
+    class EnvironmentUnavailable : public std::runtime_error
+    {
+    public:
+        using std::runtime_error::runtime_error;
+    };
+
     Vk::Mat4 identityMatrix()
     {
         Vk::Mat4 result = {};
@@ -55,19 +61,19 @@ int main(int argc, char** argv)
         const unsigned int frames = frameCount(argc, argv);
 
         if (SDL_Init(SDL_INIT_VIDEO) != 0)
-            throw std::runtime_error(std::string("SDL initialization failed: ") + SDL_GetError());
+            throw EnvironmentUnavailable(std::string("SDL initialization failed: ") + SDL_GetError());
 
         window = SDL_CreateWindow("OpenMW Vulkan smoke test",
             SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 640, 480,
             SDL_WINDOW_VULKAN | SDL_WINDOW_HIDDEN | SDL_WINDOW_ALLOW_HIGHDPI);
         if (!window)
-            throw std::runtime_error(std::string("SDL Vulkan window creation failed: ") + SDL_GetError());
+            throw EnvironmentUnavailable(std::string("SDL Vulkan window creation failed: ") + SDL_GetError());
 
         int drawableWidth = 0;
         int drawableHeight = 0;
         SDL_Vulkan_GetDrawableSize(window, &drawableWidth, &drawableHeight);
         if (drawableWidth <= 0 || drawableHeight <= 0)
-            throw std::runtime_error("SDL returned an invalid Vulkan drawable size");
+            throw EnvironmentUnavailable("SDL returned an unavailable Vulkan drawable size");
 
         {
             auto renderer = std::make_unique<Vk::Renderer>(window, true);
@@ -100,6 +106,14 @@ int main(int argc, char** argv)
         SDL_Quit();
         std::cout << "Vulkan renderer smoke test passed (" << frames << " frames)\n";
         return EXIT_SUCCESS;
+    }
+    catch (const EnvironmentUnavailable& error)
+    {
+        if (window)
+            SDL_DestroyWindow(window);
+        SDL_Quit();
+        std::cerr << "Vulkan renderer smoke test skipped: " << error.what() << '\n';
+        return 77;
     }
     catch (const std::exception& error)
     {
