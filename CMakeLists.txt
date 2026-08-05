@@ -260,7 +260,7 @@ if(MSVC)
     add_compile_options("/utf-8")
 endif()
 
-option(OPENMW_USE_VULKAN "Build with Vulkan rendering backend (requires Vulkan SDK)" OFF)
+option(OPENMW_USE_VULKAN "Build the standalone Vulkan migration renderer and tests (requires Vulkan SDK)" OFF)
 
 # Dependencies
 if (APPLE)

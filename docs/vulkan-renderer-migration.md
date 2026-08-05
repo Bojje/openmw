@@ -13,8 +13,9 @@ This plan deliberately prioritizes removal of duplicate renderer code. OpenScene
 ## Current checkpoint
 
 The experiment is currently isolated on the `openmw-vulkan` branch. The full game remains
-OSG-only, and the Vulkan renderer is exercised by the standalone smoke target; this keeps
-the process lifecycle single-backend while the scene bridge is incomplete.
+OSG-only, and `OPENMW_USE_VULKAN` currently builds the standalone Vulkan migration renderer
+and smoke tests; it is not yet a full-game backend selector. This keeps the process lifecycle
+single-backend while the scene bridge is incomplete.
 The pre-migration OSG reference is frozen at the `openmw-vulkan-osg-reference` tag.
 
 Completed reduction checkpoints include removal of the incomplete full-game Vulkan bridge,
@@ -142,7 +143,9 @@ real replacement consumes its responsibility and the fast tests cover the bounda
 
 ### 3. Remove the dual-renderer lifecycle
 
-- Initially use `OPENMW_USE_VULKAN` as a compile-time backend choice.
+- Keep `OPENMW_USE_VULKAN` as the build gate for the standalone migration renderer until a
+  complete full-game backend boundary exists; only then turn it into a compile-time game
+  backend choice.
 - Delete the incomplete second-window Vulkan bridge from the full game until Vulkan owns the required engine services.
 - Keep the full game on one OSG renderer and keep Vulkan validation in the standalone renderer smoke target during the scene-bridge phase.
 - When the renderer-neutral scene bridge is ready, create one Vulkan window and skip OSG window/context initialization in Vulkan mode.
