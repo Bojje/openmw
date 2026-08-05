@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstdlib>
+#include <optional>
 
 #include <osg/ClipControl>
 #include <osg/ComputeBoundsVisitor>
@@ -513,6 +514,20 @@ namespace MWRender
             return *iter->second;
         });
 
+        if (mTerrainStorage && mTerrain)
+        {
+            const ESM::RefId worldspace = mTerrain->getWorldspace();
+            for (const Render::CellScene* cell : mWorldScene.cellsInOrder())
+            {
+                if (!cell->exterior)
+                    continue;
+                const osg::Vec2f center(cell->gridX + 0.5f, cell->gridY + 0.5f);
+                if (std::optional<Render::TerrainTile> tile
+                    = mTerrainStorage->getRenderTile(0, 1.f, center, worldspace))
+                    result.terrainTiles.push_back(std::move(*tile));
+            }
+        }
+
         Resource::ResourceSystem* const resourceSystem = mResourceSystem;
         result.textureResolver = [resourceSystem](std::string_view path) {
             if (path.empty())
@@ -700,6 +715,9 @@ namespace MWRender
         mPathgrid->addCell(store);
 
         mWater->changeCell(store);
+
+        mWorldScene.recordCell(static_cast<const void*>(store), store->getCell()->isExterior(),
+            store->getCell()->getGridX(), store->getCell()->getGridY(), store->getCell()->getNameId());
 
         if (store->getCell()->isExterior())
         {

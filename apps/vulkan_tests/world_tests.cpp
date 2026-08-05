@@ -29,6 +29,12 @@ int main()
     int firstCellHandle = 0;
     int secondCellHandle = 0;
     Render::WorldScene world;
+    int emptyCellHandle = 0;
+    world.recordCell(&emptyCellHandle, true, 9, 9, "empty");
+    if (world.findCell(&emptyCellHandle) == nullptr || !world.findCell(&emptyCellHandle)->objects.empty())
+        throw std::runtime_error("renderer-neutral world scene failed to record an empty cell");
+    world.removeCell(&emptyCellHandle);
+
     Render::ObjectTransform objectTransform;
     objectTransform.position.x = 4.f;
     world.recordObject(&objectHandle, &firstCellHandle, true, 1, 2, "first", "meshes/first.nif", objectTransform, false);

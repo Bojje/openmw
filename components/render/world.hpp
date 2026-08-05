@@ -94,6 +94,13 @@ namespace Render
         }
 
     public:
+        void recordCell(const void* cellKey, bool exterior, int gridX, int gridY, std::string_view name)
+        {
+            if (cellKey == nullptr)
+                return;
+            ensureCell(cellKey, exterior, gridX, gridY, name);
+        }
+
         void recordObject(const void* objectKey, const void* cellKey, bool exterior, int gridX, int gridY,
             std::string_view cellName, std::string_view model, const ObjectTransform& transform, bool visible)
         {
