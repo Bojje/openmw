@@ -10,6 +10,7 @@
 #include <SDL_vulkan.h>
 
 #include <components/nif/data.hpp>
+#include <components/nif/node.hpp>
 #include <components/resource/nifmeshmanager.hpp>
 #include <components/vk/vkrenderer.hpp>
 
@@ -54,11 +55,19 @@ namespace
         data->mVertices = { { -0.5f, -0.5f, 0.0f }, { 0.5f, -0.5f, 0.0f }, { 0.0f, 0.5f, 0.0f } };
         data->mTriangles = { 0, 1, 2 };
 
-        auto shape = std::make_unique<Nif::NiTriShape>();
-        shape->mData = data.get();
+        auto firstShape = std::make_unique<Nif::NiTriShape>();
+        firstShape->mData = data.get();
+        auto secondShape = std::make_unique<Nif::NiTriShape>();
+        secondShape->mData = data.get();
+        secondShape->mTransform.mTranslation.x() = 0.25f;
+        auto root = std::make_unique<Nif::NiNode>();
+        root->mChildren.push_back(firstShape.get());
+        root->mChildren.push_back(secondShape.get());
         file->mRecords.push_back(std::move(data));
-        file->mRoots.push_back(shape.get());
-        file->mRecords.push_back(std::move(shape));
+        file->mRecords.push_back(std::move(firstShape));
+        file->mRecords.push_back(std::move(secondShape));
+        file->mRoots.push_back(root.get());
+        file->mRecords.push_back(std::move(root));
 
         Resource::NifMeshManager meshManager(nullptr);
         return meshManager.get(file);
