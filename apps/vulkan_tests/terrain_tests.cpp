@@ -101,8 +101,24 @@ int main()
                 && terrainMesh->transform.data[12] == 0.f && terrainMesh->mesh.vertices[3].texcoord[0] == 1.f
                 && terrainMesh->mesh.vertices[3].texcoord[1] == 1.f,
             "opaque terrain tile was not converted for Vulkan mesh submission");
+        const auto blendedTerrainMeshes = Render::makeTerrainMeshes(*tile);
+        expect(blendedTerrainMeshes.size() == 1 && blendedTerrainMeshes.front().mesh.material.terrainBlend
+                && blendedTerrainMeshes.front().mesh.material.alphaTexture
+                && blendedTerrainMeshes.front().mesh.material.alphaTexture->valid()
+                && blendedTerrainMeshes.front().mesh.vertices[3].blendTexcoord[0] > 0.99f
+                && blendedTerrainMeshes.front().mesh.vertices[3].blendTexcoord[0] < 1.01f
+                && blendedTerrainMeshes.front().mesh.vertices[3].blendTexcoord[1] > 0.49f
+                && blendedTerrainMeshes.front().mesh.vertices[3].blendTexcoord[1] < 0.51f,
+            "terrain blendmap layer was not converted for Vulkan submission");
         expect(!Render::makeOpaqueTerrainMesh(*tile).has_value(),
-            "multi-layer terrain tile should wait for a terrain shader consumer");
+            "blendmap terrain should not be accepted by the opaque-only helper");
+
+        Render::TerrainTile multiLayerTile = *tile;
+        multiLayerTile.layers.push_back(tile->layers.front());
+        const auto multiLayerMeshes = Render::makeTerrainMeshes(multiLayerTile);
+        expect(multiLayerMeshes.size() == 2 && multiLayerMeshes[0].mesh.material.terrainFirstLayer
+                && !multiLayerMeshes[1].mesh.material.terrainFirstLayer,
+            "terrain layers were not kept in ordered first/subsequent form");
 
         Render::TerrainTile malformed = *opaqueTile;
         malformed.indices.back() = static_cast<std::uint32_t>(malformed.vertices.size());

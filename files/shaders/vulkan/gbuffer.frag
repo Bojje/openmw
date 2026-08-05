@@ -7,8 +7,11 @@ layout(location = 3) in vec4 fragColor;
 layout(location = 4) in vec4 fragMaterial;
 layout(location = 5) flat in uint fragMaterialFlags;
 layout(location = 6) flat in uint fragAlbedoTextureIndex;
+layout(location = 7) flat in uint fragAlphaTextureIndex;
+layout(location = 8) in vec2 fragAlphaTexCoord;
 
 layout(set = 0, binding = 1) uniform sampler2D albedoTextures[64];
+layout(set = 0, binding = 2) uniform sampler2D alphaTextures[64];
 
 layout(set = 0, binding = 0) uniform CameraUBO {
     mat4 view;
@@ -27,6 +30,9 @@ layout(location = 2) out vec4 outMaterial;
 void main() {
     vec4 albedoSample = texture(albedoTextures[fragAlbedoTextureIndex], fragTexCoord);
     vec4 albedo = fragColor * albedoSample;
+
+    if ((fragMaterialFlags & 2u) != 0u)
+        albedo.a *= texture(alphaTextures[fragAlphaTextureIndex], fragAlphaTexCoord).a;
 
     if ((fragMaterialFlags & 1u) != 0u) {
         // The threshold is packed into the upper byte of the per-draw flag word.

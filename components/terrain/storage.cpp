@@ -62,6 +62,9 @@ namespace Terrain
         tile.cellWorldSize = getCellWorldSize(worldspace);
         if (tile.cellWorldSize <= 0.f)
             return std::nullopt;
+        tile.blendmapScale = static_cast<float>(getTextureTileCount(size, worldspace));
+        if (tile.blendmapScale <= 0.f)
+            return std::nullopt;
         tile.verticesPerSide = static_cast<std::uint32_t>(
             std::sqrt(static_cast<double>(positions->size())));
         while (static_cast<std::size_t>(tile.verticesPerSide + 1) * (tile.verticesPerSide + 1)

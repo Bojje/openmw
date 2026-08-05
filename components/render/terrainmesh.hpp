@@ -1,26 +1,35 @@
 #ifndef OPENMW_COMPONENTS_RENDER_TERRAINMESH_H
 #define OPENMW_COMPONENTS_RENDER_TERRAINMESH_H
 
+#include <memory>
 #include <optional>
+#include <vector>
 
 #include "mesh.hpp"
 #include "terrain.hpp"
 
 namespace Render
 {
-    // The first Vulkan terrain consumer intentionally accepts only the opaque
-    // single-layer form. Multi-layer blendmaps need a terrain-specific shader
-    // and remain in the deletion ledger until that consumer exists.
-    inline std::optional<MeshInstance> makeOpaqueTerrainMesh(const TerrainTile& tile)
+    inline std::optional<MeshInstance> makeTerrainLayerMesh(
+        const TerrainTile& tile, const TerrainLayer& layer, std::size_t layerIndex)
     {
-        if (!tile.valid() || tile.layers.size() != 1 || tile.layers[0].blendmap.valid())
+        if (!tile.valid() || tile.layers.empty() || layer.diffuseTexture.empty())
+            return std::nullopt;
+        if (tile.layers.size() > 1 && !layer.blendmap.valid())
             return std::nullopt;
 
         const std::uint32_t side = tile.verticesPerSide;
         MeshInstance result;
         result.mesh.vertices.resize(tile.vertices.size());
         result.mesh.indices = tile.indices;
-        result.mesh.material.albedoTexture = tile.layers[0].diffuseTexture;
+        result.mesh.material.albedoTexture = layer.diffuseTexture;
+        result.mesh.material.terrainBlend = layer.blendmap.valid();
+        result.mesh.material.terrainFirstLayer = layerIndex == 0;
+        if (layer.blendmap.valid())
+        {
+            result.mesh.material.alphaBlend = true;
+            result.mesh.material.alphaTexture = std::make_shared<const TextureData>(layer.blendmap);
+        }
 
         result.transform = {};
         result.transform.data[0] = 1.f;
@@ -44,6 +53,16 @@ namespace Render
             const std::uint32_t y = static_cast<std::uint32_t>(index) / side;
             target.texcoord[0] = static_cast<float>(x) / static_cast<float>(side - 1);
             target.texcoord[1] = static_cast<float>(y) / static_cast<float>(side - 1);
+            target.blendTexcoord[0] = target.texcoord[0];
+            target.blendTexcoord[1] = target.texcoord[1];
+            if (layer.blendmap.valid())
+            {
+                const float scale = tile.blendmapScale / (tile.blendmapScale + 1.f);
+                target.blendTexcoord[0] = scale * target.texcoord[0]
+                    + 0.5f * (1.f - scale) + 1.f / tile.blendmapScale / 4.f;
+                target.blendTexcoord[1] = scale * target.texcoord[1]
+                    + 0.5f * (1.f - scale) - 1.f / tile.blendmapScale / 4.f;
+            }
             for (std::size_t channel = 0; channel < 4; ++channel)
                 target.color[channel] = static_cast<float>(source.color[channel]) / 255.f;
             target.material[0] = 1.f;
@@ -53,6 +72,35 @@ namespace Render
         }
 
         return result;
+    }
+
+    // Terrain layers are ordered like the legacy passes: the first layer
+    // establishes depth and subsequent layers use equal-depth additive
+    // blending. A missing blendmap in a multi-layer tile is rejected instead
+    // of silently turning a layer opaque.
+    inline std::vector<MeshInstance> makeTerrainMeshes(const TerrainTile& tile)
+    {
+        std::vector<MeshInstance> result;
+        if (!tile.valid() || tile.layers.empty())
+            return result;
+
+        result.reserve(tile.layers.size());
+        for (std::size_t layerIndex = 0; layerIndex < tile.layers.size(); ++layerIndex)
+        {
+            const auto mesh = makeTerrainLayerMesh(tile, tile.layers[layerIndex], layerIndex);
+            if (!mesh)
+                return {};
+            result.push_back(*mesh);
+        }
+        return result;
+    }
+
+    inline std::optional<MeshInstance> makeOpaqueTerrainMesh(const TerrainTile& tile)
+    {
+        if (tile.layers.size() != 1 || tile.layers[0].blendmap.valid())
+            return std::nullopt;
+        const std::vector<MeshInstance> meshes = makeTerrainMeshes(tile);
+        return meshes.size() == 1 ? std::optional<MeshInstance>(meshes.front()) : std::nullopt;
     }
 }
 

@@ -5,11 +5,13 @@
 #include <algorithm>
 #include <iterator>
 #include <limits>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <vector>
 
 #include "math.hpp"
+#include "texture.hpp"
 #include "world.hpp"
 
 namespace Render
@@ -23,6 +25,9 @@ namespace Render
         bool alphaBlend = false;
         bool alphaTest = false;
         uint8_t alphaTestThreshold = 0;
+        bool terrainBlend = false;
+        bool terrainFirstLayer = false;
+        std::shared_ptr<const TextureData> alphaTexture;
     };
 
     struct MeshVertex
@@ -30,11 +35,12 @@ namespace Render
         float position[3];
         float normal[3];
         float texcoord[2];
+        float blendTexcoord[2];
         float color[4];
         float material[4];
     };
 
-    static_assert(sizeof(MeshVertex) == sizeof(float) * 16);
+    static_assert(sizeof(MeshVertex) == sizeof(float) * 18);
 
     struct MeshData
     {

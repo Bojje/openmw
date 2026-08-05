@@ -156,7 +156,25 @@ namespace
             { { 0.5f, 0.5f, -0.25f }, { 0.f, 0.f, 1.f }, { 255, 255, 255, 255 } },
         };
         tile.indices = { 0, 2, 1, 1, 2, 3 };
-        tile.layers.push_back({ "textures/vulkan-smoke.rgba", {}, false, false, {} });
+        Render::TextureData firstBlendmap;
+        firstBlendmap.width = 2;
+        firstBlendmap.height = 2;
+        firstBlendmap.pixels = {
+            255, 255, 255, 255, 255, 255, 255, 255,
+            255, 255, 255, 255, 255, 255, 255, 255,
+        };
+        Render::TextureData secondBlendmap = firstBlendmap;
+        secondBlendmap.pixels = {
+            255, 255, 255, 255, 128, 255, 255, 128,
+            255, 255, 255, 128, 255, 255, 255, 128,
+        };
+        Render::TerrainLayer firstLayer;
+        firstLayer.diffuseTexture = "textures/vulkan-smoke.rgba";
+        firstLayer.blendmap = std::move(firstBlendmap);
+        Render::TerrainLayer secondLayer;
+        secondLayer.diffuseTexture = "textures/vulkan-smoke.rgba";
+        secondLayer.blendmap = std::move(secondBlendmap);
+        tile.layers = { std::move(firstLayer), std::move(secondLayer) };
         return tile;
     }
 }

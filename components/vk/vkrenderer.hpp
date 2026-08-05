@@ -93,7 +93,7 @@ namespace Vk
         void createUniformBuffers();
         void createGBufferSampler();
         void writeCompositeDescriptor(uint32_t binding, VkImageView view);
-        void writeSceneTextureDescriptor(uint32_t textureIndex, VkImageView view);
+        void writeSceneTextureDescriptor(uint32_t binding, uint32_t textureIndex, VkImageView view);
         uint32_t createTextureResource(const Render::TextureData& texture);
         void destroyTextures();
         void destroyMesh();
@@ -130,6 +130,8 @@ namespace Vk
 
         VkPipeline mGBufferPipeline = VK_NULL_HANDLE;
         VkPipeline mGBufferAlphaPipeline = VK_NULL_HANDLE;
+        VkPipeline mGBufferTerrainFirstPipeline = VK_NULL_HANDLE;
+        VkPipeline mGBufferTerrainLayerPipeline = VK_NULL_HANDLE;
         VkPipelineLayout mGBufferPipelineLayout = VK_NULL_HANDLE;
         VkPipeline mCompositePipeline = VK_NULL_HANDLE;
         VkPipelineLayout mCompositePipelineLayout = VK_NULL_HANDLE;
@@ -152,6 +154,7 @@ namespace Vk
         std::vector<TextureResource> mTextures;
         std::unordered_map<std::string, uint32_t> mTextureIndices;
         std::vector<uint32_t> mMeshTextureIndices;
+        std::vector<uint32_t> mMeshAlphaTextureIndices;
 
         struct MeshBuffers
         {

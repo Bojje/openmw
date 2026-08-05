@@ -5,6 +5,7 @@
 #include <cstring>
 #include <limits>
 #include <fstream>
+#include <iterator>
 #include <stdexcept>
 #include <utility>
 
@@ -57,6 +58,17 @@ namespace Vk
 
         VK_CHECK(vkAllocateMemory(device, &allocInfo, nullptr, &memory));
         VK_CHECK(vkBindBufferMemory(device, buffer, memory, 0));
+    }
+
+    static std::string embeddedTextureKey(const Render::TextureData& texture)
+    {
+        std::string key("\0terrain-alpha:", 15);
+        key += std::to_string(texture.width);
+        key.push_back('x');
+        key += std::to_string(texture.height);
+        key.push_back(':');
+        key.append(reinterpret_cast<const char*>(texture.pixels.data()), texture.pixels.size());
+        return key;
     }
 
     Renderer::Renderer(SDL_Window* window, bool enableValidation)
@@ -220,7 +232,10 @@ namespace Vk
             const uint32_t index = static_cast<uint32_t>(mTextures.size());
             mTextures.push_back(resource);
             if (mSceneDescriptorSets[0] != VK_NULL_HANDLE)
-                writeSceneTextureDescriptor(index, resource.view);
+            {
+                writeSceneTextureDescriptor(1, index, resource.view);
+                writeSceneTextureDescriptor(2, index, resource.view);
+            }
             return index;
         }
         catch (...)
@@ -598,7 +613,7 @@ namespace Vk
         }
     }
 
-    void Renderer::writeSceneTextureDescriptor(uint32_t textureIndex, VkImageView view)
+    void Renderer::writeSceneTextureDescriptor(uint32_t binding, uint32_t textureIndex, VkImageView view)
     {
         if (textureIndex >= maxTextures)
             throw std::out_of_range("Vulkan texture descriptor index is out of range");
@@ -613,7 +628,7 @@ namespace Vk
             VkWriteDescriptorSet write = {};
             write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
             write.dstSet = mSceneDescriptorSets[i];
-            write.dstBinding = 1;
+            write.dstBinding = binding;
             write.dstArrayElement = textureIndex;
             write.descriptorCount = 1;
             write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
@@ -626,10 +641,10 @@ namespace Vk
 
     void Renderer::createDescriptorSetLayouts()
     {
-        // Scene layout (set 0 for G-buffer pass): camera UBO and an indexed
-        // table of neutral albedo textures.
+        // Scene layout (set 0 for G-buffer pass): camera UBO and indexed
+        // albedo/terrain blendmap textures.
         {
-            std::array<VkDescriptorSetLayoutBinding, 2> bindings = {};
+            std::array<VkDescriptorSetLayoutBinding, 3> bindings = {};
             bindings[0].binding = 0;
             bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
             bindings[0].descriptorCount = 1;
@@ -639,6 +654,11 @@ namespace Vk
             bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
             bindings[1].descriptorCount = maxTextures;
             bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+            bindings[2].binding = 2;
+            bindings[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            bindings[2].descriptorCount = maxTextures;
+            bindings[2].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
             VkDescriptorSetLayoutCreateInfo layoutInfo = {};
             layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -698,7 +718,7 @@ namespace Vk
     {
         std::vector<VkDescriptorPoolSize> poolSizes = {
             { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, maxFramesInFlight * 2 },
-            { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, maxTextures * maxFramesInFlight + 16 + maxFramesInFlight },
+            { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, maxTextures * maxFramesInFlight * 2 + 16 + maxFramesInFlight },
             { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 2 },
         };
 
@@ -766,7 +786,10 @@ namespace Vk
             }
 
             for (uint32_t textureIndex = 0; textureIndex < maxTextures; ++textureIndex)
-                writeSceneTextureDescriptor(textureIndex, mTextures.front().view);
+            {
+                writeSceneTextureDescriptor(1, textureIndex, mTextures.front().view);
+                writeSceneTextureDescriptor(2, textureIndex, mTextures.front().view);
+            }
         }
 
         // Composite descriptor sets (per frame, for per-frame UBO binding)
@@ -813,7 +836,7 @@ namespace Vk
     void Renderer::createGBufferPipeline()
     {
         VkPushConstantRange pushConstant = {};
-        pushConstant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+        pushConstant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
         pushConstant.offset = 0;
         pushConstant.size = sizeof(Render::Mat4) * 2 + sizeof(uint32_t) * 2;
 
@@ -882,12 +905,13 @@ namespace Vk
             bindingDesc[0].stride = sizeof(Render::MeshVertex);
             bindingDesc[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
-            std::array<VkVertexInputAttributeDescription, 5> attrDesc = {};
+            std::array<VkVertexInputAttributeDescription, 6> attrDesc = {};
             attrDesc[0] = { 0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0 };
             attrDesc[1] = { 1, 0, VK_FORMAT_R32G32B32_SFLOAT, sizeof(float) * 3 };
             attrDesc[2] = { 2, 0, VK_FORMAT_R32G32_SFLOAT, sizeof(float) * 6 };
-            attrDesc[3] = { 3, 0, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(float) * 8 };
-            attrDesc[4] = { 4, 0, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(float) * 12 };
+            attrDesc[3] = { 3, 0, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(float) * 10 };
+            attrDesc[4] = { 4, 0, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(float) * 14 };
+            attrDesc[5] = { 5, 0, VK_FORMAT_R32G32_SFLOAT, sizeof(float) * 8 };
 
             VkPipelineVertexInputStateCreateInfo vertexInput = {};
             vertexInput.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -968,6 +992,27 @@ namespace Vk
 
             VK_CHECK(vkCreateGraphicsPipelines(mDevice->handle(), VK_NULL_HANDLE, 1,
                 &pipelineInfo, nullptr, &mGBufferAlphaPipeline));
+
+            // Terrain layer zero writes the depth and replaces the G-buffer
+            // albedo with its blendmap-weighted color. Later layers use the
+            // same depth and add their weighted color in submission order.
+            blendAttachments[0].dstColorBlendFactor = VK_BLEND_FACTOR_ZERO;
+            blendAttachments[0].dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+            blendAttachments[1].blendEnable = VK_FALSE;
+            blendAttachments[2].blendEnable = VK_FALSE;
+            depthStencil.depthWriteEnable = VK_TRUE;
+            depthStencil.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+
+            VK_CHECK(vkCreateGraphicsPipelines(mDevice->handle(), VK_NULL_HANDLE, 1,
+                &pipelineInfo, nullptr, &mGBufferTerrainFirstPipeline));
+
+            blendAttachments[0].dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
+            blendAttachments[0].dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+            depthStencil.depthWriteEnable = VK_FALSE;
+            depthStencil.depthCompareOp = VK_COMPARE_OP_EQUAL;
+
+            VK_CHECK(vkCreateGraphicsPipelines(mDevice->handle(), VK_NULL_HANDLE, 1,
+                &pipelineInfo, nullptr, &mGBufferTerrainLayerPipeline));
         }
 
         // Composite pipeline
@@ -1187,7 +1232,7 @@ namespace Vk
                         Render::Mat4 model;
                         Render::Mat4 normalMatrix;
                         uint32_t materialFlags;
-                        uint32_t albedoTextureIndex;
+                        uint32_t textureIndices;
                     };
 
                     VkDeviceSize offset = 0;
@@ -1197,21 +1242,28 @@ namespace Vk
                     for (std::size_t drawIndex = 0; drawIndex < mMeshDraws.size(); ++drawIndex)
                     {
                         const Render::MeshDraw& draw = mMeshDraws[drawIndex];
-                        const VkPipeline pipeline = draw.material.alphaBlend ? mGBufferAlphaPipeline : mGBufferPipeline;
+                        const VkPipeline pipeline = draw.material.terrainBlend
+                            ? (draw.material.terrainFirstLayer ? mGBufferTerrainFirstPipeline
+                                                               : mGBufferTerrainLayerPipeline)
+                            : (draw.material.alphaBlend ? mGBufferAlphaPipeline : mGBufferPipeline);
                         if (pipeline != boundPipeline)
                         {
                             vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
                             boundPipeline = pipeline;
                         }
+                        uint32_t materialFlags = draw.material.alphaTest
+                            ? 1u | (static_cast<uint32_t>(draw.material.alphaTestThreshold) << 8u)
+                            : 0u;
+                        if (draw.material.terrainBlend)
+                            materialFlags |= 2u;
                         const PushData pushData = {
                             draw.transform,
                             draw.normalMatrix,
-                            draw.material.alphaTest
-                                ? 1u | (static_cast<uint32_t>(draw.material.alphaTestThreshold) << 8u)
-                                : 0u,
-                            mMeshTextureIndices[drawIndex],
+                            materialFlags,
+                            mMeshTextureIndices[drawIndex] | (mMeshAlphaTextureIndices[drawIndex] << 6u),
                         };
-                        vkCmdPushConstants(cmd, mGBufferPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT,
+                        vkCmdPushConstants(cmd, mGBufferPipelineLayout,
+                            VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
                             0, sizeof(pushData), &pushData);
                         vkCmdDrawIndexed(cmd, draw.indexCount, 1, draw.firstIndex, draw.vertexOffset, 0);
                     }
@@ -1390,8 +1442,9 @@ namespace Vk
         std::vector<Render::MeshInstance> meshes = submission.meshes;
         for (const Render::TerrainTile& tile : submission.terrainTiles)
         {
-            if (std::optional<Render::MeshInstance> terrain = Render::makeOpaqueTerrainMesh(tile))
-                meshes.push_back(std::move(*terrain));
+            std::vector<Render::MeshInstance> terrain = Render::makeTerrainMeshes(tile);
+            meshes.insert(meshes.end(), std::make_move_iterator(terrain.begin()),
+                std::make_move_iterator(terrain.end()));
         }
         setMeshes(meshes, std::move(resolver));
     }
@@ -1400,7 +1453,9 @@ namespace Vk
     {
         Render::MeshBatch batch = Render::batchMeshes(meshes);
         std::vector<uint32_t> textureIndices;
+        std::vector<uint32_t> alphaTextureIndices;
         textureIndices.reserve(batch.draws.size());
+        alphaTextureIndices.reserve(batch.draws.size());
         for (const Render::MeshDraw& draw : batch.draws)
         {
             if (draw.material.albedoTexture.empty() || !textureResolver)
@@ -1422,10 +1477,32 @@ namespace Vk
             textureIndices.push_back(textureIndex);
         }
 
+        for (const Render::MeshDraw& draw : batch.draws)
+        {
+            if (!draw.material.alphaTexture || !draw.material.alphaTexture->valid())
+            {
+                alphaTextureIndices.push_back(0);
+                continue;
+            }
+
+            const std::string key = embeddedTextureKey(*draw.material.alphaTexture);
+            const auto alphaExisting = mTextureIndices.find(key);
+            if (alphaExisting != mTextureIndices.end())
+            {
+                alphaTextureIndices.push_back(alphaExisting->second);
+                continue;
+            }
+
+            const uint32_t alphaTextureIndex = createTextureResource(*draw.material.alphaTexture);
+            mTextureIndices.emplace(key, alphaTextureIndex);
+            alphaTextureIndices.push_back(alphaTextureIndex);
+        }
+
         mMeshDraws = std::move(batch.draws);
         mMeshVertices = std::move(batch.vertices);
         mMeshIndices = std::move(batch.indices);
         mMeshTextureIndices = std::move(textureIndices);
+        mMeshAlphaTextureIndices = std::move(alphaTextureIndices);
         ++mMeshRevision;
         if (mMeshRevision == 0)
             ++mMeshRevision;
@@ -1486,6 +1563,7 @@ namespace Vk
         mMeshVertices.clear();
         mMeshIndices.clear();
         mMeshTextureIndices.clear();
+        mMeshAlphaTextureIndices.clear();
     }
 
     void Renderer::destroyMesh(uint32_t frameIndex)
@@ -1564,6 +1642,10 @@ namespace Vk
             vkDestroyPipeline(dev, mGBufferPipeline, nullptr);
         if (mGBufferAlphaPipeline != VK_NULL_HANDLE)
             vkDestroyPipeline(dev, mGBufferAlphaPipeline, nullptr);
+        if (mGBufferTerrainFirstPipeline != VK_NULL_HANDLE)
+            vkDestroyPipeline(dev, mGBufferTerrainFirstPipeline, nullptr);
+        if (mGBufferTerrainLayerPipeline != VK_NULL_HANDLE)
+            vkDestroyPipeline(dev, mGBufferTerrainLayerPipeline, nullptr);
         if (mGBufferPipelineLayout != VK_NULL_HANDLE)
             vkDestroyPipelineLayout(dev, mGBufferPipelineLayout, nullptr);
         if (mCompositePipeline != VK_NULL_HANDLE)

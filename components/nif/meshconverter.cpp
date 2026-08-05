@@ -57,6 +57,8 @@ namespace Nif
                     vertex.texcoord[0] = 0.0f;
                     vertex.texcoord[1] = 0.0f;
                 }
+                vertex.blendTexcoord[0] = vertex.texcoord[0];
+                vertex.blendTexcoord[1] = vertex.texcoord[1];
 
                 if (hasColors)
                 {

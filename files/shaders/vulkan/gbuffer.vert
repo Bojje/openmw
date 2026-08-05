@@ -5,12 +5,13 @@ layout(location = 1) in vec3 inNormal;
 layout(location = 2) in vec2 inTexCoord;
 layout(location = 3) in vec4 inColor;
 layout(location = 4) in vec4 inMaterial;
+layout(location = 5) in vec2 inBlendTexCoord;
 
 layout(push_constant) uniform PushConstants {
     mat4 model;
     mat4 normalMatrix;
     uint materialFlags;
-    uint albedoTextureIndex;
+    uint textureIndices;
 } push;
 
 layout(set = 0, binding = 0) uniform CameraUBO {
@@ -30,6 +31,8 @@ layout(location = 3) out vec4 fragColor;
 layout(location = 4) out vec4 fragMaterial;
 layout(location = 5) flat out uint fragMaterialFlags;
 layout(location = 6) flat out uint fragAlbedoTextureIndex;
+layout(location = 7) flat out uint fragAlphaTextureIndex;
+layout(location = 8) out vec2 fragAlphaTexCoord;
 
 void main() {
     vec4 worldPos = push.model * vec4(inPosition, 1.0);
@@ -39,6 +42,8 @@ void main() {
     fragColor = inColor;
     fragMaterial = inMaterial;
     fragMaterialFlags = push.materialFlags;
-    fragAlbedoTextureIndex = push.albedoTextureIndex;
+    fragAlbedoTextureIndex = push.textureIndices & 63u;
+    fragAlphaTextureIndex = (push.textureIndices >> 6u) & 63u;
+    fragAlphaTexCoord = inBlendTexCoord;
     gl_Position = camera.projection * camera.view * worldPos;
 }
