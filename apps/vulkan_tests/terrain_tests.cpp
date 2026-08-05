@@ -106,6 +106,8 @@ int main()
         expect(blendedTerrainMeshes.size() == 1 && blendedTerrainMeshes.front().mesh.material.terrainBlend
                 && blendedTerrainMeshes.front().mesh.material.alphaTexture
                 && blendedTerrainMeshes.front().mesh.material.alphaTexture->valid()
+                && blendedTerrainMeshes.front().mesh.vertices[3].texcoord[0] > 3.99f
+                && blendedTerrainMeshes.front().mesh.vertices[3].texcoord[0] < 4.01f
                 && blendedTerrainMeshes.front().mesh.vertices[3].blendTexcoord[0] > 0.99f
                 && blendedTerrainMeshes.front().mesh.vertices[3].blendTexcoord[0] < 1.01f
                 && blendedTerrainMeshes.front().mesh.vertices[3].blendTexcoord[1] > 0.49f

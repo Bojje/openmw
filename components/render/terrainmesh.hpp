@@ -51,16 +51,18 @@ namespace Render
             target.normal[2] = source.normal[2];
             const std::uint32_t x = static_cast<std::uint32_t>(index) % side;
             const std::uint32_t y = static_cast<std::uint32_t>(index) / side;
-            target.texcoord[0] = static_cast<float>(x) / static_cast<float>(side - 1);
-            target.texcoord[1] = static_cast<float>(y) / static_cast<float>(side - 1);
-            target.blendTexcoord[0] = target.texcoord[0];
-            target.blendTexcoord[1] = target.texcoord[1];
+            const float u = static_cast<float>(x) / static_cast<float>(side - 1);
+            const float v = static_cast<float>(y) / static_cast<float>(side - 1);
+            target.texcoord[0] = u * tile.size;
+            target.texcoord[1] = v * tile.size;
+            target.blendTexcoord[0] = u;
+            target.blendTexcoord[1] = v;
             if (layer.blendmap.valid())
             {
                 const float scale = tile.blendmapScale / (tile.blendmapScale + 1.f);
-                target.blendTexcoord[0] = scale * target.texcoord[0]
+                target.blendTexcoord[0] = scale * u
                     + 0.5f * (1.f - scale) + 1.f / tile.blendmapScale / 4.f;
-                target.blendTexcoord[1] = scale * target.texcoord[1]
+                target.blendTexcoord[1] = scale * v
                     + 0.5f * (1.f - scale) - 1.f / tile.blendmapScale / 4.f;
             }
             for (std::size_t channel = 0; channel < 4; ++channel)
