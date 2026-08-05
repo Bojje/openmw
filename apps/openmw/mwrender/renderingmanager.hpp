@@ -6,6 +6,7 @@
 #include "rendermode.hpp"
 
 #include <components/render/mesh.hpp>
+#include <components/render/terrain.hpp>
 #include <components/render/texture.hpp>
 #include <components/render/world.hpp>
 
@@ -20,6 +21,7 @@
 #include <deque>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <span>
 #include <string_view>
 #include <unordered_map>
@@ -174,6 +176,10 @@ namespace MWRender
 
         /// Collect visible meshes from the renderer-neutral loaded-cell snapshot.
         std::vector<Render::MeshInstance> getNeutralMeshes() const;
+
+        /// Snapshot one terrain tile without exposing the OSG terrain graph or images.
+        std::optional<Render::TerrainTile> getNeutralTerrainTile(
+            int lodLevel, float size, const osg::Vec2f& center, ESM::RefId worldspace) const;
 
         void enableTerrain(bool enable, ESM::RefId worldspace);
 

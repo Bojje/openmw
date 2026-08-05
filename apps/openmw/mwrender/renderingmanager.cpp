@@ -529,6 +529,14 @@ namespace MWRender
         });
     }
 
+    std::optional<Render::TerrainTile> RenderingManager::getNeutralTerrainTile(
+        int lodLevel, float size, const osg::Vec2f& center, ESM::RefId worldspace) const
+    {
+        if (!mTerrainStorage)
+            return std::nullopt;
+        return mTerrainStorage->getRenderTile(lodLevel, size, center, worldspace);
+    }
+
     Render::WorldObject* RenderingManager::findNeutralObject(const MWWorld::Ptr& ptr)
     {
         if (ptr.isEmpty())
