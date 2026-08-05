@@ -92,7 +92,7 @@ is part of the real full-game neutral handoff rather than only a test fixture; c
 happens on cell add/remove rather than on every frame export.
 
 Against the actual PR base `origin/openmw-vulkan` (PR #5), the current checkpoint changes
-48 files, deleting 261 lines and adding 3,579 lines (net `+3,318`). The larger Vulkan-only
+48 files, deleting 261 lines and adding 3,575 lines (net `+3,314`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
@@ -102,6 +102,8 @@ lookup, removal, and cell-transfer wrappers. The lifecycle now calls `WorldScene
 directly. The terrain adapter is now consumed for opaque, normal-mapped, parallax, and
 blendmap/multi-layer Vulkan terrain; its remaining owner boundary is quadtree-scale
 streaming and complete image coverage.
+The Vulkan renderer now accepts only the aggregate `SceneSubmission`; its duplicate resolver
+argument and local resolver type alias were removed.
 
 The remaining migration is not a compatibility problem that can be solved by retaining
 both renderers in one execution path. Static-world transforms, materials, textures,
