@@ -1,6 +1,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <exception>
+#include <filesystem>
 #include <iostream>
 #include <memory>
 #include <optional>
@@ -50,6 +51,28 @@ namespace
         if (end == argv[2] || *end != '\0' || parsed < 1 || parsed > 100)
             throw std::runtime_error("frame count must be an integer from 1 to 100");
         return static_cast<unsigned int>(parsed);
+    }
+
+    std::optional<Render::TextureData> referenceImage(int argc, char** argv)
+    {
+        if (argc < 4)
+            return std::nullopt;
+        const auto image = Render::readPpm(argv[3]);
+        if (!image)
+            throw std::runtime_error(std::string("could not read Vulkan reference image: ") + argv[3]);
+        return image;
+    }
+
+    std::filesystem::path captureDirectory(int argc, char** argv)
+    {
+        if (argc < 5)
+            return {};
+        const std::filesystem::path directory = argv[4];
+        std::error_code error;
+        std::filesystem::create_directories(directory, error);
+        if (error)
+            throw std::runtime_error("could not create Vulkan capture directory: " + error.message());
+        return directory;
     }
 
     std::shared_ptr<const Resource::NifMeshManager::Meshes> smokeMeshes()
@@ -151,6 +174,8 @@ int main(int argc, char** argv)
     try
     {
         const unsigned int frames = frameCount(argc, argv);
+        const auto reference = referenceImage(argc, argv);
+        const std::filesystem::path captures = captureDirectory(argc, argv);
         const auto meshes = smokeMeshes();
         const auto texture = smokeTexture("textures/vulkan-smoke.rgba");
         if (!texture || !texture->valid())
@@ -203,6 +228,19 @@ int main(int argc, char** argv)
                     const std::optional<Render::TextureData> capture = renderer->captureFrame();
                     if (!capture || !capture->valid())
                         throw std::runtime_error("Vulkan smoke could not capture its rendered frame");
+                    if (reference)
+                    {
+                        const Render::ImageComparison comparison = Render::compareImages(*reference, *capture, 1);
+                        if (!comparison.matches(1))
+                            throw std::runtime_error("Vulkan smoke frame did not match the reference image");
+                    }
+                    if (!captures.empty())
+                    {
+                        const std::filesystem::path path
+                            = captures / ("vulkan-frame-" + std::to_string(frame) + ".ppm");
+                        if (!Render::writePpm(*capture, path))
+                            throw std::runtime_error("Vulkan smoke could not write its captured frame");
+                    }
                     if (previousCapture)
                     {
                         const Render::ImageComparison comparison

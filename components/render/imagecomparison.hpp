@@ -4,11 +4,77 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <filesystem>
+#include <fstream>
+#include <optional>
+#include <string>
 
 #include "texture.hpp"
 
 namespace Render
 {
+    // PPM is deliberately used for migration captures because it is trivial
+    // to read and write without adding an image-library dependency to the
+    // renderer test harness. The in-memory representation remains RGBA8.
+    inline bool writePpm(const TextureData& image, const std::filesystem::path& path)
+    {
+        if (!image.valid())
+            return false;
+
+        std::ofstream output(path, std::ios::binary);
+        if (!output)
+            return false;
+
+        output << "P6\n" << image.width << ' ' << image.height << "\n255\n";
+        for (std::size_t pixel = 0; pixel < image.pixels.size(); pixel += 4)
+        {
+            output.put(static_cast<char>(image.pixels[pixel + 0]));
+            output.put(static_cast<char>(image.pixels[pixel + 1]));
+            output.put(static_cast<char>(image.pixels[pixel + 2]));
+        }
+        return output.good();
+    }
+
+    inline std::optional<TextureData> readPpm(const std::filesystem::path& path)
+    {
+        std::ifstream input(path, std::ios::binary);
+        if (!input)
+            return std::nullopt;
+
+        std::string magic;
+        uint32_t width = 0;
+        uint32_t height = 0;
+        unsigned int maxValue = 0;
+        if (!(input >> magic >> width >> height >> maxValue) || magic != "P6" || width == 0 || height == 0
+            || maxValue != 255)
+            return std::nullopt;
+
+        // Formatted extraction leaves the separator before the binary pixel
+        // payload unread. PPM permits arbitrary whitespace, but consuming one
+        // byte is sufficient for the writer above and avoids treating the
+        // first pixel as a separator.
+        input.get();
+
+        const std::size_t pixelCount = static_cast<std::size_t>(width) * height;
+        std::vector<uint8_t> rgb(pixelCount * 3);
+        input.read(reinterpret_cast<char*>(rgb.data()), static_cast<std::streamsize>(rgb.size()));
+        if (!input)
+            return std::nullopt;
+
+        TextureData result;
+        result.width = width;
+        result.height = height;
+        result.pixels.resize(pixelCount * 4);
+        for (std::size_t pixel = 0; pixel < pixelCount; ++pixel)
+        {
+            result.pixels[pixel * 4 + 0] = rgb[pixel * 3 + 0];
+            result.pixels[pixel * 4 + 1] = rgb[pixel * 3 + 1];
+            result.pixels[pixel * 4 + 2] = rgb[pixel * 3 + 2];
+            result.pixels[pixel * 4 + 3] = 255;
+        }
+        return result;
+    }
+
     struct ImageComparison
     {
         bool sameDimensions = false;

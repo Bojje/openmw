@@ -1,6 +1,7 @@
 #include <cstdlib>
 #include <cstdint>
 #include <exception>
+#include <filesystem>
 #include <initializer_list>
 #include <iostream>
 #include <stdexcept>
@@ -63,6 +64,23 @@ namespace
         different.height = 2;
         expect(!Render::compareImages(reference, different).sameDimensions, "different dimensions should not compare");
     }
+
+    void testPpmRoundTrip()
+    {
+        const std::filesystem::path path = std::filesystem::temp_directory_path() / "openmw-image-comparison.ppm";
+        const Render::TextureData source = makeImage({ 0, 32, 64, 1, 255, 128, 16, 2 });
+        expect(Render::writePpm(source, path), "PPM writer failed");
+        const auto loaded = Render::readPpm(path);
+        std::error_code error;
+        std::filesystem::remove(path, error);
+        expect(loaded.has_value(), "PPM reader failed");
+        expect(loaded->width == source.width && loaded->height == source.height, "PPM dimensions changed");
+        expect(loaded->pixels[0] == source.pixels[0] && loaded->pixels[1] == source.pixels[1]
+                && loaded->pixels[2] == source.pixels[2] && loaded->pixels[3] == 255
+                && loaded->pixels[4] == source.pixels[4] && loaded->pixels[6] == source.pixels[6]
+                && loaded->pixels[7] == 255,
+            "PPM RGBA conversion changed pixel data");
+    }
 }
 
 int main()
@@ -72,6 +90,7 @@ int main()
         testExactMatch();
         testToleranceAndMetrics();
         testInvalidOrDifferentImages();
+        testPpmRoundTrip();
         std::cout << "Vulkan image comparison tests passed\n";
         return EXIT_SUCCESS;
     }
