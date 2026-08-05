@@ -77,15 +77,15 @@ is part of the real full-game neutral handoff rather than only a test fixture; c
 happens on cell add/remove rather than on every frame export.
 
 Against the actual PR base `origin/openmw-vulkan` (PR #5), the current checkpoint changes
-46 files, deleting 251 lines and adding 3,102 lines (net `+2,851`). The larger Vulkan-only
+46 files, deleting 251 lines and adding 3,079 lines (net `+2,828`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
 
-The latest reduction checkpoint also removed two unused `RenderingManager` wrappers: the
-neutral cell lookup and the unconsumed manager-level terrain snapshot. The terrain adapter
-remains available at `TerrainStorage`, where its conversion is directly tested, until a
-Vulkan terrain consumer gives it a real owner.
+The latest reduction checkpoint also removed the remaining manager-only neutral-object
+lookup, removal, and cell-transfer wrappers. The lifecycle now calls `WorldScene`
+directly, while the terrain adapter remains available at `TerrainStorage`, where its
+conversion is directly tested, until a Vulkan terrain consumer gives it a real owner.
 
 The remaining migration is not a compatibility problem that can be solved by retaining
 both renderers in one execution path. Static-world transforms, materials, textures,
