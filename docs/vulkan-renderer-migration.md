@@ -80,10 +80,10 @@ both opaque tiles and ordered multi-layer/blendmap tiles: blendmaps use the neut
 texture table, legacy-compatible UV transforms, and separate first-layer/equal-depth
 terrain pipelines. Terrain normal maps now flow through the same neutral texture table and
 G-buffer normal path; parallax offsetting now uses the normal-map height channel. Specular
-maps, terrain paging/LOD, and complete terrain image coverage remain outstanding. The
-neutral cache now retains per-cell LOD snapshots and selects one deterministically by camera
-distance before handoff; quadtree-scale streaming and composite-image coverage remain
-outstanding. `WorldScene` now records empty
+maps and complete terrain image coverage remain outstanding. The neutral cache now retains
+per-cell LOD snapshots and selects one deterministically by camera distance before handoff;
+quadtree-scale streaming and composite-image coverage remain outstanding. `WorldScene` now
+records empty
 loaded cells as well as object-bearing cells, and `RenderingManager::getNeutralScene()`
 collects cached terrain tiles for loaded exterior cells in the active worldspace, so terrain
 is part of the real full-game neutral handoff rather than only a test fixture; conversion
