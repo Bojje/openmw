@@ -54,6 +54,12 @@ sun push constants were removed, and ambient light is part of the neutral snapsh
 OSG-facing manager now also exposes neutral loaded-world mesh collection and RGBA8 texture
 resolution backed by the existing resource caches, giving a future Vulkan consumer a concrete
 full-game input without exposing OSG objects.
+The fast test suite now also contains a backend-neutral RGBA8 image comparator with
+per-channel tolerance, differing-pixel count, maximum error, and mean error metrics.
+This makes future OSG/Vulkan captures diagnosable instead of reducing them to an opaque
+pixel mismatch. A neutral terrain tile snapshot adapter also converts the legacy
+OSG-array/OSG-image storage contract into vertices, layer metadata, and RGBA8 blendmaps;
+opaque single-layer terrain retains an intentionally absent blendmap.
 
 Against the actual PR base `origin/openmw-vulkan` (PR #5), the current checkpoint changes
 36 files, deleting 244 lines and adding 2,173 lines (net `+1,929`). The larger Vulkan-only
@@ -78,6 +84,7 @@ the game unplayable rather than reduce duplication safely.
 | Vulkan utility/queue helper paths | Removed | Complete |
 | Parsed NIF resource cache wrapper | Removed | Complete; cache now owns shared NIF files directly |
 | NIF-to-neutral mesh conversion | Renderer-neutral NIF boundary, material data, mesh cache, Vulkan mesh batch, standalone texture table, and full-game neutral resolver | Connect the resolver to a Vulkan frame consumer, add material shading, skinning, and static-world submission |
+| Terrain geometry and layer data | Legacy OSG terrain storage/ChunkManager plus a tested renderer-neutral tile snapshot adapter | Add a Vulkan terrain consumer, terrain paging/LOD policy, and terrain image/shader coverage |
 | Loaded-cell object identity, transforms, and paging state | Renderer-neutral `WorldScene`/`CellScene` snapshots updated by scene lifecycle | Consume snapshots from a backend and migrate visibility/paging policy |
 | GUI, loading screens, screenshots, and presentation | OSG/MyGUI path | Vulkan presentation and GUI coverage |
 
@@ -98,7 +105,10 @@ real replacement consumes its responsibility and the fast tests cover the bounda
 - Add a small test mode or executable that starts one renderer, loads a manifest of test scenes/cameras, renders multiple checkpoints, writes images, and exits. The current standalone smoke target validates neutral mesh/cache/material setup before window creation, then covers one textured alpha-blended scene and multiple frame submissions when a Vulkan surface is available; image capture and reference comparison remain pending until a Vulkan-capable presentation or offscreen test target is available.
 - Use fixed camera paths, time, weather, random seed, resolution, and content.
 - Add CPU-side tests for matrix conversion, NIF conversion, transforms, resource lookup, and scene snapshots. The current fast tests cover matrix conversion, NIF conversion, parent-child transforms, safe index handling, cache reuse, cell-object transform composition, and renderer-neutral batch layout.
-- Compare Vulkan output with OSG reference images using tolerances rather than exact pixel equality.
+- Compare Vulkan output with OSG reference images using the neutral image comparator's
+  tolerances and error metrics rather than exact pixel equality. Actual capture and
+  reference-image execution remain pending until a Vulkan-capable presentation or
+  offscreen test target is available.
 
 ### 3. Remove the dual-renderer lifecycle
 
@@ -125,7 +135,9 @@ real replacement consumes its responsibility and the fast tests cover the bounda
 ### 6. Port static world rendering
 
 - Wire NIF loading and `MeshConverter` into resource management. The NIF converter now has a tested tree traversal and material boundary, `NifMeshManager` caches converted instances, image resources expose neutral RGBA8 data, and `RenderingManager` can collect loaded-cell meshes and resolve their textures without exposing OSG objects. The standalone Vulkan path consumes resolved textures; a live full-game Vulkan frame consumer, shading, and a static-world consumer are still outstanding.
-- Implement model caching, cell add/remove, transforms, textures, materials, terrain, interiors, and static objects.
+- Implement model caching, cell add/remove, transforms, textures, materials, terrain,
+  interiors, and static objects. The terrain adapter is now the boundary for the
+  geometry/layer portion; Vulkan upload, terrain paging/LOD, and terrain shaders remain.
 - Reach a static playable scene without OSG rendering.
 
 ### 7. Port dynamic content and presentation

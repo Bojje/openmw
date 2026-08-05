@@ -1,0 +1,44 @@
+#ifndef OPENMW_COMPONENTS_RENDER_TERRAIN_H
+#define OPENMW_COMPONENTS_RENDER_TERRAIN_H
+
+#include <array>
+#include <cstdint>
+#include <string>
+#include <vector>
+
+#include "texture.hpp"
+
+namespace Render
+{
+    struct TerrainVertex
+    {
+        std::array<float, 3> position{};
+        std::array<float, 3> normal{};
+        std::array<std::uint8_t, 4> color{ 255, 255, 255, 255 };
+    };
+
+    struct TerrainLayer
+    {
+        std::string diffuseTexture;
+        std::string normalTexture;
+        bool parallax = false;
+        bool specular = false;
+        TextureData blendmap;
+    };
+
+    struct TerrainTile
+    {
+        int lod = 0;
+        float size = 0.f;
+        std::array<float, 2> center{};
+        std::vector<TerrainVertex> vertices;
+        std::vector<TerrainLayer> layers;
+
+        bool valid() const
+        {
+            return lod >= 0 && size > 0.f && !vertices.empty();
+        }
+    };
+}
+
+#endif

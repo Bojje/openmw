@@ -1,6 +1,7 @@
 #ifndef COMPONENTS_TERRAIN_STORAGE_H
 #define COMPONENTS_TERRAIN_STORAGE_H
 
+#include <optional>
 #include <vector>
 
 #include <osg/Array>
@@ -10,6 +11,7 @@
 
 #include <components/esm/exteriorcelllocation.hpp>
 #include <components/esm/refid.hpp>
+#include <components/render/terrain.hpp>
 
 #include "defs.hpp"
 
@@ -90,6 +92,12 @@ namespace Terrain
 
         /// Get the number of texture tiles on one side per chunk (chunkSize 1.0 = 1 cell).
         virtual int getTextureTileCount(float chunkSize, ESM::RefId worldspace) = 0;
+
+        // Transitional adapter: the legacy storage providers still fill OSG
+        // buffers, but the migration boundary exposes an independent snapshot
+        // that a Vulkan terrain consumer can upload without owning OSG objects.
+        std::optional<Render::TerrainTile> getRenderTile(
+            int lodLevel, float size, const osg::Vec2f& center, ESM::RefId worldspace);
     };
 
 }

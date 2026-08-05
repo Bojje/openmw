@@ -36,6 +36,33 @@ if (BUILD_TESTING)
     add_test(NAME openmw-render-mesh-tests COMMAND openmw-render-mesh-tests)
 endif()
 
+add_executable(openmw-vulkan-image-tests image_tests.cpp)
+
+target_include_directories(openmw-vulkan-image-tests
+    PRIVATE
+    ${CMAKE_SOURCE_DIR}
+)
+
+if (BUILD_TESTING)
+    add_test(NAME openmw-vulkan-image-tests COMMAND openmw-vulkan-image-tests)
+endif()
+
+add_executable(openmw-vulkan-terrain-tests terrain_tests.cpp)
+
+target_include_directories(openmw-vulkan-terrain-tests
+    PRIVATE
+    ${CMAKE_SOURCE_DIR}
+)
+
+target_link_libraries(openmw-vulkan-terrain-tests
+    PRIVATE
+    components
+)
+
+if (BUILD_TESTING)
+    add_test(NAME openmw-vulkan-terrain-tests COMMAND openmw-vulkan-terrain-tests)
+endif()
+
 add_executable(openmw-vulkan-smoke renderer_smoke.cpp)
 
 target_link_libraries(openmw-vulkan-smoke
