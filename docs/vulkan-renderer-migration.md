@@ -15,6 +15,7 @@ This plan deliberately prioritizes removal of duplicate renderer code. OpenScene
 The experiment is currently isolated on the `openmw-vulkan` branch. The full game remains
 OSG-only, and the Vulkan renderer is exercised by the standalone smoke target; this keeps
 the process lifecycle single-backend while the scene bridge is incomplete.
+The pre-migration OSG reference is frozen at the `openmw-vulkan-osg-reference` tag.
 
 Completed reduction checkpoints include removal of the incomplete full-game Vulkan bridge,
 the unused Vulkan mesh submission queue, inactive ray-tracing scaffolding, and unused
@@ -53,11 +54,11 @@ OSG-facing manager now also exposes neutral loaded-world mesh collection and RGB
 resolution backed by the existing resource caches, giving a future Vulkan consumer a concrete
 full-game input without exposing OSG objects.
 
-Against `openmw-vulkan`, the current checkpoint changes 50 files, deleting 2,233 lines and
-adding 2,261 lines (net `+28`). The earlier Vulkan-only cleanup remains a real deletion
-checkpoint, but the neutral resource groundwork currently offsets it; this is not the
-speculative 10k-line target, and further deletions remain gated on replacing the remaining
-OSG-owned responsibilities.
+Against the actual PR base `origin/openmw-vulkan` (PR #5), the current checkpoint changes
+36 files, deleting 244 lines and adding 2,140 lines (net `+1,896`). The larger Vulkan-only
+cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
+not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
+consumer to replace the remaining OSG-owned responsibilities.
 
 The remaining migration is not a compatibility problem that can be solved by retaining
 both renderers in one execution path. Static-world transforms, materials, textures,
