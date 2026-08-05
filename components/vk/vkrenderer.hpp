@@ -59,11 +59,8 @@ namespace Vk
         Renderer(const Renderer&) = delete;
         Renderer& operator=(const Renderer&) = delete;
 
-        bool beginFrame();
-        void endFrame();
         bool render();
         void resize(uint32_t width, uint32_t height);
-        void cleanup();
         bool loadShadersAndCreatePipelines(const std::string& shaderDir);
 
         void setScene(const Render::SceneSubmission& submission, TextureResolver textureResolver = {});
@@ -102,6 +99,9 @@ namespace Vk
 
         void createImage(uint32_t width, uint32_t height, VkFormat format, VkImageUsageFlags usage,
             VkImage& image, VkDeviceMemory& memory);
+        bool beginFrame();
+        void endFrame();
+        void cleanup();
         VkImageView createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags);
         void transitionImageLayout(VkCommandBuffer cmd, VkImage image, VkImageLayout oldLayout,
             VkImageLayout newLayout, VkImageAspectFlags aspectMask);
