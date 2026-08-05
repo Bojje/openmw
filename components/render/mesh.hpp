@@ -7,7 +7,7 @@
 #include <vector>
 
 #include "math.hpp"
-#include "scene.hpp"
+#include "world.hpp"
 
 namespace Render
 {
@@ -81,6 +81,25 @@ namespace Render
             }
             result.vertices.insert(result.vertices.end(), mesh.mesh.vertices.begin(), mesh.mesh.vertices.end());
             result.draws.push_back(draw);
+        }
+        return result;
+    }
+
+    inline MeshInstance transformMeshInstance(const WorldObject& object, const MeshInstance& mesh)
+    {
+        MeshInstance result = mesh;
+        result.transform = multiply(makeObjectTransformMatrix(object.transform), mesh.transform);
+        return result;
+    }
+
+    template <class ResolveMeshes>
+    std::vector<MeshInstance> collectCellMeshes(const CellScene& scene, ResolveMeshes&& resolveMeshes)
+    {
+        std::vector<MeshInstance> result;
+        for (const WorldObject& object : scene.objects)
+        {
+            for (const MeshInstance& mesh : resolveMeshes(object.model))
+                result.push_back(transformMeshInstance(object, mesh));
         }
         return result;
     }

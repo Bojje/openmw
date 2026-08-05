@@ -94,6 +94,11 @@ int main()
         throw std::runtime_error("renderer-neutral mesh batching returned the wrong layout");
     expectNear(batch.draws[1].transform.data[12], 12.0f, "batched mesh translation");
 
+    Render::WorldObject object{ 1, "synthetic.nif", {} };
+    object.transform.position.x = 5.0f;
+    const Render::MeshInstance transformed = Render::transformMeshInstance(object, instances.front());
+    expectNear(transformed.transform.data[12], 17.0f, "cell object translation");
+
     Render::MeshInstance invalidBatch = instances.front();
     invalidBatch.mesh.indices = { 3 };
     bool rejectedInvalidBatchIndex = false;

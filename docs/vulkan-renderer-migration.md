@@ -28,7 +28,9 @@ cache owned by `ResourceSystem`. The smoke harness exercises that cache boundary
 submitting its test mesh to Vulkan. Loaded world references now also have a renderer-neutral
 cell snapshot: the scene lifecycle records model identity, position, orientation, scale,
 cell transfer, and removal independently of the OSG node tree. OSG still consumes the same
-events, but it no longer needs to be the only source of object transform state.
+events, but it no longer needs to be the only source of object transform state. The Vulkan
+smoke path now resolves a cell snapshot through the cached NIF meshes and composes object
+transforms with NIF node transforms before batching.
 
 The remaining migration is not a compatibility problem that can be solved by retaining
 both renderers in one execution path. Static-world transforms, materials, textures,
@@ -66,7 +68,7 @@ real replacement consumes its responsibility and the fast tests cover the bounda
 
 - Add a small test mode or executable that starts one renderer, loads a manifest of test scenes/cameras, renders multiple checkpoints, writes images, and exits. The current standalone smoke target covers one neutral mesh and multiple frame submissions; image capture and reference comparison remain pending until a Vulkan-capable presentation or offscreen test target is available.
 - Use fixed camera paths, time, weather, random seed, resolution, and content.
-- Add CPU-side tests for matrix conversion, NIF conversion, transforms, resource lookup, and scene snapshots. The current fast tests cover matrix conversion, NIF conversion, parent-child transforms, safe index handling, cache reuse, and renderer-neutral batch layout.
+- Add CPU-side tests for matrix conversion, NIF conversion, transforms, resource lookup, and scene snapshots. The current fast tests cover matrix conversion, NIF conversion, parent-child transforms, safe index handling, cache reuse, cell-object transform composition, and renderer-neutral batch layout.
 - Compare Vulkan output with OSG reference images using tolerances rather than exact pixel equality.
 
 ### 3. Remove the dual-renderer lifecycle
@@ -87,7 +89,7 @@ real replacement consumes its responsibility and the fast tests cover the bounda
 
 ### 5. Replace OSG scene ownership
 
-- Separate cell visibility, transforms, camera state, lighting, and material data from OSG scene nodes. Camera/light scene data, transform-preserving neutral mesh instances, and updateable loaded-cell object snapshots are in place; backend consumption, paging visibility, and materials remain to be migrated.
+- Separate cell visibility, transforms, camera state, lighting, and material data from OSG scene nodes. Camera/light scene data, transform-preserving neutral mesh instances, updateable loaded-cell object snapshots, and a cached-mesh cell composition adapter are in place; backend consumption, paging visibility, and materials remain to be migrated.
 - Feed both reference and Vulkan implementations from renderer-neutral scene data during the transition.
 - Delete OSG scene ownership once Vulkan consumes all required scene events.
 
