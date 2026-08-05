@@ -5,10 +5,7 @@
 #include "renderinginterface.hpp"
 #include "rendermode.hpp"
 
-#include <components/render/mesh.hpp>
 #include <components/render/submission.hpp>
-#include <components/render/terrain.hpp>
-#include <components/render/texture.hpp>
 #include <components/render/world.hpp>
 
 #include <components/settings/settings.hpp>
@@ -22,7 +19,6 @@
 #include <deque>
 #include <cstdint>
 #include <memory>
-#include <optional>
 #include <span>
 #include <string_view>
 #include <unordered_map>
@@ -167,14 +163,8 @@ namespace MWRender
         /// This is the renderer-neutral scene source used by future backends.
         void recordObject(const MWWorld::Ptr& ptr, std::string_view model, bool visible = true);
 
-        const Render::CellScene* getCellScene(const MWWorld::CellStore* store) const;
-
         /// Collect one backend-neutral static-scene submission for a renderer.
         Render::SceneSubmission getNeutralScene() const;
-
-        /// Snapshot one terrain tile without exposing the OSG terrain graph or images.
-        std::optional<Render::TerrainTile> getNeutralTerrainTile(
-            int lodLevel, float size, const osg::Vec2f& center, ESM::RefId worldspace) const;
 
         void enableTerrain(bool enable, ESM::RefId worldspace);
 

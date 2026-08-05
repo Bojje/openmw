@@ -482,11 +482,6 @@ namespace MWRender
             cell->getCell()->getNameId(), model, transform, visible);
     }
 
-    const Render::CellScene* RenderingManager::getCellScene(const MWWorld::CellStore* store) const
-    {
-        return mWorldScene.findCell(static_cast<const void*>(store));
-    }
-
     Render::SceneSubmission RenderingManager::getNeutralScene() const
     {
         Render::SceneSubmission result;
@@ -525,14 +520,6 @@ namespace MWRender
             return resourceSystem->getImageManager()->getRenderTexture(VFS::Path::Normalized(path));
         };
         return result;
-    }
-
-    std::optional<Render::TerrainTile> RenderingManager::getNeutralTerrainTile(
-        int lodLevel, float size, const osg::Vec2f& center, ESM::RefId worldspace) const
-    {
-        if (!mTerrainStorage)
-            return std::nullopt;
-        return mTerrainStorage->getRenderTile(lodLevel, size, center, worldspace);
     }
 
     Render::WorldObject* RenderingManager::findNeutralObject(const MWWorld::Ptr& ptr)
