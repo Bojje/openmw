@@ -30,8 +30,9 @@ cell snapshot: the scene lifecycle records model identity, position, orientation
 visibility, cell transfer, and removal independently of the OSG node tree. Paged references
 remain in the snapshot with `visible == false` until the scene activates them. OSG still consumes the same
 events, but it no longer needs to be the only source of object transform state. The Vulkan
-smoke path now resolves a cell snapshot through the cached NIF meshes and composes object
-transforms with NIF node transforms before batching. Cell object lookup and removal are
+smoke path now resolves a cell snapshot through the cached NIF meshes, filters paged objects
+by neutral visibility, and composes object transforms with NIF node transforms before batching.
+Cell object lookup and removal are
 owned by the neutral `CellScene` data type rather than the OSG-facing manager.
 
 The remaining migration is not a compatibility problem that can be solved by retaining

@@ -95,6 +95,18 @@ int main()
     const Render::MeshInstance transformed = Render::transformMeshInstance(object, instances.front());
     expectNear(transformed.transform.data[12], 17.0f, "cell object translation");
 
+    Render::CellScene scene;
+    scene.objects.push_back({ 2, "hidden.nif", {}, false });
+    scene.objects.push_back({ 3, "synthetic.nif", {} });
+    const std::vector<Render::MeshInstance> visibleMeshes = Render::collectCellMeshes(
+        scene, [&](std::string_view model) -> const Resource::NifMeshManager::Meshes& {
+            if (model != "synthetic.nif")
+                throw std::runtime_error("cell mesh collection resolved a hidden object");
+            return *cached;
+        });
+    if (visibleMeshes.size() != 1)
+        throw std::runtime_error("cell mesh collection did not filter hidden objects");
+
     Render::MeshInstance invalidBatch = instances.front();
     invalidBatch.mesh.indices = { 3 };
     bool rejectedInvalidBatchIndex = false;

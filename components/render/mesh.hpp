@@ -98,6 +98,9 @@ namespace Render
         std::vector<MeshInstance> result;
         for (const WorldObject& object : scene.objects)
         {
+            if (!object.visible)
+                continue;
+
             for (const MeshInstance& mesh : resolveMeshes(object.model))
                 result.push_back(transformMeshInstance(object, mesh));
         }
