@@ -138,6 +138,8 @@ namespace Vk
         std::array<VkBuffer, maxFramesInFlight> mUniformBuffers = {};
         std::array<VkDeviceMemory, maxFramesInFlight> mUniformMemory = {};
         std::array<void*, maxFramesInFlight> mUniformMapped = {};
+        Render::SceneData mSceneData = {};
+        bool mHasSceneData = false;
 
         VkSampler mGBufferSampler = VK_NULL_HANDLE;
 

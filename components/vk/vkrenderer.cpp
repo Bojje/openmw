@@ -1064,6 +1064,9 @@ namespace Vk
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
         VK_CHECK(vkBeginCommandBuffer(cmd, &beginInfo));
 
+        if (mHasSceneData)
+            std::memcpy(mUniformMapped[mCurrentFrame], &mSceneData, sizeof(Render::SceneData));
+
         return true;
     }
 
@@ -1265,6 +1268,8 @@ namespace Vk
 
     void Renderer::updateScene(const Render::SceneData& sceneData)
     {
+        mSceneData = sceneData;
+        mHasSceneData = true;
         std::memcpy(mUniformMapped[mCurrentFrame], &sceneData, sizeof(Render::SceneData));
     }
 
