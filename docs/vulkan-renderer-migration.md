@@ -71,7 +71,7 @@ that opaque form through the existing indexed mesh path, while multi-layer/blend
 are explicitly deferred until a terrain shader exists.
 
 Against the actual PR base `origin/openmw-vulkan` (PR #5), the current checkpoint changes
-46 files, deleting 251 lines and adding 2,927 lines (net `+2,676`). The larger Vulkan-only
+46 files, deleting 251 lines and adding 2,930 lines (net `+2,679`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
