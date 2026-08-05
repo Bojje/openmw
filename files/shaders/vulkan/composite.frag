@@ -5,8 +5,6 @@ layout(location = 0) in vec2 fragTexCoord;
 layout(set = 0, binding = 0) uniform sampler2D gbufferAlbedo;
 layout(set = 0, binding = 1) uniform sampler2D gbufferNormal;
 layout(set = 0, binding = 2) uniform sampler2D gbufferDepth;
-layout(set = 0, binding = 3) uniform sampler2D rtOutput;
-
 layout(set = 0, binding = 5) uniform sampler2D gbufferMaterial;
 
 layout(set = 0, binding = 4) uniform SceneUBO {
@@ -39,7 +37,6 @@ void main() {
     vec4 albedoSample = texture(gbufferAlbedo, fragTexCoord);
     vec4 normalSample = texture(gbufferNormal, fragTexCoord);
     float depthSample = texture(gbufferDepth, fragTexCoord).r;
-    vec4 rtSample = texture(rtOutput, fragTexCoord);
 
     if (depthSample >= 1.0) {
         vec3 skyTop = vec3(0.2, 0.4, 0.8);
@@ -56,8 +53,8 @@ void main() {
 
     float NdotL = max(dot(N, L), 0.0);
 
-    float shadow = rtSample.r;
-    vec3 reflectionColor = rtSample.gba;
+    float shadow = 1.0;
+    vec3 reflectionColor = vec3(0.0);
 
     vec3 ambient = albedo * 0.15;
     vec3 diffuse = albedo * sunCol * NdotL * shadow;

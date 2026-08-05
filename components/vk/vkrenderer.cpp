@@ -174,25 +174,11 @@ namespace Vk
             srcStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
             dstStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
         }
-        else if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_GENERAL)
-        {
-            barrier.srcAccessMask = 0;
-            barrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-            srcStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-            dstStage = VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR;
-        }
         else if (oldLayout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
         {
             barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
             barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
             srcStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-            dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-        }
-        else if (oldLayout == VK_IMAGE_LAYOUT_GENERAL && newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
-        {
-            barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-            barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-            srcStage = VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR;
             dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
         }
         else if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
@@ -208,13 +194,6 @@ namespace Vk
             barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
             srcStage = VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
             dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-        }
-        else if (oldLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_GENERAL)
-        {
-            barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
-            barrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-            srcStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-            dstStage = VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR;
         }
         else
         {
@@ -520,9 +499,9 @@ namespace Vk
             VK_CHECK(vkCreateDescriptorSetLayout(mDevice->handle(), &layoutInfo, nullptr, &mSceneDescriptorLayout));
         }
 
-        // Composite layout: G-buffer textures + RT output + scene UBO
+        // Composite layout: G-buffer textures, scene UBO, and material data
         {
-            std::array<VkDescriptorSetLayoutBinding, 6> bindings = {};
+            std::array<VkDescriptorSetLayoutBinding, 5> bindings = {};
 
             // Albedo
             bindings[0].binding = 0;
@@ -542,23 +521,17 @@ namespace Vk
             bindings[2].descriptorCount = 1;
             bindings[2].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-            // RT output
-            bindings[3].binding = 3;
-            bindings[3].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            // Scene UBO (view/projection inverse matrices for world position reconstruction)
+            bindings[3].binding = 4;
+            bindings[3].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
             bindings[3].descriptorCount = 1;
             bindings[3].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-            // Scene UBO (view/projection inverse matrices for world position reconstruction)
-            bindings[4].binding = 4;
-            bindings[4].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+            // Material (PBR parameters from G-buffer)
+            bindings[4].binding = 5;
+            bindings[4].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
             bindings[4].descriptorCount = 1;
             bindings[4].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-
-            // Material (PBR parameters from G-buffer)
-            bindings[5].binding = 5;
-            bindings[5].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-            bindings[5].descriptorCount = 1;
-            bindings[5].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
             VkDescriptorSetLayoutCreateInfo layoutInfo = {};
             layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -660,7 +633,6 @@ namespace Vk
             writeCompositeDescriptor(0, mGBuffer.albedoView);
             writeCompositeDescriptor(1, mGBuffer.normalView);
             writeCompositeDescriptor(2, mGBuffer.depthView);
-            writeCompositeDescriptor(3, mGBuffer.albedoView);
             writeCompositeDescriptor(5, mGBuffer.materialView);
 
             // Bind the scene UBO to each per-frame composite descriptor set
@@ -1119,8 +1091,6 @@ namespace Vk
         writeCompositeDescriptor(1, mGBuffer.normalView);
         writeCompositeDescriptor(2, mGBuffer.depthView);
         writeCompositeDescriptor(5, mGBuffer.materialView);
-
-        writeCompositeDescriptor(3, mGBuffer.albedoView);
     }
 
     void Renderer::updateScene(const Render::SceneData& sceneData)
