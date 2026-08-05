@@ -29,7 +29,9 @@ This plan deliberately prioritizes removal of duplicate renderer code. OpenScene
 ### 3. Remove the dual-renderer lifecycle
 
 - Initially use `OPENMW_USE_VULKAN` as a compile-time backend choice.
-- In Vulkan mode, create one Vulkan window and skip OSG window/context initialization.
+- Delete the incomplete second-window Vulkan bridge from the full game until Vulkan owns the required engine services.
+- Keep the full game on one OSG renderer and keep Vulkan validation in the standalone renderer smoke target during the scene-bridge phase.
+- When the renderer-neutral scene bridge is ready, create one Vulkan window and skip OSG window/context initialization in Vulkan mode.
 - Keep the default OSG build unchanged until the Vulkan path owns the required engine services.
 - Add runtime backend selection only after the backend boundary is stable.
 
