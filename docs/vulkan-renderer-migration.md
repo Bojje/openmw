@@ -61,6 +61,9 @@ services have a Vulkan owner. Mesh submission no longer waits for the whole devi
 rebuilds one global buffer: neutral mesh data is retained on the CPU and uploaded into
 the current frame slot only after its fence is waited, so a future live frame loop can
 submit scene updates without the previous device-wide stall.
+Neutral cells now retain worldspace identity, and both mesh and terrain collection filter
+to the active worldspace so an unloaded or inactive worldspace cannot leak into a Vulkan
+submission.
 The fast test suite now also contains a backend-neutral RGBA8 image comparator with
 per-channel tolerance, differing-pixel count, maximum error, and mean error metrics.
 The Vulkan smoke path now reads back rendered RGBA8/BGRA8 swapchain frames and compares
@@ -80,7 +83,7 @@ is part of the real full-game neutral handoff rather than only a test fixture; c
 happens on cell add/remove rather than on every frame export.
 
 Against the actual PR base `origin/openmw-vulkan` (PR #5), the current checkpoint changes
-46 files, deleting 256 lines and adding 3,142 lines (net `+2,886`). The larger Vulkan-only
+46 files, deleting 256 lines and adding 3,162 lines (net `+2,906`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
