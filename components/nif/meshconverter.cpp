@@ -1,7 +1,6 @@
 #include "meshconverter.hpp"
 
 #include <stdexcept>
-#include <utility>
 
 #include "data.hpp"
 #include "node.hpp"
@@ -170,14 +169,6 @@ namespace Nif
                 }
             }
         }
-    }
-
-    std::vector<Render::MeshData> collectMeshes(FileView file)
-    {
-        std::vector<Render::MeshData> meshes;
-        for (Render::MeshInstance& instance : collectMeshInstances(file))
-            meshes.push_back(std::move(instance.mesh));
-        return meshes;
     }
 
     std::vector<Render::MeshInstance> collectMeshInstances(FileView file)

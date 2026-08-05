@@ -13,7 +13,6 @@ namespace Nif
 
     Render::MeshData convertMesh(const NiTriShapeData& source);
     Render::MeshData convertMesh(const NiTriStripsData& source);
-    std::vector<Render::MeshData> collectMeshes(FileView file);
     std::vector<Render::MeshInstance> collectMeshInstances(FileView file);
 }
 
