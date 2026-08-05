@@ -583,14 +583,21 @@ namespace Vk
     {
         VkSamplerCreateInfo samplerInfo = {};
         samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-        samplerInfo.magFilter = VK_FILTER_NEAREST;
-        samplerInfo.minFilter = VK_FILTER_NEAREST;
+        samplerInfo.magFilter = VK_FILTER_LINEAR;
+        samplerInfo.minFilter = VK_FILTER_LINEAR;
         samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
         samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
         samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
         samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 
         VK_CHECK(vkCreateSampler(mDevice->handle(), &samplerInfo, nullptr, &mGBufferSampler));
+
+        // Scene textures use tiled UVs for terrain and must repeat. The G-buffer
+        // sampler above remains clamped because its coordinates are screen-space.
+        samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        VK_CHECK(vkCreateSampler(mDevice->handle(), &samplerInfo, nullptr, &mSceneSampler));
     }
 
     void Renderer::writeCompositeDescriptor(uint32_t binding, VkImageView view)
@@ -620,7 +627,7 @@ namespace Vk
             throw std::out_of_range("Vulkan texture descriptor index is out of range");
 
         VkDescriptorImageInfo imageInfo = {};
-        imageInfo.sampler = mGBufferSampler;
+        imageInfo.sampler = mSceneSampler;
         imageInfo.imageView = view;
         imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
@@ -1661,6 +1668,8 @@ namespace Vk
         destroyTextures();
         if (mGBufferSampler != VK_NULL_HANDLE)
             vkDestroySampler(dev, mGBufferSampler, nullptr);
+        if (mSceneSampler != VK_NULL_HANDLE)
+            vkDestroySampler(dev, mSceneSampler, nullptr);
 
         if (mGBufferPipeline != VK_NULL_HANDLE)
             vkDestroyPipeline(dev, mGBufferPipeline, nullptr);
