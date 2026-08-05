@@ -95,13 +95,6 @@ namespace Render
         return result;
     }
 
-    inline std::optional<MeshInstance> makeOpaqueTerrainMesh(const TerrainTile& tile)
-    {
-        if (tile.layers.size() != 1 || tile.layers[0].blendmap.valid())
-            return std::nullopt;
-        const std::vector<MeshInstance> meshes = makeTerrainMeshes(tile);
-        return meshes.size() == 1 ? std::optional<MeshInstance>(meshes.front()) : std::nullopt;
-    }
 }
 
 #endif

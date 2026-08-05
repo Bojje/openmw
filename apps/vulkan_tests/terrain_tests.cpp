@@ -95,11 +95,12 @@ int main()
         expect(opaqueTile.has_value() && opaqueTile->valid() && opaqueTile->layers.size() == 1
                 && !opaqueTile->layers[0].blendmap.valid(),
             "opaque terrain layer should not require a blendmap");
-        const auto terrainMesh = Render::makeOpaqueTerrainMesh(*opaqueTile);
-        expect(terrainMesh.has_value() && terrainMesh->mesh.indices == opaqueTile->indices
-                && terrainMesh->mesh.material.albedoTexture == "textures/grass.dds"
-                && terrainMesh->transform.data[12] == 0.f && terrainMesh->mesh.vertices[3].texcoord[0] == 1.f
-                && terrainMesh->mesh.vertices[3].texcoord[1] == 1.f,
+        const auto opaqueTerrainMeshes = Render::makeTerrainMeshes(*opaqueTile);
+        expect(opaqueTerrainMeshes.size() == 1 && opaqueTerrainMeshes.front().mesh.indices == opaqueTile->indices
+                && opaqueTerrainMeshes.front().mesh.material.albedoTexture == "textures/grass.dds"
+                && opaqueTerrainMeshes.front().transform.data[12] == 0.f
+                && opaqueTerrainMeshes.front().mesh.vertices[3].texcoord[0] == 1.f
+                && opaqueTerrainMeshes.front().mesh.vertices[3].texcoord[1] == 1.f,
             "opaque terrain tile was not converted for Vulkan mesh submission");
         const auto blendedTerrainMeshes = Render::makeTerrainMeshes(*tile);
         expect(blendedTerrainMeshes.size() == 1 && blendedTerrainMeshes.front().mesh.material.terrainBlend
@@ -110,9 +111,6 @@ int main()
                 && blendedTerrainMeshes.front().mesh.vertices[3].blendTexcoord[1] > 0.49f
                 && blendedTerrainMeshes.front().mesh.vertices[3].blendTexcoord[1] < 0.51f,
             "terrain blendmap layer was not converted for Vulkan submission");
-        expect(!Render::makeOpaqueTerrainMesh(*tile).has_value(),
-            "blendmap terrain should not be accepted by the opaque-only helper");
-
         Render::TerrainTile multiLayerTile = *tile;
         multiLayerTile.layers.push_back(tile->layers.front());
         const auto multiLayerMeshes = Render::makeTerrainMeshes(multiLayerTile);
@@ -122,7 +120,7 @@ int main()
 
         Render::TerrainTile malformed = *opaqueTile;
         malformed.indices.back() = static_cast<std::uint32_t>(malformed.vertices.size());
-        expect(!malformed.valid() && !Render::makeOpaqueTerrainMesh(malformed).has_value(),
+        expect(!malformed.valid() && Render::makeTerrainMeshes(malformed).empty(),
             "terrain validation should reject out-of-range indices");
 
         std::cout << "Vulkan terrain snapshot tests passed\n";
