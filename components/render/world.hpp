@@ -146,6 +146,8 @@ namespace Render
             return found == mCells.end() ? nullptr : &found->second;
         }
 
+        const std::unordered_map<const void*, CellScene>& cells() const { return mCells; }
+
         CellScene* findCell(const void* cellKey)
         {
             const auto found = mCells.find(cellKey);

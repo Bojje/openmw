@@ -73,11 +73,14 @@ namespace
         Resource::NifMeshManager meshManager(nullptr);
         const auto cachedMeshes = meshManager.get(file);
 
-        Render::CellScene scene;
-        scene.objects.push_back({ 1, file->mPath.value(), {} });
-        scene.objects.front().transform.position.x = 0.5f;
+        int objectHandle = 0;
+        int cellHandle = 0;
+        Render::WorldScene world;
+        Render::ObjectTransform transform;
+        transform.position.x = 0.5f;
+        world.recordObject(&objectHandle, &cellHandle, true, 0, 0, file->mPath.view(), transform, true);
         return std::make_shared<const Resource::NifMeshManager::Meshes>(
-            Render::collectCellMeshes(scene, [&](std::string_view model) -> const Resource::NifMeshManager::Meshes& {
+            Render::collectWorldMeshes(world, [&](std::string_view model) -> const Resource::NifMeshManager::Meshes& {
                 if (model != file->mPath.view())
                     throw std::runtime_error("Vulkan smoke scene referenced an uncached model");
                 return *cachedMeshes;

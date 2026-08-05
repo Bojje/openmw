@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <algorithm>
+#include <iterator>
 #include <limits>
 #include <stdexcept>
 #include <string>
@@ -133,6 +134,19 @@ namespace Render
 
             for (const MeshInstance& mesh : resolveMeshes(object.model))
                 result.push_back(transformMeshInstance(object, mesh));
+        }
+        return result;
+    }
+
+    template <class ResolveMeshes>
+    std::vector<MeshInstance> collectWorldMeshes(const WorldScene& world, ResolveMeshes&& resolveMeshes)
+    {
+        std::vector<MeshInstance> result;
+        for (const auto& [_, cell] : world.cells())
+        {
+            std::vector<MeshInstance> cellMeshes = collectCellMeshes(cell, resolveMeshes);
+            result.insert(result.end(), std::make_move_iterator(cellMeshes.begin()),
+                std::make_move_iterator(cellMeshes.end()));
         }
         return result;
     }

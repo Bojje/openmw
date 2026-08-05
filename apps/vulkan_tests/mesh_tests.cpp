@@ -142,6 +142,19 @@ int main()
     if (visibleMeshes.size() != 1)
         throw std::runtime_error("cell mesh collection did not filter hidden objects");
 
+    int worldObjectHandle = 0;
+    int worldCellHandle = 0;
+    Render::WorldScene world;
+    world.recordObject(&worldObjectHandle, &worldCellHandle, true, 0, 0, "synthetic.nif", object.transform, true);
+    const std::vector<Render::MeshInstance> worldMeshes = Render::collectWorldMeshes(
+        world, [&](std::string_view model) -> const Resource::NifMeshManager::Meshes& {
+            if (model != "synthetic.nif")
+                throw std::runtime_error("world mesh collection resolved an unexpected model");
+            return *cached;
+        });
+    if (worldMeshes.size() != 1)
+        throw std::runtime_error("world mesh collection did not consume loaded cells");
+
     Render::MeshInstance invalidBatch = instances.front();
     invalidBatch.mesh.indices = { 3 };
     bool rejectedInvalidBatchIndex = false;

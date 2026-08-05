@@ -30,8 +30,8 @@ cell snapshot: the scene lifecycle records model identity, position, orientation
 visibility, cell transfer, and removal independently of the OSG node tree. Paged references
 remain in the snapshot with `visible == false` until the scene activates them. OSG still consumes the same
 events, but it no longer needs to be the only source of object transform state. The Vulkan
-smoke path now resolves a cell snapshot through the cached NIF meshes, filters paged objects
-by neutral visibility, and composes object transforms with NIF node transforms before batching.
+smoke path now resolves all loaded-cell snapshots through the cached NIF meshes, filters paged
+objects by neutral visibility, and composes object transforms with NIF node transforms before batching.
 NIF classic texture, diffuse/emissive, glossiness, and alpha properties now cross the
 renderer-neutral mesh boundary and survive batching; the neutral batch applies diffuse
 and alpha to vertex color output, while Vulkan texture binding and full material shading
