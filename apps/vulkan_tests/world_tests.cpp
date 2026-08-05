@@ -1,6 +1,7 @@
 #include <stdexcept>
 #include <string>
 
+#include <components/render/submission.hpp>
 #include <components/render/world.hpp>
 
 int main()
@@ -66,4 +67,19 @@ int main()
         || world.cellsInOrder().size() != 3 || world.cellsInOrder()[1] != world.findCell(&fourthCellHandle)
         || world.cellsInOrder()[2] != world.findCell(&thirdCellHandle))
         throw std::runtime_error("renderer-neutral world scene failed cell removal");
+
+    Render::SceneSubmission submission;
+    submission.scene.ambientColor = { 0.2f, 0.3f, 0.4f, 1.f };
+    bool resolverCalled = false;
+    submission.textureResolver = [&resolverCalled](std::string_view path) {
+        if (path != "textures/submission.dds")
+            throw std::runtime_error("scene submission passed an unexpected texture path");
+        resolverCalled = true;
+        return std::make_shared<const Render::TextureData>(Render::TextureData{ .width = 1,
+            .height = 1,
+            .pixels = { 255, 128, 0, 255 } });
+    };
+    const auto resolvedTexture = submission.textureResolver("textures/submission.dds");
+    if (!resolverCalled || !resolvedTexture || !resolvedTexture->valid() || submission.scene.ambientColor.y != 0.3f)
+        throw std::runtime_error("renderer-neutral scene submission failed resource handoff");
 }
