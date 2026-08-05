@@ -177,11 +177,17 @@ real replacement consumes its responsibility and the fast tests cover the bounda
 - Delete duplicate adapters, dead OSG paths, obsolete Vulkan stubs, and transitional interfaces.
 - Update the deletion ledger and line-count report after every subsystem removal.
 
-### 9. Decide the final OSG policy
+### 9. Final OSG policy
 
-- Keep OSG as a separate compatibility/reference build if it remains valuable.
-- Make Vulkan the default only after feature and CI coverage are sufficient.
-- Remove OSG dependencies from the active build only when the fallback is no longer needed.
+The policy for this experiment is decided: keep OSG as a separate compatibility and
+visual-reference build, but never initialize OSG and Vulkan in the same runtime. The
+`openmw-vulkan` branch may continue to build the OSG reference configuration so visual
+captures, startup behavior, and fallback compatibility remain available; that build is
+not a second renderer in the Vulkan process. Vulkan becomes the active game backend only
+after static and dynamic content, terrain, GUI, loading screens, screenshots, presentation,
+and CI coverage reach the required parity gates. OSG dependencies may then be removed from
+the active Vulkan build, while the reference build can remain separately if it still
+provides maintenance or compatibility value.
 
 ## Test cadence
 
