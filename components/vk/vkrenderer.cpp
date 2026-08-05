@@ -1380,7 +1380,6 @@ namespace Vk
     {
         mSceneData = submission.scene;
         mHasSceneData = true;
-        std::memcpy(mUniformMapped[mCurrentFrame], &submission.scene, sizeof(Render::SceneData));
         TextureResolver resolver = textureResolver ? std::move(textureResolver) : submission.textureResolver;
         if (submission.terrainTiles.empty())
         {
