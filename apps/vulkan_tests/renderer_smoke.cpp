@@ -88,6 +88,15 @@ int main(int argc, char** argv)
             scene.sunDirection = { 0.0f, -1.0f, 0.0f, 0.0f };
             scene.sunColor = { 1.0f, 1.0f, 1.0f, 1.0f };
 
+            Render::MeshData mesh;
+            mesh.vertices = {
+                { { -0.5f, -0.5f, 0.0f }, { 0.0f, 0.0f, 1.0f }, { 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
+                { { 0.5f, -0.5f, 0.0f }, { 0.0f, 0.0f, 1.0f }, { 1.0f, 0.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
+                { { 0.0f, 0.5f, 0.0f }, { 0.0f, 0.0f, 1.0f }, { 0.5f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
+            };
+            mesh.indices = { 0, 1, 2 };
+            renderer->setMesh(mesh);
+
             unsigned int renderedFrames = 0;
             for (unsigned int frame = 0; frame < frames; ++frame)
             {

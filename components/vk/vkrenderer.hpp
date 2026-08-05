@@ -10,6 +10,7 @@
 #include <vulkan/vulkan.h>
 
 #include "vkcommon.hpp"
+#include "../render/mesh.hpp"
 #include "../render/scene.hpp"
 
 struct SDL_Window;
@@ -59,6 +60,7 @@ namespace Vk
         bool loadShadersAndCreatePipelines(const std::string& shaderDir);
 
         void updateScene(const Render::SceneData& sceneData);
+        void setMesh(const Render::MeshData& mesh);
 
     private:
         void createSurface();
@@ -77,6 +79,7 @@ namespace Vk
         void createUniformBuffers();
         void createGBufferSampler();
         void writeCompositeDescriptor(uint32_t binding, VkImageView view);
+        void destroyMesh();
 
         void createImage(uint32_t width, uint32_t height, VkFormat format, VkImageUsageFlags usage,
             VkImage& image, VkDeviceMemory& memory);
@@ -118,6 +121,12 @@ namespace Vk
         std::array<void*, maxFramesInFlight> mUniformMapped = {};
 
         VkSampler mGBufferSampler = VK_NULL_HANDLE;
+
+        VkBuffer mMeshVertexBuffer = VK_NULL_HANDLE;
+        VkDeviceMemory mMeshVertexMemory = VK_NULL_HANDLE;
+        VkBuffer mMeshIndexBuffer = VK_NULL_HANDLE;
+        VkDeviceMemory mMeshIndexMemory = VK_NULL_HANDLE;
+        uint32_t mMeshIndexCount = 0;
 
         std::vector<VkCommandBuffer> mCommandBuffers;
 

@@ -1006,6 +1006,28 @@ namespace Vk
                 vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mGBufferPipelineLayout,
                     0, 1, &mSceneDescriptorSets[mCurrentFrame], 0, nullptr);
 
+                if (mMeshVertexBuffer != VK_NULL_HANDLE && mMeshIndexBuffer != VK_NULL_HANDLE)
+                {
+                    Render::Mat4 identity = {};
+                    identity.data[0] = 1.0f;
+                    identity.data[5] = 1.0f;
+                    identity.data[10] = 1.0f;
+                    identity.data[15] = 1.0f;
+
+                    struct PushData
+                    {
+                        Render::Mat4 model;
+                        Render::Mat4 normalMatrix;
+                    } pushData = { identity, identity };
+                    vkCmdPushConstants(cmd, mGBufferPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT,
+                        0, sizeof(pushData), &pushData);
+
+                    VkDeviceSize offset = 0;
+                    vkCmdBindVertexBuffers(cmd, 0, 1, &mMeshVertexBuffer, &offset);
+                    vkCmdBindIndexBuffer(cmd, mMeshIndexBuffer, 0, VK_INDEX_TYPE_UINT32);
+                    vkCmdDrawIndexed(cmd, mMeshIndexCount, 1, 0, 0, 0);
+                }
+
             }
 
             vkCmdEndRenderPass(cmd);
@@ -1098,6 +1120,68 @@ namespace Vk
         std::memcpy(mUniformMapped[mCurrentFrame], &sceneData, sizeof(Render::SceneData));
     }
 
+    void Renderer::setMesh(const Render::MeshData& mesh)
+    {
+        vkDeviceWaitIdle(mDevice->handle());
+        destroyMesh();
+
+        if (mesh.vertices.empty() || mesh.indices.empty())
+            return;
+
+        try
+        {
+            createBufferLocal(mDevice->handle(), mDevice->physical(),
+                sizeof(Render::MeshVertex) * mesh.vertices.size(), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                mMeshVertexBuffer, mMeshVertexMemory);
+            createBufferLocal(mDevice->handle(), mDevice->physical(),
+                sizeof(uint32_t) * mesh.indices.size(), VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                mMeshIndexBuffer, mMeshIndexMemory);
+
+            void* mapped = nullptr;
+            VK_CHECK(vkMapMemory(mDevice->handle(), mMeshVertexMemory, 0,
+                sizeof(Render::MeshVertex) * mesh.vertices.size(), 0, &mapped));
+            std::memcpy(mapped, mesh.vertices.data(), sizeof(Render::MeshVertex) * mesh.vertices.size());
+            vkUnmapMemory(mDevice->handle(), mMeshVertexMemory);
+
+            mapped = nullptr;
+            VK_CHECK(vkMapMemory(mDevice->handle(), mMeshIndexMemory, 0,
+                sizeof(uint32_t) * mesh.indices.size(), 0, &mapped));
+            std::memcpy(mapped, mesh.indices.data(), sizeof(uint32_t) * mesh.indices.size());
+            vkUnmapMemory(mDevice->handle(), mMeshIndexMemory);
+
+            mMeshIndexCount = static_cast<uint32_t>(mesh.indices.size());
+        }
+        catch (...)
+        {
+            destroyMesh();
+            throw;
+        }
+    }
+
+    void Renderer::destroyMesh()
+    {
+        if (!mDevice)
+            return;
+
+        VkDevice dev = mDevice->handle();
+        if (mMeshVertexBuffer != VK_NULL_HANDLE)
+            vkDestroyBuffer(dev, mMeshVertexBuffer, nullptr);
+        if (mMeshVertexMemory != VK_NULL_HANDLE)
+            vkFreeMemory(dev, mMeshVertexMemory, nullptr);
+        if (mMeshIndexBuffer != VK_NULL_HANDLE)
+            vkDestroyBuffer(dev, mMeshIndexBuffer, nullptr);
+        if (mMeshIndexMemory != VK_NULL_HANDLE)
+            vkFreeMemory(dev, mMeshIndexMemory, nullptr);
+
+        mMeshVertexBuffer = VK_NULL_HANDLE;
+        mMeshVertexMemory = VK_NULL_HANDLE;
+        mMeshIndexBuffer = VK_NULL_HANDLE;
+        mMeshIndexMemory = VK_NULL_HANDLE;
+        mMeshIndexCount = 0;
+    }
+
     void Renderer::cleanup()
     {
         if (!mDevice)
@@ -1106,6 +1190,8 @@ namespace Vk
         vkDeviceWaitIdle(mDevice->handle());
 
         VkDevice dev = mDevice->handle();
+
+        destroyMesh();
 
         for (uint32_t i = 0; i < maxFramesInFlight; i++)
         {
