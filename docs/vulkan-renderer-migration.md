@@ -26,7 +26,8 @@ transform-preserving NIF tree traversal for static mesh discovery, and a Vulkan 
 resulting neutral mesh. Renderer-neutral batching now flattens multiple mesh instances with
 independent transforms before the Vulkan backend uploads them. Parsed NIF resources now use a shared-pointer cache instead of an OSG object
 wrapper, and converted renderer-neutral NIF mesh instances have a separate path-keyed
-cache owned by `ResourceSystem`. The smoke harness exercises that cache boundary before
+cache owned by `ResourceSystem`; its cache lifecycle is now forwarded explicitly without
+the OSG `BaseResourceManager` interface. The smoke harness exercises that cache boundary before
 submitting its test mesh to Vulkan. Loaded world references now also have a renderer-neutral
 cell snapshot: the scene lifecycle records model identity, position, orientation, scale,
 visibility, cell transfer, and removal independently of the OSG node tree. Paged references
@@ -98,7 +99,7 @@ is part of the real full-game neutral handoff rather than only a test fixture; c
 happens on cell add/remove rather than on every frame export.
 
 Against the actual PR base `origin/openmw-vulkan` (PR #5), the current checkpoint changes
-50 files, deleting 275 lines and adding 3,834 lines (net `+3,559`). The larger Vulkan-only
+50 files, deleting 275 lines and adding 3,821 lines (net `+3,546`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.

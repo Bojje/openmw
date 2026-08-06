@@ -28,11 +28,9 @@ namespace Resource
         const std::string key = file->mPath.value();
         {
             std::lock_guard lock(mMutex);
-            ++mStats.mGet;
             const auto found = mCache.find(key);
             if (found != mCache.end())
             {
-                ++mStats.mHit;
                 return found->second.mMeshes;
             }
         }
@@ -54,7 +52,6 @@ namespace Resource
                 cacheItem.mLastUsage = referenceTime;
             if (cacheItem.mLastUsage > expiryTime)
                 return false;
-            ++mStats.mExpired;
             return true;
         });
     }
@@ -71,11 +68,4 @@ namespace Resource
         mExpiryDelay = expiryDelay;
     }
 
-    void NifMeshManager::reportStats(unsigned int frameNumber, osg::Stats* stats) const
-    {
-        std::lock_guard lock(mMutex);
-        CacheStats statsCopy = mStats;
-        statsCopy.mSize = mCache.size();
-        Resource::reportStats("NifMesh", frameNumber, statsCopy, *stats);
-    }
 }

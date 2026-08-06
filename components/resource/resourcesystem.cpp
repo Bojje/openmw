@@ -27,7 +27,6 @@ namespace Resource
         mAnimBlendRulesManager = std::make_unique<AnimBlendRulesManager>(vfs, expiryDelay);
 
         addResourceManager(mNifFileManager.get());
-        addResourceManager(mNifMeshManager.get());
         addResourceManager(mBgsmFileManager.get());
         addResourceManager(mKeyframeManager.get());
         // note, scene references images so add images afterwards for correct implementation of updateCache()
@@ -80,6 +79,7 @@ namespace Resource
 
     void ResourceSystem::setExpiryDelay(double expiryDelay)
     {
+        mNifMeshManager->setExpiryDelay(expiryDelay);
         for (std::vector<BaseResourceManager*>::iterator it = mResourceManagers.begin(); it != mResourceManagers.end();
              ++it)
             (*it)->setExpiryDelay(expiryDelay);
@@ -91,6 +91,7 @@ namespace Resource
 
     void ResourceSystem::updateCache(double referenceTime)
     {
+        mNifMeshManager->updateCache(referenceTime);
         for (std::vector<BaseResourceManager*>::iterator it = mResourceManagers.begin(); it != mResourceManagers.end();
              ++it)
             (*it)->updateCache(referenceTime);
@@ -98,6 +99,7 @@ namespace Resource
 
     void ResourceSystem::clearCache()
     {
+        mNifMeshManager->clearCache();
         for (std::vector<BaseResourceManager*>::iterator it = mResourceManagers.begin(); it != mResourceManagers.end();
              ++it)
             (*it)->clearCache();
