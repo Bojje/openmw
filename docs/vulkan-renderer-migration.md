@@ -86,7 +86,8 @@ OSG-facing manager now also exposes neutral loaded-world mesh collection and RGB
 resolution backed by the existing resource caches, giving a future Vulkan consumer a concrete
 full-game input without exposing OSG objects.
 Those inputs can now be collected as one `Render::SceneSubmission`; `Vk::Renderer::setScene`
-consumes that handoff in the standalone path, and the smoke test exercises it. The full-game
+consumes that handoff in the standalone path, and the smoke test exercises it. The submission
+boundary now validates mesh indices and terrain snapshots before Vulkan consumes them. The full-game
 Vulkan call site is still intentionally absent until window, input, dynamic-content, and GUI
 services have a Vulkan owner. Mesh submission no longer waits for the whole device or
 rebuilds one global buffer: neutral mesh data is retained on the CPU and uploaded into
@@ -128,7 +129,7 @@ handoff rather than only a test fixture; conversion happens on cell add/remove r
 on every frame export.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-52 files, deleting 326 lines and adding 4,177 lines (net `+3,851`). The larger Vulkan-only
+52 files, deleting 326 lines and adding 4,219 lines (net `+3,893`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.

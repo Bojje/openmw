@@ -1,6 +1,7 @@
 #ifndef OPENMW_COMPONENTS_RENDER_SUBMISSION_H
 #define OPENMW_COMPONENTS_RENDER_SUBMISSION_H
 
+#include <algorithm>
 #include <vector>
 
 #include "mesh.hpp"
@@ -19,6 +20,26 @@ namespace Render
         std::vector<MeshInstance> meshes;
         std::vector<TerrainTile> terrainTiles;
         TextureResolver textureResolver;
+
+        bool valid() const
+        {
+            for (const MeshInstance& instance : meshes)
+            {
+                if (instance.mesh.indices.empty())
+                    continue;
+                if (instance.mesh.vertices.empty())
+                    return false;
+                for (const std::uint32_t index : instance.mesh.indices)
+                {
+                    if (index >= instance.mesh.vertices.size())
+                        return false;
+                }
+            }
+
+            return std::all_of(terrainTiles.begin(), terrainTiles.end(), [](const TerrainTile& tile) {
+                return tile.valid();
+            });
+        }
     };
 }
 

@@ -1511,6 +1511,9 @@ namespace Vk
 
     void Renderer::setScene(const Render::SceneSubmission& submission)
     {
+        if (!submission.valid())
+            throw std::invalid_argument("Vulkan scene submission contains invalid geometry");
+
         mSceneData = submission.scene;
         mHasSceneData = true;
         if (submission.terrainTiles.empty())

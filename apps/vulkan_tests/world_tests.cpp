@@ -105,6 +105,21 @@ int main()
             .pixels = { 255, 128, 0, 255 } });
     };
     const auto resolvedTexture = submission.textureResolver("textures/submission.dds");
-    if (!resolverCalled || !resolvedTexture || !resolvedTexture->valid() || submission.scene.ambientColor.y != 0.3f)
+    if (!resolverCalled || !resolvedTexture || !resolvedTexture->valid() || submission.scene.ambientColor.y != 0.3f
+        || !submission.valid())
         throw std::runtime_error("renderer-neutral scene submission failed resource handoff");
+
+    Render::MeshInstance malformedMesh;
+    malformedMesh.mesh.vertices.resize(1);
+    malformedMesh.mesh.indices.push_back(1);
+    submission.meshes.push_back(std::move(malformedMesh));
+    if (submission.valid())
+        throw std::runtime_error("renderer-neutral scene submission accepted an invalid mesh index");
+    submission.meshes.clear();
+
+    Render::TerrainTile malformedTerrain;
+    malformedTerrain.size = 1.f;
+    submission.terrainTiles.push_back(std::move(malformedTerrain));
+    if (submission.valid())
+        throw std::runtime_error("renderer-neutral scene submission accepted an invalid terrain tile");
 }
