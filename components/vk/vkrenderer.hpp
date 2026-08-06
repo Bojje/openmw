@@ -114,7 +114,7 @@ namespace Vk
         void createImage(uint32_t width, uint32_t height, VkFormat format, VkImageUsageFlags usage,
             VkImage& image, VkDeviceMemory& memory);
         bool beginFrame();
-        void endFrame();
+        bool endFrame();
         void cleanup();
         VkImageView createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags);
         void transitionImageLayout(VkCommandBuffer cmd, VkImage image, VkImageLayout oldLayout,

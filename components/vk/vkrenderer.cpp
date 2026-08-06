@@ -1210,7 +1210,7 @@ namespace Vk
         return true;
     }
 
-    void Renderer::endFrame()
+    bool Renderer::endFrame()
     {
         VkCommandBuffer cmd = mCommandBuffers[mCurrentFrame];
         VK_CHECK(vkEndCommandBuffer(cmd));
@@ -1249,6 +1249,8 @@ namespace Vk
             int w, h;
             SDL_Vulkan_GetDrawableSize(mWindow, &w, &h);
             resize(static_cast<uint32_t>(w), static_cast<uint32_t>(h));
+            mCurrentFrame = (mCurrentFrame + 1) % maxFramesInFlight;
+            return false;
         }
         else
         {
@@ -1258,6 +1260,7 @@ namespace Vk
             mHasSubmittedFrame = true;
         }
         mCurrentFrame = (mCurrentFrame + 1) % maxFramesInFlight;
+        return true;
     }
 
     bool Renderer::render()
@@ -1401,8 +1404,7 @@ namespace Vk
             vkCmdEndRenderPass(cmd);
         }
 
-        endFrame();
-        return true;
+        return endFrame();
     }
 
     std::optional<Render::TextureData> Renderer::captureFrame()
