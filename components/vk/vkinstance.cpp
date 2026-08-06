@@ -59,36 +59,6 @@ namespace Vk
             vkDestroyInstance(mInstance, nullptr);
     }
 
-    Instance::Instance(Instance&& other) noexcept
-        : mInstance(other.mInstance)
-        , mDebugMessenger(other.mDebugMessenger)
-        , mValidationEnabled(other.mValidationEnabled)
-        , mValidationErrorCount(other.mValidationErrorCount.load())
-    {
-        other.mInstance = VK_NULL_HANDLE;
-        other.mDebugMessenger = VK_NULL_HANDLE;
-    }
-
-    Instance& Instance::operator=(Instance&& other) noexcept
-    {
-        if (this != &other)
-        {
-            if (mDebugMessenger != VK_NULL_HANDLE)
-                destroyDebugUtilsMessengerEXT(mInstance, mDebugMessenger, nullptr);
-            if (mInstance != VK_NULL_HANDLE)
-                vkDestroyInstance(mInstance, nullptr);
-
-            mInstance = other.mInstance;
-            mDebugMessenger = other.mDebugMessenger;
-            mValidationEnabled = other.mValidationEnabled;
-            mValidationErrorCount.store(other.mValidationErrorCount.load());
-
-            other.mInstance = VK_NULL_HANDLE;
-            other.mDebugMessenger = VK_NULL_HANDLE;
-        }
-        return *this;
-    }
-
     void Instance::createInstance(const std::string& appName, const std::string& engineName)
     {
         VkApplicationInfo appInfo = {};

@@ -106,7 +106,7 @@ is part of the real full-game neutral handoff rather than only a test fixture; c
 happens on cell add/remove rather than on every frame export.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-51 files, deleting 279 lines and adding 3,989 lines (net `+3,710`). The larger Vulkan-only
+51 files, deleting 309 lines and adding 3,987 lines (net `+3,678`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.

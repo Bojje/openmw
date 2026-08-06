@@ -17,8 +17,6 @@ namespace Vk
 
         Instance(const Instance&) = delete;
         Instance& operator=(const Instance&) = delete;
-        Instance(Instance&& other) noexcept;
-        Instance& operator=(Instance&& other) noexcept;
 
         VkInstance handle() const { return mInstance; }
         bool validationEnabled() const { return mValidationEnabled; }
