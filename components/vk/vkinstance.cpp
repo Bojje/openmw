@@ -63,6 +63,7 @@ namespace Vk
         : mInstance(other.mInstance)
         , mDebugMessenger(other.mDebugMessenger)
         , mValidationEnabled(other.mValidationEnabled)
+        , mValidationErrorCount(other.mValidationErrorCount.load())
     {
         other.mInstance = VK_NULL_HANDLE;
         other.mDebugMessenger = VK_NULL_HANDLE;
@@ -80,6 +81,7 @@ namespace Vk
             mInstance = other.mInstance;
             mDebugMessenger = other.mDebugMessenger;
             mValidationEnabled = other.mValidationEnabled;
+            mValidationErrorCount.store(other.mValidationErrorCount.load());
 
             other.mInstance = VK_NULL_HANDLE;
             other.mDebugMessenger = VK_NULL_HANDLE;
@@ -127,6 +129,7 @@ namespace Vk
                 | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT
                 | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
             debugCreateInfo.pfnUserCallback = debugCallback;
+            debugCreateInfo.pUserData = this;
             createInfo.pNext = &debugCreateInfo;
         }
         else
@@ -148,6 +151,7 @@ namespace Vk
         createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT
             | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
         createInfo.pfnUserCallback = debugCallback;
+        createInfo.pUserData = this;
 
         VK_CHECK(createDebugUtilsMessengerEXT(mInstance, &createInfo, nullptr, &mDebugMessenger));
     }
@@ -185,10 +189,15 @@ namespace Vk
 
     VKAPI_ATTR VkBool32 VKAPI_CALL Instance::debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
         VkDebugUtilsMessageTypeFlagsEXT /*messageType*/,
-        const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, void* /*pUserData*/)
+        const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData)
     {
+        auto* instance = static_cast<Instance*>(pUserData);
         if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
+        {
+            if (instance != nullptr)
+                instance->mValidationErrorCount.fetch_add(1);
             Log(Debug::Error) << "Vulkan validation: " << pCallbackData->pMessage;
+        }
         else if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
             Log(Debug::Warning) << "Vulkan validation: " << pCallbackData->pMessage;
 

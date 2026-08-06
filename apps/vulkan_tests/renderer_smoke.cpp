@@ -309,6 +309,8 @@ int main(int argc, char** argv)
 
             if (renderedFrames == 0)
                 throw EnvironmentUnavailable("Vulkan drawable became unavailable before a frame was submitted");
+            if (renderer->validationErrorCount() != 0)
+                throw std::runtime_error("Vulkan smoke test received validation errors");
         }
 
         SDL_DestroyWindow(window);

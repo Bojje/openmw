@@ -1,6 +1,7 @@
 #ifndef OPENMW_COMPONENTS_VK_VKINSTANCE_H
 #define OPENMW_COMPONENTS_VK_VKINSTANCE_H
 
+#include <atomic>
 #include <string>
 #include <vector>
 
@@ -21,6 +22,7 @@ namespace Vk
 
         VkInstance handle() const { return mInstance; }
         bool validationEnabled() const { return mValidationEnabled; }
+        uint32_t validationErrorCount() const { return mValidationErrorCount.load(); }
 
     private:
         void createInstance(const std::string& appName, const std::string& engineName);
@@ -35,6 +37,7 @@ namespace Vk
         VkInstance mInstance = VK_NULL_HANDLE;
         VkDebugUtilsMessengerEXT mDebugMessenger = VK_NULL_HANDLE;
         bool mValidationEnabled = false;
+        std::atomic<uint32_t> mValidationErrorCount{ 0 };
 
         static constexpr const char* sValidationLayerName = "VK_LAYER_KHRONOS_validation";
     };

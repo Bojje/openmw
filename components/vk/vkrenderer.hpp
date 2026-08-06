@@ -62,6 +62,7 @@ namespace Vk
         void resize(uint32_t width, uint32_t height);
         bool loadShadersAndCreatePipelines(const std::string& shaderDir);
         bool validationEnabled() const;
+        uint32_t validationErrorCount() const;
 
         void setScene(const Render::SceneSubmission& submission);
 

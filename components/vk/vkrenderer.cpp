@@ -122,6 +122,11 @@ namespace Vk
         return mInstance != nullptr && mInstance->validationEnabled();
     }
 
+    uint32_t Renderer::validationErrorCount() const
+    {
+        return mInstance != nullptr ? mInstance->validationErrorCount() : 0;
+    }
+
     void Renderer::createSurface()
     {
         if (!SDL_Vulkan_CreateSurface(mWindow, mInstance->handle(), &mSurface))
