@@ -65,7 +65,6 @@ namespace Vk
 
     void Swapchain::recreate(uint32_t width, uint32_t height)
     {
-        vkDeviceWaitIdle(mDevice.handle());
         cleanup();
         create(width, height);
     }

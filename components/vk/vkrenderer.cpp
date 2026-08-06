@@ -1351,7 +1351,6 @@ namespace Vk
             throw std::runtime_error("Vulkan frame capture requires an RGBA8 or BGRA8 swapchain");
 
         mFrameSync->waitForFrame(mLastSubmittedFrame);
-        VK_CHECK(vkQueueWaitIdle(mDevice->graphicsQueue()));
         VK_CHECK(vkQueueWaitIdle(mDevice->presentQueue()));
 
         const VkExtent2D extent = mSwapchain->extent();
@@ -1586,7 +1585,6 @@ namespace Vk
         if (!mDevice)
             return;
 
-        vkDeviceWaitIdle(mDevice->handle());
         for (uint32_t frameIndex = 0; frameIndex < maxFramesInFlight; ++frameIndex)
             destroyMesh(frameIndex);
         mUploadedMeshRevisions = {};
