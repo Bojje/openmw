@@ -15,6 +15,7 @@ namespace
     {
     public:
         bool mOpaqueOnly = false;
+        bool mEmpty = false;
 
         void getBounds(float&, float&, float&, float&, ESM::RefId) override {}
 
@@ -23,6 +24,9 @@ namespace
         void fillVertexBuffers(int, float, const osg::Vec2f&, ESM::RefId, osg::Vec3Array& positions,
             osg::Vec3Array& normals, osg::Vec4ubArray& colors) override
         {
+            if (mEmpty)
+                return;
+
             positions.push_back(osg::Vec3f(0.f, 0.f, 1.f));
             positions.push_back(osg::Vec3f(1.f, 0.f, 1.f));
             positions.push_back(osg::Vec3f(0.f, 1.f, 1.f));
@@ -100,6 +104,11 @@ int main()
         expect(opaqueTile.has_value() && opaqueTile->valid() && opaqueTile->layers.size() == 1
                 && !opaqueTile->layers[0].blendmap.valid(),
             "opaque terrain layer should not require a blendmap");
+
+        storage.mEmpty = true;
+        expect(!storage.getRenderTile(0, 1.f, osg::Vec2f(), ESM::RefId()).has_value(),
+            "empty terrain storage should not produce a tile");
+        storage.mEmpty = false;
         const auto opaqueTerrainMeshes = Render::makeTerrainMeshes(*opaqueTile);
         expect(opaqueTerrainMeshes.size() == 1 && opaqueTerrainMeshes.front().mesh.indices == opaqueTile->indices
                 && opaqueTerrainMeshes.front().mesh.material.albedoTexture == "textures/grass.dds"

@@ -72,7 +72,8 @@ namespace Terrain
             ++tile.verticesPerSide;
         while (static_cast<std::size_t>(tile.verticesPerSide) * tile.verticesPerSide > positions->size())
             --tile.verticesPerSide;
-        if (static_cast<std::size_t>(tile.verticesPerSide) * tile.verticesPerSide != positions->size())
+        if (tile.verticesPerSide < 2
+            || static_cast<std::size_t>(tile.verticesPerSide) * tile.verticesPerSide != positions->size())
             return std::nullopt;
         tile.vertices.resize(positions->size());
         tile.indices.reserve(static_cast<std::size_t>(tile.verticesPerSide - 1)
