@@ -117,6 +117,11 @@ namespace Vk
         cleanup();
     }
 
+    bool Renderer::validationEnabled() const
+    {
+        return mInstance != nullptr && mInstance->validationEnabled();
+    }
+
     void Renderer::createSurface()
     {
         if (!SDL_Vulkan_CreateSurface(mWindow, mInstance->handle(), &mSurface))

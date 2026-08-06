@@ -82,6 +82,8 @@ the local headless environment still skips before this runtime path. It can opti
 read a PPM reference image as its fourth argument and write per-frame PPM captures to a
 directory supplied as its fifth argument. This makes future OSG/Vulkan captures
 diagnosable without adding an image-library dependency or repeatedly restarting a game.
+When a presentation-capable run reaches renderer creation, the smoke test also requires
+the Khronos validation layer to be active; headless runs still skip before that gate.
 A neutral terrain tile snapshot adapter also converts the legacy
 OSG-array/OSG-image storage contract into vertices, layer metadata, and RGBA8 blendmaps;
 opaque single-layer terrain retains an intentionally absent blendmap. Vulkan now consumes
@@ -101,7 +103,7 @@ is part of the real full-game neutral handoff rather than only a test fixture; c
 happens on cell add/remove rather than on every frame export.
 
 Against the actual PR base `origin/openmw-vulkan` (PR #5), the current checkpoint changes
-50 files, deleting 275 lines and adding 3,942 lines (net `+3,667`). The larger Vulkan-only
+51 files, deleting 275 lines and adding 3,951 lines (net `+3,676`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.

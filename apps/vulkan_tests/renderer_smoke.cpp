@@ -233,6 +233,8 @@ int main(int argc, char** argv)
 
         {
             auto renderer = std::make_unique<Vk::Renderer>(window, true);
+            if (!renderer->validationEnabled())
+                throw std::runtime_error("Vulkan smoke test requires validation layers");
             if (!renderer->loadShadersAndCreatePipelines(shaderDir))
                 throw std::runtime_error("Vulkan smoke test could not load the raster shaders");
 

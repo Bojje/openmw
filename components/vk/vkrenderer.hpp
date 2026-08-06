@@ -61,6 +61,7 @@ namespace Vk
         std::optional<Render::TextureData> captureFrame();
         void resize(uint32_t width, uint32_t height);
         bool loadShadersAndCreatePipelines(const std::string& shaderDir);
+        bool validationEnabled() const;
 
         void setScene(const Render::SceneSubmission& submission);
 

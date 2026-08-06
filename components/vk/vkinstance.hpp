@@ -20,6 +20,7 @@ namespace Vk
         Instance& operator=(Instance&& other) noexcept;
 
         VkInstance handle() const { return mInstance; }
+        bool validationEnabled() const { return mValidationEnabled; }
 
     private:
         void createInstance(const std::string& appName, const std::string& engineName);
