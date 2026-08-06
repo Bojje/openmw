@@ -93,6 +93,21 @@ jobs:
     - name: Build Vulkan migration targets
       run: cmake --build build-vulkan --target openmw openmw-vulkan-smoke openmw-vulkan-math-tests openmw-render-world-tests openmw-render-mesh-tests openmw-vulkan-image-tests openmw-vulkan-terrain-tests -- -j$(nproc)
 
+    - name: Verify renderer link isolation
+      run: |
+        if readelf -d build-vulkan/openmw | grep -Eiq 'libvulkan|libOpenSceneGraph|libosg'; then
+          echo "openmw must not carry Vulkan or OSG runtime dependencies in the isolated build"
+          exit 1
+        fi
+        if ! readelf -d build-vulkan/openmw-vulkan-smoke | grep -q 'libvulkan'; then
+          echo "openmw-vulkan-smoke must carry the Vulkan runtime dependency"
+          exit 1
+        fi
+        if readelf -d build-vulkan/openmw-vulkan-smoke | grep -Eiq 'libOpenSceneGraph|libosg'; then
+          echo "openmw-vulkan-smoke must not carry OSG runtime dependencies"
+          exit 1
+        fi
+
     - name: Run Vulkan CPU and neutral tests
       run: >
         xvfb-run -a
