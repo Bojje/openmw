@@ -137,6 +137,31 @@ int main()
     expectNear(instances.front().mesh.material.emissive.z, 0.6f, "material emissive");
     expectNear(instances.front().mesh.material.glossiness, 42.f, "material glossiness");
 
+    Nif::BSEffectShaderProperty effect;
+    effect.mSourceTexture = "textures\\effect.dds";
+    effect.mNormalTexture = "textures\\effect_n.dds";
+    effect.mClamp = 1;
+    effect.mBaseColor = { 0.25f, 0.5f, 0.75f, 0.5f };
+    effect.mBaseColorScale = 2.f;
+    effect.mEmittanceColor = { 0.1f, 0.2f, 0.3f };
+    effect.mShaderFlags2 = Nif::BSLSFlag2_DoubleSided;
+    Nif::NiTriShape effectShape;
+    effectShape.mData = &treeData;
+    effectShape.mShaderProperty = &effect;
+    effectShape.mAlphaProperty = nullptr;
+    auto effectFile = std::make_shared<Nif::NIFFile>(VFS::Path::Normalized("effect.nif"));
+    effectFile->mRoots.push_back(&effectShape);
+    const std::vector<Render::MeshInstance> effectInstances
+        = Nif::collectMeshInstances(Nif::FileView(*effectFile));
+    if (effectInstances.size() != 1 || effectInstances.front().mesh.material.albedoTexture != "textures/effect.dds"
+        || effectInstances.front().mesh.material.normalTexture != "textures/effect_n.dds"
+        || !effectInstances.front().mesh.material.alphaBlend || !effectInstances.front().mesh.material.doubleSided
+        || effectInstances.front().mesh.material.albedoWrapU || !effectInstances.front().mesh.material.albedoWrapV)
+        throw std::runtime_error("NIF effect shader material conversion lost neutral state");
+    expectNear(effectInstances.front().mesh.material.diffuse.x, 0.5f, "effect diffuse red");
+    expectNear(effectInstances.front().mesh.material.diffuse.w, 0.5f, "effect alpha");
+    expectNear(effectInstances.front().mesh.material.emissive.z, 0.3f, "effect emissive blue");
+
     Resource::NifMeshManager meshManager(nullptr);
     const auto cached = meshManager.get(file);
     const auto cachedAgain = meshManager.get(file);

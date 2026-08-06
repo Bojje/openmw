@@ -287,6 +287,28 @@ namespace Nif
                     result.emissive = { ppLighting->mEmissiveColor.x(), ppLighting->mEmissiveColor.y(),
                         ppLighting->mEmissiveColor.z(), ppLighting->mEmissiveColor.w() };
                 }
+                else if (const auto* effect = dynamic_cast<const BSEffectShaderProperty*>(shader))
+                {
+                    if (!effect->mSourceTexture.empty())
+                    {
+                        result.albedoTexture = VFS::Path::toNormalized(effect->mSourceTexture).value();
+                        result.albedoWrapU = effect->wrapS();
+                        result.albedoWrapV = effect->wrapT();
+                    }
+                    if (!effect->mNormalTexture.empty())
+                    {
+                        result.normalTexture = VFS::Path::toNormalized(effect->mNormalTexture).value();
+                        result.normalWrapU = effect->wrapS();
+                        result.normalWrapV = effect->wrapT();
+                    }
+                    result.diffuse = { effect->mBaseColor.x() * effect->mBaseColorScale,
+                        effect->mBaseColor.y() * effect->mBaseColorScale,
+                        effect->mBaseColor.z() * effect->mBaseColorScale, effect->mBaseColor.w() };
+                    result.emissive = { effect->mEmittanceColor.x(), effect->mEmittanceColor.y(),
+                        effect->mEmittanceColor.z(), 1.f };
+                    result.doubleSided = effect->doubleSided();
+                    result.alphaBlend = result.diffuse.w < 1.f || effect->softEffect() || effect->refraction();
+                }
             }
 
             result.normalMap = !result.normalTexture.empty();
