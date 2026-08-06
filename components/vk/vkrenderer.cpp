@@ -27,19 +27,7 @@ namespace Vk
         = sizeof(Render::Mat4) + sizeof(float) * 12 + sizeof(std::uint32_t) * 2;
     static_assert(gbufferPushConstantSize == 120);
 
-    static uint32_t findMemoryTypeLocal(VkPhysicalDevice physicalDevice, uint32_t typeFilter, VkMemoryPropertyFlags properties)
-    {
-        VkPhysicalDeviceMemoryProperties memProperties;
-        vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProperties);
-        for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++)
-        {
-            if ((typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties)
-                return i;
-        }
-        throw std::runtime_error("Failed to find suitable memory type");
-    }
-
-    static void createBufferLocal(VkDevice device, VkPhysicalDevice physicalDevice, VkDeviceSize size,
+    static void createBufferLocal(Device& device, VkDeviceSize size,
         VkBufferUsageFlags usage, VkMemoryPropertyFlags properties,
         VkBuffer& buffer, VkDeviceMemory& memory)
     {
@@ -49,18 +37,18 @@ namespace Vk
         bufferInfo.usage = usage;
         bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-        VK_CHECK(vkCreateBuffer(device, &bufferInfo, nullptr, &buffer));
+        VK_CHECK(vkCreateBuffer(device.handle(), &bufferInfo, nullptr, &buffer));
 
         VkMemoryRequirements memRequirements;
-        vkGetBufferMemoryRequirements(device, buffer, &memRequirements);
+        vkGetBufferMemoryRequirements(device.handle(), buffer, &memRequirements);
 
         VkMemoryAllocateInfo allocInfo = {};
         allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
         allocInfo.allocationSize = memRequirements.size;
-        allocInfo.memoryTypeIndex = findMemoryTypeLocal(physicalDevice, memRequirements.memoryTypeBits, properties);
+        allocInfo.memoryTypeIndex = device.findMemoryType(memRequirements.memoryTypeBits, properties);
 
-        VK_CHECK(vkAllocateMemory(device, &allocInfo, nullptr, &memory));
-        VK_CHECK(vkBindBufferMemory(device, buffer, memory, 0));
+        VK_CHECK(vkAllocateMemory(device.handle(), &allocInfo, nullptr, &memory));
+        VK_CHECK(vkBindBufferMemory(device.handle(), buffer, memory, 0));
     }
 
     static std::string embeddedTextureKey(const Render::TextureData& texture)
@@ -199,7 +187,7 @@ namespace Vk
         resource.samplerMode = samplerMode;
         try
         {
-            createBufferLocal(mDevice->handle(), mDevice->physical(), texture.pixels.size(),
+            createBufferLocal(*mDevice, texture.pixels.size(),
                 VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                 stagingBuffer, stagingMemory);
@@ -813,7 +801,7 @@ namespace Vk
 
         for (uint32_t i = 0; i < maxFramesInFlight; i++)
         {
-            createBufferLocal(mDevice->handle(), mDevice->physical(), bufferSize,
+            createBufferLocal(*mDevice, bufferSize,
                 VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                 mUniformBuffers[i], mUniformMemory[i]);
@@ -1432,7 +1420,7 @@ namespace Vk
         const VkDeviceSize byteSize = static_cast<VkDeviceSize>(extent.width) * extent.height * 4;
         VkBuffer stagingBuffer = VK_NULL_HANDLE;
         VkDeviceMemory stagingMemory = VK_NULL_HANDLE;
-        createBufferLocal(mDevice->handle(), mDevice->physical(), byteSize,
+        createBufferLocal(*mDevice, byteSize,
             VK_BUFFER_USAGE_TRANSFER_DST_BIT,
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
             stagingBuffer, stagingMemory);
@@ -1646,11 +1634,11 @@ namespace Vk
 
         try
         {
-            createBufferLocal(mDevice->handle(), mDevice->physical(),
+            createBufferLocal(*mDevice,
                 sizeof(Render::MeshVertex) * mMeshVertices.size(), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                 buffers.vertex, buffers.vertexMemory);
-            createBufferLocal(mDevice->handle(), mDevice->physical(),
+            createBufferLocal(*mDevice,
                 sizeof(uint32_t) * mMeshIndices.size(), VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                 buffers.index, buffers.indexMemory);
