@@ -88,7 +88,8 @@ directory supplied as its fifth argument. This makes future OSG/Vulkan captures
 diagnosable without adding an image-library dependency or repeatedly restarting a game.
 When a presentation-capable run reaches renderer creation, the smoke test also requires
 the Khronos validation layer to be active and fails on error-level validation messages;
-headless runs still skip before that gate.
+headless local runs still skip before that gate. CI runs the presentation smoke directly,
+so an unexpected skip is a failure rather than a green test result.
 A neutral terrain tile snapshot adapter also converts the legacy
 OSG-array/OSG-image storage contract into vertices, layer metadata, and RGBA8 blendmaps;
 opaque single-layer terrain retains an intentionally absent blendmap. Vulkan now consumes

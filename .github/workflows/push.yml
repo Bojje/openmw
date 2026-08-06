@@ -93,11 +93,18 @@ jobs:
     - name: Build Vulkan migration targets
       run: cmake --build build-vulkan --target openmw openmw-vulkan-smoke openmw-vulkan-math-tests openmw-render-world-tests openmw-render-mesh-tests openmw-vulkan-image-tests openmw-vulkan-terrain-tests -- -j$(nproc)
 
-    - name: Run Vulkan migration tests
+    - name: Run Vulkan CPU and neutral tests
       run: >
         xvfb-run -a
         ctest --test-dir build-vulkan --output-on-failure
-        -R 'openmw-(vulkan-(math-tests|image-tests|terrain-tests|smoke)|render-(world|mesh)-tests)'
+        -R 'openmw-(vulkan-(math-tests|image-tests|terrain-tests)|render-(world|mesh)-tests)'
+
+    - name: Run Vulkan presentation smoke
+      run: >
+        xvfb-run -a
+        env SDL_VIDEODRIVER=x11 LIBGL_ALWAYS_SOFTWARE=1
+        ./build-vulkan/openmw-vulkan-smoke
+        ./build-vulkan/resources/shaders/vulkan 3
 
   MacOS:
     strategy:
