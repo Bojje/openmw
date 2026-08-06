@@ -111,6 +111,10 @@ jobs:
           echo "openmw-vulkan-smoke must not contain OSG renderer implementation symbols"
           exit 1
         fi
+        if nm -C build-vulkan/openmw-vulkan-smoke | grep -Eiq 'osg::|Nif::|(^| )Log::'; then
+          echo "openmw-vulkan-smoke must not contain legacy OSG, NIF, or shared logging symbols"
+          exit 1
+        fi
 
     - name: Run Vulkan CPU and neutral tests
       run: >
