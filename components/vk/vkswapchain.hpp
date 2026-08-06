@@ -42,7 +42,6 @@ namespace Vk
         VkSurfaceFormatKHR chooseSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& available) const;
         VkPresentModeKHR choosePresentMode(const std::vector<VkPresentModeKHR>& available) const;
         VkExtent2D chooseExtent(const VkSurfaceCapabilitiesKHR& capabilities, uint32_t width, uint32_t height) const;
-        VkFormat findDepthFormat() const;
 
         Device& mDevice;
         VkSurfaceKHR mSurface;
