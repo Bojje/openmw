@@ -1,5 +1,6 @@
 #include "vkinstance.hpp"
 
+#include <algorithm>
 #include <cstring>
 #include <stdexcept>
 #include <vector>
@@ -94,7 +95,12 @@ namespace Vk
         appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
         appInfo.pEngineName = engineName.c_str();
         appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-        appInfo.apiVersion = VK_API_VERSION_1_3;
+        uint32_t loaderVersion = VK_API_VERSION_1_0;
+        const auto enumerateInstanceVersion = reinterpret_cast<PFN_vkEnumerateInstanceVersion>(
+            vkGetInstanceProcAddr(VK_NULL_HANDLE, "vkEnumerateInstanceVersion"));
+        if (enumerateInstanceVersion != nullptr)
+            VK_CHECK(enumerateInstanceVersion(&loaderVersion));
+        appInfo.apiVersion = std::min(loaderVersion, VK_API_VERSION_1_3);
 
         auto extensions = getRequiredExtensions();
 
