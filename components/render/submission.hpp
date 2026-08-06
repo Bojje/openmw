@@ -41,6 +41,12 @@ namespace Render
                 }
             }
 
+            for (const WorldObject& object : dynamicObjects)
+            {
+                if (!object.dynamic || object.model.empty())
+                    return false;
+            }
+
             return std::all_of(terrainTiles.begin(), terrainTiles.end(), [](const TerrainTile& tile) {
                 return tile.valid();
             });
