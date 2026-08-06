@@ -10,7 +10,7 @@ layout(location = 6) in vec4 inTangent;
 
 layout(push_constant) uniform PushConstants {
     mat4 model;
-    mat4 normalMatrix;
+    mat3 normalMatrix;
     uint materialFlags;
     uint textureIndices;
 } push;

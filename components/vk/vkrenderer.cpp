@@ -23,6 +23,10 @@
 
 namespace Vk
 {
+    constexpr std::size_t gbufferPushConstantSize
+        = sizeof(Render::Mat4) + sizeof(float) * 12 + sizeof(std::uint32_t) * 2;
+    static_assert(gbufferPushConstantSize == 120);
+
     static uint32_t findMemoryTypeLocal(VkPhysicalDevice physicalDevice, uint32_t typeFilter, VkMemoryPropertyFlags properties)
     {
         VkPhysicalDeviceMemoryProperties memProperties;
@@ -903,7 +907,7 @@ namespace Vk
         VkPushConstantRange pushConstant = {};
         pushConstant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
         pushConstant.offset = 0;
-        pushConstant.size = sizeof(Render::Mat4) * 2 + sizeof(uint32_t) * 2;
+        pushConstant.size = gbufferPushConstantSize;
 
         VkPipelineLayoutCreateInfo layoutInfo = {};
         layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -1310,10 +1314,11 @@ namespace Vk
                     struct PushData
                     {
                         Render::Mat4 model;
-                        Render::Mat4 normalMatrix;
+                        std::array<float, 12> normalMatrix;
                         uint32_t materialFlags;
                         uint32_t textureIndices;
                     };
+                    static_assert(sizeof(PushData) == gbufferPushConstantSize);
 
                     VkDeviceSize offset = 0;
                     vkCmdBindVertexBuffers(cmd, 0, 1, &meshBuffers.vertex, &offset);
@@ -1348,7 +1353,9 @@ namespace Vk
                             materialFlags |= 8u;
                         const PushData pushData = {
                             draw.transform,
-                            draw.normalMatrix,
+                            { draw.normalMatrix.data[0], draw.normalMatrix.data[1], draw.normalMatrix.data[2], 0.f,
+                                draw.normalMatrix.data[4], draw.normalMatrix.data[5], draw.normalMatrix.data[6], 0.f,
+                                draw.normalMatrix.data[8], draw.normalMatrix.data[9], draw.normalMatrix.data[10], 0.f },
                             materialFlags,
                             mMeshTextureIndices[drawIndex] | (mMeshAlphaTextureIndices[drawIndex] << 6u)
                                 | (mMeshNormalTextureIndices[drawIndex] << 12u)
