@@ -95,6 +95,10 @@ jobs:
 
     - name: Verify renderer link isolation
       run: |
+        if rg -n '#include[[:space:]]*[<"]osg|namespace[[:space:]]+osg|osg::|Nif::|Log::' components/vk components/render; then
+          echo "renderer-neutral and Vulkan source boundaries must not depend on OSG, NIF, or shared logging"
+          exit 1
+        fi
         if readelf -d build-vulkan/openmw | grep -Eiq 'libvulkan|libOpenSceneGraph|libosg'; then
           echo "openmw must not carry Vulkan or OSG runtime dependencies in the isolated build"
           exit 1

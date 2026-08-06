@@ -116,6 +116,9 @@ When a presentation-capable run reaches renderer creation, the smoke test also r
 the Khronos validation layer to be active and fails on error-level validation messages;
 headless local runs still skip before that gate. CI runs the presentation smoke directly,
 so an unexpected skip is a failure rather than a green test result.
+CI also rejects OSG/NIF/shared-logging includes and namespaces in the renderer-neutral and Vulkan
+source boundaries before checking the linked smoke binary, preventing static linking from hiding
+a boundary regression.
 A neutral terrain tile snapshot adapter also converts the legacy
 OSG-array/OSG-image storage contract into vertices, layer metadata, and RGBA8 blendmaps;
 opaque single-layer terrain retains an intentionally absent blendmap. Vulkan now consumes
@@ -135,7 +138,7 @@ handoff rather than only a test fixture; conversion happens on cell add/remove r
 on every frame export.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-52 files, deleting 492 lines and adding 4,403 lines (net `+3,911`). The larger Vulkan-only
+52 files, deleting 492 lines and adding 4,410 lines (net `+3,918`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
