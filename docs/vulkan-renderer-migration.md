@@ -20,10 +20,12 @@ shared `components` archive, so the OSG game target does not link the inactive b
 The top-level build now also rejects a future `openmw-lib -> openmw_vulkan` link, and CI
 checks the final ELF dependencies and renderer-symbol set in both binaries, making that
 separation a configure- and link-time invariant. This keeps the process lifecycle
-single-backend while the scene bridge is incomplete. The Vulkan link interface currently
-retains only OSG core/OpenThreads for
-legacy NIF record math; the OSG viewer, animation, particle, shadow, database, utility,
-plugin, and GUI renderer implementations are no longer linked into the Vulkan smoke target.
+single-backend while the scene bridge is incomplete. The standalone Vulkan smoke target
+now links only SDL2 and Vulkan at runtime; no OSG library or renderer symbol is present.
+Its fixture submits renderer-neutral mesh and terrain data directly, while the separate
+renderer-mesh CPU test retains coverage for NIF conversion, material extraction, and the
+path-keyed mesh cache. This makes the presentation validation process independent of the
+legacy NIF/OSG object model.
 The pre-migration OSG reference is frozen at the `openmw-vulkan-osg-reference` tag.
 
 Completed reduction checkpoints include removal of the incomplete full-game Vulkan bridge,
@@ -35,14 +37,15 @@ resulting neutral mesh. Renderer-neutral batching now flattens multiple mesh ins
 independent transforms before the Vulkan backend uploads them. Parsed NIF resources now use a shared-pointer cache instead of an OSG object
 wrapper, and converted renderer-neutral NIF mesh instances have a separate path-keyed
 cache owned by `ResourceSystem`; its cache lifecycle is now forwarded explicitly without
-the OSG `BaseResourceManager` interface. The smoke harness exercises that cache boundary before
-submitting its test mesh to Vulkan. Loaded world references now also have a renderer-neutral
+the OSG `BaseResourceManager` interface. The renderer-mesh CPU test exercises that cache
+boundary, while the presentation smoke submits neutral mesh instances directly. Loaded world references now also have a renderer-neutral
 cell snapshot: the scene lifecycle records model identity, position, orientation, scale,
 visibility, cell transfer, and removal independently of the OSG node tree. Paged references
 remain in the snapshot with `visible == false` until the scene activates them. OSG still consumes the same
-events, but it no longer needs to be the only source of object transform state. The Vulkan
-smoke path now resolves all loaded-cell snapshots through the cached NIF meshes, filters paged
-objects by neutral visibility, and composes object transforms with NIF node transforms before batching.
+events, but it no longer needs to be the only source of object transform state. The neutral
+world path resolves loaded-cell snapshots through cached NIF meshes, filters paged objects by
+neutral visibility, and composes object transforms with NIF node transforms before batching;
+that handoff remains covered by the CPU tests until a live Vulkan game consumer is connected.
 NIF classic texture, diffuse/emissive, glossiness, and alpha properties now cross the
 renderer-neutral mesh boundary and survive batching; the neutral batch applies diffuse
 and alpha to vertex color output. NIF bump/normal texture slots now cross the same boundary
@@ -169,7 +172,7 @@ real replacement consumes its responsibility and the fast tests cover the bounda
 
 ### 2. Create a deterministic renderer-test foundation
 
-- Add a small test mode or executable that starts one renderer, loads a manifest of test scenes/cameras, renders multiple checkpoints, writes images, and exits. The current standalone smoke target validates neutral mesh/cache/material setup before window creation, then covers one textured alpha-blended scene, reads back each rendered swapchain frame, compares consecutive captures when a Vulkan surface is available, and supports optional PPM reference/capture paths.
+- Add a small test mode or executable that starts one renderer, loads a manifest of test scenes/cameras, renders multiple checkpoints, writes images, and exits. The current renderer-mesh CPU test validates NIF conversion, cache, and material setup; the standalone smoke target submits neutral mesh/terrain data, then covers one textured alpha-blended scene, reads back each rendered swapchain frame, compares consecutive captures when a Vulkan surface is available, and supports optional PPM reference/capture paths.
 - Use fixed camera paths, time, weather, random seed, resolution, and content.
 - Add CPU-side tests for matrix conversion, NIF conversion, transforms, resource lookup, and scene snapshots. The current fast tests cover matrix conversion, NIF conversion, parent-child transforms, safe index handling, cache reuse, cell-object transform composition, and renderer-neutral batch layout.
 - Compare Vulkan output with OSG reference images using the neutral image comparator's

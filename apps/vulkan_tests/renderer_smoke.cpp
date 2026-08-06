@@ -12,11 +12,8 @@
 #include <SDL.h>
 #include <SDL_vulkan.h>
 
-#include <components/nif/data.hpp>
-#include <components/nif/node.hpp>
 #include <components/render/imagecomparison.hpp>
 #include <components/render/mesh.hpp>
-#include <components/resource/nifmeshmanager.hpp>
 #include <components/vk/vkrenderer.hpp>
 
 #ifndef OPENMW_VULKAN_SHADER_DIR
@@ -75,46 +72,24 @@ namespace
         return directory;
     }
 
-    std::shared_ptr<const Resource::NifMeshManager::Meshes> smokeMeshes()
+    std::shared_ptr<const std::vector<Render::MeshInstance>> smokeMeshes()
     {
-        auto file = std::make_shared<Nif::NIFFile>(VFS::Path::Normalized("vulkan-smoke.nif"));
-        auto data = std::make_unique<Nif::NiTriShapeData>();
-        data->mVertices = { { -0.5f, -0.5f, 0.0f }, { 0.5f, -0.5f, 0.0f }, { 0.0f, 0.5f, 0.0f } };
-        data->mTriangles = { 0, 1, 2 };
+        Render::MeshData data;
+        data.vertices = {
+            { { -0.5f, -0.5f, 0.0f }, { 0.0f, 0.0f, 1.0f }, { 0.0f, 0.0f }, { 0.0f, 0.0f },
+                { 1.0f, 1.0f, 1.0f, 1.0f }, {}, { 0.0f, 0.0f, 1.0f, 1.0f } },
+            { { 0.5f, -0.5f, 0.0f }, { 0.0f, 0.0f, 1.0f }, { 1.0f, 0.0f }, { 0.0f, 0.0f },
+                { 1.0f, 1.0f, 1.0f, 1.0f }, {}, { 0.0f, 0.0f, 1.0f, 1.0f } },
+            { { 0.0f, 0.5f, 0.0f }, { 0.0f, 0.0f, 1.0f }, { 0.5f, 1.0f }, { 0.0f, 0.0f },
+                { 1.0f, 1.0f, 1.0f, 1.0f }, {}, { 0.0f, 0.0f, 1.0f, 1.0f } },
+        };
+        data.indices = { 0, 1, 2 };
 
-        auto firstShape = std::make_unique<Nif::NiTriShape>();
-        firstShape->mData = data.get();
-        firstShape->mShaderProperty = nullptr;
-        firstShape->mAlphaProperty = nullptr;
-        auto secondShape = std::make_unique<Nif::NiTriShape>();
-        secondShape->mData = data.get();
-        secondShape->mShaderProperty = nullptr;
-        secondShape->mAlphaProperty = nullptr;
-        secondShape->mTransform.mTranslation.x() = 0.25f;
-        auto root = std::make_unique<Nif::NiNode>();
-        root->mChildren.push_back(firstShape.get());
-        root->mChildren.push_back(secondShape.get());
-        file->mRecords.push_back(std::move(data));
-        file->mRecords.push_back(std::move(firstShape));
-        file->mRecords.push_back(std::move(secondShape));
-        file->mRoots.push_back(root.get());
-        file->mRecords.push_back(std::move(root));
-
-        Resource::NifMeshManager meshManager(nullptr);
-        const auto cachedMeshes = meshManager.get(file);
-
-        int objectHandle = 0;
-        int cellHandle = 0;
-        Render::WorldScene world;
-        Render::ObjectTransform transform;
-        transform.position.x = 0.5f;
-        world.recordObject(&objectHandle, &cellHandle, true, 0, 0, "smoke", file->mPath.view(), transform, true);
-        Resource::NifMeshManager::Meshes result = Render::collectWorldMeshes(
-            world, [&](std::string_view model) -> const Resource::NifMeshManager::Meshes& {
-                if (model != file->mPath.view())
-                    throw std::runtime_error("Vulkan smoke scene referenced an uncached model");
-                return *cachedMeshes;
-            });
+        std::vector<Render::MeshInstance> result;
+        result.push_back({ data, identityMatrix() });
+        result.push_back({ data, identityMatrix() });
+        result[0].transform.data[12] = 0.5f;
+        result[1].transform.data[12] = 0.75f;
         for (std::size_t i = 0; i < result.size(); ++i)
         {
             Render::MeshInstance& mesh = result[i];
@@ -125,7 +100,7 @@ namespace
                 mesh.mesh.material.diffuse.w = 0.75f;
             }
         }
-        return std::make_shared<const Resource::NifMeshManager::Meshes>(std::move(result));
+        return std::make_shared<const std::vector<Render::MeshInstance>>(std::move(result));
     }
 
     std::shared_ptr<const Render::TextureData> smokeTexture(std::string_view path)
