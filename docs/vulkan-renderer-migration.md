@@ -102,7 +102,7 @@ collects cached terrain tiles for loaded exterior cells in the active worldspace
 is part of the real full-game neutral handoff rather than only a test fixture; conversion
 happens on cell add/remove rather than on every frame export.
 
-Against the actual PR base `origin/openmw-vulkan` (PR #5), the current checkpoint changes
+Against the current `origin/openmw-vulkan` base, the current checkpoint changes
 51 files, deleting 275 lines and adding 3,951 lines (net `+3,676`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
