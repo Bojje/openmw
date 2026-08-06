@@ -84,8 +84,10 @@ int main()
     texturing.mTextures.resize(Nif::NiTexturingProperty::BumpTexture + 1);
     texturing.mTextures.front().mEnabled = true;
     texturing.mTextures.front().mSourceTexture = &texture;
+    texturing.mTextures.front().mClamp = 0;
     texturing.mTextures[Nif::NiTexturingProperty::BumpTexture].mEnabled = true;
     texturing.mTextures[Nif::NiTexturingProperty::BumpTexture].mSourceTexture = &normalTexture;
+    texturing.mTextures[Nif::NiTexturingProperty::BumpTexture].mClamp = 1;
     Nif::NiMaterialProperty material;
     material.mDiffuse = { 0.25f, 0.5f, 0.75f };
     material.mAlpha = 0.75f;
@@ -126,7 +128,9 @@ int main()
         || !instances.front().mesh.material.normalMap
         || !instances.front().mesh.material.alphaBlend || !instances.front().mesh.material.alphaTest
         || instances.front().mesh.material.alphaTestThreshold != 128
-        || !instances.front().mesh.material.doubleSided)
+        || !instances.front().mesh.material.doubleSided
+        || instances.front().mesh.material.albedoWrapU || instances.front().mesh.material.albedoWrapV
+        || instances.front().mesh.material.normalWrapU || !instances.front().mesh.material.normalWrapV)
         throw std::runtime_error("NIF material conversion lost texture or alpha state");
     expectNear(instances.front().mesh.material.diffuse.x, 0.25f, "material diffuse red");
     expectNear(instances.front().mesh.material.diffuse.w, 0.75f, "material alpha");

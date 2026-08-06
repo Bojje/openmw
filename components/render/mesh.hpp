@@ -26,6 +26,10 @@ namespace Render
         bool alphaBlend = false;
         bool alphaTest = false;
         bool doubleSided = false;
+        bool albedoWrapU = true;
+        bool albedoWrapV = true;
+        bool normalWrapU = true;
+        bool normalWrapV = true;
         uint8_t alphaTestThreshold = 0;
         bool terrainBlend = false;
         bool terrainFirstLayer = false;

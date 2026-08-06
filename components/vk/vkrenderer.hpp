@@ -69,9 +69,18 @@ namespace Vk
 
         struct TextureResource
         {
+            enum class SamplerMode
+            {
+                Repeat,
+                Clamp,
+                RepeatU,
+                RepeatV,
+            };
+
             VkImage image = VK_NULL_HANDLE;
             VkDeviceMemory memory = VK_NULL_HANDLE;
             VkImageView view = VK_NULL_HANDLE;
+            SamplerMode samplerMode = SamplerMode::Repeat;
         };
 
         void createSurface();
@@ -92,7 +101,8 @@ namespace Vk
         void writeCompositeDescriptor(uint32_t binding, VkImageView view);
         void writeSceneTextureDescriptor(uint32_t frameIndex, uint32_t binding, uint32_t textureIndex, VkImageView view);
         void syncSceneTextureDescriptors(uint32_t frameIndex);
-        uint32_t createTextureResource(const Render::TextureData& texture);
+        uint32_t createTextureResource(const Render::TextureData& texture,
+            TextureResource::SamplerMode samplerMode = TextureResource::SamplerMode::Repeat);
         void destroyTextures();
         void destroyMesh();
         void destroyMesh(uint32_t frameIndex);
@@ -151,6 +161,8 @@ namespace Vk
         VkSampler mGBufferSampler = VK_NULL_HANDLE;
         VkSampler mSceneSampler = VK_NULL_HANDLE;
         VkSampler mAlphaSampler = VK_NULL_HANDLE;
+        VkSampler mRepeatUSampler = VK_NULL_HANDLE;
+        VkSampler mRepeatVSampler = VK_NULL_HANDLE;
 
         VkCommandBuffer mUploadCommandBuffer = VK_NULL_HANDLE;
         std::vector<TextureResource> mTextures;

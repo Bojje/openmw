@@ -172,7 +172,8 @@ namespace Vk
         return view;
     }
 
-    uint32_t Renderer::createTextureResource(const Render::TextureData& texture)
+    uint32_t Renderer::createTextureResource(const Render::TextureData& texture,
+        TextureResource::SamplerMode samplerMode)
     {
         if (!texture.valid())
             throw std::invalid_argument("Cannot upload invalid Vulkan texture data");
@@ -182,6 +183,7 @@ namespace Vk
         VkBuffer stagingBuffer = VK_NULL_HANDLE;
         VkDeviceMemory stagingMemory = VK_NULL_HANDLE;
         TextureResource resource;
+        resource.samplerMode = samplerMode;
         try
         {
             createBufferLocal(mDevice->handle(), mDevice->physical(), texture.pixels.size(),
@@ -600,6 +602,13 @@ namespace Vk
         samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
         samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
         VK_CHECK(vkCreateSampler(mDevice->handle(), &samplerInfo, nullptr, &mAlphaSampler));
+
+        samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        VK_CHECK(vkCreateSampler(mDevice->handle(), &samplerInfo, nullptr, &mRepeatUSampler));
+        samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        VK_CHECK(vkCreateSampler(mDevice->handle(), &samplerInfo, nullptr, &mRepeatVSampler));
     }
 
     void Renderer::writeCompositeDescriptor(uint32_t binding, VkImageView view)
@@ -632,7 +641,26 @@ namespace Vk
             throw std::out_of_range("Vulkan texture descriptor index is out of range");
 
         VkDescriptorImageInfo imageInfo = {};
-        imageInfo.sampler = binding == 2 ? mAlphaSampler : mSceneSampler;
+        if (binding == 2)
+            imageInfo.sampler = mAlphaSampler;
+        else
+        {
+            switch (mTextures.at(textureIndex).samplerMode)
+            {
+                case TextureResource::SamplerMode::Repeat:
+                    imageInfo.sampler = mSceneSampler;
+                    break;
+                case TextureResource::SamplerMode::Clamp:
+                    imageInfo.sampler = mAlphaSampler;
+                    break;
+                case TextureResource::SamplerMode::RepeatU:
+                    imageInfo.sampler = mRepeatUSampler;
+                    break;
+                case TextureResource::SamplerMode::RepeatV:
+                    imageInfo.sampler = mRepeatVSampler;
+                    break;
+            }
+        }
         imageInfo.imageView = view;
         imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
@@ -1502,27 +1530,35 @@ namespace Vk
         alphaTextureIndices.reserve(batch.draws.size());
         normalTextureIndices.reserve(batch.draws.size());
 
-        const auto resolveTexture = [&](std::string_view path) {
+        const auto resolveTexture = [&](std::string_view path, bool wrapU, bool wrapV) {
             if (path.empty() || !textureResolver)
                 return uint32_t(0);
 
-            const std::string key(path);
+            const TextureResource::SamplerMode samplerMode = wrapU
+                ? (wrapV ? TextureResource::SamplerMode::Repeat : TextureResource::SamplerMode::RepeatU)
+                : (wrapV ? TextureResource::SamplerMode::RepeatV : TextureResource::SamplerMode::Clamp);
+            std::string key(path);
+            key.push_back('\0');
+            key.push_back(static_cast<char>(samplerMode));
             const auto existing = mTextureIndices.find(key);
             if (existing != mTextureIndices.end())
                 return existing->second;
 
             const std::shared_ptr<const Render::TextureData> texture = textureResolver(path);
-            const uint32_t textureIndex = texture && texture->valid() ? createTextureResource(*texture) : 0;
+            const uint32_t textureIndex = texture && texture->valid()
+                ? createTextureResource(*texture, samplerMode)
+                : 0;
             mTextureIndices.emplace(key, textureIndex);
             return textureIndex;
         };
 
         for (Render::MeshDraw& draw : batch.draws)
         {
-            textureIndices.push_back(resolveTexture(draw.material.albedoTexture));
+            textureIndices.push_back(
+                resolveTexture(draw.material.albedoTexture, draw.material.albedoWrapU, draw.material.albedoWrapV));
             const bool wantsNormalMap = draw.material.normalMap || draw.material.terrainNormalMap;
             const uint32_t normalTextureIndex = wantsNormalMap
-                ? resolveTexture(draw.material.normalTexture)
+                ? resolveTexture(draw.material.normalTexture, draw.material.normalWrapU, draw.material.normalWrapV)
                 : 0;
             draw.material.normalMap = draw.material.normalMap && normalTextureIndex != 0;
             draw.material.terrainNormalMap = draw.material.terrainNormalMap && normalTextureIndex != 0;
@@ -1546,7 +1582,8 @@ namespace Vk
                 continue;
             }
 
-            const uint32_t alphaTextureIndex = createTextureResource(*draw.material.alphaTexture);
+            const uint32_t alphaTextureIndex
+                = createTextureResource(*draw.material.alphaTexture, TextureResource::SamplerMode::Clamp);
             mTextureIndices.emplace(key, alphaTextureIndex);
             alphaTextureIndices.push_back(alphaTextureIndex);
         }
@@ -1695,6 +1732,10 @@ namespace Vk
             vkDestroySampler(dev, mSceneSampler, nullptr);
         if (mAlphaSampler != VK_NULL_HANDLE)
             vkDestroySampler(dev, mAlphaSampler, nullptr);
+        if (mRepeatUSampler != VK_NULL_HANDLE)
+            vkDestroySampler(dev, mRepeatUSampler, nullptr);
+        if (mRepeatVSampler != VK_NULL_HANDLE)
+            vkDestroySampler(dev, mRepeatVSampler, nullptr);
 
         if (mGBufferPipeline != VK_NULL_HANDLE)
             vkDestroyPipeline(dev, mGBufferPipeline, nullptr);

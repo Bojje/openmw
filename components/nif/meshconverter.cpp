@@ -197,16 +197,21 @@ namespace Nif
             }
         }
 
-        void setShaderTexture(Render::MeshMaterial& material, const BSShaderTextureSetPtr& textureSet)
+        void setShaderTexture(Render::MeshMaterial& material, const BSShaderTextureSetPtr& textureSet,
+            bool wrapU, bool wrapV)
         {
             if (textureSet.empty() || textureSet->mTextures.empty())
                 return;
 
             material.albedoTexture = VFS::Path::toNormalized(textureSet->mTextures.front()).value();
+            material.albedoWrapU = wrapU;
+            material.albedoWrapV = wrapV;
             if (textureSet->mTextures.size() > 1 && !textureSet->mTextures[1].empty())
             {
                 material.normalTexture = VFS::Path::toNormalized(textureSet->mTextures[1]).value();
                 material.normalMap = !material.normalTexture.empty();
+                material.normalWrapU = wrapU;
+                material.normalWrapV = wrapV;
             }
         }
 
@@ -226,14 +231,22 @@ namespace Nif
                         const NiTexturingProperty::Texture& texture
                             = texturing->mTextures[NiTexturingProperty::BaseTexture];
                         if (texture.mEnabled && !texture.mSourceTexture.empty())
+                        {
                             result.albedoTexture = VFS::Path::toNormalized(texture.mSourceTexture->mFile).value();
+                            result.albedoWrapU = texture.wrapS();
+                            result.albedoWrapV = texture.wrapT();
+                        }
                     }
                     if (texturing->mTextures.size() > NiTexturingProperty::BumpTexture)
                     {
                         const NiTexturingProperty::Texture& texture
                             = texturing->mTextures[NiTexturingProperty::BumpTexture];
                         if (texture.mEnabled && !texture.mSourceTexture.empty())
+                        {
                             result.normalTexture = VFS::Path::toNormalized(texture.mSourceTexture->mFile).value();
+                            result.normalWrapU = texture.wrapS();
+                            result.normalWrapV = texture.wrapT();
+                        }
                     }
                 }
                 else if (const auto* material = dynamic_cast<const NiMaterialProperty*>(property.getPtr()))
@@ -260,7 +273,7 @@ namespace Nif
                 const BSShaderProperty* shader = geometry.mShaderProperty.getPtr();
                 if (const auto* lighting = dynamic_cast<const BSLightingShaderProperty*>(shader))
                 {
-                    setShaderTexture(result, lighting->mTextureSet);
+                    setShaderTexture(result, lighting->mTextureSet, lighting->wrapS(), lighting->wrapT());
                     result.doubleSided = lighting->doubleSided();
                     result.diffuse.w = lighting->mAlpha;
                     result.emissive = { lighting->mEmissive.x() * lighting->mEmissiveMult,
@@ -270,7 +283,7 @@ namespace Nif
                 }
                 else if (const auto* ppLighting = dynamic_cast<const BSShaderPPLightingProperty*>(shader))
                 {
-                    setShaderTexture(result, ppLighting->mTextureSet);
+                    setShaderTexture(result, ppLighting->mTextureSet, ppLighting->wrapS(), ppLighting->wrapT());
                     result.emissive = { ppLighting->mEmissiveColor.x(), ppLighting->mEmissiveColor.y(),
                         ppLighting->mEmissiveColor.z(), ppLighting->mEmissiveColor.w() };
                 }
