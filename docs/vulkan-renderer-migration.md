@@ -76,6 +76,8 @@ for a future Vulkan frame consumer. Neutral loaded-cell snapshots retain inserti
 collected, making backend draw lists stable for image comparison and predictable alpha ordering.
 Fog color and start/end distances now cross the same neutral scene handoff, and the Vulkan
 composite applies the active linear fog range after reconstructing world position.
+The CPU ABI guard tracks the expanded 336-byte scene UBO so future neutral-state additions
+cannot silently desynchronize the Vulkan shader layout.
 The neutral world snapshot now has an explicit reset path owned by `RenderingManager::clear()`,
 so a game/world unload cannot retain stale object identities, terrain tiles, or cell ordering.
 The Vulkan composite pass now consumes that single scene-lighting UBO directly; duplicated
@@ -126,7 +128,7 @@ handoff rather than only a test fixture; conversion happens on cell add/remove r
 on every frame export.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-52 files, deleting 326 lines and adding 4,175 lines (net `+3,849`). The larger Vulkan-only
+52 files, deleting 326 lines and adding 4,177 lines (net `+3,851`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
