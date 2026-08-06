@@ -26,7 +26,6 @@ namespace Vk
         VkFormat format() const { return mFormat; }
         VkImage image(uint32_t imageIndex) const { return mImages.at(imageIndex); }
         const std::vector<VkImageView>& imageViews() const { return mImageViews; }
-        VkImageView depthImageView() const { return mDepthImageView; }
         uint32_t imageCount() const { return static_cast<uint32_t>(mImages.size()); }
         VkSwapchainKHR handle() const { return mSwapchain; }
 
@@ -41,7 +40,6 @@ namespace Vk
         void create(uint32_t width, uint32_t height);
         void cleanup();
         void createImageViews();
-        void createDepthResources();
         SurfaceDetails querySurfaceDetails() const;
         VkSurfaceFormatKHR chooseSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& available) const;
         VkPresentModeKHR choosePresentMode(const std::vector<VkPresentModeKHR>& available) const;
@@ -55,9 +53,6 @@ namespace Vk
         VkExtent2D mExtent = {};
         std::vector<VkImage> mImages;
         std::vector<VkImageView> mImageViews;
-        VkImage mDepthImage = VK_NULL_HANDLE;
-        VkDeviceMemory mDepthImageMemory = VK_NULL_HANDLE;
-        VkImageView mDepthImageView = VK_NULL_HANDLE;
     };
 }
 
