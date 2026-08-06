@@ -39,6 +39,7 @@ namespace Vk
 
         VkPhysicalDevice bestDevice = VK_NULL_HANDLE;
         int bestScore = -1;
+        bool descriptorBudgetRejected = false;
         for (auto device : devices)
         {
             auto queueIndices = findQueueFamilies(device, surface);
@@ -49,7 +50,10 @@ namespace Vk
                 continue;
 
             if (!supportsDescriptorBudget(device))
+            {
+                descriptorBudgetRejected = true;
                 continue;
+            }
 
             int score = rateDevice(device);
 
@@ -61,7 +65,12 @@ namespace Vk
         }
 
         if (bestDevice == VK_NULL_HANDLE)
+        {
+            if (descriptorBudgetRejected)
+                throw std::runtime_error(
+                    "No suitable Vulkan GPU found: the renderer requires 256 sampled descriptors per set");
             throw std::runtime_error("No suitable Vulkan GPU found");
+        }
 
         mPhysicalDevice = bestDevice;
         mQueueFamilyIndices = findQueueFamilies(mPhysicalDevice, surface);
@@ -163,14 +172,14 @@ namespace Vk
         VkPhysicalDeviceProperties props;
         vkGetPhysicalDeviceProperties(device, &props);
 
-        // The G-buffer uses four 64-entry sampled-image arrays. The composite
-        // pass adds four sampled attachments, and all of them are allocated in
-        // the same descriptor pool. Reject a device that cannot represent the
-        // fixed shader ABI before logical-device creation reaches descriptor
-        // allocation or pipeline validation.
+        // The G-buffer uses four 64-entry sampled-image arrays. Reject a device
+        // that cannot represent the fixed shader ABI before logical-device
+        // creation reaches descriptor allocation or pipeline validation. The
+        // descriptor-set limits are per set; the composite set is smaller.
         constexpr uint32_t sceneDescriptors = maxSceneTextures * sceneTextureBindingCount;
         constexpr uint32_t compositeDescriptors = 4;
-        constexpr uint32_t requiredDescriptors = sceneDescriptors + compositeDescriptors;
+        constexpr uint32_t requiredDescriptors
+            = sceneDescriptors > compositeDescriptors ? sceneDescriptors : compositeDescriptors;
         return props.limits.maxPerStageDescriptorSampledImages >= sceneDescriptors
             && props.limits.maxDescriptorSetSampledImages >= requiredDescriptors
             && props.limits.maxDescriptorSetSamplers >= requiredDescriptors;
