@@ -3,6 +3,7 @@
 
 #include <array>
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -45,6 +46,24 @@ namespace Render
                 || vertices.size() != static_cast<std::size_t>(verticesPerSide) * verticesPerSide
                 || indices.empty() || indices.size() % 3 != 0 || layers.empty())
                 return false;
+
+            if (!std::isfinite(size) || !std::isfinite(center[0]) || !std::isfinite(center[1])
+                || !std::isfinite(cellWorldSize) || !std::isfinite(blendmapScale))
+                return false;
+
+            for (const TerrainVertex& vertex : vertices)
+            {
+                for (const float value : vertex.position)
+                {
+                    if (!std::isfinite(value))
+                        return false;
+                }
+                for (const float value : vertex.normal)
+                {
+                    if (!std::isfinite(value))
+                        return false;
+                }
+            }
 
             if (!std::all_of(indices.begin(), indices.end(), [this](std::uint32_t index) {
                     return index < vertices.size();

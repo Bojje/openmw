@@ -19,6 +19,11 @@ namespace Render
         Vec3 position{};
         Quat rotation{ 0.f, 0.f, 0.f, 1.f };
         Vec3 scale{ 1.f, 1.f, 1.f };
+
+        bool valid() const
+        {
+            return Render::valid(position) && Render::valid(rotation) && Render::valid(scale);
+        }
     };
 
     // Renderer-neutral state for one loaded world reference. The id is owned by

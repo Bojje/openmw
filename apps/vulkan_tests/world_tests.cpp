@@ -1,3 +1,4 @@
+#include <limits>
 #include <stdexcept>
 #include <string>
 
@@ -136,6 +137,11 @@ int main()
     if (submission.valid())
         throw std::runtime_error("renderer-neutral scene submission accepted an invalid mesh index");
     submission.meshes.clear();
+
+    submission.scene.view.data[0] = std::numeric_limits<float>::quiet_NaN();
+    if (submission.valid())
+        throw std::runtime_error("renderer-neutral scene submission accepted a non-finite scene matrix");
+    submission.scene.view.data[0] = 0.f;
 
     Render::TerrainTile malformedTerrain;
     malformedTerrain.size = 1.f;

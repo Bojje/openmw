@@ -2,6 +2,7 @@
 #define OPENMW_COMPONENTS_RENDER_SUBMISSION_H
 
 #include <algorithm>
+#include <cmath>
 #include <vector>
 
 #include "mesh.hpp"
@@ -28,12 +29,55 @@ namespace Render
 
         bool valid() const
         {
+            if (!scene.valid())
+                return false;
+
             for (const MeshInstance& instance : meshes)
             {
                 if (instance.mesh.indices.empty())
                     continue;
-                if (instance.mesh.vertices.empty())
+                if (instance.mesh.vertices.empty() || !Render::valid(instance.transform)
+                    || !Render::valid(instance.mesh.material.diffuse) || !Render::valid(instance.mesh.material.emissive)
+                    || !std::isfinite(instance.mesh.material.glossiness))
                     return false;
+                for (const MeshVertex& vertex : instance.mesh.vertices)
+                {
+                    for (const float value : vertex.position)
+                    {
+                        if (!std::isfinite(value))
+                            return false;
+                    }
+                    for (const float value : vertex.normal)
+                    {
+                        if (!std::isfinite(value))
+                            return false;
+                    }
+                    for (const float value : vertex.texcoord)
+                    {
+                        if (!std::isfinite(value))
+                            return false;
+                    }
+                    for (const float value : vertex.blendTexcoord)
+                    {
+                        if (!std::isfinite(value))
+                            return false;
+                    }
+                    for (const float value : vertex.color)
+                    {
+                        if (!std::isfinite(value))
+                            return false;
+                    }
+                    for (const float value : vertex.material)
+                    {
+                        if (!std::isfinite(value))
+                            return false;
+                    }
+                    for (const float value : vertex.tangent)
+                    {
+                        if (!std::isfinite(value))
+                            return false;
+                    }
+                }
                 for (const std::uint32_t index : instance.mesh.indices)
                 {
                     if (index >= instance.mesh.vertices.size())
@@ -43,7 +87,7 @@ namespace Render
 
             for (const WorldObject& object : dynamicObjects)
             {
-                if (!object.dynamic || object.model.empty())
+                if (!object.dynamic || object.model.empty() || !object.transform.valid())
                     return false;
             }
 
