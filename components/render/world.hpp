@@ -213,15 +213,15 @@ namespace Render
         // Dynamic objects remain owned by the scene snapshot until a backend
         // with animation/skinning support consumes them. Preserve cell order
         // so the handoff is deterministic without exposing engine types.
-        std::vector<const WorldObject*> dynamicObjectsInOrder(std::string_view worldspace = {}) const
+        std::vector<WorldObject> dynamicObjectsInOrder(std::string_view worldspace = {}) const
         {
-            std::vector<const WorldObject*> result;
+            std::vector<WorldObject> result;
             for (const CellScene* cell : cellsInOrder(worldspace))
             {
                 for (const WorldObject& object : cell->objects)
                 {
                     if (object.dynamic)
-                        result.push_back(&object);
+                        result.push_back(object);
                 }
             }
             return result;

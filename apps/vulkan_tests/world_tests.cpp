@@ -71,8 +71,8 @@ int main()
     if (world.findObject(&dynamicObjectHandle) == nullptr || !world.findObject(&dynamicObjectHandle)->dynamic)
         throw std::runtime_error("renderer-neutral world scene failed to retain dynamic-object state");
     const auto dynamicObjects = world.dynamicObjectsInOrder();
-    if (dynamicObjects.size() != 1 || dynamicObjects.front()->model != "meshes/animated.nif"
-        || !dynamicObjects.front()->visible)
+    if (dynamicObjects.size() != 1 || dynamicObjects.front().model != "meshes/animated.nif"
+        || !dynamicObjects.front().visible)
         throw std::runtime_error("renderer-neutral world scene failed dynamic-object handoff");
 
     int thirdCellHandle = 0;
