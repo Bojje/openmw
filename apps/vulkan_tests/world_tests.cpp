@@ -84,6 +84,15 @@ int main()
         || world.cellsInOrder()[2] != world.findCell(&thirdCellHandle))
         throw std::runtime_error("renderer-neutral world scene failed cell removal");
 
+    world.clear();
+    if (world.findCell(&firstCellHandle) != nullptr || world.findObject(&objectHandle) != nullptr
+        || !world.cellsInOrder().empty())
+        throw std::runtime_error("renderer-neutral world scene failed world reset");
+
+    world.recordObject(&objectHandle, &firstCellHandle, true, 1, 2, "first", "meshes/first.nif", objectTransform, true);
+    if (world.findObject(&objectHandle) == nullptr || world.findObject(&objectHandle)->id != 1)
+        throw std::runtime_error("renderer-neutral world scene did not reset object identity");
+
     Render::SceneSubmission submission;
     submission.scene.ambientColor = { 0.2f, 0.3f, 0.4f, 1.f };
     bool resolverCalled = false;

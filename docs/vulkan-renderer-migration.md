@@ -74,6 +74,8 @@ manager; the manager now only translates engine lifecycle events into that compo
 manager also exposes a renderer-neutral camera/inverse-matrix and directional-light snapshot
 for a future Vulkan frame consumer. Neutral loaded-cell snapshots retain insertion order when
 collected, making backend draw lists stable for image comparison and predictable alpha ordering.
+The neutral world snapshot now has an explicit reset path owned by `RenderingManager::clear()`,
+so a game/world unload cannot retain stale object identities, terrain tiles, or cell ordering.
 The Vulkan composite pass now consumes that single scene-lighting UBO directly; duplicated
 sun push constants were removed, and ambient light is part of the neutral snapshot. The
 OSG-facing manager now also exposes neutral loaded-world mesh collection and RGBA8 texture
@@ -122,7 +124,7 @@ handoff rather than only a test fixture; conversion happens on cell add/remove r
 on every frame export.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-51 files, deleting 324 lines and adding 4,126 lines (net `+3,802`). The larger Vulkan-only
+51 files, deleting 324 lines and adding 4,149 lines (net `+3,825`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.

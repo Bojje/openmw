@@ -273,6 +273,17 @@ namespace Render
             mCells.erase(cellKey);
             std::erase(mCellOrder, cellKey);
         }
+
+        // Reset renderer-neutral world ownership when the game unloads its
+        // world. This is separate from removeCell so a backend can retain
+        // stable cell ordering during ordinary streaming.
+        void clear()
+        {
+            mCells.clear();
+            mCellOrder.clear();
+            mObjects.clear();
+            mNextObjectId = 1;
+        }
     };
 
     inline Mat4 makeObjectTransformMatrix(const ObjectTransform& transform)

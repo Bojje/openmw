@@ -1237,6 +1237,7 @@ namespace MWRender
         mSky->setMoonColour(false);
 
         notifyWorldSpaceChanged();
+        mWorldScene.clear();
         if (mObjectPaging)
             mObjectPaging->clear();
     }
