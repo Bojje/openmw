@@ -667,21 +667,8 @@ target_link_libraries(components ${_components_yaml_target})
 target_link_libraries(components ${BULLET_LIBRARIES})
 
 if (OPENMW_USE_VULKAN)
-    # The shared components archive still contains legacy code used by the game.
-    # Link only its archive file through a deliberately narrow interface for the
-    # standalone Vulkan target. The current Vulkan sources need the component
-    # logging implementation and SDL2; resource, physics, YAML, and OSG
-    # dependencies belong to the full-game target and must not leak here.
-    add_library(components_vulkan INTERFACE)
-    add_dependencies(components_vulkan components)
-    target_include_directories(components_vulkan INTERFACE ${CMAKE_SOURCE_DIR})
-    target_link_libraries(components_vulkan INTERFACE
-        "$<TARGET_FILE:components>"
-        SDL2::SDL2
-    )
-
     add_library(openmw_vulkan STATIC ${VULKAN_COMPONENT_FILES})
-    target_link_libraries(openmw_vulkan PUBLIC components_vulkan Vulkan::Vulkan)
+    target_link_libraries(openmw_vulkan PUBLIC SDL2::SDL2 Vulkan::Vulkan)
     target_compile_definitions(openmw_vulkan PUBLIC OPENMW_USE_VULKAN=1)
 endif()
 

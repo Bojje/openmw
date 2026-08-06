@@ -5,13 +5,12 @@
 #include <cstring>
 #include <limits>
 #include <fstream>
+#include <iostream>
 #include <iterator>
 #include <stdexcept>
 #include <utility>
 
 #include <SDL_vulkan.h>
-
-#include <components/debug/debuglog.hpp>
 
 #include "../render/math.hpp"
 #include "../render/terrainmesh.hpp"
@@ -938,8 +937,8 @@ namespace Vk
 
         if (!gbufVert || !gbufFrag || !compVert || !compFrag)
         {
-            Log(Debug::Warning) << "Vulkan SPIR-V shaders not found in " << shaderDir
-                                << ", rendering disabled until shaders are compiled";
+            std::clog << "Vulkan SPIR-V shaders not found in " << shaderDir
+                      << ", rendering disabled until shaders are compiled\n";
             return false;
         }
 
@@ -1149,7 +1148,7 @@ namespace Vk
                 &pipelineInfo, nullptr, &mCompositePipeline));
         }
 
-        Log(Debug::Info) << "Vulkan pipelines created successfully";
+        std::clog << "Vulkan pipelines created successfully\n";
         return true;
     }
 

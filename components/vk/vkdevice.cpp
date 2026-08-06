@@ -1,12 +1,11 @@
 #include "vkdevice.hpp"
 
 #include <cstring>
+#include <iostream>
 #include <set>
 #include <stdexcept>
 #include <string>
 #include <vector>
-
-#include <components/debug/debuglog.hpp>
 
 #include "vkinstance.hpp"
 
@@ -100,7 +99,7 @@ namespace Vk
 
         VkPhysicalDeviceProperties props;
         vkGetPhysicalDeviceProperties(mPhysicalDevice, &props);
-        Log(Debug::Info) << "Selected GPU: " << props.deviceName;
+        std::clog << "Selected GPU: " << props.deviceName << '\n';
     }
 
     void Device::createLogicalDevice()

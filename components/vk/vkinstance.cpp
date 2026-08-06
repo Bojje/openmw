@@ -2,12 +2,11 @@
 
 #include <algorithm>
 #include <cstring>
+#include <iostream>
 #include <stdexcept>
 #include <vector>
 
 #include <SDL_vulkan.h>
-
-#include <components/debug/debuglog.hpp>
 
 #include "vkcommon.hpp"
 
@@ -41,7 +40,7 @@ namespace Vk
     {
         if (mValidationEnabled && !checkValidationLayerSupport())
         {
-            Log(Debug::Warning) << "Vulkan validation layers requested but not available, disabling";
+            std::clog << "Vulkan validation layers requested but not available, disabling\n";
             mValidationEnabled = false;
         }
 
@@ -109,7 +108,7 @@ namespace Vk
 
         VK_CHECK(vkCreateInstance(&createInfo, nullptr, &mInstance));
 
-        Log(Debug::Info) << "Vulkan instance created";
+        std::clog << "Vulkan instance created\n";
     }
 
     void Instance::setupDebugMessenger()
@@ -166,10 +165,10 @@ namespace Vk
         {
             if (instance != nullptr)
                 instance->mValidationErrorCount.fetch_add(1);
-            Log(Debug::Error) << "Vulkan validation: " << pCallbackData->pMessage;
+            std::clog << "Vulkan validation: " << pCallbackData->pMessage << '\n';
         }
         else if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
-            Log(Debug::Warning) << "Vulkan validation: " << pCallbackData->pMessage;
+            std::clog << "Vulkan validation: " << pCallbackData->pMessage << '\n';
 
         return VK_FALSE;
     }
