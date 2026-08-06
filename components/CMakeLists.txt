@@ -657,16 +657,40 @@ target_link_libraries(components
     )
 
 if(yaml-cpp_VERSION VERSION_GREATER_EQUAL 0.8.0)
-    target_link_libraries(components yaml-cpp::yaml-cpp)
+    set(_components_yaml_target yaml-cpp::yaml-cpp)
 else()
-    target_link_libraries(components yaml-cpp)
+    set(_components_yaml_target yaml-cpp)
 endif()
+
+target_link_libraries(components ${_components_yaml_target})
 
 target_link_libraries(components ${BULLET_LIBRARIES})
 
 if (OPENMW_USE_VULKAN)
+    # The shared components archive still contains legacy OSG-facing code used by
+    # the game. Link its archive file through a deliberately narrow interface for
+    # Vulkan targets so the inactive OSG renderer stack is not propagated into the
+    # Vulkan process. Any remaining legacy data dependencies must be listed here
+    # explicitly and can be removed as their neutral replacements land.
+    add_library(components_vulkan INTERFACE)
+    add_dependencies(components_vulkan components)
+    target_include_directories(components_vulkan INTERFACE ${CMAKE_SOURCE_DIR})
+    target_link_libraries(components_vulkan INTERFACE
+        "$<TARGET_FILE:components>"
+        Boost::iostreams
+        SDL2::SDL2
+        LZ4::LZ4
+        smhasher
+        ZLIB::ZLIB
+        ${_components_yaml_target}
+        ${BULLET_LIBRARIES}
+        ${OSG_LIBRARIES}
+        ${OPENTHREADS_LIBRARIES}
+        ${CMAKE_THREAD_LIBS_INIT}
+    )
+
     add_library(openmw_vulkan STATIC ${VULKAN_COMPONENT_FILES})
-    target_link_libraries(openmw_vulkan PUBLIC components Vulkan::Vulkan)
+    target_link_libraries(openmw_vulkan PUBLIC components_vulkan Vulkan::Vulkan)
     target_compile_definitions(openmw_vulkan PUBLIC OPENMW_USE_VULKAN=1)
 endif()
 

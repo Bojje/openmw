@@ -78,7 +78,7 @@ jobs:
     - name: Install Building and Vulkan Dependencies
       run: >
         sudo CI/install_debian_deps.sh gcc openmw-deps openmw-deps-dynamic
-        && sudo apt-get install -y libvulkan-dev glslang-tools mesa-vulkan-drivers
+        && sudo apt-get install -y binutils libvulkan-dev glslang-tools mesa-vulkan-drivers
         vulkan-validationlayers xvfb
 
     - name: Configure Vulkan migration build
@@ -105,6 +105,10 @@ jobs:
         fi
         if readelf -d build-vulkan/openmw-vulkan-smoke | grep -Eiq 'libOpenSceneGraph|libosg'; then
           echo "openmw-vulkan-smoke must not carry OSG runtime dependencies"
+          exit 1
+        fi
+        if nm -C build-vulkan/openmw-vulkan-smoke | grep -Eiq 'osgViewer::|osgAnimation::|osgParticle::|osgShadow::|osgDB::|osgUtil::|osgGA::|osgSim::|osgText::'; then
+          echo "openmw-vulkan-smoke must not contain OSG renderer implementation symbols"
           exit 1
         fi
 
