@@ -99,7 +99,11 @@ namespace Vk
         const auto enumerateInstanceVersion = reinterpret_cast<PFN_vkEnumerateInstanceVersion>(
             vkGetInstanceProcAddr(VK_NULL_HANDLE, "vkEnumerateInstanceVersion"));
         if (enumerateInstanceVersion != nullptr)
-            VK_CHECK(enumerateInstanceVersion(&loaderVersion));
+        {
+            const VkResult result = enumerateInstanceVersion(&loaderVersion);
+            if (result != VK_SUCCESS && result != VK_ERROR_INCOMPATIBLE_DRIVER)
+                VK_CHECK(result);
+        }
         appInfo.apiVersion = std::min(loaderVersion, VK_API_VERSION_1_3);
 
         auto extensions = getRequiredExtensions();
