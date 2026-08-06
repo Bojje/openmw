@@ -51,7 +51,14 @@ namespace Vk
     class Renderer
     {
     public:
-        Renderer(SDL_Window* window, bool enableValidation);
+        enum class SurfaceMode
+        {
+            Window,
+            Headless,
+        };
+
+        Renderer(SDL_Window* window, bool enableValidation, SurfaceMode surfaceMode = SurfaceMode::Window,
+            uint32_t width = 640, uint32_t height = 480);
         ~Renderer();
 
         Renderer(const Renderer&) = delete;
@@ -122,6 +129,7 @@ namespace Vk
         VkFormat findDepthFormat();
 
         SDL_Window* mWindow;
+        bool mHeadless = false;
         VkSurfaceKHR mSurface = VK_NULL_HANDLE;
 
         std::unique_ptr<Instance> mInstance;

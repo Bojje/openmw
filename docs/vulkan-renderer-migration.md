@@ -110,7 +110,11 @@ The Vulkan smoke path now reads back rendered RGBA8/BGRA8 swapchain frames and c
 consecutive captures with that comparator when a presentation-capable host is available;
 without a reference image it also replaces the scene once in the same process to exercise
 descriptor growth and frame-safe mesh replacement;
-the local headless environment still skips before this runtime path. It can optionally
+an optional `OPENMW_VULKAN_HEADLESS=1` mode uses `VK_EXT_headless_surface` to exercise the
+same frame lifecycle without SDL/X11/Wayland, omitting only swapchain image readback; CTest
+runs that probe and treats missing validation/headless WSI support as an environment skip;
+the local headless environment reaches Vulkan device selection but skips when llvmpipe
+rejects its headless swapchain allocation. It can optionally
 read a PPM reference image as its fourth argument and write per-frame PPM captures to a
 directory supplied as its fifth argument. This makes future OSG/Vulkan captures
 diagnosable without adding an image-library dependency or repeatedly restarting a game.
@@ -140,7 +144,7 @@ handoff rather than only a test fixture; conversion happens on cell add/remove r
 on every frame export.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-53 files, deleting 513 lines and adding 4,627 lines (net `+4,114`). The larger Vulkan-only
+53 files, deleting 540 lines and adding 4,768 lines (net `+4,228`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.

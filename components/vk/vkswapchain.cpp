@@ -9,9 +9,10 @@
 
 namespace Vk
 {
-    Swapchain::Swapchain(Device& device, VkSurfaceKHR surface, uint32_t width, uint32_t height)
+    Swapchain::Swapchain(Device& device, VkSurfaceKHR surface, uint32_t width, uint32_t height, bool readback)
         : mDevice(device)
         , mSurface(surface)
+        , mReadback(readback)
     {
         create(width, height);
     }
@@ -34,7 +35,11 @@ namespace Vk
         auto presentMode = choosePresentMode(details.presentModes);
         auto extent = chooseExtent(details.capabilities, width, height);
 
-        uint32_t imageCount = details.capabilities.minImageCount + 1;
+        // The surface minimum is sufficient for the renderer's explicit
+        // per-image presentation semaphore ownership. Avoid allocating an
+        // unnecessary extra image, which matters for headless and
+        // memory-constrained implementations.
+        uint32_t imageCount = details.capabilities.minImageCount;
         if (details.capabilities.maxImageCount > 0 && imageCount > details.capabilities.maxImageCount)
             imageCount = details.capabilities.maxImageCount;
 
@@ -46,9 +51,11 @@ namespace Vk
         createInfo.imageColorSpace = surfaceFormat.colorSpace;
         createInfo.imageExtent = extent;
         createInfo.imageArrayLayers = 1;
-        if ((details.capabilities.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_SRC_BIT) == 0)
+        if (mReadback && (details.capabilities.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_SRC_BIT) == 0)
             throw std::runtime_error("Vulkan swapchain does not support image readback");
-        createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+        createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+        if (mReadback)
+            createInfo.imageUsage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 
         auto indices = mDevice.indices();
         uint32_t queueFamilyIndices[] = { indices.graphics.value(), indices.present.value() };

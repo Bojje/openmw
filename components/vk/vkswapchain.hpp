@@ -12,7 +12,7 @@ namespace Vk
     class Swapchain
     {
     public:
-        Swapchain(Device& device, VkSurfaceKHR surface, uint32_t width, uint32_t height);
+        Swapchain(Device& device, VkSurfaceKHR surface, uint32_t width, uint32_t height, bool readback = true);
         ~Swapchain();
 
         Swapchain(const Swapchain&) = delete;
@@ -45,6 +45,7 @@ namespace Vk
 
         Device& mDevice;
         VkSurfaceKHR mSurface;
+        bool mReadback = true;
         VkSwapchainKHR mSwapchain = VK_NULL_HANDLE;
         VkFormat mFormat = VK_FORMAT_UNDEFINED;
         VkExtent2D mExtent = {};

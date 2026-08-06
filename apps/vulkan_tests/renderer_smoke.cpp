@@ -189,35 +189,50 @@ int main(int argc, char** argv)
     }
 
     SDL_Window* window = nullptr;
+    bool headless = false;
     try
     {
         const unsigned int frames = frameCount(argc, argv);
+        const char* headlessEnvironment = std::getenv("OPENMW_VULKAN_HEADLESS");
+        headless = headlessEnvironment != nullptr && std::string_view(headlessEnvironment) == "1";
         const auto reference = referenceImage(argc, argv);
         const std::filesystem::path captures = captureDirectory(argc, argv);
+        if (headless && reference)
+            throw std::invalid_argument("headless Vulkan smoke does not support image capture references");
         const auto meshes = smokeMeshes();
         const auto texture = smokeTexture("textures/vulkan-smoke.rgba");
         if (!texture || !texture->valid())
             throw std::runtime_error("Vulkan smoke texture resolver returned invalid data");
 
-        if (SDL_Init(SDL_INIT_VIDEO) != 0)
-            throw EnvironmentUnavailable(std::string("SDL initialization failed: ") + SDL_GetError());
+        int drawableWidth = 640;
+        int drawableHeight = 480;
+        if (!headless)
+        {
+            if (SDL_Init(SDL_INIT_VIDEO) != 0)
+                throw EnvironmentUnavailable(std::string("SDL initialization failed: ") + SDL_GetError());
 
-        window = SDL_CreateWindow("OpenMW Vulkan smoke test",
-            SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 640, 480,
-            SDL_WINDOW_VULKAN | SDL_WINDOW_HIDDEN | SDL_WINDOW_ALLOW_HIGHDPI);
-        if (!window)
-            throw EnvironmentUnavailable(std::string("SDL Vulkan window creation failed: ") + SDL_GetError());
+            window = SDL_CreateWindow("OpenMW Vulkan smoke test",
+                SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, drawableWidth, drawableHeight,
+                SDL_WINDOW_VULKAN | SDL_WINDOW_HIDDEN | SDL_WINDOW_ALLOW_HIGHDPI);
+            if (!window)
+                throw EnvironmentUnavailable(std::string("SDL Vulkan window creation failed: ") + SDL_GetError());
 
-        int drawableWidth = 0;
-        int drawableHeight = 0;
-        SDL_Vulkan_GetDrawableSize(window, &drawableWidth, &drawableHeight);
-        if (drawableWidth <= 0 || drawableHeight <= 0)
-            throw EnvironmentUnavailable("SDL returned an unavailable Vulkan drawable size");
+            SDL_Vulkan_GetDrawableSize(window, &drawableWidth, &drawableHeight);
+            if (drawableWidth <= 0 || drawableHeight <= 0)
+                throw EnvironmentUnavailable("SDL returned an unavailable Vulkan drawable size");
+        }
 
         {
-            auto renderer = std::make_unique<Vk::Renderer>(window, true);
+            const auto surfaceMode = headless ? Vk::Renderer::SurfaceMode::Headless
+                                               : Vk::Renderer::SurfaceMode::Window;
+            auto renderer = std::make_unique<Vk::Renderer>(window, true, surfaceMode,
+                static_cast<uint32_t>(drawableWidth), static_cast<uint32_t>(drawableHeight));
             if (!renderer->validationEnabled())
+            {
+                if (headless)
+                    throw EnvironmentUnavailable("headless Vulkan smoke requires validation layers");
                 throw std::runtime_error("Vulkan smoke test requires validation layers");
+            }
             if (!renderer->loadShadersAndCreatePipelines(shaderDir))
                 throw std::runtime_error("Vulkan smoke test could not load the raster shaders");
 
@@ -254,34 +269,36 @@ int main(int argc, char** argv)
                     previousCapture.reset();
                 }
 
-                SDL_PumpEvents();
+                if (!headless)
+                    SDL_PumpEvents();
                 if (renderer->render())
                 {
                     ++renderedFrames;
                     const std::optional<Render::TextureData> capture = renderer->captureFrame();
-                    if (!capture || !capture->valid())
+                    if (!headless && (!capture || !capture->valid()))
                         throw std::runtime_error("Vulkan smoke could not capture its rendered frame");
-                    if (reference)
+                    if (reference && capture)
                     {
                         const Render::ImageComparison comparison = Render::compareImages(*reference, *capture, 1);
                         if (!comparison.matches(1))
                             throw std::runtime_error("Vulkan smoke frame did not match the reference image");
                     }
-                    if (!captures.empty())
+                    if (!captures.empty() && capture)
                     {
                         const std::filesystem::path path
                             = captures / ("vulkan-frame-" + std::to_string(frame) + ".ppm");
                         if (!Render::writePpm(*capture, path))
                             throw std::runtime_error("Vulkan smoke could not write its captured frame");
                     }
-                    if (previousCapture)
+                    if (previousCapture && capture)
                     {
                         const Render::ImageComparison comparison
                             = Render::compareImages(*previousCapture, *capture, 1);
                         if (!comparison.matches(1))
                             throw std::runtime_error("Vulkan smoke frame capture was not deterministic");
                     }
-                    previousCapture = *capture;
+                    if (capture)
+                        previousCapture = *capture;
                 }
 
                 // Recreate the swapchain once without restarting the process. This
@@ -315,6 +332,14 @@ int main(int argc, char** argv)
         if (window)
             SDL_DestroyWindow(window);
         SDL_Quit();
+        const std::string message = error.what();
+        if (headless && (message.find("VK_ERROR_OUT_OF_DEVICE_MEMORY") != std::string::npos
+                || message.find("Required Vulkan instance extension") != std::string::npos
+                || message.find("headless surface") != std::string::npos))
+        {
+            std::cerr << "Vulkan renderer smoke test skipped: " << message << '\n';
+            return 77;
+        }
         std::cerr << "Vulkan renderer smoke test failed: " << error.what() << '\n';
         return EXIT_FAILURE;
     }

@@ -83,4 +83,13 @@ if (BUILD_TESTING)
         COMMAND openmw-vulkan-smoke "${VK_SHADER_OUTPUT_DIR}" 3
     )
     set_tests_properties(openmw-vulkan-smoke PROPERTIES SKIP_RETURN_CODE 77)
+
+    add_test(
+        NAME openmw-vulkan-headless-smoke
+        COMMAND openmw-vulkan-smoke "${VK_SHADER_OUTPUT_DIR}" 3
+    )
+    set_tests_properties(openmw-vulkan-headless-smoke PROPERTIES
+        ENVIRONMENT "OPENMW_VULKAN_HEADLESS=1"
+        SKIP_RETURN_CODE 77
+    )
 endif()

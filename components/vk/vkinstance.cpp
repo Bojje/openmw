@@ -35,8 +35,10 @@ namespace
 
 namespace Vk
 {
-    Instance::Instance(const std::string& appName, const std::string& engineName, bool enableValidation)
+    Instance::Instance(const std::string& appName, const std::string& engineName, bool enableValidation,
+        bool headless)
         : mValidationEnabled(enableValidation)
+        , mHeadless(headless)
     {
         if (mValidationEnabled && !checkValidationLayerSupport())
         {
@@ -78,6 +80,8 @@ namespace Vk
         appInfo.apiVersion = std::min(loaderVersion, VK_API_VERSION_1_3);
 
         auto extensions = getRequiredExtensions();
+        if (!checkInstanceExtensionSupport(extensions))
+            throw std::runtime_error("Required Vulkan instance extension is unavailable");
 
         VkInstanceCreateInfo createInfo = {};
         createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
@@ -127,7 +131,10 @@ namespace Vk
 
     std::vector<const char*> Instance::getRequiredExtensions() const
     {
-        // SDL provides the platform-specific surface extensions
+        if (mHeadless)
+            return { VK_KHR_SURFACE_EXTENSION_NAME, VK_EXT_HEADLESS_SURFACE_EXTENSION_NAME };
+
+        // SDL provides the platform-specific surface extensions.
         unsigned int sdlExtensionCount = 0;
         SDL_Vulkan_GetInstanceExtensions(nullptr, &sdlExtensionCount, nullptr);
 
@@ -138,6 +145,24 @@ namespace Vk
             extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 
         return extensions;
+    }
+
+    bool Instance::checkInstanceExtensionSupport(const std::vector<const char*>& extensions) const
+    {
+        uint32_t extensionCount = 0;
+        vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
+        std::vector<VkExtensionProperties> available(extensionCount);
+        vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, available.data());
+
+        for (const char* required : extensions)
+        {
+            const auto found = std::find_if(available.begin(), available.end(), [required](const auto& extension) {
+                return std::strcmp(extension.extensionName, required) == 0;
+            });
+            if (found == available.end())
+                return false;
+        }
+        return true;
     }
 
     bool Instance::checkValidationLayerSupport() const

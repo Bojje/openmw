@@ -62,19 +62,30 @@ namespace Vk
         return key;
     }
 
-    Renderer::Renderer(SDL_Window* window, bool enableValidation)
+    Renderer::Renderer(SDL_Window* window, bool enableValidation, SurfaceMode surfaceMode,
+        uint32_t width, uint32_t height)
         : mWindow(window)
+        , mHeadless(surfaceMode == SurfaceMode::Headless)
     {
-        mInstance = std::make_unique<Instance>("OpenMW", "OpenMW Engine", enableValidation);
+        if (!mHeadless && mWindow == nullptr)
+            throw std::invalid_argument("Window Vulkan surface mode requires an SDL window");
+        if (mHeadless && (width == 0 || height == 0))
+            throw std::invalid_argument("Headless Vulkan surface requires a non-zero extent");
+
+        mInstance = std::make_unique<Instance>("OpenMW", "OpenMW Engine", enableValidation, mHeadless);
         createSurface();
 
         mDevice = std::make_unique<Device>(*mInstance, mSurface);
 
-        int w, h;
-        SDL_Vulkan_GetDrawableSize(window, &w, &h);
+        int drawableWidth = static_cast<int>(width);
+        int drawableHeight = static_cast<int>(height);
+        if (!mHeadless)
+            SDL_Vulkan_GetDrawableSize(window, &drawableWidth, &drawableHeight);
+        if (drawableWidth <= 0 || drawableHeight <= 0)
+            throw std::runtime_error("Vulkan surface returned an unavailable drawable size");
 
         mSwapchain = std::make_unique<Swapchain>(*mDevice, mSurface,
-            static_cast<uint32_t>(w), static_cast<uint32_t>(h));
+            static_cast<uint32_t>(drawableWidth), static_cast<uint32_t>(drawableHeight), !mHeadless);
         mCommandPool = std::make_unique<CommandPool>(*mDevice, mDevice->indices().graphics.value());
         mFrameSync = std::make_unique<FrameSync>(*mDevice, mSwapchain->imageCount());
 
@@ -120,6 +131,19 @@ namespace Vk
 
     void Renderer::createSurface()
     {
+        if (mHeadless)
+        {
+            const auto createHeadlessSurface = reinterpret_cast<PFN_vkCreateHeadlessSurfaceEXT>(
+                vkGetInstanceProcAddr(mInstance->handle(), "vkCreateHeadlessSurfaceEXT"));
+            if (createHeadlessSurface == nullptr)
+                throw std::runtime_error("Vulkan headless surface entry point is unavailable");
+
+            VkHeadlessSurfaceCreateInfoEXT createInfo = {};
+            createInfo.sType = VK_STRUCTURE_TYPE_HEADLESS_SURFACE_CREATE_INFO_EXT;
+            VK_CHECK(createHeadlessSurface(mInstance->handle(), &createInfo, nullptr, &mSurface));
+            return;
+        }
+
         if (!SDL_Vulkan_CreateSurface(mWindow, mInstance->handle(), &mSurface))
             throw std::runtime_error("Failed to create Vulkan surface via SDL");
     }
@@ -1159,7 +1183,13 @@ namespace Vk
 
         int drawableWidth = 0;
         int drawableHeight = 0;
-        SDL_Vulkan_GetDrawableSize(mWindow, &drawableWidth, &drawableHeight);
+        if (mHeadless)
+        {
+            drawableWidth = static_cast<int>(mSwapchain->extent().width);
+            drawableHeight = static_cast<int>(mSwapchain->extent().height);
+        }
+        else
+            SDL_Vulkan_GetDrawableSize(mWindow, &drawableWidth, &drawableHeight);
         if (drawableWidth <= 0 || drawableHeight <= 0)
             return false;
 
@@ -1174,7 +1204,8 @@ namespace Vk
 
             if (result == VK_ERROR_OUT_OF_DATE_KHR)
             {
-                SDL_Vulkan_GetDrawableSize(mWindow, &drawableWidth, &drawableHeight);
+                if (!mHeadless)
+                    SDL_Vulkan_GetDrawableSize(mWindow, &drawableWidth, &drawableHeight);
                 if (drawableWidth <= 0 || drawableHeight <= 0)
                     return false;
                 resize(static_cast<uint32_t>(drawableWidth), static_cast<uint32_t>(drawableHeight));
@@ -1238,8 +1269,10 @@ namespace Vk
         if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR)
         {
             mHasSubmittedFrame = false;
-            int w, h;
-            SDL_Vulkan_GetDrawableSize(mWindow, &w, &h);
+            int w = static_cast<int>(mSwapchain->extent().width);
+            int h = static_cast<int>(mSwapchain->extent().height);
+            if (!mHeadless)
+                SDL_Vulkan_GetDrawableSize(mWindow, &w, &h);
             resize(static_cast<uint32_t>(w), static_cast<uint32_t>(h));
             mCurrentFrame = (mCurrentFrame + 1) % maxFramesInFlight;
             return false;
@@ -1404,7 +1437,7 @@ namespace Vk
 
     std::optional<Render::TextureData> Renderer::captureFrame()
     {
-        if (!mHasSubmittedFrame)
+        if (!mHasSubmittedFrame || mHeadless)
             return std::nullopt;
 
         const VkFormat format = mSwapchain->format();
