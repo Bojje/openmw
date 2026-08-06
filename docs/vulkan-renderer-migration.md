@@ -94,7 +94,7 @@ is part of the real full-game neutral handoff rather than only a test fixture; c
 happens on cell add/remove rather than on every frame export.
 
 Against the actual PR base `origin/openmw-vulkan` (PR #5), the current checkpoint changes
-48 files, deleting 265 lines and adding 3,592 lines (net `+3,327`). The larger Vulkan-only
+48 files, deleting 265 lines and adding 3,597 lines (net `+3,332`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
@@ -108,6 +108,8 @@ The Vulkan renderer now accepts only the aggregate `SceneSubmission`; its duplic
 argument and local resolver type alias were removed.
 The descriptor pool now reserves only the scene/composite descriptors actually allocated;
 the removed storage-image and excess-set capacity is gone.
+Texture descriptor writes are also deferred until the owning frame fence has completed,
+so scene updates do not mutate descriptor sets used by another in-flight frame.
 
 The remaining migration is not a compatibility problem that can be solved by retaining
 both renderers in one execution path. Static-world transforms, materials, textures,
