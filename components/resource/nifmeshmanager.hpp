@@ -8,6 +8,8 @@
 
 #include <components/nif/meshconverter.hpp>
 
+#include "cachestats.hpp"
+
 namespace Resource
 {
     class NifFileManager;
@@ -30,6 +32,7 @@ namespace Resource
         mutable std::mutex mMutex;
         std::map<std::string, CacheItem, std::less<>> mCache;
         double mExpiryDelay = 0.0;
+        CacheStats mStats;
 
     public:
         explicit NifMeshManager(NifFileManager* nifFileManager);
@@ -44,6 +47,7 @@ namespace Resource
         void updateCache(double referenceTime);
         void clearCache();
         void setExpiryDelay(double expiryDelay);
+        CacheStats getStats() const;
     };
 }
 

@@ -125,6 +125,7 @@ namespace Resource
 
     void ResourceSystem::reportStats(unsigned int frameNumber, osg::Stats* stats) const
     {
+        Resource::reportStats("NifMesh", frameNumber, mNifMeshManager->getStats(), *stats);
         for (std::vector<BaseResourceManager*>::const_iterator it = mResourceManagers.begin();
              it != mResourceManagers.end(); ++it)
             (*it)->reportStats(frameNumber, stats);

@@ -28,9 +28,11 @@ namespace Resource
         const std::string key = file->mPath.value();
         {
             std::lock_guard lock(mMutex);
+            ++mStats.mGet;
             const auto found = mCache.find(key);
             if (found != mCache.end())
             {
+                ++mStats.mHit;
                 return found->second.mMeshes;
             }
         }
@@ -52,6 +54,7 @@ namespace Resource
                 cacheItem.mLastUsage = referenceTime;
             if (cacheItem.mLastUsage > expiryTime)
                 return false;
+            ++mStats.mExpired;
             return true;
         });
     }
@@ -66,6 +69,14 @@ namespace Resource
     {
         std::lock_guard lock(mMutex);
         mExpiryDelay = expiryDelay;
+    }
+
+    CacheStats NifMeshManager::getStats() const
+    {
+        std::lock_guard lock(mMutex);
+        CacheStats result = mStats;
+        result.mSize = mCache.size();
+        return result;
     }
 
 }
