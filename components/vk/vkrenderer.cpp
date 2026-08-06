@@ -592,6 +592,14 @@ namespace Vk
         samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
         samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
         VK_CHECK(vkCreateSampler(mDevice->handle(), &samplerInfo, nullptr, &mSceneSampler));
+
+        // Blendmaps are finite masks, not tiled scene textures. Clamp their
+        // edge samples so filtering cannot pull opacity from the opposite
+        // side of the image.
+        samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        VK_CHECK(vkCreateSampler(mDevice->handle(), &samplerInfo, nullptr, &mAlphaSampler));
     }
 
     void Renderer::writeCompositeDescriptor(uint32_t binding, VkImageView view)
@@ -624,7 +632,7 @@ namespace Vk
             throw std::out_of_range("Vulkan texture descriptor index is out of range");
 
         VkDescriptorImageInfo imageInfo = {};
-        imageInfo.sampler = mSceneSampler;
+        imageInfo.sampler = binding == 2 ? mAlphaSampler : mSceneSampler;
         imageInfo.imageView = view;
         imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
@@ -1672,6 +1680,8 @@ namespace Vk
             vkDestroySampler(dev, mGBufferSampler, nullptr);
         if (mSceneSampler != VK_NULL_HANDLE)
             vkDestroySampler(dev, mSceneSampler, nullptr);
+        if (mAlphaSampler != VK_NULL_HANDLE)
+            vkDestroySampler(dev, mAlphaSampler, nullptr);
 
         if (mGBufferPipeline != VK_NULL_HANDLE)
             vkDestroyPipeline(dev, mGBufferPipeline, nullptr);

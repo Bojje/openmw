@@ -148,6 +148,7 @@ namespace Vk
 
         VkSampler mGBufferSampler = VK_NULL_HANDLE;
         VkSampler mSceneSampler = VK_NULL_HANDLE;
+        VkSampler mAlphaSampler = VK_NULL_HANDLE;
 
         VkCommandBuffer mUploadCommandBuffer = VK_NULL_HANDLE;
         std::vector<TextureResource> mTextures;
