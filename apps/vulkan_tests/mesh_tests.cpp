@@ -102,7 +102,7 @@ int main()
     lighting->mGlossiness = 42.f;
     lighting->mTextureSet = Nif::BSShaderTextureSetPtr(nullptr);
     Nif::NiAlphaProperty alpha;
-    alpha.mFlags = Nif::NiAlphaProperty::Flag_Testing;
+    alpha.mFlags = Nif::NiAlphaProperty::Flag_Blending | Nif::NiAlphaProperty::Flag_Testing;
     alpha.mThreshold = 128;
     Nif::NiTriShape shape;
     shape.mTransform = Nif::NiTransform::getIdentity();

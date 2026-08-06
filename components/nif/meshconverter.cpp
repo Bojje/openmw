@@ -276,7 +276,6 @@ namespace Nif
                     setShaderTexture(result, lighting->mTextureSet, lighting->wrapS(), lighting->wrapT());
                     result.doubleSided = lighting->doubleSided();
                     result.diffuse.w = lighting->mAlpha;
-                    result.alphaBlend = result.alphaBlend || lighting->mAlpha < 1.f;
                     result.emissive = { lighting->mEmissive.x() * lighting->mEmissiveMult,
                         lighting->mEmissive.y() * lighting->mEmissiveMult,
                         lighting->mEmissive.z() * lighting->mEmissiveMult, 1.f };
