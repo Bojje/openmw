@@ -33,6 +33,7 @@ namespace Vk
         void createLogicalDevice();
         QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR surface) const;
         bool checkDeviceExtensionSupport(VkPhysicalDevice device, const std::vector<const char*>& extensions) const;
+        bool supportsDescriptorBudget(VkPhysicalDevice device) const;
         int rateDevice(VkPhysicalDevice device) const;
 
         VkDevice mDevice = VK_NULL_HANDLE;

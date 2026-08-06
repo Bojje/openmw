@@ -48,6 +48,9 @@ namespace Vk
             if (!checkDeviceExtensionSupport(device, sRequiredExtensions))
                 continue;
 
+            if (!supportsDescriptorBudget(device))
+                continue;
+
             int score = rateDevice(device);
 
             if (score > bestScore)
@@ -153,6 +156,24 @@ namespace Vk
                 return false;
         }
         return true;
+    }
+
+    bool Device::supportsDescriptorBudget(VkPhysicalDevice device) const
+    {
+        VkPhysicalDeviceProperties props;
+        vkGetPhysicalDeviceProperties(device, &props);
+
+        // The G-buffer uses four 64-entry sampled-image arrays. The composite
+        // pass adds four sampled attachments, and all of them are allocated in
+        // the same descriptor pool. Reject a device that cannot represent the
+        // fixed shader ABI before logical-device creation reaches descriptor
+        // allocation or pipeline validation.
+        constexpr uint32_t sceneDescriptors = maxSceneTextures * sceneTextureBindingCount;
+        constexpr uint32_t compositeDescriptors = 4;
+        constexpr uint32_t requiredDescriptors = sceneDescriptors + compositeDescriptors;
+        return props.limits.maxPerStageDescriptorSampledImages >= sceneDescriptors
+            && props.limits.maxDescriptorSetSampledImages >= requiredDescriptors
+            && props.limits.maxDescriptorSetSamplers >= requiredDescriptors;
     }
 
     int Device::rateDevice(VkPhysicalDevice device) const

@@ -140,7 +140,7 @@ handoff rather than only a test fixture; conversion happens on cell add/remove r
 on every frame export.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-52 files, deleting 497 lines and adding 4,583 lines (net `+4,086`). The larger Vulkan-only
+53 files, deleting 495 lines and adding 4,610 lines (net `+4,115`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
@@ -158,6 +158,9 @@ at the shared storage boundary, preventing ESM4 default layers from acquiring un
 parallax or specular state.
 The Vulkan renderer now accepts only the aggregate `SceneSubmission`; its duplicate resolver
 argument and local resolver type alias were removed.
+Physical-device selection now checks the fixed G-buffer texture-array descriptor budget before
+creating a logical device, so unsupported descriptor limits fail early instead of producing a
+late descriptor-allocation or pipeline-validation error.
 The descriptor pool now reserves only the scene/composite descriptors actually allocated;
 the removed storage-image and excess-set capacity is gone.
 Texture descriptor writes are also deferred until the owning frame fence has completed,

@@ -67,7 +67,7 @@ namespace Vk
         void setScene(const Render::SceneSubmission& submission);
 
     private:
-        static constexpr uint32_t maxTextures = 64;
+        static constexpr uint32_t maxTextures = maxSceneTextures;
 
         struct TextureResource
         {
