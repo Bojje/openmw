@@ -102,7 +102,7 @@ int main()
     lighting->mGlossiness = 42.f;
     lighting->mTextureSet = Nif::BSShaderTextureSetPtr(nullptr);
     Nif::NiAlphaProperty alpha;
-    alpha.mFlags = Nif::NiAlphaProperty::Flag_Blending | Nif::NiAlphaProperty::Flag_Testing;
+    alpha.mFlags = Nif::NiAlphaProperty::Flag_Testing;
     alpha.mThreshold = 128;
     Nif::NiTriShape shape;
     shape.mTransform = Nif::NiTransform::getIdentity();
@@ -161,6 +161,23 @@ int main()
     expectNear(effectInstances.front().mesh.material.diffuse.x, 0.5f, "effect diffuse red");
     expectNear(effectInstances.front().mesh.material.diffuse.w, 0.5f, "effect alpha");
     expectNear(effectInstances.front().mesh.material.emissive.z, 0.3f, "effect emissive blue");
+
+    Nif::BSShaderNoLightingProperty noLighting;
+    noLighting.mFilename = "textures\\unlit.dds";
+    noLighting.mClamp = 1;
+    Nif::NiTriShape noLightingShape;
+    noLightingShape.mData = &treeData;
+    noLightingShape.mShaderProperty = &noLighting;
+    noLightingShape.mAlphaProperty = nullptr;
+    auto noLightingFile = std::make_shared<Nif::NIFFile>(VFS::Path::Normalized("unlit.nif"));
+    noLightingFile->mRoots.push_back(&noLightingShape);
+    const std::vector<Render::MeshInstance> noLightingInstances
+        = Nif::collectMeshInstances(Nif::FileView(*noLightingFile));
+    if (noLightingInstances.size() != 1
+        || noLightingInstances.front().mesh.material.albedoTexture != "textures/unlit.dds"
+        || noLightingInstances.front().mesh.material.albedoWrapU
+        || !noLightingInstances.front().mesh.material.albedoWrapV)
+        throw std::runtime_error("NIF no-lighting shader material conversion lost neutral state");
 
     Resource::NifMeshManager meshManager(nullptr);
     const auto cached = meshManager.get(file);

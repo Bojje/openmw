@@ -276,6 +276,7 @@ namespace Nif
                     setShaderTexture(result, lighting->mTextureSet, lighting->wrapS(), lighting->wrapT());
                     result.doubleSided = lighting->doubleSided();
                     result.diffuse.w = lighting->mAlpha;
+                    result.alphaBlend = result.alphaBlend || lighting->mAlpha < 1.f;
                     result.emissive = { lighting->mEmissive.x() * lighting->mEmissiveMult,
                         lighting->mEmissive.y() * lighting->mEmissiveMult,
                         lighting->mEmissive.z() * lighting->mEmissiveMult, 1.f };
@@ -286,6 +287,15 @@ namespace Nif
                     setShaderTexture(result, ppLighting->mTextureSet, ppLighting->wrapS(), ppLighting->wrapT());
                     result.emissive = { ppLighting->mEmissiveColor.x(), ppLighting->mEmissiveColor.y(),
                         ppLighting->mEmissiveColor.z(), ppLighting->mEmissiveColor.w() };
+                }
+                else if (const auto* noLighting = dynamic_cast<const BSShaderNoLightingProperty*>(shader))
+                {
+                    if (!noLighting->mFilename.empty())
+                    {
+                        result.albedoTexture = VFS::Path::toNormalized(noLighting->mFilename).value();
+                        result.albedoWrapU = noLighting->wrapS();
+                        result.albedoWrapV = noLighting->wrapT();
+                    }
                 }
                 else if (const auto* effect = dynamic_cast<const BSEffectShaderProperty*>(shader))
                 {

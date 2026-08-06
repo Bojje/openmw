@@ -52,7 +52,10 @@ that handoff remains covered by the CPU tests until a live Vulkan game consumer 
 NIF classic texture, diffuse/emissive, glossiness, and alpha properties now cross the
 renderer-neutral mesh boundary and survive batching; the neutral batch applies diffuse
 and alpha to vertex color output. NIF bump/normal texture slots now cross the same boundary
-with generated or authored tangent frames for static mesh normal mapping. Resource images can
+with generated or authored tangent frames for static mesh normal mapping. BSLighting
+shader-authored alpha and BSShaderNoLighting texture properties are also preserved, so
+static materials do not become opaque or textureless merely because their data arrived
+through a Bethesda shader property rather than a classic NIF property. Resource images can
 now cross into neutral RGBA8 data,
 and authored BSLighting double-sided flags now select the matching Vulkan no-cull pipeline.
 Classic and BS shader texture wrap flags now select per-resource repeat/clamp sampler variants.
@@ -119,7 +122,7 @@ handoff rather than only a test fixture; conversion happens on cell add/remove r
 on every frame export.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-51 files, deleting 324 lines and adding 4,096 lines (net `+3,772`). The larger Vulkan-only
+51 files, deleting 324 lines and adding 4,121 lines (net `+3,797`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
