@@ -43,12 +43,26 @@ namespace Render
         {
             if (lod < 0 || size <= 0.f || cellWorldSize <= 0.f || blendmapScale <= 0.f || verticesPerSide <= 1
                 || vertices.size() != static_cast<std::size_t>(verticesPerSide) * verticesPerSide
-                || indices.empty() || indices.size() % 3 != 0)
+                || indices.empty() || indices.size() % 3 != 0 || layers.empty())
                 return false;
 
-            return std::all_of(indices.begin(), indices.end(), [this](std::uint32_t index) {
-                return index < vertices.size();
-            });
+            if (!std::all_of(indices.begin(), indices.end(), [this](std::uint32_t index) {
+                    return index < vertices.size();
+                }))
+                return false;
+
+            for (const TerrainLayer& layer : layers)
+            {
+                if (layer.diffuseTexture.empty())
+                    return false;
+                const bool hasBlendmap = layer.blendmap.width != 0 || layer.blendmap.height != 0
+                    || !layer.blendmap.pixels.empty();
+                if (hasBlendmap && !layer.blendmap.valid())
+                    return false;
+                if (layers.size() > 1 && !layer.blendmap.valid())
+                    return false;
+            }
+            return true;
         }
     };
 }

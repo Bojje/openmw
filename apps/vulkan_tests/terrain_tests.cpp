@@ -138,6 +138,14 @@ int main()
                 && !multiLayerMeshes[1].mesh.material.terrainFirstLayer,
             "terrain layers were not kept in ordered first/subsequent form");
 
+        Render::TerrainTile missingMultiLayerBlendmap = *opaqueTile;
+        missingMultiLayerBlendmap.layers.push_back(opaqueTile->layers.front());
+        expect(!missingMultiLayerBlendmap.valid(), "multi-layer terrain without blendmaps should be rejected");
+
+        Render::TerrainTile malformedBlendmap = *tile;
+        malformedBlendmap.layers.front().blendmap.pixels.pop_back();
+        expect(!malformedBlendmap.valid(), "terrain with malformed blendmap data should be rejected");
+
         Render::TerrainTile malformed = *opaqueTile;
         malformed.indices.back() = static_cast<std::uint32_t>(malformed.vertices.size());
         expect(!malformed.valid() && Render::makeTerrainMeshes(malformed).empty(),
