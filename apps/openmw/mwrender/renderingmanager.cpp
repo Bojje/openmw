@@ -521,13 +521,12 @@ namespace MWRender
             {
                 if (!cell->exterior)
                     continue;
-                const auto tile = mNeutralTerrainTiles.find(cell->key);
-                if (tile != mNeutralTerrainTiles.end())
+                if (!cell->terrainTiles.empty())
                 {
                     const float cameraX = result.scene.viewInverse.data[12];
                     const float cameraY = result.scene.viewInverse.data[13];
                     if (const Render::TerrainTile* selected
-                        = Render::selectTerrainLod(tile->second, cameraX, cameraY))
+                        = Render::selectTerrainLod(cell->terrainTiles, cameraX, cameraY))
                         result.terrainTiles.push_back(*selected);
                 }
             }
@@ -708,8 +707,7 @@ namespace MWRender
                 const osg::Vec2f center(store->getCell()->getGridX() + 0.5f,
                     store->getCell()->getGridY() + 0.5f);
                 const ESM::RefId worldspace = store->getCell()->getWorldSpace();
-                std::vector<Render::TerrainTile>& tiles = mNeutralTerrainTiles[static_cast<const void*>(store)];
-                tiles.clear();
+                std::vector<Render::TerrainTile> tiles;
                 const int cellVertices = mTerrainStorage->getCellVertices(worldspace);
                 int maxLod = 0;
                 for (int vertices = std::max(cellVertices - 1, 1); vertices > 1; vertices >>= 1)
@@ -722,6 +720,7 @@ namespace MWRender
                     else
                         break;
                 }
+                mWorldScene.setTerrainTiles(static_cast<const void*>(store), std::move(tiles));
             }
         }
     }
@@ -736,8 +735,6 @@ namespace MWRender
             getWorldspaceChunkMgr(store->getCell()->getWorldSpace())
                 .mTerrain->unloadCell(store->getCell()->getGridX(), store->getCell()->getGridY());
         }
-
-        mNeutralTerrainTiles.erase(static_cast<const void*>(store));
 
         mWater->removeCell(store);
 

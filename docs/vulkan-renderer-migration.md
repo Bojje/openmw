@@ -102,14 +102,14 @@ attachments remain clamped. Specular
 maps and complete terrain image coverage remain outstanding. The neutral cache now retains
 per-cell LOD snapshots and selects one deterministically by camera distance before handoff;
 quadtree-scale streaming and composite-image coverage remain outstanding. `WorldScene` now
-records empty
-loaded cells as well as object-bearing cells, and `RenderingManager::getNeutralScene()`
-collects cached terrain tiles for loaded exterior cells in the active worldspace, so terrain
-is part of the real full-game neutral handoff rather than only a test fixture; conversion
-happens on cell add/remove rather than on every frame export.
+records empty loaded cells as well as object-bearing cells and owns each cell's cached terrain
+LOD snapshots. `RenderingManager::getNeutralScene()` collects those snapshots for loaded
+exterior cells in the active worldspace, so terrain is part of the real full-game neutral
+handoff rather than only a test fixture; conversion happens on cell add/remove rather than
+on every frame export.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-51 files, deleting 309 lines and adding 4,002 lines (net `+3,693`). The larger Vulkan-only
+51 files, deleting 309 lines and adding 4,010 lines (net `+3,701`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.

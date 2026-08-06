@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "math.hpp"
+#include "terrain.hpp"
 
 namespace Render
 {
@@ -40,6 +41,7 @@ namespace Render
         std::string worldspace;
         std::string name;
         std::vector<WorldObject> objects;
+        std::vector<TerrainTile> terrainTiles;
 
         WorldObject* findObject(uint64_t id)
         {
@@ -105,6 +107,15 @@ namespace Render
             if (cellKey == nullptr)
                 return;
             ensureCell(cellKey, exterior, gridX, gridY, name, worldspace);
+        }
+
+        void setTerrainTiles(const void* cellKey, std::vector<TerrainTile> tiles)
+        {
+            if (cellKey == nullptr)
+                return;
+            const auto found = mCells.find(cellKey);
+            if (found != mCells.end())
+                found->second.terrainTiles = std::move(tiles);
         }
 
         void recordObject(const void* objectKey, const void* cellKey, bool exterior, int gridX, int gridY,

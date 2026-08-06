@@ -33,6 +33,16 @@ int main()
     world.recordCell(&emptyCellHandle, true, 9, 9, "empty");
     if (world.findCell(&emptyCellHandle) == nullptr || !world.findCell(&emptyCellHandle)->objects.empty())
         throw std::runtime_error("renderer-neutral world scene failed to record an empty cell");
+
+    Render::TerrainTile terrainTile;
+    terrainTile.lod = 0;
+    terrainTile.size = 1.f;
+    terrainTile.cellWorldSize = 1.f;
+    terrainTile.blendmapScale = 1.f;
+    world.setTerrainTiles(&emptyCellHandle, { terrainTile });
+    if (world.findCell(&emptyCellHandle)->terrainTiles.size() != 1
+        || world.findCell(&emptyCellHandle)->terrainTiles.front().lod != 0)
+        throw std::runtime_error("renderer-neutral world scene failed to own terrain snapshots");
     world.removeCell(&emptyCellHandle);
 
     Render::ObjectTransform objectTransform;
