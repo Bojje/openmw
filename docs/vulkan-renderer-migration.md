@@ -50,7 +50,8 @@ world path resolves loaded-cell snapshots through cached NIF meshes, filters pag
 neutral visibility, and composes object transforms with NIF node transforms before batching;
 animated objects are explicitly retained as dynamic snapshots and excluded from the static
 mesh batch until a skinning/animation consumer owns them; an ordered dynamic-object view now
-provides that future backend with the retained visibility, transform, model, and cell ordering.
+provides that future backend with the retained visibility, transform, model, and cell ordering,
+and each `SceneSubmission` copies those records across the frame boundary.
 that handoff remains covered by the CPU tests until a live Vulkan game consumer is connected.
 NIF classic texture, diffuse/emissive, glossiness, and alpha properties now cross the
 renderer-neutral mesh boundary and survive batching; the neutral batch applies diffuse
@@ -132,7 +133,7 @@ handoff rather than only a test fixture; conversion happens on cell add/remove r
 on every frame export.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-52 files, deleting 326 lines and adding 4,265 lines (net `+3,939`). The larger Vulkan-only
+52 files, deleting 326 lines and adding 4,279 lines (net `+3,953`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.

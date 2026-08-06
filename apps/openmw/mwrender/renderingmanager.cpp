@@ -519,6 +519,9 @@ namespace MWRender
             return *iter->second;
         }, mActiveWorldspace);
 
+        for (const Render::WorldObject* object : mWorldScene.dynamicObjectsInOrder(mActiveWorldspace))
+            result.dynamicObjects.push_back(*object);
+
         if (mTerrain)
         {
             for (const Render::CellScene* cell : mWorldScene.cellsInOrder(mActiveWorldspace))

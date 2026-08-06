@@ -19,6 +19,11 @@ namespace Render
         SceneData scene;
         std::vector<MeshInstance> meshes;
         std::vector<TerrainTile> terrainTiles;
+        // Dynamic records are copied into the submission so a backend can
+        // retain a frame payload without borrowing WorldScene storage. They
+        // are not part of the static mesh batch until a skinning/animation
+        // consumer is available.
+        std::vector<WorldObject> dynamicObjects;
         TextureResolver textureResolver;
 
         bool valid() const

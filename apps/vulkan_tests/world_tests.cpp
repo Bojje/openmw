@@ -119,6 +119,11 @@ int main()
         || !submission.valid())
         throw std::runtime_error("renderer-neutral scene submission failed resource handoff");
 
+    submission.dynamicObjects.push_back({ 17, "meshes/animated.nif", objectTransform, true, true });
+    if (submission.dynamicObjects.size() != 1 || !submission.dynamicObjects.front().dynamic
+        || submission.dynamicObjects.front().model != "meshes/animated.nif" || !submission.valid())
+        throw std::runtime_error("renderer-neutral scene submission lost dynamic records");
+
     Render::MeshInstance malformedMesh;
     malformedMesh.mesh.vertices.resize(1);
     malformedMesh.mesh.indices.push_back(1);
