@@ -17,7 +17,9 @@ OSG-only, and `OPENMW_USE_VULKAN` currently builds the standalone Vulkan migrati
 and smoke tests; it is not yet a full-game backend selector. Vulkan translation units now
 live in a separate `openmw_vulkan` library used by the migration targets instead of the
 shared `components` archive, so the OSG game target does not link the inactive backend.
-This keeps the process lifecycle single-backend while the scene bridge is incomplete.
+The top-level build now also rejects a future `openmw-lib -> openmw_vulkan` link,
+making that separation a configure-time invariant. This keeps the process lifecycle
+single-backend while the scene bridge is incomplete.
 The pre-migration OSG reference is frozen at the `openmw-vulkan-osg-reference` tag.
 
 Completed reduction checkpoints include removal of the incomplete full-game Vulkan bridge,
@@ -106,7 +108,7 @@ is part of the real full-game neutral handoff rather than only a test fixture; c
 happens on cell add/remove rather than on every frame export.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-51 files, deleting 309 lines and adding 3,987 lines (net `+3,678`). The larger Vulkan-only
+51 files, deleting 309 lines and adding 4,000 lines (net `+3,691`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
