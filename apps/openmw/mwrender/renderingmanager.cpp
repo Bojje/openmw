@@ -505,6 +505,10 @@ namespace MWRender
         result.scene.fogParameters = { mFog->getFogStart(mIsUnderwater), mFog->getFogEnd(mIsUnderwater), 0.f, 0.f };
 
         std::unordered_map<std::string, std::shared_ptr<const Resource::NifMeshManager::Meshes>> cache;
+        // Until the Vulkan animation consumer is available, dynamic objects use
+        // their converted bind-pose geometry. Keep the dynamic records below so
+        // the eventual skinned path can replace this fallback without changing
+        // the scene bridge.
         result.meshes = Render::collectWorldMeshes(mWorldScene, [&](std::string_view model)
             -> const Resource::NifMeshManager::Meshes& {
             const auto [iter, inserted] = cache.try_emplace(std::string(model));
@@ -517,7 +521,7 @@ namespace MWRender
                     iter->second = std::make_shared<const Resource::NifMeshManager::Meshes>();
             }
             return *iter->second;
-        }, mActiveWorldspace);
+        }, mActiveWorldspace, true);
 
         result.dynamicObjects = mWorldScene.dynamicObjectsInOrder(mActiveWorldspace);
 
