@@ -67,7 +67,7 @@ add_executable(openmw-vulkan-smoke renderer_smoke.cpp)
 
 target_link_libraries(openmw-vulkan-smoke
     PRIVATE
-    components
+    openmw_vulkan
 )
 
 target_compile_definitions(openmw-vulkan-smoke

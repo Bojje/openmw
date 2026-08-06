@@ -529,6 +529,7 @@ add_component_dir(render
 )
 
 if (OPENMW_USE_VULKAN)
+    set(_component_files_before_vulkan ${COMPONENT_FILES})
     add_component_dir (vk
         vkcommon
         vkinstance
@@ -539,6 +540,11 @@ if (OPENMW_USE_VULKAN)
         vkshader
         vkrenderer
         )
+
+    set(VULKAN_COMPONENT_FILES ${COMPONENT_FILES})
+    list(REMOVE_ITEM VULKAN_COMPONENT_FILES ${_component_files_before_vulkan})
+    list(REMOVE_ITEM COMPONENT_FILES ${VULKAN_COMPONENT_FILES})
+    unset(_component_files_before_vulkan)
 
 endif()
 
@@ -659,8 +665,9 @@ endif()
 target_link_libraries(components ${BULLET_LIBRARIES})
 
 if (OPENMW_USE_VULKAN)
-    target_link_libraries(components Vulkan::Vulkan)
-    target_compile_definitions(components PUBLIC OPENMW_USE_VULKAN=1)
+    add_library(openmw_vulkan STATIC ${VULKAN_COMPONENT_FILES})
+    target_link_libraries(openmw_vulkan PUBLIC components Vulkan::Vulkan)
+    target_compile_definitions(openmw_vulkan PUBLIC OPENMW_USE_VULKAN=1)
 endif()
 
 if (USE_QT)
