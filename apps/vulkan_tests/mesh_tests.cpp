@@ -92,6 +92,13 @@ int main()
     material.mEmissive = { 0.1f, 0.2f, 0.3f };
     material.mEmissiveMult = 2.f;
     material.mGlossiness = 42.f;
+    auto lighting = std::make_unique<Nif::BSLightingShaderProperty>();
+    lighting->mShaderFlags2 = Nif::BSLSFlag2_DoubleSided;
+    lighting->mAlpha = 0.75f;
+    lighting->mEmissive = { 0.1f, 0.2f, 0.3f };
+    lighting->mEmissiveMult = 2.f;
+    lighting->mGlossiness = 42.f;
+    lighting->mTextureSet = Nif::BSShaderTextureSetPtr(nullptr);
     Nif::NiAlphaProperty alpha;
     alpha.mFlags = Nif::NiAlphaProperty::Flag_Blending | Nif::NiAlphaProperty::Flag_Testing;
     alpha.mThreshold = 128;
@@ -99,7 +106,7 @@ int main()
     shape.mTransform = Nif::NiTransform::getIdentity();
     shape.mTransform.mTranslation.x() = 2.0f;
     shape.mData = &treeData;
-    shape.mShaderProperty = nullptr;
+    shape.mShaderProperty = lighting.get();
     shape.mProperties.push_back(&texturing);
     shape.mProperties.push_back(&material);
     shape.mAlphaProperty = &alpha;
@@ -118,7 +125,8 @@ int main()
         || instances.front().mesh.material.normalTexture != "textures/synthetic_n.dds"
         || !instances.front().mesh.material.normalMap
         || !instances.front().mesh.material.alphaBlend || !instances.front().mesh.material.alphaTest
-        || instances.front().mesh.material.alphaTestThreshold != 128)
+        || instances.front().mesh.material.alphaTestThreshold != 128
+        || !instances.front().mesh.material.doubleSided)
         throw std::runtime_error("NIF material conversion lost texture or alpha state");
     expectNear(instances.front().mesh.material.diffuse.x, 0.25f, "material diffuse red");
     expectNear(instances.front().mesh.material.diffuse.w, 0.75f, "material alpha");

@@ -25,6 +25,7 @@ namespace Render
         float glossiness = 0.f;
         bool alphaBlend = false;
         bool alphaTest = false;
+        bool doubleSided = false;
         uint8_t alphaTestThreshold = 0;
         bool terrainBlend = false;
         bool terrainFirstLayer = false;

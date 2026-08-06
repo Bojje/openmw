@@ -127,7 +127,9 @@ namespace Vk
         std::vector<VkFramebuffer> mCompositeFramebuffers;
 
         VkPipeline mGBufferPipeline = VK_NULL_HANDLE;
+        VkPipeline mGBufferDoubleSidedPipeline = VK_NULL_HANDLE;
         VkPipeline mGBufferAlphaPipeline = VK_NULL_HANDLE;
+        VkPipeline mGBufferAlphaDoubleSidedPipeline = VK_NULL_HANDLE;
         VkPipeline mGBufferTerrainFirstPipeline = VK_NULL_HANDLE;
         VkPipeline mGBufferTerrainLayerPipeline = VK_NULL_HANDLE;
         VkPipelineLayout mGBufferPipelineLayout = VK_NULL_HANDLE;

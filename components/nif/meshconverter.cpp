@@ -261,6 +261,7 @@ namespace Nif
                 if (const auto* lighting = dynamic_cast<const BSLightingShaderProperty*>(shader))
                 {
                     setShaderTexture(result, lighting->mTextureSet);
+                    result.doubleSided = lighting->doubleSided();
                     result.diffuse.w = lighting->mAlpha;
                     result.emissive = { lighting->mEmissive.x() * lighting->mEmissiveMult,
                         lighting->mEmissive.y() * lighting->mEmissiveMult,

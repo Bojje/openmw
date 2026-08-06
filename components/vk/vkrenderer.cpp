@@ -1001,6 +1001,11 @@ namespace Vk
             VK_CHECK(vkCreateGraphicsPipelines(mDevice->handle(), VK_NULL_HANDLE, 1,
                 &pipelineInfo, nullptr, &mGBufferPipeline));
 
+            rasterizer.cullMode = VK_CULL_MODE_NONE;
+            VK_CHECK(vkCreateGraphicsPipelines(mDevice->handle(), VK_NULL_HANDLE, 1,
+                &pipelineInfo, nullptr, &mGBufferDoubleSidedPipeline));
+            rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
+
             // Alpha-blended materials use a separate pipeline so opaque draws
             // retain depth writes. The G-buffer blend is intentionally simple;
             // final ordering and material composition remain migration work.
@@ -1015,6 +1020,11 @@ namespace Vk
 
             VK_CHECK(vkCreateGraphicsPipelines(mDevice->handle(), VK_NULL_HANDLE, 1,
                 &pipelineInfo, nullptr, &mGBufferAlphaPipeline));
+
+            rasterizer.cullMode = VK_CULL_MODE_NONE;
+            VK_CHECK(vkCreateGraphicsPipelines(mDevice->handle(), VK_NULL_HANDLE, 1,
+                &pipelineInfo, nullptr, &mGBufferAlphaDoubleSidedPipeline));
+            rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
 
             // Terrain layer zero writes the depth and replaces the G-buffer
             // albedo with its blendmap-weighted color. Later layers use the
@@ -1272,7 +1282,10 @@ namespace Vk
                         const VkPipeline pipeline = draw.material.terrainBlend
                             ? (draw.material.terrainFirstLayer ? mGBufferTerrainFirstPipeline
                                                                : mGBufferTerrainLayerPipeline)
-                            : (draw.material.alphaBlend ? mGBufferAlphaPipeline : mGBufferPipeline);
+                            : (draw.material.alphaBlend
+                                    ? (draw.material.doubleSided ? mGBufferAlphaDoubleSidedPipeline
+                                                                 : mGBufferAlphaPipeline)
+                                    : (draw.material.doubleSided ? mGBufferDoubleSidedPipeline : mGBufferPipeline));
                         if (pipeline != boundPipeline)
                         {
                             vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
@@ -1685,8 +1698,12 @@ namespace Vk
 
         if (mGBufferPipeline != VK_NULL_HANDLE)
             vkDestroyPipeline(dev, mGBufferPipeline, nullptr);
+        if (mGBufferDoubleSidedPipeline != VK_NULL_HANDLE)
+            vkDestroyPipeline(dev, mGBufferDoubleSidedPipeline, nullptr);
         if (mGBufferAlphaPipeline != VK_NULL_HANDLE)
             vkDestroyPipeline(dev, mGBufferAlphaPipeline, nullptr);
+        if (mGBufferAlphaDoubleSidedPipeline != VK_NULL_HANDLE)
+            vkDestroyPipeline(dev, mGBufferAlphaDoubleSidedPipeline, nullptr);
         if (mGBufferTerrainFirstPipeline != VK_NULL_HANDLE)
             vkDestroyPipeline(dev, mGBufferTerrainFirstPipeline, nullptr);
         if (mGBufferTerrainLayerPipeline != VK_NULL_HANDLE)

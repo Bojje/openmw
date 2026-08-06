@@ -40,7 +40,8 @@ renderer-neutral mesh boundary and survive batching; the neutral batch applies d
 and alpha to vertex color output. NIF bump/normal texture slots now cross the same boundary
 with generated or authored tangent frames for static mesh normal mapping. Resource images can
 now cross into neutral RGBA8 data,
-and the standalone Vulkan renderer uploads/caches indexed albedo textures and samples them
+and authored BSLighting double-sided flags now select the matching Vulkan no-cull pipeline.
+The standalone Vulkan renderer uploads/caches indexed albedo textures and samples them
 in the G-buffer (currently bounded to a 64-entry table). Vulkan now consumes neutral
 alpha-test state and thresholds in the G-buffer
 cutout path, and the standalone harness has a basic source-alpha pipeline for blended draws;
@@ -99,7 +100,7 @@ is part of the real full-game neutral handoff rather than only a test fixture; c
 happens on cell add/remove rather than on every frame export.
 
 Against the actual PR base `origin/openmw-vulkan` (PR #5), the current checkpoint changes
-50 files, deleting 275 lines and adding 3,837 lines (net `+3,562`). The larger Vulkan-only
+50 files, deleting 275 lines and adding 3,867 lines (net `+3,592`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
