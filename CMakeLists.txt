@@ -278,6 +278,26 @@ if (OPENMW_USE_VULKAN)
     find_package(Vulkan REQUIRED COMPONENTS glslangValidator)
     message(STATUS "Vulkan found: ${Vulkan_LIBRARIES}")
 
+    if (NOT Vulkan_GLSLANG_VALIDATOR_EXECUTABLE)
+        message(FATAL_ERROR "OPENMW_USE_VULKAN requires a glslangValidator executable")
+    endif()
+    execute_process(
+        COMMAND "${Vulkan_GLSLANG_VALIDATOR_EXECUTABLE}" --version
+        RESULT_VARIABLE _glslang_result
+        OUTPUT_VARIABLE _glslang_output
+        ERROR_VARIABLE _glslang_error
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_STRIP_TRAILING_WHITESPACE
+    )
+    if (NOT _glslang_result EQUAL 0 OR NOT _glslang_output MATCHES "[Gg]lslang")
+        message(FATAL_ERROR
+            "OPENMW_USE_VULKAN requires a working glslangValidator; got '${Vulkan_GLSLANG_VALIDATOR_EXECUTABLE}'\n"
+            "${_glslang_output}\n${_glslang_error}")
+    endif()
+    unset(_glslang_result)
+    unset(_glslang_output)
+    unset(_glslang_error)
+
     include(CompileShaders)
     set(VK_SHADER_OUTPUT_DIR "${CMAKE_BINARY_DIR}/resources/shaders/vulkan")
     file(MAKE_DIRECTORY ${VK_SHADER_OUTPUT_DIR})

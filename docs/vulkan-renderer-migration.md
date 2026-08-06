@@ -22,6 +22,8 @@ checks the final ELF dependencies and renderer-symbol set in both binaries, maki
 separation a configure- and link-time invariant. This keeps the process lifecycle
 single-backend while the scene bridge is incomplete. The standalone Vulkan smoke target
 now links only SDL2 and Vulkan at runtime; no OSG library or renderer symbol is present.
+Vulkan configuration also probes `glslangValidator --version` and rejects a missing or
+no-op shader compiler, so a successful build cannot silently omit the SPIR-V artifacts.
 Its fixture submits renderer-neutral mesh and terrain data directly, while the separate
 renderer-mesh CPU test retains coverage for NIF conversion, material extraction, and the
 path-keyed mesh cache. This makes the presentation validation process independent of the
@@ -138,7 +140,7 @@ handoff rather than only a test fixture; conversion happens on cell add/remove r
 on every frame export.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-52 files, deleting 495 lines and adding 4,444 lines (net `+3,949`). The larger Vulkan-only
+52 files, deleting 495 lines and adding 4,464 lines (net `+3,969`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
