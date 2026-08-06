@@ -124,7 +124,7 @@ handoff rather than only a test fixture; conversion happens on cell add/remove r
 on every frame export.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-51 files, deleting 324 lines and adding 4,148 lines (net `+3,824`). The larger Vulkan-only
+52 files, deleting 326 lines and adding 4,156 lines (net `+3,830`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
@@ -133,7 +133,9 @@ The latest reduction checkpoint also removed the remaining manager-only neutral-
 lookup, removal, and cell-transfer wrappers. The lifecycle now calls `WorldScene`
 directly. The terrain adapter is now consumed for opaque, normal-mapped, parallax, and
 blendmap/multi-layer Vulkan terrain; its remaining owner boundary is quadtree-scale
-streaming and complete image coverage.
+streaming and complete image coverage. Terrain layer feature flags now default to disabled
+at the shared storage boundary, preventing ESM4 default layers from acquiring undefined
+parallax or specular state.
 The Vulkan renderer now accepts only the aggregate `SceneSubmission`; its duplicate resolver
 argument and local resolver type alias were removed.
 The descriptor pool now reserves only the scene/composite descriptors actually allocated;

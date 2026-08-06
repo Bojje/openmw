@@ -18,8 +18,8 @@ namespace Terrain
     {
         VFS::Path::Normalized mDiffuseMap;
         VFS::Path::Normalized mNormalMap;
-        bool mParallax; // Height info in normal map alpha channel?
-        bool mSpecular; // Specular info in diffuse map alpha channel?
+        bool mParallax = false; // Height info in normal map alpha channel?
+        bool mSpecular = false; // Specular info in diffuse map alpha channel?
 
         bool requiresShaders() const { return !mNormalMap.empty() || mSpecular; }
     };

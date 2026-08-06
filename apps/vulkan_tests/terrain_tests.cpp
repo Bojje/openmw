@@ -74,6 +74,10 @@ int main()
 {
     try
     {
+        Terrain::LayerInfo defaultLayer;
+        expect(!defaultLayer.mParallax && !defaultLayer.mSpecular,
+            "terrain layer feature flags must default to disabled");
+
         TestStorage storage;
         const auto tile = storage.getRenderTile(2, 4.f, osg::Vec2f(3.f, -2.f), ESM::RefId());
         expect(tile.has_value() && tile->valid(), "terrain adapter returned an invalid tile");
