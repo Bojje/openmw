@@ -231,12 +231,6 @@ namespace Vk
 
             const uint32_t index = static_cast<uint32_t>(mTextures.size());
             mTextures.push_back(resource);
-            if (mSceneDescriptorSets[0] != VK_NULL_HANDLE)
-            {
-                writeSceneTextureDescriptor(1, index, resource.view);
-                writeSceneTextureDescriptor(2, index, resource.view);
-                writeSceneTextureDescriptor(3, index, resource.view);
-            }
             return index;
         }
         catch (...)
@@ -621,8 +615,11 @@ namespace Vk
         }
     }
 
-    void Renderer::writeSceneTextureDescriptor(uint32_t binding, uint32_t textureIndex, VkImageView view)
+    void Renderer::writeSceneTextureDescriptor(
+        uint32_t frameIndex, uint32_t binding, uint32_t textureIndex, VkImageView view)
     {
+        if (frameIndex >= maxFramesInFlight)
+            throw std::out_of_range("Vulkan frame index is out of range");
         if (textureIndex >= maxTextures)
             throw std::out_of_range("Vulkan texture descriptor index is out of range");
 
@@ -631,17 +628,25 @@ namespace Vk
         imageInfo.imageView = view;
         imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-        for (uint32_t i = 0; i < maxFramesInFlight; ++i)
+        VkWriteDescriptorSet write = {};
+        write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        write.dstSet = mSceneDescriptorSets[frameIndex];
+        write.dstBinding = binding;
+        write.dstArrayElement = textureIndex;
+        write.descriptorCount = 1;
+        write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        write.pImageInfo = &imageInfo;
+        vkUpdateDescriptorSets(mDevice->handle(), 1, &write, 0, nullptr);
+    }
+
+    void Renderer::syncSceneTextureDescriptors(uint32_t frameIndex)
+    {
+        for (uint32_t textureIndex = 0; textureIndex < mTextures.size(); ++textureIndex)
         {
-            VkWriteDescriptorSet write = {};
-            write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            write.dstSet = mSceneDescriptorSets[i];
-            write.dstBinding = binding;
-            write.dstArrayElement = textureIndex;
-            write.descriptorCount = 1;
-            write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-            write.pImageInfo = &imageInfo;
-            vkUpdateDescriptorSets(mDevice->handle(), 1, &write, 0, nullptr);
+            const VkImageView view = mTextures[textureIndex].view;
+            writeSceneTextureDescriptor(frameIndex, 1, textureIndex, view);
+            writeSceneTextureDescriptor(frameIndex, 2, textureIndex, view);
+            writeSceneTextureDescriptor(frameIndex, 3, textureIndex, view);
         }
     }
 
@@ -797,12 +802,8 @@ namespace Vk
                 vkUpdateDescriptorSets(mDevice->handle(), 1, &write, 0, nullptr);
             }
 
-            for (uint32_t textureIndex = 0; textureIndex < maxTextures; ++textureIndex)
-            {
-                writeSceneTextureDescriptor(1, textureIndex, mTextures.front().view);
-                writeSceneTextureDescriptor(2, textureIndex, mTextures.front().view);
-                writeSceneTextureDescriptor(3, textureIndex, mTextures.front().view);
-            }
+            for (uint32_t frameIndex = 0; frameIndex < maxFramesInFlight; ++frameIndex)
+                syncSceneTextureDescriptors(frameIndex);
         }
 
         // Composite descriptor sets (per frame, for per-frame UBO binding)
@@ -1100,6 +1101,7 @@ namespace Vk
     bool Renderer::beginFrame()
     {
         mFrameSync->waitForFrame(mCurrentFrame);
+        syncSceneTextureDescriptors(mCurrentFrame);
 
         int drawableWidth = 0;
         int drawableHeight = 0;

@@ -90,7 +90,8 @@ namespace Vk
         void createUniformBuffers();
         void createGBufferSampler();
         void writeCompositeDescriptor(uint32_t binding, VkImageView view);
-        void writeSceneTextureDescriptor(uint32_t binding, uint32_t textureIndex, VkImageView view);
+        void writeSceneTextureDescriptor(uint32_t frameIndex, uint32_t binding, uint32_t textureIndex, VkImageView view);
+        void syncSceneTextureDescriptors(uint32_t frameIndex);
         uint32_t createTextureResource(const Render::TextureData& texture);
         void destroyTextures();
         void destroyMesh();
