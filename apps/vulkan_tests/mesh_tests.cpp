@@ -170,6 +170,29 @@ int main()
     expectNear(effectInstances.front().mesh.material.diffuse.w, 0.5f, "effect alpha");
     expectNear(effectInstances.front().mesh.material.emissive.z, 0.3f, "effect emissive blue");
 
+    auto shaderTextureSet = std::make_unique<Nif::BSShaderTextureSet>();
+    shaderTextureSet->mTextures = { "textures\\shader.dds", "textures\\shader_n.dds",
+        "textures\\shader_glow.dds" };
+    auto shaderLighting = std::make_unique<Nif::BSLightingShaderProperty>();
+    shaderLighting->mTextureSet = Nif::BSShaderTextureSetPtr(shaderTextureSet.get());
+    shaderLighting->mClamp = 1;
+    Nif::NiTriShape shaderShape;
+    shaderShape.mData = &treeData;
+    shaderShape.mShaderProperty = shaderLighting.get();
+    shaderShape.mAlphaProperty = nullptr;
+    auto shaderFile = std::make_shared<Nif::NIFFile>(VFS::Path::Normalized("shader.nif"));
+    shaderFile->mRoots.push_back(&shaderShape);
+    const std::vector<Render::MeshInstance> shaderInstances
+        = Nif::collectMeshInstances(Nif::FileView(*shaderFile));
+    if (shaderInstances.size() != 1 || shaderInstances.front().mesh.material.albedoTexture != "textures/shader.dds"
+        || shaderInstances.front().mesh.material.normalTexture != "textures/shader_n.dds"
+        || shaderInstances.front().mesh.material.emissiveTexture != "textures/shader_glow.dds"
+        || shaderInstances.front().mesh.material.albedoWrapU || !shaderInstances.front().mesh.material.albedoWrapV
+        || shaderInstances.front().mesh.material.normalWrapU || !shaderInstances.front().mesh.material.normalWrapV
+        || shaderInstances.front().mesh.material.emissiveWrapU
+        || !shaderInstances.front().mesh.material.emissiveWrapV)
+        throw std::runtime_error("BS shader texture-set conversion lost emissive texture state");
+
     Nif::BSShaderNoLightingProperty noLighting;
     noLighting.mFilename = "textures\\unlit.dds";
     noLighting.mClamp = 1;
