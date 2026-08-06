@@ -65,6 +65,12 @@ int main()
         || world.findCell(&firstCellHandle)->objects.size() != 0)
         throw std::runtime_error("renderer-neutral world scene failed to move an object");
 
+    int dynamicObjectHandle = 0;
+    world.recordObject(&dynamicObjectHandle, &firstCellHandle, true, 1, 2, "first", "meshes/animated.nif",
+        objectTransform, true, {}, true);
+    if (world.findObject(&dynamicObjectHandle) == nullptr || !world.findObject(&dynamicObjectHandle)->dynamic)
+        throw std::runtime_error("renderer-neutral world scene failed to retain dynamic-object state");
+
     int thirdCellHandle = 0;
     world.recordObject(&objectHandle, &thirdCellHandle, false, 3, 4, "third", "meshes/third.nif", objectTransform, true);
     int fourthObjectHandle = 0;

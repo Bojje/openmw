@@ -481,7 +481,8 @@ namespace MWRender
         transform.scale = { scale.x(), scale.y(), scale.z() };
         mWorldScene.recordObject(static_cast<const void*>(ptr.mRef), static_cast<const void*>(cell),
             cell->getCell()->isExterior(), cell->getCell()->getGridX(), cell->getCell()->getGridY(),
-            cell->getCell()->getNameId(), model, transform, visible, cell->getCell()->getWorldSpace().serializeText());
+            cell->getCell()->getNameId(), model, transform, visible, cell->getCell()->getWorldSpace().serializeText(),
+            ptr.getClass().useAnim());
     }
 
     Render::SceneSubmission RenderingManager::getNeutralScene() const

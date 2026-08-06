@@ -29,6 +29,7 @@ namespace Render
         std::string model;
         ObjectTransform transform;
         bool visible = true;
+        bool dynamic = false;
     };
 
     // A cell snapshot is updated by the world lifecycle, not by a renderer.
@@ -120,7 +121,7 @@ namespace Render
 
         void recordObject(const void* objectKey, const void* cellKey, bool exterior, int gridX, int gridY,
             std::string_view cellName, std::string_view model, const ObjectTransform& transform, bool visible,
-            std::string_view worldspace = {})
+            std::string_view worldspace = {}, bool dynamic = false)
         {
             if (objectKey == nullptr || cellKey == nullptr || model.empty())
             {
@@ -136,7 +137,8 @@ namespace Render
                 {
                     if (updateObjectCell(objectKey, objectKey, cellKey, exterior, gridX, gridY, cellName, worldspace))
                         return recordObject(
-                            objectKey, cellKey, exterior, gridX, gridY, cellName, model, transform, visible, worldspace);
+                            objectKey, cellKey, exterior, gridX, gridY, cellName, model, transform, visible, worldspace,
+                            dynamic);
                     mObjects.erase(found);
                 }
                 else if (CellScene* scene = findCell(location.cell))
@@ -146,6 +148,7 @@ namespace Render
                         object->model = model;
                         object->transform = transform;
                         object->visible = visible;
+                        object->dynamic = dynamic;
                         return;
                     }
                 }
@@ -160,6 +163,7 @@ namespace Render
             object.model = model;
             object.transform = transform;
             object.visible = visible;
+            object.dynamic = dynamic;
             ensureCell(cellKey, exterior, gridX, gridY, cellName, worldspace).objects.push_back(std::move(object));
             mObjects.emplace(objectKey, ObjectLocation{ cellKey, id });
         }

@@ -205,6 +205,7 @@ int main()
     Render::CellScene scene;
     scene.objects.push_back({ 2, "hidden.nif", {}, false });
     scene.objects.push_back({ 3, "synthetic.nif", {} });
+    scene.objects.push_back({ 4, "animated.nif", {}, true, true });
     const std::vector<Render::MeshInstance> visibleMeshes = Render::collectCellMeshes(
         scene, [&](std::string_view model) -> const Resource::NifMeshManager::Meshes& {
             if (model != "synthetic.nif")
@@ -213,6 +214,14 @@ int main()
         });
     if (visibleMeshes.size() != 1)
         throw std::runtime_error("cell mesh collection did not filter hidden objects");
+    const std::vector<Render::MeshInstance> allMeshes = Render::collectCellMeshes(
+        scene, [&](std::string_view model) -> const Resource::NifMeshManager::Meshes& {
+            if (model != "synthetic.nif" && model != "animated.nif")
+                throw std::runtime_error("dynamic mesh collection resolved an unexpected model");
+            return *cached;
+        }, true);
+    if (allMeshes.size() != 2)
+        throw std::runtime_error("cell mesh collection could not opt into dynamic objects");
 
     int worldObjectHandle = 0;
     int worldCellHandle = 0;
