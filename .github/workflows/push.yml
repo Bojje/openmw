@@ -66,6 +66,39 @@ jobs:
     #     path: ./build_artifact.7z
     #     name: build_artifact.7z
 
+  Vulkan:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: Add OpenMW PPA Dependencies
+      run: sudo add-apt-repository ppa:openmw/openmw; sudo apt-get update
+
+    - name: Install Building and Vulkan Dependencies
+      run: >
+        sudo CI/install_debian_deps.sh gcc openmw-deps openmw-deps-dynamic
+        && sudo apt-get install -y libvulkan-dev glslang-tools mesa-vulkan-drivers
+        vulkan-validationlayers xvfb
+
+    - name: Configure Vulkan migration build
+      run: >
+        cmake -S . -B build-vulkan
+        -D CMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+        -D OPENMW_USE_SYSTEM_RECASTNAVIGATION=ON
+        -D USE_SYSTEM_TINYXML=ON
+        -D OPENMW_USE_VULKAN=ON
+        -D BUILD_VULKAN_TESTS=ON
+
+    - name: Build Vulkan migration targets
+      run: cmake --build build-vulkan --target openmw openmw-vulkan-smoke openmw-vulkan-math-tests openmw-render-world-tests openmw-render-mesh-tests openmw-vulkan-image-tests openmw-vulkan-terrain-tests -- -j$(nproc)
+
+    - name: Run Vulkan migration tests
+      run: >
+        xvfb-run -a
+        ctest --test-dir build-vulkan --output-on-failure
+        -R 'openmw-(vulkan-(math-tests|image-tests|terrain-tests|smoke)|render-(world|mesh)-tests)'
+
   MacOS:
     strategy:
       fail-fast: true
