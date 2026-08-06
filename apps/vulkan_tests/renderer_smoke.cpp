@@ -99,6 +99,8 @@ namespace
                 mesh.mesh.material.alphaBlend = true;
                 mesh.mesh.material.diffuse.w = 0.75f;
             }
+            else
+                mesh.mesh.material.emissiveTexture = "textures/vulkan-smoke-glow.rgba";
         }
         return std::make_shared<const std::vector<Render::MeshInstance>>(std::move(result));
     }
@@ -106,6 +108,7 @@ namespace
     std::shared_ptr<const Render::TextureData> smokeTexture(std::string_view path)
     {
         if (path != "textures/vulkan-smoke.rgba" && path != "textures/vulkan-smoke-alt.rgba"
+            && path != "textures/vulkan-smoke-glow.rgba"
             && path != "textures/vulkan-smoke-normal.rgba")
             throw std::runtime_error("Vulkan smoke requested an unexpected texture");
 
@@ -116,6 +119,11 @@ namespace
             ? std::vector<uint8_t>{
                   128, 128, 255, 255, 128, 128, 255, 255,
                   128, 128, 255, 255, 128, 128, 255, 255,
+              }
+            : path == "textures/vulkan-smoke-glow.rgba"
+            ? std::vector<uint8_t>{
+                  255, 32, 8, 255, 32, 255, 8, 255,
+                  8, 32, 255, 255, 255, 255, 32, 255,
               }
             : path == "textures/vulkan-smoke.rgba"
             ? std::vector<uint8_t>{
