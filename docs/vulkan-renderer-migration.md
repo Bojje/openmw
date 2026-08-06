@@ -27,6 +27,9 @@ renderer-mesh CPU test retains coverage for NIF conversion, material extraction,
 path-keyed mesh cache. This makes the presentation validation process independent of the
 legacy NIF/OSG object model.
 The pre-migration OSG reference is frozen at the `openmw-vulkan-osg-reference` tag.
+An independent OSG-only configuration using the repository's bundled Bullet, OSG, MyGUI,
+and RecastNavigation dependencies has also been configured with `OPENMW_USE_VULKAN=OFF`
+and rebuilt through the full `openmw` executable.
 
 Completed reduction checkpoints include removal of the incomplete full-game Vulkan bridge,
 the unused Vulkan mesh submission queue, inactive ray-tracing scaffolding, and unused
@@ -116,7 +119,7 @@ handoff rather than only a test fixture; conversion happens on cell add/remove r
 on every frame export.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-51 files, deleting 325 lines and adding 4,047 lines (net `+3,722`). The larger Vulkan-only
+51 files, deleting 325 lines and adding 4,051 lines (net `+3,726`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
