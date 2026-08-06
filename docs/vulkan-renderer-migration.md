@@ -73,6 +73,8 @@ The fast test suite now also contains a backend-neutral RGBA8 image comparator w
 per-channel tolerance, differing-pixel count, maximum error, and mean error metrics.
 The Vulkan smoke path now reads back rendered RGBA8/BGRA8 swapchain frames and compares
 consecutive captures with that comparator when a presentation-capable host is available;
+without a reference image it also replaces the scene once in the same process to exercise
+descriptor growth and frame-safe mesh replacement;
 the local headless environment still skips before this runtime path. It can optionally
 read a PPM reference image as its fourth argument and write per-frame PPM captures to a
 directory supplied as its fifth argument. This makes future OSG/Vulkan captures
@@ -96,7 +98,7 @@ is part of the real full-game neutral handoff rather than only a test fixture; c
 happens on cell add/remove rather than on every frame export.
 
 Against the actual PR base `origin/openmw-vulkan` (PR #5), the current checkpoint changes
-49 files, deleting 275 lines and adding 3,780 lines (net `+3,505`). The larger Vulkan-only
+49 files, deleting 275 lines and adding 3,801 lines (net `+3,526`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.

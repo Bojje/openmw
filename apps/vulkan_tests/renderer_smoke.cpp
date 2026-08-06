@@ -130,20 +130,26 @@ namespace
 
     std::shared_ptr<const Render::TextureData> smokeTexture(std::string_view path)
     {
-        if (path != "textures/vulkan-smoke.rgba" && path != "textures/vulkan-smoke-normal.rgba")
+        if (path != "textures/vulkan-smoke.rgba" && path != "textures/vulkan-smoke-alt.rgba"
+            && path != "textures/vulkan-smoke-normal.rgba")
             throw std::runtime_error("Vulkan smoke requested an unexpected texture");
 
         auto texture = std::make_shared<Render::TextureData>();
         texture->width = 2;
         texture->height = 2;
-        texture->pixels = path == "textures/vulkan-smoke.rgba"
+        texture->pixels = path == "textures/vulkan-smoke-normal.rgba"
+            ? std::vector<uint8_t>{
+                  128, 128, 255, 255, 128, 128, 255, 255,
+                  128, 128, 255, 255, 128, 128, 255, 255,
+              }
+            : path == "textures/vulkan-smoke.rgba"
             ? std::vector<uint8_t>{
                   255, 64, 64, 255, 64, 255, 64, 255,
                   64, 64, 255, 255, 255, 255, 255, 255,
               }
             : std::vector<uint8_t>{
-                  128, 128, 255, 255, 128, 128, 255, 255,
-                  128, 128, 255, 255, 128, 128, 255, 255,
+                  255, 255, 64, 255, 64, 64, 255, 255,
+                  255, 64, 255, 255, 255, 255, 64, 255,
               };
         return texture;
     }
@@ -246,10 +252,23 @@ int main(int argc, char** argv)
             submission.textureResolver = smokeTexture;
             renderer->setScene(submission);
 
+            // Replace the scene once in the same renderer process. This
+            // exercises descriptor growth and per-frame mesh replacement; a
+            // reference-image run stays on the single reference checkpoint.
+            Render::SceneSubmission alternateSubmission = submission;
+            alternateSubmission.meshes[0].mesh.material.albedoTexture = "textures/vulkan-smoke-alt.rgba";
+            alternateSubmission.scene.ambientColor = { 0.25f, 0.2f, 0.15f, 1.0f };
+
             unsigned int renderedFrames = 0;
             std::optional<Render::TextureData> previousCapture;
             for (unsigned int frame = 0; frame < frames; ++frame)
             {
+                if (!reference && frames > 2 && frame == frames / 2)
+                {
+                    renderer->setScene(alternateSubmission);
+                    previousCapture.reset();
+                }
+
                 SDL_PumpEvents();
                 if (renderer->render())
                 {
