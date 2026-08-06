@@ -919,13 +919,14 @@ namespace Vk
             bindingDesc[0].stride = sizeof(Render::MeshVertex);
             bindingDesc[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
-        std::array<VkVertexInputAttributeDescription, 6> attrDesc = {};
+            std::array<VkVertexInputAttributeDescription, 7> attrDesc = {};
             attrDesc[0] = { 0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0 };
             attrDesc[1] = { 1, 0, VK_FORMAT_R32G32B32_SFLOAT, sizeof(float) * 3 };
             attrDesc[2] = { 2, 0, VK_FORMAT_R32G32_SFLOAT, sizeof(float) * 6 };
             attrDesc[3] = { 3, 0, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(float) * 10 };
             attrDesc[4] = { 4, 0, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(float) * 14 };
             attrDesc[5] = { 5, 0, VK_FORMAT_R32G32_SFLOAT, sizeof(float) * 8 };
+            attrDesc[6] = { 6, 0, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(float) * 18 };
 
             VkPipelineVertexInputStateCreateInfo vertexInput = {};
             vertexInput.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -1274,7 +1275,7 @@ namespace Vk
                             : 0u;
                         if (draw.material.terrainBlend)
                             materialFlags |= 2u;
-                        if (draw.material.terrainNormalMap)
+                        if (draw.material.normalMap || draw.material.terrainNormalMap)
                             materialFlags |= 4u;
                         if (draw.material.terrainParallax)
                             materialFlags |= 8u;
@@ -1498,9 +1499,11 @@ namespace Vk
         for (Render::MeshDraw& draw : batch.draws)
         {
             textureIndices.push_back(resolveTexture(draw.material.albedoTexture));
-            const uint32_t normalTextureIndex = draw.material.terrainNormalMap
+            const bool wantsNormalMap = draw.material.normalMap || draw.material.terrainNormalMap;
+            const uint32_t normalTextureIndex = wantsNormalMap
                 ? resolveTexture(draw.material.normalTexture)
                 : 0;
+            draw.material.normalMap = draw.material.normalMap && normalTextureIndex != 0;
             draw.material.terrainNormalMap = draw.material.terrainNormalMap && normalTextureIndex != 0;
             draw.material.terrainParallax = draw.material.terrainParallax && draw.material.terrainNormalMap;
             normalTextureIndices.push_back(normalTextureIndex);

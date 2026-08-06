@@ -28,6 +28,7 @@ namespace Render
         uint8_t alphaTestThreshold = 0;
         bool terrainBlend = false;
         bool terrainFirstLayer = false;
+        bool normalMap = false;
         bool terrainNormalMap = false;
         bool terrainParallax = false;
         bool terrainSpecular = false;
@@ -42,9 +43,10 @@ namespace Render
         float blendTexcoord[2];
         float color[4];
         float material[4];
+        float tangent[4];
     };
 
-    static_assert(sizeof(MeshVertex) == sizeof(float) * 18);
+    static_assert(sizeof(MeshVertex) == sizeof(float) * 22);
 
     struct MeshData
     {

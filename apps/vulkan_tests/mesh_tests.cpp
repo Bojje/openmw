@@ -43,6 +43,8 @@ int main()
     expectNear(mesh.vertices[1].position[2], 6.0f, "position");
     expectNear(mesh.vertices[2].texcoord[0], 0.5f, "texcoord");
     expectNear(mesh.vertices[0].color[0], 1.0f, "color");
+    expectNear(mesh.vertices[0].tangent[0], 1.0f, "fallback tangent");
+    expectNear(mesh.vertices[0].tangent[3], 1.0f, "tangent handedness");
 
     source.mNormals.clear();
     source.mUVList.clear();
@@ -76,10 +78,14 @@ int main()
     treeData.mTriangles = { 0, 1, 2 };
     Nif::NiSourceTexture texture;
     texture.mFile = "textures\\synthetic.dds";
+    Nif::NiSourceTexture normalTexture;
+    normalTexture.mFile = "textures\\synthetic_n.dds";
     Nif::NiTexturingProperty texturing;
-    texturing.mTextures.resize(1);
+    texturing.mTextures.resize(Nif::NiTexturingProperty::BumpTexture + 1);
     texturing.mTextures.front().mEnabled = true;
     texturing.mTextures.front().mSourceTexture = &texture;
+    texturing.mTextures[Nif::NiTexturingProperty::BumpTexture].mEnabled = true;
+    texturing.mTextures[Nif::NiTexturingProperty::BumpTexture].mSourceTexture = &normalTexture;
     Nif::NiMaterialProperty material;
     material.mDiffuse = { 0.25f, 0.5f, 0.75f };
     material.mAlpha = 0.75f;
@@ -109,6 +115,8 @@ int main()
         throw std::runtime_error("NIF scene traversal did not collect a mesh instance");
     expectNear(instances.front().transform.data[12], 12.0f, "composed mesh translation");
     if (instances.front().mesh.material.albedoTexture != "textures/synthetic.dds"
+        || instances.front().mesh.material.normalTexture != "textures/synthetic_n.dds"
+        || !instances.front().mesh.material.normalMap
         || !instances.front().mesh.material.alphaBlend || !instances.front().mesh.material.alphaTest
         || instances.front().mesh.material.alphaTestThreshold != 128)
         throw std::runtime_error("NIF material conversion lost texture or alpha state");

@@ -75,6 +75,10 @@ namespace Render
             target.material[1] = 0.f;
             target.material[2] = 1.f;
             target.material[3] = 0.f;
+            target.tangent[0] = 1.f;
+            target.tangent[1] = 0.f;
+            target.tangent[2] = 0.f;
+            target.tangent[3] = 1.f;
         }
 
         return result;
