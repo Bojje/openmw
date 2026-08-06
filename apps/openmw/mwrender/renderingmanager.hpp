@@ -370,6 +370,7 @@ namespace MWRender
 
         osg::Vec4f mAmbientColor;
         float mNightEyeFactor;
+        bool mIsUnderwater = false;
 
         float mNearClip;
         float mViewDistance;

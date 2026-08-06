@@ -15,6 +15,8 @@ layout(set = 0, binding = 4) uniform SceneUBO {
     vec4 sunDirection;
     vec4 sunColor;
     vec4 ambientColor;
+    vec4 fogColor;
+    vec4 fogParameters;
 } scene;
 
 layout(location = 0) out vec4 outColor;
@@ -74,6 +76,14 @@ void main() {
     vec3 specular = sunCol * spec * specularStrength * shadow;
 
     vec3 color = ambient + diffuse + specular + reflectionColor + albedo * emission;
+
+    if (scene.fogParameters.y > scene.fogParameters.x && scene.fogParameters.y > 0.0)
+    {
+        float distanceToCamera = length(worldPos - scene.viewInverse[3].xyz);
+        float fogFactor = clamp((scene.fogParameters.y - distanceToCamera)
+                / (scene.fogParameters.y - scene.fogParameters.x), 0.0, 1.0);
+        color = mix(scene.fogColor.rgb, color, fogFactor);
+    }
 
     color = acesFilmic(color);
     color = pow(color, vec3(1.0 / 2.2));

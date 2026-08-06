@@ -499,6 +499,9 @@ namespace MWRender
         result.scene.sunColor = { sunColor.x(), sunColor.y(), sunColor.z(), sunColor.w() };
         const osg::Vec4f ambientColor = mSunLight->getAmbient();
         result.scene.ambientColor = { ambientColor.x(), ambientColor.y(), ambientColor.z(), ambientColor.w() };
+        const osg::Vec4f fogColor = mFog->getFogColor(mIsUnderwater);
+        result.scene.fogColor = { fogColor.x(), fogColor.y(), fogColor.z(), fogColor.w() };
+        result.scene.fogParameters = { mFog->getFogStart(mIsUnderwater), mFog->getFogEnd(mIsUnderwater), 0.f, 0.f };
 
         std::unordered_map<std::string, std::shared_ptr<const Resource::NifMeshManager::Meshes>> cache;
         result.meshes = Render::collectWorldMeshes(mWorldScene, [&](std::string_view model)
@@ -868,6 +871,7 @@ namespace MWRender
         mCamera->update(dt, paused);
 
         bool isUnderwater = mWater->isUnderwater(mCamera->getPosition());
+        mIsUnderwater = isUnderwater;
 
         float fogStart = mFog->getFogStart(isUnderwater);
         float fogEnd = mFog->getFogEnd(isUnderwater);

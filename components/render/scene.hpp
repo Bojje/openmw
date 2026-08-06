@@ -33,6 +33,10 @@ namespace Render
         Vec4 sunDirection;
         Vec4 sunColor;
         Vec4 ambientColor;
+        Vec4 fogColor;
+        // x = fog start distance, y = fog end distance. A non-positive range
+        // disables fog for fixtures that do not provide atmospheric state.
+        Vec4 fogParameters;
     };
 }
 
