@@ -692,6 +692,7 @@ namespace Vk
             writeSceneTextureDescriptor(frameIndex, 1, textureIndex, view);
             writeSceneTextureDescriptor(frameIndex, 2, textureIndex, view);
             writeSceneTextureDescriptor(frameIndex, 3, textureIndex, view);
+            writeSceneTextureDescriptor(frameIndex, 4, textureIndex, view);
         }
     }
 
@@ -702,7 +703,7 @@ namespace Vk
         // Scene layout (set 0 for G-buffer pass): camera UBO and indexed
         // albedo/terrain blendmap textures.
         {
-            std::array<VkDescriptorSetLayoutBinding, 4> bindings = {};
+            std::array<VkDescriptorSetLayoutBinding, 5> bindings = {};
             bindings[0].binding = 0;
             bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
             bindings[0].descriptorCount = 1;
@@ -722,6 +723,11 @@ namespace Vk
             bindings[3].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
             bindings[3].descriptorCount = maxTextures;
             bindings[3].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+            bindings[4].binding = 4;
+            bindings[4].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            bindings[4].descriptorCount = maxTextures;
+            bindings[4].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
             VkDescriptorSetLayoutCreateInfo layoutInfo = {};
             layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -781,7 +787,7 @@ namespace Vk
     {
         std::vector<VkDescriptorPoolSize> poolSizes = {
             { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, maxFramesInFlight * 2 },
-            { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, maxTextures * maxFramesInFlight * 3 + maxFramesInFlight * 4 },
+            { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, maxTextures * maxFramesInFlight * 4 + maxFramesInFlight * 4 },
         };
 
         const uint32_t maxSets = maxFramesInFlight * 2;
@@ -1342,7 +1348,8 @@ namespace Vk
                             draw.normalMatrix,
                             materialFlags,
                             mMeshTextureIndices[drawIndex] | (mMeshAlphaTextureIndices[drawIndex] << 6u)
-                                | (mMeshNormalTextureIndices[drawIndex] << 12u),
+                                | (mMeshNormalTextureIndices[drawIndex] << 12u)
+                                | (mMeshEmissiveTextureIndices[drawIndex] << 18u),
                         };
                         vkCmdPushConstants(cmd, mGBufferPipelineLayout,
                             VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
@@ -1538,9 +1545,11 @@ namespace Vk
         std::vector<uint32_t> textureIndices;
         std::vector<uint32_t> alphaTextureIndices;
         std::vector<uint32_t> normalTextureIndices;
+        std::vector<uint32_t> emissiveTextureIndices;
         textureIndices.reserve(batch.draws.size());
         alphaTextureIndices.reserve(batch.draws.size());
         normalTextureIndices.reserve(batch.draws.size());
+        emissiveTextureIndices.reserve(batch.draws.size());
 
         const auto resolveTexture = [&](std::string_view path, bool wrapU, bool wrapV) {
             if (path.empty() || !textureResolver)
@@ -1576,6 +1585,9 @@ namespace Vk
             draw.material.terrainNormalMap = draw.material.terrainNormalMap && normalTextureIndex != 0;
             draw.material.terrainParallax = draw.material.terrainParallax && draw.material.terrainNormalMap;
             normalTextureIndices.push_back(normalTextureIndex);
+
+            emissiveTextureIndices.push_back(
+                resolveTexture(draw.material.emissiveTexture, draw.material.emissiveWrapU, draw.material.emissiveWrapV));
         }
 
         for (const Render::MeshDraw& draw : batch.draws)
@@ -1606,6 +1618,7 @@ namespace Vk
         mMeshTextureIndices = std::move(textureIndices);
         mMeshAlphaTextureIndices = std::move(alphaTextureIndices);
         mMeshNormalTextureIndices = std::move(normalTextureIndices);
+        mMeshEmissiveTextureIndices = std::move(emissiveTextureIndices);
         ++mMeshRevision;
         if (mMeshRevision == 0)
             ++mMeshRevision;

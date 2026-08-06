@@ -20,6 +20,7 @@ namespace Render
     {
         std::string albedoTexture;
         std::string normalTexture;
+        std::string emissiveTexture;
         Vec4 diffuse{ 1.f, 1.f, 1.f, 1.f };
         Vec4 emissive{};
         float glossiness = 0.f;
@@ -30,6 +31,8 @@ namespace Render
         bool albedoWrapV = true;
         bool normalWrapU = true;
         bool normalWrapV = true;
+        bool emissiveWrapU = true;
+        bool emissiveWrapV = true;
         uint8_t alphaTestThreshold = 0;
         bool terrainBlend = false;
         bool terrainFirstLayer = false;

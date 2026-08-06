@@ -213,6 +213,12 @@ namespace Nif
                 material.normalWrapU = wrapU;
                 material.normalWrapV = wrapV;
             }
+            if (textureSet->mTextures.size() > 2 && !textureSet->mTextures[2].empty())
+            {
+                material.emissiveTexture = VFS::Path::toNormalized(textureSet->mTextures[2]).value();
+                material.emissiveWrapU = wrapU;
+                material.emissiveWrapV = wrapV;
+            }
         }
 
         Render::MeshMaterial convertMaterial(const NiGeometry& geometry)
@@ -246,6 +252,17 @@ namespace Nif
                             result.normalTexture = VFS::Path::toNormalized(texture.mSourceTexture->mFile).value();
                             result.normalWrapU = texture.wrapS();
                             result.normalWrapV = texture.wrapT();
+                        }
+                    }
+                    if (texturing->mTextures.size() > NiTexturingProperty::GlowTexture)
+                    {
+                        const NiTexturingProperty::Texture& texture
+                            = texturing->mTextures[NiTexturingProperty::GlowTexture];
+                        if (texture.mEnabled && !texture.mSourceTexture.empty())
+                        {
+                            result.emissiveTexture = VFS::Path::toNormalized(texture.mSourceTexture->mFile).value();
+                            result.emissiveWrapU = texture.wrapS();
+                            result.emissiveWrapV = texture.wrapT();
                         }
                     }
                 }

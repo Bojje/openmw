@@ -172,6 +172,7 @@ namespace Vk
         std::vector<uint32_t> mMeshTextureIndices;
         std::vector<uint32_t> mMeshAlphaTextureIndices;
         std::vector<uint32_t> mMeshNormalTextureIndices;
+        std::vector<uint32_t> mMeshEmissiveTextureIndices;
 
         struct MeshBuffers
         {

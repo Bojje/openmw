@@ -80,6 +80,8 @@ int main()
     texture.mFile = "textures\\synthetic.dds";
     Nif::NiSourceTexture normalTexture;
     normalTexture.mFile = "textures\\synthetic_n.dds";
+    Nif::NiSourceTexture glowTexture;
+    glowTexture.mFile = "textures\\synthetic_glow.dds";
     Nif::NiTexturingProperty texturing;
     texturing.mTextures.resize(Nif::NiTexturingProperty::BumpTexture + 1);
     texturing.mTextures.front().mEnabled = true;
@@ -88,6 +90,9 @@ int main()
     texturing.mTextures[Nif::NiTexturingProperty::BumpTexture].mEnabled = true;
     texturing.mTextures[Nif::NiTexturingProperty::BumpTexture].mSourceTexture = &normalTexture;
     texturing.mTextures[Nif::NiTexturingProperty::BumpTexture].mClamp = 1;
+    texturing.mTextures[Nif::NiTexturingProperty::GlowTexture].mEnabled = true;
+    texturing.mTextures[Nif::NiTexturingProperty::GlowTexture].mSourceTexture = &glowTexture;
+    texturing.mTextures[Nif::NiTexturingProperty::GlowTexture].mClamp = 2;
     Nif::NiMaterialProperty material;
     material.mDiffuse = { 0.25f, 0.5f, 0.75f };
     material.mAlpha = 0.75f;
@@ -125,6 +130,7 @@ int main()
     expectNear(instances.front().transform.data[12], 12.0f, "composed mesh translation");
     if (instances.front().mesh.material.albedoTexture != "textures/synthetic.dds"
         || instances.front().mesh.material.normalTexture != "textures/synthetic_n.dds"
+        || instances.front().mesh.material.emissiveTexture != "textures/synthetic_glow.dds"
         || !instances.front().mesh.material.normalMap
         || !instances.front().mesh.material.alphaBlend || !instances.front().mesh.material.alphaTest
         || instances.front().mesh.material.alphaTestThreshold != 128
@@ -132,6 +138,8 @@ int main()
         || instances.front().mesh.material.albedoWrapU || instances.front().mesh.material.albedoWrapV
         || instances.front().mesh.material.normalWrapU || !instances.front().mesh.material.normalWrapV)
         throw std::runtime_error("NIF material conversion lost texture or alpha state");
+    if (!instances.front().mesh.material.emissiveWrapU || instances.front().mesh.material.emissiveWrapV)
+        throw std::runtime_error("NIF material conversion lost emissive texture wrapping");
     expectNear(instances.front().mesh.material.diffuse.x, 0.25f, "material diffuse red");
     expectNear(instances.front().mesh.material.diffuse.w, 0.75f, "material alpha");
     expectNear(instances.front().mesh.material.emissive.z, 0.6f, "material emissive");

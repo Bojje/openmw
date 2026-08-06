@@ -59,8 +59,9 @@ and alpha to vertex color output. NIF bump/normal texture slots now cross the sa
 with generated or authored tangent frames for static mesh normal mapping. BSLighting
 shader-authored alpha and BSShaderNoLighting texture properties are also preserved, so
 static materials do not become opaque or textureless merely because their data arrived
-through a Bethesda shader property rather than a classic NIF property. Resource images can
-now cross into neutral RGBA8 data,
+through a Bethesda shader property rather than a classic NIF property. Classic NIF glow
+slots and Bethesda shader glow textures now cross the same boundary and contribute to the
+neutral emissive channel. Resource images can now cross into neutral RGBA8 data,
 and authored BSLighting double-sided flags now select the matching Vulkan no-cull pipeline.
 Classic and BS shader texture wrap flags now select per-resource repeat/clamp sampler variants.
 The standalone Vulkan renderer uploads/caches indexed albedo textures and samples them
@@ -133,7 +134,7 @@ handoff rather than only a test fixture; conversion happens on cell add/remove r
 on every frame export.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-52 files, deleting 326 lines and adding 4,279 lines (net `+3,953`). The larger Vulkan-only
+52 files, deleting 326 lines and adding 4,331 lines (net `+4,005`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
