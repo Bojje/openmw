@@ -17,8 +17,6 @@ namespace Vk
 
         Swapchain(const Swapchain&) = delete;
         Swapchain& operator=(const Swapchain&) = delete;
-        Swapchain(Swapchain&& other) noexcept;
-        Swapchain& operator=(Swapchain&& other) noexcept;
 
         void recreate(uint32_t width, uint32_t height);
 

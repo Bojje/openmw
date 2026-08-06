@@ -134,7 +134,7 @@ handoff rather than only a test fixture; conversion happens on cell add/remove r
 on every frame export.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-52 files, deleting 423 lines and adding 4,374 lines (net `+3,951`). The larger Vulkan-only
+52 files, deleting 491 lines and adding 4,376 lines (net `+3,885`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
@@ -158,6 +158,8 @@ Resize, capture, and cleanup now retain only the synchronization waits required 
 their ownership boundaries; redundant device/queue-idle calls were removed.
 The swapchain no longer allocates a second unused depth image: depth is owned solely by
 the renderer's G-buffer, removing the duplicate swapchain resource lifecycle.
+The Vulkan device and swapchain are also now explicitly non-movable because both are
+owned through `std::unique_ptr`; their unreachable custom move implementations are gone.
 
 The remaining migration is not a compatibility problem that can be solved by retaining
 both renderers in one execution path. Static-world transforms, materials, textures,

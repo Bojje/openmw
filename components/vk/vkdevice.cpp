@@ -27,40 +27,6 @@ namespace Vk
             vkDestroyDevice(mDevice, nullptr);
     }
 
-    Device::Device(Device&& other) noexcept
-        : mDevice(other.mDevice)
-        , mPhysicalDevice(other.mPhysicalDevice)
-        , mQueueFamilyIndices(other.mQueueFamilyIndices)
-        , mGraphicsQueue(other.mGraphicsQueue)
-        , mPresentQueue(other.mPresentQueue)
-    {
-        other.mDevice = VK_NULL_HANDLE;
-        other.mPhysicalDevice = VK_NULL_HANDLE;
-        other.mGraphicsQueue = VK_NULL_HANDLE;
-        other.mPresentQueue = VK_NULL_HANDLE;
-    }
-
-    Device& Device::operator=(Device&& other) noexcept
-    {
-        if (this != &other)
-        {
-            if (mDevice != VK_NULL_HANDLE)
-                vkDestroyDevice(mDevice, nullptr);
-
-            mDevice = other.mDevice;
-            mPhysicalDevice = other.mPhysicalDevice;
-            mQueueFamilyIndices = other.mQueueFamilyIndices;
-            mGraphicsQueue = other.mGraphicsQueue;
-            mPresentQueue = other.mPresentQueue;
-
-            other.mDevice = VK_NULL_HANDLE;
-            other.mPhysicalDevice = VK_NULL_HANDLE;
-            other.mGraphicsQueue = VK_NULL_HANDLE;
-            other.mPresentQueue = VK_NULL_HANDLE;
-        }
-        return *this;
-    }
-
     void Device::selectPhysicalDevice(VkInstance instance, VkSurfaceKHR surface)
     {
         uint32_t deviceCount = 0;

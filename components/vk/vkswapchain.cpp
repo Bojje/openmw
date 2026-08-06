@@ -21,36 +21,6 @@ namespace Vk
         cleanup();
     }
 
-    Swapchain::Swapchain(Swapchain&& other) noexcept
-        : mDevice(other.mDevice)
-        , mSurface(other.mSurface)
-        , mSwapchain(other.mSwapchain)
-        , mFormat(other.mFormat)
-        , mExtent(other.mExtent)
-        , mImages(std::move(other.mImages))
-        , mImageViews(std::move(other.mImageViews))
-    {
-        other.mSwapchain = VK_NULL_HANDLE;
-    }
-
-    Swapchain& Swapchain::operator=(Swapchain&& other) noexcept
-    {
-        if (this != &other)
-        {
-            cleanup();
-
-            mSurface = other.mSurface;
-            mSwapchain = other.mSwapchain;
-            mFormat = other.mFormat;
-            mExtent = other.mExtent;
-            mImages = std::move(other.mImages);
-            mImageViews = std::move(other.mImageViews);
-
-            other.mSwapchain = VK_NULL_HANDLE;
-        }
-        return *this;
-    }
-
     void Swapchain::recreate(uint32_t width, uint32_t height)
     {
         cleanup();

@@ -19,8 +19,6 @@ namespace Vk
 
         Device(const Device&) = delete;
         Device& operator=(const Device&) = delete;
-        Device(Device&& other) noexcept;
-        Device& operator=(Device&& other) noexcept;
 
         VkDevice handle() const { return mDevice; }
         VkPhysicalDevice physical() const { return mPhysicalDevice; }
