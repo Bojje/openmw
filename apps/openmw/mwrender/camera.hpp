@@ -4,6 +4,8 @@
 #include <optional>
 #include <string>
 
+#include <components/render/scene.hpp>
+
 #include <osg/Matrix>
 #include <osg/Vec3>
 #include <osg/Vec3d>
@@ -112,6 +114,8 @@ namespace MWRender
 
         const osg::Matrixf& getViewMatrix() const { return mViewMatrix; }
         const osg::Matrixf& getProjectionMatrix() const { return mProjectionMatrix; }
+        Render::Mat4 getNeutralViewMatrix() const;
+        Render::Mat4 getNeutralProjectionMatrix() const;
 
     private:
         MWWorld::Ptr mTrackingPtr;

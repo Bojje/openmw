@@ -96,16 +96,6 @@ namespace
             static_cast<float>(rotation.w()) };
     }
 
-    template <class Matrix>
-    Render::Mat4 toRenderMatrix(const Matrix& matrix)
-    {
-        Render::Mat4 result = {};
-        const auto* values = matrix.ptr();
-        for (int i = 0; i < 16; ++i)
-            result.data[i] = static_cast<float>(values[i]);
-        return result;
-    }
-
     osg::Quat getObjectRotation(const MWWorld::Ptr& ptr)
     {
         const auto& position = ptr.getRefData().getPosition();
@@ -489,8 +479,8 @@ namespace MWRender
     {
         Render::SceneSubmission result;
         result.scene = mNeutralSceneData;
-        result.scene.view = toRenderMatrix(mCamera->getViewMatrix());
-        result.scene.projection = toRenderMatrix(mCamera->getProjectionMatrix());
+        result.scene.view = mCamera->getNeutralViewMatrix();
+        result.scene.projection = mCamera->getNeutralProjectionMatrix();
         result.scene.viewInverse = Render::invertMat4(result.scene.view);
         result.scene.projInverse = Render::invertMat4(result.scene.projection);
 

@@ -23,6 +23,15 @@
 namespace
 {
 
+    Render::Mat4 toRenderMatrix(const osg::Matrixf& matrix)
+    {
+        Render::Mat4 result = {};
+        const auto* values = matrix.ptr();
+        for (int i = 0; i < 16; ++i)
+            result.data[i] = static_cast<float>(values[i]);
+        return result;
+    }
+
     class UpdateRenderCameraCallback : public SceneUtil::NodeCallback<UpdateRenderCameraCallback, osg::Camera*>
     {
     public:
@@ -127,6 +136,16 @@ namespace MWRender
         cam->setViewMatrixAsLookAt(pos, pos + forward, up);
         mViewMatrix = cam->getViewMatrix();
         mProjectionMatrix = cam->getProjectionMatrix();
+    }
+
+    Render::Mat4 Camera::getNeutralViewMatrix() const
+    {
+        return toRenderMatrix(mViewMatrix);
+    }
+
+    Render::Mat4 Camera::getNeutralProjectionMatrix() const
+    {
+        return toRenderMatrix(mProjectionMatrix);
     }
 
     void Camera::update(float duration, bool paused)
