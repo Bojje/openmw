@@ -52,11 +52,6 @@ namespace Vk
         bool isComplete() const { return graphics.has_value() && present.has_value(); }
     };
 
-    class Instance;
-    class Device;
-    class Swapchain;
-    class CommandPool;
-    class FrameSync;
 }
 
 #define VK_CHECK(result)                                                                                               \

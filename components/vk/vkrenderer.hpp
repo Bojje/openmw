@@ -28,7 +28,6 @@ namespace Vk
     class Swapchain;
     class CommandPool;
     class FrameSync;
-    class ShaderModule;
 
     struct GBufferAttachments
     {
