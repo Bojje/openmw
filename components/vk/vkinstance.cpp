@@ -80,8 +80,9 @@ namespace Vk
         appInfo.apiVersion = std::min(loaderVersion, VK_API_VERSION_1_3);
 
         auto extensions = getRequiredExtensions();
-        if (!checkInstanceExtensionSupport(extensions))
-            throw std::runtime_error("Required Vulkan instance extension is unavailable");
+        const auto missingExtension = checkInstanceExtensionSupport(extensions);
+        if (missingExtension)
+            throw std::runtime_error("Required Vulkan instance extension is unavailable: " + *missingExtension);
 
         VkInstanceCreateInfo createInfo = {};
         createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
@@ -147,7 +148,7 @@ namespace Vk
         return extensions;
     }
 
-    bool Instance::checkInstanceExtensionSupport(const std::vector<const char*>& extensions) const
+    std::optional<std::string> Instance::checkInstanceExtensionSupport(const std::vector<const char*>& extensions) const
     {
         uint32_t extensionCount = 0;
         vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
@@ -160,9 +161,9 @@ namespace Vk
                 return std::strcmp(extension.extensionName, required) == 0;
             });
             if (found == available.end())
-                return false;
+                return std::string(required);
         }
-        return true;
+        return std::nullopt;
     }
 
     bool Instance::checkValidationLayerSupport() const

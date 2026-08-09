@@ -173,6 +173,9 @@ Texture descriptor writes are also deferred until the owning frame fence has com
 so scene updates do not mutate descriptor sets used by another in-flight frame.
 Window and headless drawable-size handling now share one renderer helper, so acquire and
 present recovery cannot drift between surface modes.
+Swapchain creation now selects the first supported composite-alpha mode with opaque
+composition preferred, and instance failures name the missing extension; unsupported
+surface capabilities therefore fail at the boundary with actionable diagnostics.
 Instance creation now negotiates the loader's supported Vulkan version instead of requiring
 1.3, and device creation no longer enables the unused anisotropy feature.
 Resize, capture, and cleanup now retain only the synchronization waits required by

@@ -41,6 +41,7 @@ namespace Vk
         SurfaceDetails querySurfaceDetails() const;
         VkSurfaceFormatKHR chooseSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& available) const;
         VkPresentModeKHR choosePresentMode(const std::vector<VkPresentModeKHR>& available) const;
+        VkCompositeAlphaFlagBitsKHR chooseCompositeAlpha(VkCompositeAlphaFlagsKHR supported) const;
         VkExtent2D chooseExtent(const VkSurfaceCapabilitiesKHR& capabilities, uint32_t width, uint32_t height) const;
 
         Device& mDevice;

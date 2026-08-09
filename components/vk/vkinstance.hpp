@@ -2,6 +2,7 @@
 #define OPENMW_COMPONENTS_VK_VKINSTANCE_H
 
 #include <atomic>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -27,7 +28,7 @@ namespace Vk
         void createInstance(const std::string& appName, const std::string& engineName);
         void setupDebugMessenger();
         std::vector<const char*> getRequiredExtensions() const;
-        bool checkInstanceExtensionSupport(const std::vector<const char*>& extensions) const;
+        std::optional<std::string> checkInstanceExtensionSupport(const std::vector<const char*>& extensions) const;
         bool checkValidationLayerSupport() const;
 
         static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,

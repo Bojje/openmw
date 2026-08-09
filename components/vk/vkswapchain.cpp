@@ -72,7 +72,7 @@ namespace Vk
         }
 
         createInfo.preTransform = details.capabilities.currentTransform;
-        createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+        createInfo.compositeAlpha = chooseCompositeAlpha(details.capabilities.supportedCompositeAlpha);
         createInfo.presentMode = presentMode;
         createInfo.clipped = VK_TRUE;
         createInfo.oldSwapchain = VK_NULL_HANDLE;
@@ -175,6 +175,23 @@ namespace Vk
                 return mode;
         }
         return VK_PRESENT_MODE_FIFO_KHR;
+    }
+
+    VkCompositeAlphaFlagBitsKHR Swapchain::chooseCompositeAlpha(VkCompositeAlphaFlagsKHR supported) const
+    {
+        constexpr VkCompositeAlphaFlagBitsKHR preferred[] = {
+            VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
+            VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR,
+            VK_COMPOSITE_ALPHA_POST_MULTIPLIED_BIT_KHR,
+            VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR,
+        };
+
+        for (const auto mode : preferred)
+        {
+            if ((supported & mode) != 0)
+                return mode;
+        }
+        throw std::runtime_error("Vulkan surface has no supported composite alpha mode");
     }
 
     VkExtent2D Swapchain::chooseExtent(
