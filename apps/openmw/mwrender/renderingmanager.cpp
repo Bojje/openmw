@@ -96,14 +96,6 @@ namespace
             static_cast<float>(rotation.w()) };
     }
 
-    osg::Quat getObjectRotation(const MWWorld::Ptr& ptr)
-    {
-        const auto& position = ptr.getRefData().getPosition();
-        if (ptr.getClass().isActor())
-            return osg::Quat(position.rot[2], osg::Vec3f(0, 0, -1));
-        return Misc::Convert::makeOsgQuat(position.rot);
-    }
-
     class LightManagerUpdateVisitor : public osg::NodeVisitor
     {
     public:
@@ -449,30 +441,6 @@ namespace MWRender
     MWRender::Objects& RenderingManager::getObjects()
     {
         return *mObjects.get();
-    }
-
-    void RenderingManager::recordObject(const MWWorld::Ptr& ptr, std::string_view model, bool visible)
-    {
-        if (ptr.isEmpty() || model.empty())
-        {
-            if (!ptr.isEmpty())
-                mWorldScene.removeObject(static_cast<const void*>(ptr.mRef));
-            return;
-        }
-
-        const MWWorld::CellStore* cell = ptr.getCell();
-        const auto& position = ptr.getRefData().getPosition();
-        osg::Vec3f scale(ptr.getCellRef().getScale(), ptr.getCellRef().getScale(), ptr.getCellRef().getScale());
-        ptr.getClass().adjustScale(ptr, scale, true);
-
-        Render::ObjectTransform transform;
-        transform.position = { position.pos[0], position.pos[1], position.pos[2] };
-        transform.rotation = toRenderQuat(getObjectRotation(ptr));
-        transform.scale = { scale.x(), scale.y(), scale.z() };
-        mWorldScene.recordObject(static_cast<const void*>(ptr.mRef), static_cast<const void*>(cell),
-            cell->getCell()->isExterior(), cell->getCell()->getGridX(), cell->getCell()->getGridY(),
-            cell->getCell()->getNameId(), model, transform, visible, cell->getCell()->getWorldSpace().serializeText(),
-            ptr.getClass().useAnim());
     }
 
     Render::SceneSubmission RenderingManager::getNeutralScene() const

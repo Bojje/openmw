@@ -78,8 +78,9 @@ The Vulkan G-buffer now carries neutral roughness,
 ambient-occlusion,
 and emissive-strength channels into the composite pass. Cell object lookup and removal are
 owned by the renderer-neutral `WorldScene`/`CellScene` components rather than the OSG-facing
-manager; the manager now only translates engine lifecycle events into that component. The
-manager also exposes a renderer-neutral camera/inverse-matrix and directional-light snapshot
+manager. The world scene now writes object snapshots directly during insertion and unpaging;
+the manager retains only the OSG-facing object operations. The manager also exposes a
+renderer-neutral camera/inverse-matrix and directional-light snapshot
 for a future Vulkan frame consumer. Neutral loaded-cell snapshots retain insertion order when
 collected, making backend draw lists stable for image comparison and predictable alpha ordering.
 Fog color and start/end distances now cross the same neutral scene handoff, and the Vulkan
@@ -150,7 +151,7 @@ handoff rather than only a test fixture; conversion happens on cell add/remove r
 on every frame export.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-55 files, deleting 547 lines and adding 4,832 lines (net `+4,285`). The larger Vulkan-only
+55 files, deleting 547 lines and adding 4,830 lines (net `+4,283`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.

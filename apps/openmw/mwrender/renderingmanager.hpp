@@ -161,9 +161,8 @@ namespace MWRender
         void addCell(const MWWorld::CellStore* store);
         void removeCell(const MWWorld::CellStore* store);
 
-        /// Record an object after the world has accepted it for rendering.
-        /// This is the renderer-neutral scene source used by future backends.
-        void recordObject(const MWWorld::Ptr& ptr, std::string_view model, bool visible = true);
+        /// Renderer-neutral world ownership updated by the world scene lifecycle.
+        Render::WorldScene& getNeutralWorldScene() { return mWorldScene; }
 
         /// Collect one backend-neutral static-scene submission for a renderer.
         Render::SceneSubmission getNeutralScene() const;

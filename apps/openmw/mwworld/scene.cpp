@@ -90,6 +90,37 @@ namespace
         return makeDirectNodeRotation(ptr);
     }
 
+    Render::Quat toRenderQuat(const osg::Quat& rotation)
+    {
+        return { static_cast<float>(rotation.x()), static_cast<float>(rotation.y()), static_cast<float>(rotation.z()),
+            static_cast<float>(rotation.w()) };
+    }
+
+    void recordNeutralObject(const MWWorld::Ptr& ptr, std::string_view model, bool visible,
+        MWRender::RenderingManager& rendering)
+    {
+        if (ptr.isEmpty() || model.empty())
+        {
+            if (!ptr.isEmpty())
+                rendering.getNeutralWorldScene().removeObject(static_cast<const void*>(ptr.mRef));
+            return;
+        }
+
+        const MWWorld::CellStore* cell = ptr.getCell();
+        const auto& position = ptr.getRefData().getPosition();
+        osg::Vec3f scale(ptr.getCellRef().getScale(), ptr.getCellRef().getScale(), ptr.getCellRef().getScale());
+        ptr.getClass().adjustScale(ptr, scale, true);
+
+        Render::ObjectTransform transform;
+        transform.position = { position.pos[0], position.pos[1], position.pos[2] };
+        transform.rotation = toRenderQuat(makeDirectNodeRotation(ptr));
+        transform.scale = { scale.x(), scale.y(), scale.z() };
+        rendering.getNeutralWorldScene().recordObject(static_cast<const void*>(ptr.mRef), static_cast<const void*>(cell),
+            cell->getCell()->isExterior(), cell->getCell()->getGridX(), cell->getCell()->getGridY(),
+            cell->getCell()->getNameId(), model, transform, visible, cell->getCell()->getWorldSpace().serializeText(),
+            ptr.getClass().useAnim());
+    }
+
     void setNodeRotation(const MWWorld::Ptr& ptr, MWRender::RenderingManager& rendering, const osg::Quat& rotation)
     {
         if (ptr.getRefData().getBaseNode())
@@ -127,7 +158,7 @@ namespace
             ptr.getRefData().setBaseNode(pagedNode);
         setNodeRotation(ptr, rendering, rotation);
         if (!model.empty())
-            rendering.recordObject(ptr, model.view(), !isPaged);
+            recordNeutralObject(ptr, model.view(), !isPaged, rendering);
 
         if (ptr.getClass().useAnim())
             MWBase::Environment::get().getMechanicsManager()->add(ptr);
@@ -326,7 +357,7 @@ namespace MWWorld
             const VFS::Path::Normalized model = getModel(ptr);
             ptr.getClass().insertObjectRendering(ptr, model, mRendering);
             setNodeRotation(ptr, mRendering, makeNodeRotation(ptr, RotationOrder::direct));
-            mRendering.recordObject(ptr, model.view(), true);
+            recordNeutralObject(ptr, model.view(), true, mRendering);
             reloadTerrain();
         }
     }
