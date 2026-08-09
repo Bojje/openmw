@@ -161,14 +161,11 @@ namespace MWRender
         void addCell(const MWWorld::CellStore* store);
         void removeCell(const MWWorld::CellStore* store);
 
-        /// Renderer-neutral world ownership updated by the world scene lifecycle.
-        Render::WorldScene& getNeutralWorldScene() { return mWorldScene; }
-
         /// Build the neutral terrain snapshot for a cell loaded by the world scene.
         std::vector<Render::TerrainTile> getNeutralTerrainTiles(const MWWorld::CellStore* store);
 
         /// Collect one backend-neutral static-scene submission for a renderer.
-        Render::SceneSubmission getNeutralScene() const;
+        Render::SceneSubmission getNeutralScene(const Render::WorldScene& worldScene) const;
 
         void enableTerrain(bool enable, ESM::RefId worldspace);
 
@@ -349,7 +346,6 @@ namespace MWRender
         std::unique_ptr<Objects> mObjects;
         std::unique_ptr<Water> mWater;
         std::unordered_map<ESM::RefId, WorldspaceChunkMgr> mWorldspaceChunks;
-        Render::WorldScene mWorldScene;
         std::string mActiveWorldspace;
         Terrain::World* mTerrain;
         std::unique_ptr<TerrainStorage> mTerrainStorage;

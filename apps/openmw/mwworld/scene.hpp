@@ -15,6 +15,7 @@
 
 #include <components/esm/exteriorcelllocation.hpp>
 #include <components/misc/constants.hpp>
+#include <components/render/world.hpp>
 
 namespace osg
 {
@@ -110,6 +111,8 @@ namespace MWWorld
 
         std::vector<ESM::RefNum> mPagedRefs;
 
+        Render::WorldScene mNeutralWorldScene;
+
         std::vector<osg::ref_ptr<SceneUtil::WorkItem>> mWorkItems;
 
         std::optional<ChangeCellGridRequest> mChangeCellGridRequest;
@@ -175,6 +178,9 @@ namespace MWWorld
 
         void clear();
         ///< Change into a void
+
+        /// Renderer-neutral world ownership updated by this scene lifecycle.
+        Render::WorldScene& getNeutralWorldScene() { return mNeutralWorldScene; }
 
         void markCellAsUnchanged();
 

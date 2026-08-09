@@ -437,7 +437,7 @@ namespace MWRender
         return *mObjects.get();
     }
 
-    Render::SceneSubmission RenderingManager::getNeutralScene() const
+    Render::SceneSubmission RenderingManager::getNeutralScene(const Render::WorldScene& worldScene) const
     {
         Render::SceneSubmission result;
         result.scene = mNeutralSceneData;
@@ -451,7 +451,7 @@ namespace MWRender
         // their converted bind-pose geometry. Keep the dynamic records below so
         // the eventual skinned path can replace this fallback without changing
         // the scene bridge.
-        result.meshes = Render::collectWorldMeshes(mWorldScene, [&](std::string_view model)
+        result.meshes = Render::collectWorldMeshes(worldScene, [&](std::string_view model)
             -> const Resource::NifMeshManager::Meshes& {
             const auto [iter, inserted] = cache.try_emplace(std::string(model));
             if (inserted)
@@ -465,11 +465,11 @@ namespace MWRender
             return *iter->second;
         }, mActiveWorldspace, true);
 
-        result.dynamicObjects = mWorldScene.dynamicObjectsInOrder(mActiveWorldspace);
+        result.dynamicObjects = worldScene.dynamicObjectsInOrder(mActiveWorldspace);
 
         if (mTerrain)
         {
-            for (const Render::CellScene* cell : mWorldScene.cellsInOrder(mActiveWorldspace))
+            for (const Render::CellScene* cell : worldScene.cellsInOrder(mActiveWorldspace))
             {
                 if (!cell->exterior)
                     continue;
