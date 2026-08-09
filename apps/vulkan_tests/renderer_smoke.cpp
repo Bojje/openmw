@@ -229,9 +229,7 @@ int main(int argc, char** argv)
                 static_cast<uint32_t>(drawableWidth), static_cast<uint32_t>(drawableHeight));
             if (!renderer->validationEnabled())
             {
-                if (headless)
-                    throw EnvironmentUnavailable("headless Vulkan smoke requires validation layers");
-                throw std::runtime_error("Vulkan smoke test requires validation layers");
+                throw EnvironmentUnavailable("Vulkan smoke requires validation layers");
             }
             if (!renderer->loadShadersAndCreatePipelines(shaderDir))
                 throw std::runtime_error("Vulkan smoke test could not load the raster shaders");
