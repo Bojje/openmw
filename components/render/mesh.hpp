@@ -145,7 +145,8 @@ namespace Render
 
     template <class ResolveMeshes>
     std::vector<MeshInstance> collectCellMeshes(
-        const CellScene& scene, ResolveMeshes&& resolveMeshes, bool includeDynamic = false)
+        const CellScene& scene, ResolveMeshes&& resolveMeshes, bool includeDynamic = false,
+        std::vector<std::string>* unresolvedModels = nullptr)
     {
         std::vector<MeshInstance> result;
         for (const WorldObject& object : scene.objects)
@@ -153,7 +154,10 @@ namespace Render
             if (!object.visible || (!includeDynamic && object.dynamic))
                 continue;
 
-            for (const MeshInstance& mesh : resolveMeshes(object.model))
+            const std::vector<MeshInstance> resolvedMeshes = resolveMeshes(object.model);
+            if (resolvedMeshes.empty() && unresolvedModels != nullptr)
+                unresolvedModels->push_back(object.model);
+            for (const MeshInstance& mesh : resolvedMeshes)
                 result.push_back(transformMeshInstance(object, mesh));
         }
         return result;
@@ -162,12 +166,13 @@ namespace Render
     template <class ResolveMeshes>
     std::vector<MeshInstance> collectWorldMeshes(
         const WorldScene& world, ResolveMeshes&& resolveMeshes, std::string_view worldspace = {},
-        bool includeDynamic = false)
+        bool includeDynamic = false, std::vector<std::string>* unresolvedModels = nullptr)
     {
         std::vector<MeshInstance> result;
         for (const CellScene* cell : world.cellsInOrder(worldspace))
         {
-            std::vector<MeshInstance> cellMeshes = collectCellMeshes(*cell, resolveMeshes, includeDynamic);
+            std::vector<MeshInstance> cellMeshes
+                = collectCellMeshes(*cell, resolveMeshes, includeDynamic, unresolvedModels);
             result.insert(result.end(), std::make_move_iterator(cellMeshes.begin()),
                 std::make_move_iterator(cellMeshes.end()));
         }

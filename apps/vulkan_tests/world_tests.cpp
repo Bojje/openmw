@@ -117,6 +117,12 @@ int main()
     if (aggregate.meshes.size() != 1 || aggregate.dynamicObjects.size() != 0 || !aggregate.valid())
         throw std::runtime_error("renderer-neutral scene submission collector lost world state");
 
+    const Render::SceneSubmission unresolved = Render::collectSceneSubmission(world, aggregateScene, "",
+        [](std::string_view) { return std::vector<Render::MeshInstance>(); }, false);
+    if (unresolved.unresolvedModels.size() != 1 || unresolved.unresolvedModels.front() != "meshes/first.nif"
+        || unresolved.valid())
+        throw std::runtime_error("renderer-neutral scene submission hid an unresolved visible model");
+
     Render::SceneSubmission submission;
     submission.scene.ambientColor = { 0.2f, 0.3f, 0.4f, 1.f };
     bool resolverCalled = false;
