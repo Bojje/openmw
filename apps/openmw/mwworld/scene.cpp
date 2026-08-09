@@ -447,6 +447,7 @@ namespace MWWorld
 
         MWBase::Environment::get().getMechanicsManager()->drop(cell);
 
+        mRendering.getNeutralWorldScene().removeCell(static_cast<const void*>(cell));
         mRendering.removeCell(cell);
         MWBase::Environment::get().getWindowManager()->removeCell(cell);
 
@@ -474,6 +475,8 @@ namespace MWWorld
         const MWWorld::Cell& cellVariant = *cell.getCell();
         ESM::RefId worldspace = cellVariant.getWorldSpace();
         ESM::ExteriorCellLocation cellIndex(cellX, cellY, worldspace);
+        mRendering.getNeutralWorldScene().recordCell(static_cast<const void*>(&cell), cellVariant.isExterior(), cellX,
+            cellY, cellVariant.getNameId(), worldspace.serializeText());
 
         if (cellVariant.isExterior())
         {

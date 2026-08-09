@@ -654,10 +654,6 @@ namespace MWRender
 
         mWater->changeCell(store);
 
-        mWorldScene.recordCell(static_cast<const void*>(store), store->getCell()->isExterior(),
-            store->getCell()->getGridX(), store->getCell()->getGridY(), store->getCell()->getNameId(),
-            store->getCell()->getWorldSpace().serializeText());
-
         if (store->getCell()->isExterior())
         {
             enableTerrain(true, store->getCell()->getWorldSpace());
@@ -699,7 +695,6 @@ namespace MWRender
 
         mWater->removeCell(store);
 
-        mWorldScene.removeCell(static_cast<const void*>(store));
     }
 
     void RenderingManager::enableTerrain(bool enable, ESM::RefId worldspace)
