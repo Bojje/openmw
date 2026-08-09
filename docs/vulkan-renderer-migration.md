@@ -89,8 +89,9 @@ Fog color and start/end distances now cross the same neutral scene handoff, and 
 composite applies the active linear fog range after reconstructing world position.
 The CPU ABI guard tracks the expanded 336-byte scene UBO so future neutral-state additions
 cannot silently desynchronize the Vulkan shader layout.
-The neutral world snapshot now has an explicit reset path owned by `RenderingManager::clear()`,
-so a game/world unload cannot retain stale object identities, terrain tiles, or cell ordering.
+The neutral world snapshot now has an explicit reset path owned by `Scene::clear()` after cell
+teardown, so a game/world unload cannot retain stale object identities, terrain tiles, or cell
+ordering.
 The Vulkan composite pass now consumes that single scene-lighting UBO directly; duplicated
 sun push constants were removed, and ambient light is part of the neutral snapshot. The
 OSG-facing manager now also exposes neutral loaded-world mesh collection and RGBA8 texture
