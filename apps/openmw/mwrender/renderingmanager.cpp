@@ -489,8 +489,8 @@ namespace MWRender
     {
         Render::SceneSubmission result;
         result.scene = {};
-        result.scene.view = toRenderMatrix(mViewer->getCamera()->getViewMatrix());
-        result.scene.projection = toRenderMatrix(mViewer->getCamera()->getProjectionMatrix());
+        result.scene.view = toRenderMatrix(mCamera->getViewMatrix());
+        result.scene.projection = toRenderMatrix(mCamera->getProjectionMatrix());
         result.scene.viewInverse = Render::invertMat4(result.scene.view);
         result.scene.projInverse = Render::invertMat4(result.scene.projection);
 
