@@ -7,6 +7,7 @@
 
 #include <components/debug/debuglog.hpp>
 #include <components/misc/pathhelpers.hpp>
+#include <components/render/textureconversion.hpp>
 #include <components/sceneutil/glextensions.hpp>
 #include <components/vfs/manager.hpp>
 #include <components/vfs/pathutil.hpp>
@@ -218,25 +219,14 @@ namespace Resource
         if (!image || image->s() <= 0 || image->t() <= 0)
             return nullptr;
 
-        auto texture = std::make_shared<Render::TextureData>();
-        texture->width = static_cast<uint32_t>(image->s());
-        texture->height = static_cast<uint32_t>(image->t());
-        texture->pixels.resize(static_cast<std::size_t>(texture->width) * texture->height * 4);
-
-        for (uint32_t y = 0; y < texture->height; ++y)
-        {
-            for (uint32_t x = 0; x < texture->width; ++x)
-            {
+        Render::TextureData texture = Render::makeRgba8Texture(static_cast<std::uint32_t>(image->s()),
+            static_cast<std::uint32_t>(image->t()), [image](std::uint32_t x, std::uint32_t y) {
                 const osg::Vec4 color = image->getColor(static_cast<int>(x), static_cast<int>(y), 0);
-                const std::size_t offset = (static_cast<std::size_t>(y) * texture->width + x) * 4;
-                texture->pixels[offset] = static_cast<uint8_t>(std::clamp(color.r(), 0.f, 1.f) * 255.f + 0.5f);
-                texture->pixels[offset + 1] = static_cast<uint8_t>(std::clamp(color.g(), 0.f, 1.f) * 255.f + 0.5f);
-                texture->pixels[offset + 2] = static_cast<uint8_t>(std::clamp(color.b(), 0.f, 1.f) * 255.f + 0.5f);
-                texture->pixels[offset + 3] = static_cast<uint8_t>(std::clamp(color.a(), 0.f, 1.f) * 255.f + 0.5f);
-            }
-        }
-
-        return texture;
+                return std::array<float, 4>{ color.r(), color.g(), color.b(), color.a() };
+            });
+        if (!texture.valid())
+            return nullptr;
+        return std::make_shared<const Render::TextureData>(std::move(texture));
     }
 
     osg::Image* ImageManager::getWarningImage()

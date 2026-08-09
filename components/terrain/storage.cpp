@@ -6,39 +6,19 @@
 
 #include <osg/Image>
 
+#include <components/render/textureconversion.hpp>
+
 namespace Terrain
 {
     namespace
     {
         Render::TextureData convertBlendmap(const osg::Image& image)
         {
-            Render::TextureData result;
-            result.width = static_cast<std::uint32_t>(image.s());
-            result.height = static_cast<std::uint32_t>(image.t());
-            if (result.width == 0 || result.height == 0)
-            {
-                result.width = 0;
-                result.height = 0;
-                return result;
-            }
-
-            result.pixels.resize(static_cast<std::size_t>(result.width) * result.height * 4);
-            for (std::uint32_t y = 0; y < result.height; ++y)
-            {
-                for (std::uint32_t x = 0; x < result.width; ++x)
-                {
+            return Render::makeRgba8Texture(static_cast<std::uint32_t>(image.s()),
+                static_cast<std::uint32_t>(image.t()), [&image](std::uint32_t x, std::uint32_t y) {
                     const osg::Vec4 color = image.getColor(x, y);
-                    const std::size_t offset = (static_cast<std::size_t>(y) * result.width + x) * 4;
-                    const auto toByte = [](float value) {
-                        return static_cast<std::uint8_t>(std::clamp(value, 0.f, 1.f) * 255.f + 0.5f);
-                    };
-                    result.pixels[offset + 0] = toByte(color.r());
-                    result.pixels[offset + 1] = toByte(color.g());
-                    result.pixels[offset + 2] = toByte(color.b());
-                    result.pixels[offset + 3] = toByte(color.a());
-                }
-            }
-            return result;
+                    return std::array<float, 4>{ color.r(), color.g(), color.b(), color.a() };
+                });
         }
     }
 

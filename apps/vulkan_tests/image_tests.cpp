@@ -7,6 +7,7 @@
 #include <stdexcept>
 
 #include <components/render/imagecomparison.hpp>
+#include <components/render/textureconversion.hpp>
 
 namespace
 {
@@ -81,6 +82,21 @@ namespace
                 && loaded->pixels[7] == 255,
             "PPM RGBA conversion changed pixel data");
     }
+
+    void testRgba8Conversion()
+    {
+        const Render::TextureData image = Render::makeRgba8Texture(2, 1, [](std::uint32_t x, std::uint32_t) {
+            return std::array<float, 4>{ x == 0 ? -0.1f : 0.5f, 0.25f, 1.1f, 0.5f };
+        });
+        expect(image.valid(), "RGBA8 conversion should produce a valid image");
+        expect(image.pixels == std::vector<std::uint8_t>({ 0, 64, 255, 128, 128, 64, 255, 128 }),
+            "RGBA8 conversion should clamp and quantize channels consistently");
+
+        const Render::TextureData invalid = Render::makeRgba8Texture(1, 1, [](std::uint32_t, std::uint32_t) {
+            return std::array<float, 4>{ 0.f, std::numeric_limits<float>::quiet_NaN(), 0.f, 1.f };
+        });
+        expect(!invalid.valid(), "RGBA8 conversion should reject non-finite channels");
+    }
 }
 
 int main()
@@ -91,6 +107,7 @@ int main()
         testToleranceAndMetrics();
         testInvalidOrDifferentImages();
         testPpmRoundTrip();
+        testRgba8Conversion();
         std::cout << "Vulkan image comparison tests passed\n";
         return EXIT_SUCCESS;
     }
