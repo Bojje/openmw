@@ -21,36 +21,30 @@ namespace
 
         bool getMinMaxHeights(float, const osg::Vec2f&, ESM::RefId, float&, float&) override { return true; }
 
-        void fillVertexBuffers(int, float, const osg::Vec2f&, ESM::RefId, osg::Vec3Array& positions,
-            osg::Vec3Array& normals, osg::Vec4ubArray& colors) override
+        void fillRenderVertexBuffers(int, float, const std::array<float, 2>&, ESM::RefId,
+            std::vector<Render::TerrainVertex>& vertices) override
         {
             if (mEmpty)
                 return;
 
-            positions.push_back(osg::Vec3f(0.f, 0.f, 1.f));
-            positions.push_back(osg::Vec3f(1.f, 0.f, 1.f));
-            positions.push_back(osg::Vec3f(0.f, 1.f, 1.f));
-            positions.push_back(osg::Vec3f(1.f, 1.f, 1.f));
-            normals.push_back(osg::Vec3f(0.f, 0.f, 1.f));
-            normals.push_back(osg::Vec3f(0.f, 0.f, 1.f));
-            normals.push_back(osg::Vec3f(0.f, 0.f, 1.f));
-            normals.push_back(osg::Vec3f(0.f, 0.f, 1.f));
-            colors.push_back(osg::Vec4ub(255, 0, 0, 255));
-            colors.push_back(osg::Vec4ub(0, 255, 0, 255));
-            colors.push_back(osg::Vec4ub(0, 0, 255, 255));
-            colors.push_back(osg::Vec4ub(255, 255, 255, 255));
+            vertices = {
+                { { 0.f, 0.f, 1.f }, { 0.f, 0.f, 1.f }, { 255, 0, 0, 255 } },
+                { { 1.f, 0.f, 1.f }, { 0.f, 0.f, 1.f }, { 0, 255, 0, 255 } },
+                { { 0.f, 1.f, 1.f }, { 0.f, 0.f, 1.f }, { 0, 0, 255, 255 } },
+                { { 1.f, 1.f, 1.f }, { 0.f, 0.f, 1.f }, { 255, 255, 255, 255 } },
+            };
         }
 
-        void getBlendmaps(float, const osg::Vec2f&, ImageVector& blendmaps, std::vector<Terrain::LayerInfo>& layers,
-            ESM::RefId) override
+        void getRenderBlendmaps(float, const std::array<float, 2>&, std::vector<Render::TextureData>& blendmaps,
+            std::vector<Terrain::LayerInfo>& layers, ESM::RefId) override
         {
             if (!mOpaqueOnly)
             {
-                osg::ref_ptr<osg::Image> blendmap = new osg::Image;
-                blendmap->allocateImage(2, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE);
-                blendmap->setColor(osg::Vec4(1.f, 0.5f, 0.25f, 0.75f), 0, 0);
-                blendmap->setColor(osg::Vec4(0.f, 0.25f, 0.5f, 1.f), 1, 0);
-                blendmaps.push_back(blendmap);
+                Render::TextureData blendmap;
+                blendmap.width = 2;
+                blendmap.height = 1;
+                blendmap.pixels = { 255, 128, 64, 191, 0, 64, 128, 255 };
+                blendmaps.push_back(std::move(blendmap));
             }
 
             Terrain::LayerInfo layer;
@@ -98,6 +92,21 @@ int main()
             "terrain layer metadata was not converted");
         expect(tile->layers[0].blendmap.valid() && tile->layers[0].blendmap.pixels[3] == 191,
             "terrain blendmap was not converted to RGBA8");
+
+        osg::ref_ptr<osg::Vec3Array> legacyPositions = new osg::Vec3Array;
+        osg::ref_ptr<osg::Vec3Array> legacyNormals = new osg::Vec3Array;
+        osg::ref_ptr<osg::Vec4ubArray> legacyColors = new osg::Vec4ubArray;
+        storage.fillVertexBuffers(2, 4.f, osg::Vec2f(3.f, -2.f), ESM::RefId(), *legacyPositions, *legacyNormals,
+            *legacyColors);
+        expect(legacyPositions->size() == 4 && legacyNormals->size() == 4 && legacyColors->size() == 4
+                && (*legacyPositions)[1].x() == 1.f && (*legacyColors)[2].b() == 255,
+            "legacy terrain adapter did not preserve neutral vertices");
+
+        Terrain::Storage::ImageVector legacyBlendmaps;
+        std::vector<Terrain::LayerInfo> legacyLayers;
+        storage.getBlendmaps(4.f, osg::Vec2f(3.f, -2.f), legacyBlendmaps, legacyLayers, ESM::RefId());
+        expect(legacyBlendmaps.size() == 1 && legacyLayers.size() == 1 && legacyBlendmaps.front()->data()[3] == 191,
+            "legacy terrain adapter did not preserve neutral blendmaps");
 
         storage.mOpaqueOnly = true;
         const auto opaqueTile = storage.getRenderTile(0, 1.f, osg::Vec2f(), ESM::RefId());

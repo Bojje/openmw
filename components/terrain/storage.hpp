@@ -1,6 +1,7 @@
 #ifndef COMPONENTS_TERRAIN_STORAGE_H
 #define COMPONENTS_TERRAIN_STORAGE_H
 
+#include <array>
 #include <optional>
 #include <vector>
 
@@ -54,7 +55,19 @@ namespace Terrain
             float size, const osg::Vec2f& center, ESM::RefId worldspace, float& min, float& max)
             = 0;
 
-        /// Fill vertex buffers for a terrain chunk.
+        /// Fill renderer-neutral vertices for a terrain chunk.
+        /// The neutral path is the primary storage contract. It does not
+        /// expose renderer-owned arrays or image objects.
+        virtual void fillRenderVertexBuffers(int lodLevel, float size, const std::array<float, 2>& center,
+            ESM::RefId worldspace, std::vector<Render::TerrainVertex>& vertices)
+            = 0;
+
+        /// Create renderer-neutral textures holding layer blend values.
+        virtual void getRenderBlendmaps(float chunkSize, const std::array<float, 2>& chunkCenter,
+            std::vector<Render::TextureData>& blendmaps, std::vector<LayerInfo>& layerList, ESM::RefId worldspace)
+            = 0;
+
+        /// Legacy OSG adapter for the reference terrain renderer.
         /// @note May be called from background threads. Make sure to only call thread-safe functions from here!
         /// @note returned colors need to be in render-system specific format! Use RenderSystem::convertColourValue.
         /// @note Vertices should be written in row-major order (a row is defined as parallel to the x-axis).
@@ -66,8 +79,7 @@ namespace Terrain
         /// @param normals buffer to write vertex normals
         /// @param colours buffer to write vertex colours
         virtual void fillVertexBuffers(int lodLevel, float size, const osg::Vec2f& center, ESM::RefId worldspace,
-            osg::Vec3Array& positions, osg::Vec3Array& normals, osg::Vec4ubArray& colours)
-            = 0;
+            osg::Vec3Array& positions, osg::Vec3Array& normals, osg::Vec4ubArray& colours);
 
         typedef std::vector<osg::ref_ptr<osg::Image>> ImageVector;
         /// Create textures holding layer blend values for a terrain chunk.
@@ -79,8 +91,7 @@ namespace Terrain
         /// @param blendmaps created blendmaps will be written here
         /// @param layerList names of the layer textures used will be written here
         virtual void getBlendmaps(float chunkSize, const osg::Vec2f& chunkCenter, ImageVector& blendmaps,
-            std::vector<LayerInfo>& layerList, ESM::RefId worldspace)
-            = 0;
+            std::vector<LayerInfo>& layerList, ESM::RefId worldspace);
 
         virtual float getHeightAt(const osg::Vec3f& worldPos, ESM::RefId worldspace) = 0;
 
@@ -93,10 +104,9 @@ namespace Terrain
         /// Get the number of texture tiles on one side per chunk (chunkSize 1.0 = 1 cell).
         virtual int getTextureTileCount(float chunkSize, ESM::RefId worldspace) = 0;
 
-        // Legacy storage providers still fill OSG buffers, but this boundary
-        // exposes an independent snapshot that a renderer can upload without
-        // owning OSG objects. Unsupported layer features remain explicit in
-        // the neutral tile instead of being silently discarded.
+        // The neutral contract is consumed directly by the Vulkan migration
+        // path. The old methods above remain only as a centralized adapter for
+        // the OSG reference terrain renderer.
         std::optional<Render::TerrainTile> getRenderTile(
             int lodLevel, float size, const osg::Vec2f& center, ESM::RefId worldspace);
     };

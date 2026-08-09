@@ -105,29 +105,28 @@ namespace ESMTerrain
         bool getMinMaxHeights(
             float size, const osg::Vec2f& center, ESM::RefId worldspace, float& min, float& max) override;
 
-        /// Fill vertex buffers for a terrain chunk.
+        /// Fill renderer-neutral vertices for a terrain chunk.
         /// @note May be called from background threads. Make sure to only call thread-safe functions from here!
         /// @note Vertices should be written in row-major order (a row is defined as parallel to the x-axis).
         ///       The specified positions should be in local space, i.e. relative to the center of the terrain chunk.
         /// @param lodLevel LOD level, 0 = most detailed
         /// @param size size of the terrain chunk in cell units
         /// @param center center of the chunk in cell units
-        /// @param positions buffer to write vertices
-        /// @param normals buffer to write vertex normals
-        /// @param colours buffer to write vertex colours
-        void fillVertexBuffers(int lodLevel, float size, const osg::Vec2f& center, ESM::RefId worldspace,
-            osg::Vec3Array& positions, osg::Vec3Array& normals, osg::Vec4ubArray& colours) override;
+        /// @param vertices buffer to write neutral vertices, normals, and colours
+        void fillRenderVertexBuffers(int lodLevel, float size, const std::array<float, 2>& center,
+            ESM::RefId worldspace, std::vector<Render::TerrainVertex>& vertices) override;
 
-        /// Create textures holding layer blend values for a terrain chunk.
+        /// Create renderer-neutral textures holding layer blend values for a terrain chunk.
         /// @note The terrain chunk shouldn't be larger than one cell since otherwise we might
         ///       have to do a ridiculous amount of different layers. For larger chunks, composite maps should be used.
         /// @note May be called from background threads.
         /// @param chunkSize size of the terrain chunk in cell units
         /// @param chunkCenter center of the chunk in cell units
-        /// @param blendmaps created blendmaps will be written here
+        /// @param blendmaps created neutral RGBA8 blendmaps will be written here
         /// @param layerList names of the layer textures used will be written here
-        void getBlendmaps(float chunkSize, const osg::Vec2f& chunkCenter, ImageVector& blendmaps,
-            std::vector<Terrain::LayerInfo>& layerList, ESM::RefId worldspace) override;
+        void getRenderBlendmaps(float chunkSize, const std::array<float, 2>& chunkCenter,
+            std::vector<Render::TextureData>& blendmaps, std::vector<Terrain::LayerInfo>& layerList,
+            ESM::RefId worldspace) override;
 
         float getHeightAt(const osg::Vec3f& worldPos, ESM::RefId worldspace) override;
 
@@ -179,8 +178,9 @@ namespace ESMTerrain
         Terrain::LayerInfo getTextureSetLayerInfo(const ESM4::TextureSet& txst);
         Terrain::LayerInfo getLandTextureLayerInfo(ESM::FormId id);
 
-        void getEsm4Blendmaps(float chunkSize, const osg::Vec2f& chunkCenter, ImageVector& blendmaps,
-            std::vector<Terrain::LayerInfo>& layerList, ESM::RefId worldspace);
+        void getEsm4Blendmaps(float chunkSize, const std::array<float, 2>& chunkCenter,
+            std::vector<Render::TextureData>& blendmaps, std::vector<Terrain::LayerInfo>& layerList,
+            ESM::RefId worldspace);
     };
 
 }

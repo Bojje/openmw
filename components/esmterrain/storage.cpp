@@ -25,6 +25,20 @@ namespace ESMTerrain
 {
     namespace
     {
+        Render::TextureData makeAlphaTexture(int size, const std::vector<std::uint8_t>& alpha)
+        {
+            if (size <= 0 || alpha.size() != static_cast<std::size_t>(size) * size)
+                return {};
+
+            Render::TextureData result;
+            result.width = static_cast<std::uint32_t>(size);
+            result.height = static_cast<std::uint32_t>(size);
+            result.pixels.resize(alpha.size() * 4);
+            for (std::size_t i = 0; i < alpha.size(); ++i)
+                result.pixels[i * 4 + 3] = alpha[i];
+            return result;
+        }
+
         UniqueTextureId getTextureIdAt(const LandObject* land, std::size_t x, std::size_t y)
         {
             assert(x < ESM::Land::LAND_TEXTURE_SIZE);
@@ -243,8 +257,8 @@ namespace ESMTerrain
         }
     }
 
-    void Storage::fillVertexBuffers(int lodLevel, float size, const osg::Vec2f& center, ESM::RefId worldspace,
-        osg::Vec3Array& positions, osg::Vec3Array& normals, osg::Vec4ubArray& colours)
+    void Storage::fillRenderVertexBuffers(int lodLevel, float size, const std::array<float, 2>& center,
+        ESM::RefId worldspace, std::vector<Render::TerrainVertex>& vertices)
     {
         if (lodLevel < 0 || 63 < lodLevel)
             throw std::invalid_argument("Invalid terrain lod level: " + std::to_string(lodLevel));
@@ -257,13 +271,11 @@ namespace ESMTerrain
         const std::size_t cellSize = static_cast<std::size_t>(ESM::getLandSize(worldspace));
         const std::size_t numVerts = static_cast<std::size_t>(size * (cellSize - 1) / sampleSize) + 1;
 
-        positions.resize(numVerts * numVerts);
-        normals.resize(numVerts * numVerts);
-        colours.resize(numVerts * numVerts);
+        vertices.resize(numVerts * numVerts);
 
         const bool alteration = useAlteration();
         const int landSizeInUnits = ESM::getCellSize(worldspace);
-        const osg::Vec2f origin = center - osg::Vec2f(size, size) * 0.5f;
+        const osg::Vec2f origin(center[0] - size * 0.5f, center[1] - size * 0.5f);
         const int startCellX = static_cast<int>(std::floor(origin.x()));
         const int startCellY = static_cast<int>(std::floor(origin.y()));
         LandCache cache(startCellX - 1, startCellY - 1, static_cast<std::size_t>(std::ceil(size)) + 2);
@@ -316,9 +328,9 @@ namespace ESMTerrain
 
             const std::size_t vertIndex = vertX * numVerts + vertY;
 
-            positions[vertIndex]
-                = osg::Vec3f((vertX / static_cast<float>(numVerts - 1) - 0.5f) * size * landSizeInUnits,
-                    (vertY / static_cast<float>(numVerts - 1) - 0.5f) * size * landSizeInUnits, height);
+            vertices[vertIndex].position
+                = { (vertX / static_cast<float>(numVerts - 1) - 0.5f) * size * landSizeInUnits,
+                    (vertY / static_cast<float>(numVerts - 1) - 0.5f) * size * landSizeInUnits, height };
 
             const std::size_t srcArrayIndex = col * cellSize * 3 + row * 3;
 
@@ -342,7 +354,7 @@ namespace ESMTerrain
 
             assert(normal.z() > 0);
 
-            normals[vertIndex] = normal;
+            vertices[vertIndex].normal = { normal.x(), normal.y(), normal.z() };
 
             osg::Vec4ub color(255, 255, 255, 255);
 
@@ -358,7 +370,7 @@ namespace ESMTerrain
             if (col == cellSize - 1 || row == cellSize - 1)
                 fixColour(color, cellLocation, static_cast<int>(col), static_cast<int>(row), cache);
 
-            colours[vertIndex] = color;
+            vertices[vertIndex].color = { color.r(), color.g(), color.b(), color.a() };
         };
 
         const std::size_t beginX = static_cast<std::size_t>((origin.x() - startCellX) * cellSize);
@@ -368,7 +380,8 @@ namespace ESMTerrain
         sampleCellGrid(cellSize, sampleSize, beginX, beginY, distance, handleSample);
 
         if (!validHeightDataExists && ESM::isEsm4Ext(worldspace))
-            std::fill(positions.begin(), positions.end(), osg::Vec3f());
+            for (Render::TerrainVertex& vertex : vertices)
+                vertex.position = {};
     }
 
     VFS::Path::Normalized Storage::getTextureName(UniqueTextureId id)
@@ -391,10 +404,12 @@ namespace ESMTerrain
         return Misc::ResourceHelpers::correctTexturePath(texture, *mVFS);
     }
 
-    void Storage::getEsm4Blendmaps(float chunkSize, const osg::Vec2f& chunkCenter, ImageVector& blendmaps,
-        std::vector<Terrain::LayerInfo>& layerList, ESM::RefId worldspace)
+    void Storage::getEsm4Blendmaps(float chunkSize, const std::array<float, 2>& chunkCenter,
+        std::vector<Render::TextureData>& blendmaps, std::vector<Terrain::LayerInfo>& layerList,
+        ESM::RefId worldspace)
     {
-        const osg::Vec2f origin = chunkCenter - osg::Vec2f(chunkSize - 1, chunkSize + 1) * 0.5f;
+        const osg::Vec2f origin(chunkCenter[0] - (chunkSize - 1) * 0.5f,
+            chunkCenter[1] - (chunkSize + 1) * 0.5f);
         const int startCellX = static_cast<int>(std::floor(origin.x()));
         const int startCellY = static_cast<int>(std::floor(origin.y()));
 
@@ -410,20 +425,18 @@ namespace ESMTerrain
         const LandObject* land = getLand(ESM::ExteriorCellLocation(startCellX, startCellY, worldspace), cache);
 
         std::map<ESM::FormId, std::size_t> textureIndicesMap;
+        std::vector<std::vector<std::uint8_t>> alphaMaps;
 
-        auto getOrCreateBlendmap = [&](ESM::FormId texId) -> unsigned char* {
+        auto getOrCreateBlendmap = [&](ESM::FormId texId) -> std::vector<std::uint8_t>& {
             auto found = textureIndicesMap.find(texId);
             if (found != textureIndicesMap.end())
-                return blendmaps[found->second]->data();
+                return alphaMaps[found->second];
             Terrain::LayerInfo info
                 = texId.isZeroOrUnset() ? land->getEsm4DefaultLayerInfo() : getLandTextureLayerInfo(texId);
-            osg::ref_ptr<osg::Image> image(new osg::Image);
-            image->allocateImage(blendmapSize, blendmapSize, 1, GL_ALPHA, GL_UNSIGNED_BYTE);
-            std::memset(image->data(), 0, image->getTotalDataSize());
-            textureIndicesMap.emplace(texId, blendmaps.size());
-            blendmaps.push_back(std::move(image));
+            textureIndicesMap.emplace(texId, alphaMaps.size());
+            alphaMaps.emplace_back(static_cast<std::size_t>(blendmapSize) * blendmapSize, 0);
             layerList.push_back(std::move(info));
-            return blendmaps.back()->data();
+            return alphaMaps.back();
         };
 
         const auto handleSample = [&](const CellSample& sample) {
@@ -445,19 +458,20 @@ namespace ESMTerrain
                 quad = sample.mSrcCol == 0 ? 1 : 3;
             const ESM4::Land::Texture& ltex = ldata->getEsm4Texture(quad);
 
-            unsigned char* const baseBlendmap = getOrCreateBlendmap(ESM::FormId::fromUint32(ltex.base.formId));
+            std::vector<std::uint8_t>& baseBlendmap
+                = getOrCreateBlendmap(ESM::FormId::fromUint32(ltex.base.formId));
             int starty = (static_cast<int>(sample.mDstCol) - 1) * quadSize;
             int startx = static_cast<int>(sample.mDstRow) * quadSize;
             for (int y = std::max(0, starty + 1); y <= starty + quadSize && y < blendmapSize; ++y)
             {
-                unsigned char* const row = baseBlendmap + y * blendmapSize;
                 for (int x = startx; x < startx + quadSize && x < blendmapSize; ++x)
-                    row[x] = 255;
+                    baseBlendmap[static_cast<std::size_t>(y) * blendmapSize + x] = 255;
             }
 
             for (const auto& layer : ltex.layers)
             {
-                unsigned char* const layerBlendmap = getOrCreateBlendmap(ESM::FormId::fromUint32(layer.texture.formId));
+                std::vector<std::uint8_t>& layerBlendmap
+                    = getOrCreateBlendmap(ESM::FormId::fromUint32(layer.texture.formId));
                 for (const ESM4::Land::VTXT& v : layer.data)
                 {
                     int y = v.position / (quadSize + 1);
@@ -467,7 +481,7 @@ namespace ESMTerrain
                     {
                         continue;
                     }
-                    size_t index = static_cast<size_t>((starty + y) * blendmapSize + startx + x);
+                    const std::size_t index = static_cast<std::size_t>((starty + y) * blendmapSize + startx + x);
                     auto delta = static_cast<unsigned char>(std::clamp(static_cast<int>(v.opacity * 255.f), 0, 255));
                     baseBlendmap[index] -= std::min(baseBlendmap[index], delta);
                     layerBlendmap[index] = delta;
@@ -477,12 +491,15 @@ namespace ESMTerrain
 
         sampleBlendmaps(chunkSize, origin.x(), origin.y(), quadsPerCell, handleSample);
 
-        if (blendmaps.size() == 1)
-            blendmaps.clear(); // If a single texture fills the whole terrain, there is no need to blend
+        if (alphaMaps.size() == 1)
+            return; // If a single texture fills the whole terrain, there is no need to blend
+        for (const std::vector<std::uint8_t>& alpha : alphaMaps)
+            blendmaps.push_back(makeAlphaTexture(blendmapSize, alpha));
     }
 
-    void Storage::getBlendmaps(float chunkSize, const osg::Vec2f& chunkCenter, ImageVector& blendmaps,
-        std::vector<Terrain::LayerInfo>& layerList, ESM::RefId worldspace)
+    void Storage::getRenderBlendmaps(float chunkSize, const std::array<float, 2>& chunkCenter,
+        std::vector<Render::TextureData>& blendmaps, std::vector<Terrain::LayerInfo>& layerList,
+        ESM::RefId worldspace)
     {
         if (ESM::isEsm4Ext(worldspace))
         {
@@ -490,7 +507,7 @@ namespace ESMTerrain
             return;
         }
 
-        const osg::Vec2f origin = chunkCenter - osg::Vec2f(chunkSize, chunkSize) * 0.5f;
+        const osg::Vec2f origin(chunkCenter[0] - chunkSize * 0.5f, chunkCenter[1] - chunkSize * 0.5f);
         const int startCellX = static_cast<int>(std::floor(origin.x()));
         const int startCellY = static_cast<int>(std::floor(origin.y()));
         const std::size_t blendmapSize = getBlendmapSize(chunkSize, ESM::Land::LAND_TEXTURE_SIZE);
@@ -518,6 +535,7 @@ namespace ESMTerrain
         sampleBlendmaps(chunkSize, origin.x(), origin.y(), ESM::Land::LAND_TEXTURE_SIZE, handleSample);
 
         std::map<UniqueTextureId, std::size_t> textureIndicesMap;
+        std::vector<std::vector<std::uint8_t>> alphaMaps;
 
         for (std::size_t y = 0; y < blendmapSize; ++y)
         {
@@ -544,27 +562,25 @@ namespace ESMTerrain
 
                     if (layerIndex >= layerList.size())
                     {
-                        osg::ref_ptr<osg::Image> image(new osg::Image);
-                        image->allocateImage(static_cast<int>(blendmapImageSize), static_cast<int>(blendmapImageSize),
-                            1, GL_ALPHA, GL_UNSIGNED_BYTE);
-                        std::memset(image->data(), 0, image->getTotalDataSize());
-                        blendmaps.push_back(std::move(image));
+                        alphaMaps.emplace_back(blendmapImageSize * blendmapImageSize, 0);
                         layerList.push_back(std::move(info));
                     }
                 }
                 const std::size_t layerIndex = found->second;
-                unsigned char* const data = blendmaps[layerIndex]->data();
+                std::vector<std::uint8_t>& data = alphaMaps[layerIndex];
                 const std::size_t realY = y * imageScaleFactor;
                 const std::size_t realX = x * imageScaleFactor;
-                data[((realY + 0) * blendmapImageSize + realX + 0)] = 255;
-                data[((realY + 1) * blendmapImageSize + realX + 0)] = 255;
-                data[((realY + 0) * blendmapImageSize + realX + 1)] = 255;
-                data[((realY + 1) * blendmapImageSize + realX + 1)] = 255;
+                data[(realY + 0) * blendmapImageSize + realX + 0] = 255;
+                data[(realY + 1) * blendmapImageSize + realX + 0] = 255;
+                data[(realY + 0) * blendmapImageSize + realX + 1] = 255;
+                data[(realY + 1) * blendmapImageSize + realX + 1] = 255;
             }
         }
 
-        if (blendmaps.size() == 1)
-            blendmaps.clear(); // If a single texture fills the whole terrain, there is no need to blend
+        if (alphaMaps.size() == 1)
+            return; // If a single texture fills the whole terrain, there is no need to blend
+        for (const std::vector<std::uint8_t>& alpha : alphaMaps)
+            blendmaps.push_back(makeAlphaTexture(static_cast<int>(blendmapImageSize), alpha));
     }
 
     float Storage::getHeightAt(const osg::Vec3f& worldPos, ESM::RefId worldspace)

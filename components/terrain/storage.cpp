@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <optional>
 
 #include <osg/Image>
@@ -10,15 +11,44 @@
 
 namespace Terrain
 {
-    namespace
+    void Storage::fillVertexBuffers(int lodLevel, float size, const osg::Vec2f& center, ESM::RefId worldspace,
+        osg::Vec3Array& positions, osg::Vec3Array& normals, osg::Vec4ubArray& colours)
     {
-        Render::TextureData convertBlendmap(const osg::Image& image)
+        std::vector<Render::TerrainVertex> vertices;
+        fillRenderVertexBuffers(lodLevel, size, { center.x(), center.y() }, worldspace, vertices);
+
+        positions.resize(vertices.size());
+        normals.resize(vertices.size());
+        colours.resize(vertices.size());
+        for (std::size_t i = 0; i < vertices.size(); ++i)
         {
-            return Render::makeRgba8Texture(static_cast<std::uint32_t>(image.s()),
-                static_cast<std::uint32_t>(image.t()), [&image](std::uint32_t x, std::uint32_t y) {
-                    const osg::Vec4 color = image.getColor(x, y);
-                    return std::array<float, 4>{ color.r(), color.g(), color.b(), color.a() };
-                });
+            const Render::TerrainVertex& vertex = vertices[i];
+            positions[i].set(vertex.position[0], vertex.position[1], vertex.position[2]);
+            normals[i].set(vertex.normal[0], vertex.normal[1], vertex.normal[2]);
+            colours[i].set(vertex.color[0], vertex.color[1], vertex.color[2], vertex.color[3]);
+        }
+    }
+
+    void Storage::getBlendmaps(float chunkSize, const osg::Vec2f& chunkCenter, ImageVector& blendmaps,
+        std::vector<LayerInfo>& layerList, ESM::RefId worldspace)
+    {
+        std::vector<Render::TextureData> neutralBlendmaps;
+        getRenderBlendmaps(chunkSize, { chunkCenter.x(), chunkCenter.y() }, neutralBlendmaps, layerList, worldspace);
+
+        blendmaps.clear();
+        blendmaps.reserve(neutralBlendmaps.size());
+        for (const Render::TextureData& texture : neutralBlendmaps)
+        {
+            if (!texture.valid())
+            {
+                blendmaps.clear();
+                return;
+            }
+            osg::ref_ptr<osg::Image> image = new osg::Image;
+            image->allocateImage(static_cast<int>(texture.width), static_cast<int>(texture.height), 1, GL_RGBA,
+                GL_UNSIGNED_BYTE);
+            std::memcpy(image->data(), texture.pixels.data(), texture.pixels.size());
+            blendmaps.push_back(std::move(image));
         }
     }
 
@@ -28,12 +58,8 @@ namespace Terrain
         if (lodLevel < 0 || size <= 0.f)
             return std::nullopt;
 
-        osg::ref_ptr<osg::Vec3Array> positions = new osg::Vec3Array;
-        osg::ref_ptr<osg::Vec3Array> normals = new osg::Vec3Array;
-        osg::ref_ptr<osg::Vec4ubArray> colors = new osg::Vec4ubArray;
-        fillVertexBuffers(lodLevel, size, center, worldspace, *positions, *normals, *colors);
-        if (positions->size() != normals->size() || positions->size() != colors->size())
-            return std::nullopt;
+        std::vector<Render::TerrainVertex> vertices;
+        fillRenderVertexBuffers(lodLevel, size, { center.x(), center.y() }, worldspace, vertices);
 
         Render::TerrainTile tile;
         tile.lod = lodLevel;
@@ -45,17 +71,15 @@ namespace Terrain
         tile.blendmapScale = static_cast<float>(getTextureTileCount(size, worldspace));
         if (tile.blendmapScale <= 0.f)
             return std::nullopt;
-        tile.verticesPerSide = static_cast<std::uint32_t>(
-            std::sqrt(static_cast<double>(positions->size())));
-        while (static_cast<std::size_t>(tile.verticesPerSide + 1) * (tile.verticesPerSide + 1)
-               <= positions->size())
+        tile.verticesPerSide = static_cast<std::uint32_t>(std::sqrt(static_cast<double>(vertices.size())));
+        while (static_cast<std::size_t>(tile.verticesPerSide + 1) * (tile.verticesPerSide + 1) <= vertices.size())
             ++tile.verticesPerSide;
-        while (static_cast<std::size_t>(tile.verticesPerSide) * tile.verticesPerSide > positions->size())
+        while (static_cast<std::size_t>(tile.verticesPerSide) * tile.verticesPerSide > vertices.size())
             --tile.verticesPerSide;
         if (tile.verticesPerSide < 2
-            || static_cast<std::size_t>(tile.verticesPerSide) * tile.verticesPerSide != positions->size())
+            || static_cast<std::size_t>(tile.verticesPerSide) * tile.verticesPerSide != vertices.size())
             return std::nullopt;
-        tile.vertices.resize(positions->size());
+        tile.vertices = std::move(vertices);
         tile.indices.reserve(static_cast<std::size_t>(tile.verticesPerSide - 1)
             * (tile.verticesPerSide - 1) * 6);
         for (std::uint32_t y = 0; y + 1 < tile.verticesPerSide; ++y)
@@ -70,16 +94,9 @@ namespace Terrain
                     topRight, bottomLeft, bottomRight });
             }
         }
-        for (std::size_t i = 0; i < positions->size(); ++i)
-        {
-            tile.vertices[i].position = { (*positions)[i].x(), (*positions)[i].y(), (*positions)[i].z() };
-            tile.vertices[i].normal = { (*normals)[i].x(), (*normals)[i].y(), (*normals)[i].z() };
-            tile.vertices[i].color = { (*colors)[i].r(), (*colors)[i].g(), (*colors)[i].b(), (*colors)[i].a() };
-        }
-
-        ImageVector blendmaps;
+        std::vector<Render::TextureData> blendmaps;
         std::vector<LayerInfo> layerList;
-        getBlendmaps(size, center, blendmaps, layerList, worldspace);
+        getRenderBlendmaps(size, { center.x(), center.y() }, blendmaps, layerList, worldspace);
         // A single opaque layer intentionally has no blendmap in the legacy
         // storage contract. Preserve that layer while leaving its neutral
         // blendmap invalid; the Vulkan consumer can treat it as fully opaque.
@@ -96,9 +113,7 @@ namespace Terrain
             layer.specular = layerList[i].mSpecular;
             if (i < blendmaps.size())
             {
-                if (blendmaps[i] == nullptr)
-                    return std::nullopt;
-                layer.blendmap = convertBlendmap(*blendmaps[i]);
+                layer.blendmap = std::move(blendmaps[i]);
                 if (!layer.blendmap.valid())
                     return std::nullopt;
             }
