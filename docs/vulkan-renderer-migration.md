@@ -121,7 +121,8 @@ diagnosable without adding an image-library dependency or repeatedly restarting 
 When a presentation-capable run reaches renderer creation, the smoke test also requires
 the Khronos validation layer to be active and fails on error-level validation messages;
 headless local runs still skip before that gate. CI runs the presentation smoke directly,
-so an unexpected skip is a failure rather than a green test result.
+so an unexpected skip is a failure rather than a green test result; CI also invokes the
+headless lifecycle probe and permits only its documented capability skip (77).
 CI also rejects OSG/NIF/shared-logging includes and namespaces in the renderer-neutral and Vulkan
 source boundaries before checking the linked smoke binary, preventing static linking from hiding
 a boundary regression.
@@ -144,7 +145,7 @@ handoff rather than only a test fixture; conversion happens on cell add/remove r
 on every frame export.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-53 files, deleting 547 lines and adding 4,810 lines (net `+4,263`). The larger Vulkan-only
+53 files, deleting 547 lines and adding 4,820 lines (net `+4,273`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
