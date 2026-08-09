@@ -488,21 +488,11 @@ namespace MWRender
     Render::SceneSubmission RenderingManager::getNeutralScene() const
     {
         Render::SceneSubmission result;
-        result.scene = {};
+        result.scene = mNeutralSceneData;
         result.scene.view = toRenderMatrix(mCamera->getViewMatrix());
         result.scene.projection = toRenderMatrix(mCamera->getProjectionMatrix());
         result.scene.viewInverse = Render::invertMat4(result.scene.view);
         result.scene.projInverse = Render::invertMat4(result.scene.projection);
-
-        const osg::Vec4f sunPosition = mSunLight->getPosition();
-        result.scene.sunDirection = { -sunPosition.x(), -sunPosition.y(), -sunPosition.z(), sunPosition.w() };
-        const osg::Vec4f sunColor = mSunLight->getDiffuse();
-        result.scene.sunColor = { sunColor.x(), sunColor.y(), sunColor.z(), sunColor.w() };
-        const osg::Vec4f ambientColor = mSunLight->getAmbient();
-        result.scene.ambientColor = { ambientColor.x(), ambientColor.y(), ambientColor.z(), ambientColor.w() };
-        const osg::Vec4f fogColor = mFog->getFogColor(mIsUnderwater);
-        result.scene.fogColor = { fogColor.x(), fogColor.y(), fogColor.z(), fogColor.w() };
-        result.scene.fogParameters = { mFog->getFogStart(mIsUnderwater), mFog->getFogEnd(mIsUnderwater), 0.f, 0.f };
 
         std::unordered_map<std::string, std::shared_ptr<const Resource::NifMeshManager::Meshes>> cache;
         // Until the Vulkan animation consumer is available, dynamic objects use
@@ -667,6 +657,7 @@ namespace MWRender
         mPostProcessor->getStateUpdater()->setSunPos(interiorSunPos, false);
         mPostProcessor->getStateUpdater()->setSunVec(-interiorSunPos);
         mSunLight->setPosition(interiorSunPos);
+        mNeutralSceneData.sunDirection = { -interiorSunPos.x(), -interiorSunPos.y(), -interiorSunPos.z(), 0.f };
     }
 
     void RenderingManager::setSunColour(const osg::Vec4f& diffuse, const osg::Vec4f& specular, float sunVis)
@@ -674,6 +665,7 @@ namespace MWRender
         // need to wrap this in a StateUpdater?
         mSunLight->setDiffuse(diffuse);
         mSunLight->setSpecular(osg::Vec4f(specular.x(), specular.y(), specular.z(), specular.w() * sunVis));
+        mNeutralSceneData.sunColor = { diffuse.x(), diffuse.y(), diffuse.z(), diffuse.w() };
 
         mPostProcessor->getStateUpdater()->setSunColor(diffuse);
         mPostProcessor->getStateUpdater()->setSunVis(sunVis);
@@ -690,6 +682,7 @@ namespace MWRender
         const osg::Vec3f sunlightPos = Settings::shaders().mMatchSunlightToSun ? position : -direction;
         // need to wrap this in a StateUpdater?
         mSunLight->setPosition(osg::Vec4f(sunlightPos, 0.f));
+        mNeutralSceneData.sunDirection = { -sunlightPos.x(), -sunlightPos.y(), -sunlightPos.z(), 0.f };
 
         mSky->setSunDirection(position);
 
@@ -887,6 +880,8 @@ namespace MWRender
         mStateUpdater->setFogStart(fogStart);
         mStateUpdater->setFogEnd(fogEnd);
         setFogColor(fogColor);
+        mNeutralSceneData.fogColor = { fogColor.r(), fogColor.g(), fogColor.b(), fogColor.a() };
+        mNeutralSceneData.fogParameters = { fogStart, fogEnd, 0.f, 0.f };
 
         auto world = MWBase::Environment::get().getWorld();
         const auto& stateUpdater = mPostProcessor->getStateUpdater();
@@ -1423,6 +1418,7 @@ namespace MWRender
             color += osg::Vec4f(0.7f, 0.7f, 0.7f, 0.0f) * mNightEyeFactor;
 
         mSunLight->setAmbient(color);
+        mNeutralSceneData.ambientColor = { color.r(), color.g(), color.b(), color.a() };
 
         mPostProcessor->getStateUpdater()->setAmbientColor(color);
         mStateUpdater->setAmbientColor(color);

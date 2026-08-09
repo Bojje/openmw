@@ -369,6 +369,7 @@ namespace MWRender
         osg::ref_ptr<SceneUtil::PerViewUniformStateUpdater> mPerViewUniformStateUpdater;
 
         osg::Vec4f mAmbientColor;
+        Render::SceneData mNeutralSceneData;
         float mNightEyeFactor;
         bool mIsUnderwater = false;
 

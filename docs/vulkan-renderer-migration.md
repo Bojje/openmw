@@ -94,7 +94,9 @@ OSG-facing manager now also exposes neutral loaded-world mesh collection and RGB
 resolution backed by the existing resource caches, giving a future Vulkan consumer a concrete
 full-game input without exposing OSG objects.
 The neutral camera snapshot now reads the cached camera matrices instead of querying the OSG
-viewer directly, removing another backend-specific read from the future Vulkan handoff.
+viewer directly, and neutral lighting/fog values are updated at their game-state setters rather
+than re-read from OSG objects during export. This removes backend-specific reads from the future
+Vulkan handoff.
 Those inputs can now be collected as one `Render::SceneSubmission`; `Vk::Renderer::setScene`
 consumes that handoff in the standalone path, and the smoke test exercises it. The submission
 boundary now validates mesh indices and terrain snapshots before Vulkan consumes them. The full-game
@@ -147,7 +149,7 @@ handoff rather than only a test fixture; conversion happens on cell add/remove r
 on every frame export.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-53 files, deleting 547 lines and adding 4,821 lines (net `+4,274`). The larger Vulkan-only
+53 files, deleting 547 lines and adding 4,820 lines (net `+4,273`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
