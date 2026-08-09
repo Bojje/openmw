@@ -1065,6 +1065,15 @@ namespace MWWorld
                     newPtr = currCell->moveTo(ptr, newCell);
 
                     mRendering->updatePtr(ptr, newPtr);
+                    if (!ptr.isEmpty() && !newPtr.isEmpty())
+                    {
+                        const MWWorld::CellStore* destinationCell = newPtr.getCell();
+                        mRendering->getNeutralWorldScene().updateObjectCell(static_cast<const void*>(ptr.mRef),
+                            static_cast<const void*>(newPtr.mRef), static_cast<const void*>(destinationCell),
+                            destinationCell->getCell()->isExterior(), destinationCell->getCell()->getGridX(),
+                            destinationCell->getCell()->getGridY(), destinationCell->getCell()->getNameId(),
+                            destinationCell->getCell()->getWorldSpace().serializeText());
+                    }
                     MWBase::Environment::get().getSoundManager()->updatePtr(ptr, newPtr);
                     mPhysics->updatePtr(ptr, newPtr);
 

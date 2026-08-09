@@ -1165,14 +1165,6 @@ namespace MWRender
     {
         mObjects->updatePtr(old, updated);
         mActorsPaths->updatePtr(old, updated);
-        if (!old.isEmpty() && !updated.isEmpty())
-        {
-            const MWWorld::CellStore* newCell = updated.getCell();
-            mWorldScene.updateObjectCell(static_cast<const void*>(old.mRef), static_cast<const void*>(updated.mRef),
-                static_cast<const void*>(newCell), newCell->getCell()->isExterior(), newCell->getCell()->getGridX(),
-                newCell->getCell()->getGridY(), newCell->getCell()->getNameId(),
-                newCell->getCell()->getWorldSpace().serializeText());
-        }
     }
 
     void RenderingManager::spawnEffect(VFS::Path::NormalizedView model, std::string_view texture,
