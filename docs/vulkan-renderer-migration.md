@@ -80,7 +80,8 @@ and emissive-strength channels into the composite pass. Cell object lookup and r
 owned by the renderer-neutral `WorldScene`/`CellScene` components rather than the OSG-facing
 manager. `MWWorld::Scene` now owns the neutral `WorldScene`; the world lifecycle writes object
 snapshots directly during insertion, unpaging, and transform updates, while the manager retains
-only the OSG-facing object operations and submission export. World reset is
+only the OSG-facing object operations and submission export. `Scene` also exposes the complete
+neutral submission as the future full-game backend call site. World reset is
 also owned by `Scene::clear()` after cell teardown. Terrain tile snapshots are now requested by
 the scene lifecycle after OSG terrain setup and written directly to `WorldScene`. The manager also exposes a
 renderer-neutral camera/inverse-matrix and directional-light snapshot
@@ -155,7 +156,7 @@ handoff rather than only a test fixture; conversion happens on cell add/remove r
 on every frame export.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-56 files, deleting 551 lines and adding 4,860 lines (net `+4,309`). The larger Vulkan-only
+56 files, deleting 551 lines and adding 4,871 lines (net `+4,320`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
@@ -266,7 +267,7 @@ real replacement consumes its responsibility and the fast tests cover the bounda
 
 ### 5. Replace OSG scene ownership
 
-- Separate cell visibility, transforms, camera state, lighting, and material data from OSG scene nodes. Camera/light scene data now has an OSG-to-neutral snapshot source, alongside transform-preserving neutral mesh instances, updateable `WorldScene`/`CellScene` snapshots, explicit paged-reference visibility, neutral NIF material extraction, a cached-mesh cell composition adapter, loaded exterior terrain tiles, a concrete `SceneSubmission` handoff, and standalone Vulkan texture/alpha consumption; the live full-game backend call site and complete shading remain to be migrated.
+- Separate cell visibility, transforms, camera state, lighting, and material data from OSG scene nodes. Camera/light scene data now has an OSG-to-neutral snapshot source, alongside transform-preserving neutral mesh instances, updateable `WorldScene`/`CellScene` snapshots, explicit paged-reference visibility, neutral NIF material extraction, a cached-mesh cell composition adapter, loaded exterior terrain tiles, a concrete `SceneSubmission` handoff exposed by `MWWorld::Scene`, and standalone Vulkan texture/alpha consumption; the live full-game backend call site and complete shading remain to be migrated.
 - Feed both reference and Vulkan implementations from renderer-neutral scene data during the transition.
 - Delete OSG scene ownership once Vulkan consumes all required scene events.
 

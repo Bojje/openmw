@@ -15,6 +15,7 @@
 
 #include <components/esm/exteriorcelllocation.hpp>
 #include <components/misc/constants.hpp>
+#include <components/render/submission.hpp>
 #include <components/render/world.hpp>
 
 namespace osg
@@ -181,6 +182,10 @@ namespace MWWorld
 
         /// Renderer-neutral world ownership updated by this scene lifecycle.
         Render::WorldScene& getNeutralWorldScene() { return mNeutralWorldScene; }
+        const Render::WorldScene& getNeutralWorldScene() const { return mNeutralWorldScene; }
+
+        /// Export the current loaded-world state for a renderer backend.
+        Render::SceneSubmission getNeutralScene() const;
 
         void markCellAsUnchanged();
 

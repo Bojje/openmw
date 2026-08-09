@@ -1067,6 +1067,11 @@ namespace MWWorld
         return mCurrentCell;
     }
 
+    Render::SceneSubmission Scene::getNeutralScene() const
+    {
+        return mRendering.getNeutralScene(mNeutralWorldScene);
+    }
+
     void Scene::markCellAsUnchanged()
     {
         mCellChanged = false;
