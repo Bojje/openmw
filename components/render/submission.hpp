@@ -3,11 +3,13 @@
 
 #include <algorithm>
 #include <cmath>
+#include <string_view>
 #include <vector>
 
 #include "mesh.hpp"
 #include "scene.hpp"
 #include "terrain.hpp"
+#include "terrainpaging.hpp"
 #include "texture.hpp"
 
 namespace Render
@@ -96,6 +98,33 @@ namespace Render
             });
         }
     };
+
+    // Build the backend-neutral portion of a frame from the scene owner. The
+    // resource resolver remains supplied by the game layer, while mesh and
+    // terrain collection stay independent of any renderer implementation.
+    template <class ResolveMeshes>
+    SceneSubmission collectSceneSubmission(const WorldScene& world, const SceneData& scene,
+        std::string_view worldspace, ResolveMeshes&& resolveMeshes, bool includeTerrain = true)
+    {
+        SceneSubmission result;
+        result.scene = scene;
+        result.meshes = collectWorldMeshes(world, resolveMeshes, worldspace, true);
+        result.dynamicObjects = world.dynamicObjectsInOrder(worldspace);
+
+        if (includeTerrain)
+        {
+            const float cameraX = scene.viewInverse.data[12];
+            const float cameraY = scene.viewInverse.data[13];
+            for (const CellScene* cell : world.cellsInOrder(worldspace))
+            {
+                if (!cell->exterior || cell->terrainTiles.empty())
+                    continue;
+                if (const TerrainTile* selected = selectTerrainLod(cell->terrainTiles, cameraX, cameraY))
+                    result.terrainTiles.push_back(*selected);
+            }
+        }
+        return result;
+    }
 }
 
 #endif

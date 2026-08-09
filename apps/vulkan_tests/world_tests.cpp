@@ -104,6 +104,19 @@ int main()
     if (world.findObject(&objectHandle) == nullptr || world.findObject(&objectHandle)->id != 1)
         throw std::runtime_error("renderer-neutral world scene did not reset object identity");
 
+    Render::SceneData aggregateScene = {};
+    Render::MeshInstance aggregateMesh;
+    aggregateMesh.mesh.vertices.resize(3);
+    aggregateMesh.mesh.indices = { 0, 1, 2 };
+    const Render::SceneSubmission aggregate = Render::collectSceneSubmission(world, aggregateScene, "",
+        [&](std::string_view model) -> std::vector<Render::MeshInstance> {
+            if (model != "meshes/first.nif")
+                throw std::runtime_error("scene submission collector resolved an unexpected model");
+            return { aggregateMesh };
+        }, false);
+    if (aggregate.meshes.size() != 1 || aggregate.dynamicObjects.size() != 0 || !aggregate.valid())
+        throw std::runtime_error("renderer-neutral scene submission collector lost world state");
+
     Render::SceneSubmission submission;
     submission.scene.ambientColor = { 0.2f, 0.3f, 0.4f, 1.f };
     bool resolverCalled = false;
