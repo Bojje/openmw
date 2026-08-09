@@ -110,6 +110,12 @@ namespace MWWorld
 {
     namespace
     {
+        Render::Quat toRenderQuat(const osg::Quat& rotation)
+        {
+            return { static_cast<float>(rotation.x()), static_cast<float>(rotation.y()), static_cast<float>(rotation.z()),
+                static_cast<float>(rotation.w()) };
+        }
+
         std::vector<std::pair<GlobalVariableName, ESM::Variant>> generateDefaultGlobals()
         {
             return {
@@ -1097,6 +1103,9 @@ namespace MWWorld
         if (haveToMove && newPtr.getRefData().getBaseNode())
         {
             mRendering->moveObject(newPtr, position);
+            if (Render::WorldObject* object
+                = mRendering->getNeutralWorldScene().findObject(static_cast<const void*>(newPtr.mRef)))
+                object->transform.position = { position.x(), position.y(), position.z() };
             if (movePhysics)
             {
                 mPhysics->updatePosition(newPtr);
@@ -1304,6 +1313,9 @@ namespace MWWorld
             mWorldScene->removeFromPagedRefs(ptr);
 
             mRendering->rotateObject(ptr, rotate);
+            if (Render::WorldObject* object
+                = mRendering->getNeutralWorldScene().findObject(static_cast<const void*>(ptr.mRef)))
+                object->transform.rotation = toRenderQuat(rotate);
             mPhysics->updateRotation(ptr, rotate);
 
             if (const auto object = mPhysics->getObject(ptr))

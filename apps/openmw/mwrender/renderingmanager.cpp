@@ -90,12 +90,6 @@
 
 namespace
 {
-    Render::Quat toRenderQuat(const osg::Quat& rotation)
-    {
-        return { static_cast<float>(rotation.x()), static_cast<float>(rotation.y()), static_cast<float>(rotation.z()),
-            static_cast<float>(rotation.w()) };
-    }
-
     class LightManagerUpdateVisitor : public osg::NodeVisitor
     {
     public:
@@ -874,17 +868,11 @@ namespace MWRender
         }
 
         ptr.getRefData().getBaseNode()->setAttitude(rot);
-
-        if (Render::WorldObject* object = mWorldScene.findObject(static_cast<const void*>(ptr.mRef)))
-            object->transform.rotation = toRenderQuat(rot);
     }
 
     void RenderingManager::moveObject(const MWWorld::Ptr& ptr, const osg::Vec3f& pos)
     {
         ptr.getRefData().getBaseNode()->setPosition(pos);
-
-        if (Render::WorldObject* object = mWorldScene.findObject(static_cast<const void*>(ptr.mRef)))
-            object->transform.position = { pos.x(), pos.y(), pos.z() };
     }
 
     void RenderingManager::scaleObject(const MWWorld::Ptr& ptr, const osg::Vec3f& scale)
@@ -893,9 +881,6 @@ namespace MWRender
 
         if (ptr == mCamera->getTrackingPtr()) // update height of camera
             mCamera->processViewChange();
-
-        if (Render::WorldObject* object = mWorldScene.findObject(static_cast<const void*>(ptr.mRef)))
-            object->transform.scale = { scale.x(), scale.y(), scale.z() };
     }
 
     void RenderingManager::removeObject(const MWWorld::Ptr& ptr)
