@@ -176,6 +176,9 @@ present recovery cannot drift between surface modes.
 Swapchain creation now selects the first supported composite-alpha mode with opaque
 composition preferred, and instance failures name the missing extension; unsupported
 surface capabilities therefore fail at the boundary with actionable diagnostics.
+Headless validation now enables the debug-utils extension as well, so a validation
+layer that is available on a headless CI runner reports through the same error counter
+as the windowed probe.
 Instance creation now negotiates the loader's supported Vulkan version instead of requiring
 1.3, and device creation no longer enables the unused anisotropy feature.
 Resize, capture, and cleanup now retain only the synchronization waits required by

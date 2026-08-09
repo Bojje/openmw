@@ -133,7 +133,15 @@ namespace Vk
     std::vector<const char*> Instance::getRequiredExtensions() const
     {
         if (mHeadless)
-            return { VK_KHR_SURFACE_EXTENSION_NAME, VK_EXT_HEADLESS_SURFACE_EXTENSION_NAME };
+        {
+            std::vector<const char*> extensions = {
+                VK_KHR_SURFACE_EXTENSION_NAME,
+                VK_EXT_HEADLESS_SURFACE_EXTENSION_NAME,
+            };
+            if (mValidationEnabled)
+                extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+            return extensions;
+        }
 
         // SDL provides the platform-specific surface extensions.
         unsigned int sdlExtensionCount = 0;
