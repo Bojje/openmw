@@ -144,7 +144,7 @@ handoff rather than only a test fixture; conversion happens on cell add/remove r
 on every frame export.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-53 files, deleting 540 lines and adding 4,769 lines (net `+4,229`). The larger Vulkan-only
+53 files, deleting 540 lines and adding 4,775 lines (net `+4,235`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
@@ -171,6 +171,8 @@ The descriptor pool now reserves only the scene/composite descriptors actually a
 the removed storage-image and excess-set capacity is gone.
 Texture descriptor writes are also deferred until the owning frame fence has completed,
 so scene updates do not mutate descriptor sets used by another in-flight frame.
+Window and headless drawable-size handling now share one renderer helper, so acquire and
+present recovery cannot drift between surface modes.
 Instance creation now negotiates the loader's supported Vulkan version instead of requiring
 1.3, and device creation no longer enables the unused anisotropy feature.
 Resize, capture, and cleanup now retain only the synchronization waits required by

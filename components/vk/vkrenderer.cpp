@@ -148,6 +148,18 @@ namespace Vk
             throw std::runtime_error("Failed to create Vulkan surface via SDL");
     }
 
+    std::pair<uint32_t, uint32_t> Renderer::drawableSize() const
+    {
+        if (mHeadless)
+            return { mSwapchain->extent().width, mSwapchain->extent().height };
+
+        int width = 0;
+        int height = 0;
+        SDL_Vulkan_GetDrawableSize(mWindow, &width, &height);
+        return { width > 0 ? static_cast<uint32_t>(width) : 0,
+            height > 0 ? static_cast<uint32_t>(height) : 0 };
+    }
+
     void Renderer::createImage(uint32_t width, uint32_t height, VkFormat format,
         VkImageUsageFlags usage, VkImage& image, VkDeviceMemory& memory)
     {
@@ -1181,15 +1193,7 @@ namespace Vk
         mFrameSync->waitForFrame(mCurrentFrame);
         syncSceneTextureDescriptors(mCurrentFrame);
 
-        int drawableWidth = 0;
-        int drawableHeight = 0;
-        if (mHeadless)
-        {
-            drawableWidth = static_cast<int>(mSwapchain->extent().width);
-            drawableHeight = static_cast<int>(mSwapchain->extent().height);
-        }
-        else
-            SDL_Vulkan_GetDrawableSize(mWindow, &drawableWidth, &drawableHeight);
+        auto [drawableWidth, drawableHeight] = drawableSize();
         if (drawableWidth <= 0 || drawableHeight <= 0)
             return false;
 
@@ -1204,8 +1208,9 @@ namespace Vk
 
             if (result == VK_ERROR_OUT_OF_DATE_KHR)
             {
-                if (!mHeadless)
-                    SDL_Vulkan_GetDrawableSize(mWindow, &drawableWidth, &drawableHeight);
+                const auto [newWidth, newHeight] = drawableSize();
+                drawableWidth = newWidth;
+                drawableHeight = newHeight;
                 if (drawableWidth <= 0 || drawableHeight <= 0)
                     return false;
                 resize(static_cast<uint32_t>(drawableWidth), static_cast<uint32_t>(drawableHeight));
@@ -1269,10 +1274,7 @@ namespace Vk
         if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR)
         {
             mHasSubmittedFrame = false;
-            int w = static_cast<int>(mSwapchain->extent().width);
-            int h = static_cast<int>(mSwapchain->extent().height);
-            if (!mHeadless)
-                SDL_Vulkan_GetDrawableSize(mWindow, &w, &h);
+            const auto [w, h] = drawableSize();
             resize(static_cast<uint32_t>(w), static_cast<uint32_t>(h));
             mCurrentFrame = (mCurrentFrame + 1) % maxFramesInFlight;
             return false;

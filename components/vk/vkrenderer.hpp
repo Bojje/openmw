@@ -7,6 +7,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <unordered_map>
 #include <vector>
 
@@ -93,6 +94,7 @@ namespace Vk
         };
 
         void createSurface();
+        std::pair<uint32_t, uint32_t> drawableSize() const;
         void createGBuffer();
         void destroyGBuffer();
         void createGBufferRenderPass();
