@@ -582,6 +582,7 @@ namespace MWWorld
         }
         navigatorUpdateGuard.reset();
         assert(mActiveCells.empty());
+        mRendering.getNeutralWorldScene().clear();
         mCurrentCell = nullptr;
         mLowestPoint = std::numeric_limits<float>::max();
 

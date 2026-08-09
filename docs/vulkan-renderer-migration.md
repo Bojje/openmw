@@ -79,7 +79,8 @@ ambient-occlusion,
 and emissive-strength channels into the composite pass. Cell object lookup and removal are
 owned by the renderer-neutral `WorldScene`/`CellScene` components rather than the OSG-facing
 manager. The world lifecycle now writes object snapshots directly during insertion, unpaging,
-and transform updates; the manager retains only the OSG-facing object operations. The manager also exposes a
+and transform updates; the manager retains only the OSG-facing object operations. World reset is
+also owned by `Scene::clear()` after cell teardown. The manager also exposes a
 renderer-neutral camera/inverse-matrix and directional-light snapshot
 for a future Vulkan frame consumer. Neutral loaded-cell snapshots retain insertion order when
 collected, making backend draw lists stable for image comparison and predictable alpha ordering.
@@ -161,8 +162,9 @@ attributes, and terrain coordinates at the renderer-neutral submission boundary,
 they reach Vulkan. This protects the backend from corrupted engine state without relying
 on GPU validation diagnostics.
 The latest reduction checkpoint also removed the remaining manager-only neutral-object
-lookup, removal, cell-transfer, and transform-update wrappers. The world lifecycle now calls
-`WorldScene` directly for insertion, removal, active-cell transfer, and transform updates. The terrain adapter is now consumed for opaque, normal-mapped, parallax, and
+lookup, removal, cell-transfer, transform-update, and reset wrappers. The world lifecycle now
+calls `WorldScene` directly for insertion, removal, active-cell transfer, transform updates, and
+reset. The terrain adapter is now consumed for opaque, normal-mapped, parallax, and
 blendmap/multi-layer Vulkan terrain; its remaining owner boundary is quadtree-scale
 streaming and complete image coverage. Terrain layer feature flags now default to disabled
 at the shared storage boundary, preventing ESM4 default layers from acquiring undefined
