@@ -79,6 +79,7 @@ namespace Render
         std::unordered_map<const void*, CellScene> mCells;
         std::vector<const void*> mCellOrder;
         std::unordered_map<const void*, ObjectLocation> mObjects;
+        std::string mActiveWorldspace;
         uint64_t mNextObjectId = 1;
 
         CellScene& ensureCell(const void* cell, bool exterior, int gridX, int gridY, std::string_view name,
@@ -107,6 +108,10 @@ namespace Render
         }
 
     public:
+        void setActiveWorldspace(std::string_view worldspace) { mActiveWorldspace = worldspace; }
+
+        std::string_view activeWorldspace() const { return mActiveWorldspace; }
+
         void recordCell(const void* cellKey, bool exterior, int gridX, int gridY, std::string_view name,
             std::string_view worldspace = {})
         {
@@ -308,6 +313,7 @@ namespace Render
             mCells.clear();
             mCellOrder.clear();
             mObjects.clear();
+            mActiveWorldspace.clear();
             mNextObjectId = 1;
         }
     };

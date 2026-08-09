@@ -104,6 +104,14 @@ int main()
     if (world.findObject(&objectHandle) == nullptr || world.findObject(&objectHandle)->id != 1)
         throw std::runtime_error("renderer-neutral world scene did not reset object identity");
 
+    world.setActiveWorldspace("active");
+    if (world.activeWorldspace() != "active")
+        throw std::runtime_error("renderer-neutral world scene did not retain active worldspace");
+    world.clear();
+    if (!world.activeWorldspace().empty())
+        throw std::runtime_error("renderer-neutral world scene did not reset active worldspace");
+    world.recordObject(&objectHandle, &firstCellHandle, true, 1, 2, "first", "meshes/first.nif", objectTransform, true);
+
     Render::SceneData aggregateScene = {};
     Render::MeshInstance aggregateMesh;
     aggregateMesh.mesh.vertices.resize(3);

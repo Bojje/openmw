@@ -451,7 +451,7 @@ namespace MWRender
         // their converted bind-pose geometry. Keep the dynamic records below so
         // the eventual skinned path can replace this fallback without changing
         // the scene bridge.
-        result = Render::collectSceneSubmission(worldScene, result.scene, mActiveWorldspace,
+        result = Render::collectSceneSubmission(worldScene, result.scene, worldScene.activeWorldspace(),
             [&](std::string_view model)
             -> const Resource::NifMeshManager::Meshes& {
             const auto [iter, inserted] = cache.try_emplace(std::string(model));
@@ -682,7 +682,6 @@ namespace MWRender
             mWater->setCullCallback(nullptr);
         else
         {
-            mActiveWorldspace = worldspace.serializeText();
             WorldspaceChunkMgr& newChunks = getWorldspaceChunkMgr(worldspace);
             if (newChunks.mTerrain.get() != mTerrain)
             {

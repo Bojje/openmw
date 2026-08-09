@@ -346,7 +346,6 @@ namespace MWRender
         std::unique_ptr<Objects> mObjects;
         std::unique_ptr<Water> mWater;
         std::unordered_map<ESM::RefId, WorldspaceChunkMgr> mWorldspaceChunks;
-        std::string mActiveWorldspace;
         Terrain::World* mTerrain;
         std::unique_ptr<TerrainStorage> mTerrainStorage;
         ObjectPaging* mObjectPaging;
