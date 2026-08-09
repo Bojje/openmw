@@ -181,6 +181,9 @@ parallax or specular state.
 RGBA8 conversion is now one renderer-neutral helper shared by image resources and terrain
 blendmaps, so clamping, finite-value rejection, and byte quantization cannot drift between
 resource paths. The conversion helper has direct CPU coverage.
+Neutral image resolution also rejects the legacy warning-image fallback, so the opt-in
+full-game bridge validator cannot report missing or unsupported textures as successful
+RGBA8 resources.
 The Vulkan renderer now accepts only the aggregate `SceneSubmission`; its duplicate resolver
 argument and local resolver type alias were removed.
 Physical-device selection now checks the fixed G-buffer texture-array descriptor budget before

@@ -216,7 +216,10 @@ namespace Resource
     std::shared_ptr<const Render::TextureData> ImageManager::getRenderTexture(VFS::Path::NormalizedView path)
     {
         const osg::ref_ptr<osg::Image> image = getImage(path);
-        if (!image || image->s() <= 0 || image->t() <= 0)
+        // The legacy renderer uses a warning image as a fallback for missing
+        // or unsupported resources. A neutral backend must not mistake that
+        // fallback for the requested asset.
+        if (!image || image.get() == mWarningImage.get() || image->s() <= 0 || image->t() <= 0)
             return nullptr;
 
         Render::TextureData texture = Render::makeRgba8Texture(static_cast<std::uint32_t>(image->s()),
