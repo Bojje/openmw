@@ -908,8 +908,6 @@ namespace MWRender
         mActorsPaths->remove(ptr);
         mObjects->removeObject(ptr);
         mWater->removeEmitter(ptr);
-        if (!ptr.isEmpty())
-            mWorldScene.removeObject(static_cast<const void*>(ptr.mRef));
     }
 
     void RenderingManager::setWaterEnabled(bool enabled)

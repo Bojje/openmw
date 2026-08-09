@@ -1108,6 +1108,8 @@ namespace MWWorld
             mNavigator.removeAgent(mWorld.getPathfindingAgentBounds(ptr));
         }
         mPhysics->remove(ptr);
+        if (!ptr.isEmpty())
+            mRendering.getNeutralWorldScene().removeObject(static_cast<const void*>(ptr.mRef));
         mRendering.removeObject(ptr);
         if (ptr.getClass().isActor())
             mRendering.removeWaterRippleEmitter(ptr);
