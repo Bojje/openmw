@@ -871,7 +871,6 @@ namespace MWRender
         mCamera->update(dt, paused);
 
         bool isUnderwater = mWater->isUnderwater(mCamera->getPosition());
-        mIsUnderwater = isUnderwater;
 
         float fogStart = mFog->getFogStart(isUnderwater);
         float fogEnd = mFog->getFogEnd(isUnderwater);

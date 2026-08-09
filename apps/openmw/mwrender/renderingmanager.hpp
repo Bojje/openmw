@@ -371,7 +371,6 @@ namespace MWRender
         osg::Vec4f mAmbientColor;
         Render::SceneData mNeutralSceneData{};
         float mNightEyeFactor;
-        bool mIsUnderwater = false;
 
         float mNearClip;
         float mViewDistance;
