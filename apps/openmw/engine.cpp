@@ -4,8 +4,10 @@
 #include <cerrno>
 #include <chrono>
 #include <cmath>
+#include <cstdlib>
 #include <future>
 #include <system_error>
+#include <unordered_set>
 
 #include <osgDB/ReaderWriter>
 #include <osgDB/Registry>
@@ -28,6 +30,7 @@
 #include <components/resource/resourcesystem.hpp>
 #include <components/resource/scenemanager.hpp>
 #include <components/resource/stats.hpp>
+#include <components/render/submission.hpp>
 
 #include <components/compiler/extensions0.hpp>
 
@@ -174,6 +177,40 @@ namespace
         for (osg::Camera* camera : cameras)
             camera->getStats()->report(stream, frameNumber);
     }
+
+    void validateNeutralSubmission(const Render::SceneSubmission& submission)
+    {
+        if (!submission.valid())
+            throw std::runtime_error("full-game neutral scene submission is invalid");
+        if (!submission.textureResolver)
+            throw std::runtime_error("full-game neutral scene submission has no texture resolver");
+
+        std::unordered_set<std::string> texturePaths;
+        const auto addTexturePath = [&texturePaths](std::string_view path) {
+            if (!path.empty())
+                texturePaths.emplace(path);
+        };
+        for (const Render::MeshInstance& instance : submission.meshes)
+        {
+            addTexturePath(instance.mesh.material.albedoTexture);
+            addTexturePath(instance.mesh.material.normalTexture);
+            addTexturePath(instance.mesh.material.emissiveTexture);
+        }
+        for (const Render::TerrainTile& tile : submission.terrainTiles)
+            for (const Render::TerrainLayer& layer : tile.layers)
+            {
+                addTexturePath(layer.diffuseTexture);
+                addTexturePath(layer.normalTexture);
+            }
+
+        for (const std::string& path : texturePaths)
+        {
+            const auto texture = submission.textureResolver(path);
+            if (!texture || !texture->valid())
+                throw std::runtime_error("full-game neutral scene texture resolver returned invalid data for '"
+                    + path + "'");
+        }
+    }
 }
 
 void OMW::Engine::executeLocalScripts()
@@ -316,6 +353,10 @@ bool OMW::Engine::frame(unsigned frameNumber, float frametime)
         Log(Debug::Error) << "Error in frame: " << e.what();
     }
 
+    if (mValidateNeutralScene && mStateManager->getState() != MWBase::StateManager::State_NoGame
+        && (frameNumber % 30 == 0 || mWorld->getWorldScene().hasCellChanged()))
+        validateNeutralSubmission(mWorld->getWorldScene().getNeutralScene());
+
     const bool reportResource = stats->collectStats("resource");
 
     if (reportResource)
@@ -378,6 +419,7 @@ OMW::Engine::Engine(Files::ConfigurationManager& configurationManager)
     , mExportFonts(false)
     , mRandomSeed(0)
     , mNewGame(false)
+    , mValidateNeutralScene(std::getenv("OPENMW_VALIDATE_NEUTRAL_SCENE") != nullptr)
     , mCfgMgr(configurationManager)
     , mGlMaxTextureImageUnits(0)
 {

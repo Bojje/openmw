@@ -114,6 +114,9 @@ services have a Vulkan owner. Mesh submission no longer waits for the whole devi
 rebuilds one global buffer: neutral mesh data is retained on the CPU and uploaded into
 the current frame slot only after its fence is waited, so a future live frame loop can
 submit scene updates without the previous device-wide stall.
+An opt-in `OPENMW_VALIDATE_NEUTRAL_SCENE=1` full-game run validates the submission and
+resolves every referenced mesh/terrain texture periodically during one world session,
+providing a bridge check without initializing a second renderer.
 Neutral cells now retain worldspace identity, and both mesh and terrain collection filter
 to the active worldspace so an unloaded or inactive worldspace cannot leak into a Vulkan
 submission.
@@ -158,7 +161,7 @@ handoff rather than only a test fixture; conversion happens on cell add/remove r
 on every frame export.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-56 files, deleting 551 lines and adding 4,895 lines (net `+4,344`). The larger Vulkan-only
+56 files, deleting 551 lines and adding 4,944 lines (net `+4,393`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
@@ -316,5 +319,8 @@ Normal development should use this order:
 3. One deterministic renderer-test process covering many scenes and checkpoints.
 4. One validation-layer run.
 5. A small number of full-game startup, save/load, GUI, and gameplay smoke tests.
+
+When scene-bridge changes are in progress, enable `OPENMW_VALIDATE_NEUTRAL_SCENE=1` for
+the full-game smoke run; it checks the neutral payload every 30 frames and after cell changes.
 
 The full game should not be repeatedly started for every change.

@@ -182,6 +182,7 @@ namespace OMW
         Files::Collections mFileCollections;
         Translation::Storage mTranslationDataStorage;
         bool mNewGame;
+        bool mValidateNeutralScene;
 
         Files::ConfigurationManager& mCfgMgr;
         int mGlMaxTextureImageUnits;
