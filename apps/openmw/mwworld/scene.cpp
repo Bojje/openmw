@@ -541,6 +541,9 @@ namespace MWWorld
         insertCell(cell, loadingListener, navigatorUpdateGuard);
 
         mRendering.addCell(&cell);
+        if (cellVariant.isExterior())
+            mRendering.getNeutralWorldScene().setTerrainTiles(static_cast<const void*>(&cell),
+                mRendering.getNeutralTerrainTiles(&cell));
 
         MWBase::Environment::get().getWindowManager()->addCell(&cell);
         bool waterEnabled = cellVariant.hasWater() || cell.isExterior();

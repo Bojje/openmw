@@ -493,6 +493,29 @@ namespace MWRender
         return result;
     }
 
+    std::vector<Render::TerrainTile> RenderingManager::getNeutralTerrainTiles(const MWWorld::CellStore* store)
+    {
+        std::vector<Render::TerrainTile> tiles;
+        if (store == nullptr || !store->getCell()->isExterior() || !mTerrainStorage || !mTerrain)
+            return tiles;
+
+        const osg::Vec2f center(store->getCell()->getGridX() + 0.5f, store->getCell()->getGridY() + 0.5f);
+        const ESM::RefId worldspace = store->getCell()->getWorldSpace();
+        const int cellVertices = mTerrainStorage->getCellVertices(worldspace);
+        int maxLod = 0;
+        for (int vertices = std::max(cellVertices - 1, 1); vertices > 1; vertices >>= 1)
+            ++maxLod;
+        for (int lod = 0; lod <= maxLod; ++lod)
+        {
+            if (std::optional<Render::TerrainTile> tile
+                = mTerrainStorage->getRenderTile(lod, 1.f, center, worldspace))
+                tiles.push_back(std::move(*tile));
+            else
+                break;
+        }
+        return tiles;
+    }
+
     Resource::ResourceSystem* RenderingManager::getResourceSystem()
     {
         return mResourceSystem;
@@ -653,26 +676,6 @@ namespace MWRender
             enableTerrain(true, store->getCell()->getWorldSpace());
             mTerrain->loadCell(store->getCell()->getGridX(), store->getCell()->getGridY());
 
-            if (mTerrainStorage && mTerrain)
-            {
-                const osg::Vec2f center(store->getCell()->getGridX() + 0.5f,
-                    store->getCell()->getGridY() + 0.5f);
-                const ESM::RefId worldspace = store->getCell()->getWorldSpace();
-                std::vector<Render::TerrainTile> tiles;
-                const int cellVertices = mTerrainStorage->getCellVertices(worldspace);
-                int maxLod = 0;
-                for (int vertices = std::max(cellVertices - 1, 1); vertices > 1; vertices >>= 1)
-                    ++maxLod;
-                for (int lod = 0; lod <= maxLod; ++lod)
-                {
-                    if (std::optional<Render::TerrainTile> tile
-                        = mTerrainStorage->getRenderTile(lod, 1.f, center, worldspace))
-                        tiles.push_back(std::move(*tile));
-                    else
-                        break;
-                }
-                mWorldScene.setTerrainTiles(static_cast<const void*>(store), std::move(tiles));
-            }
         }
     }
     void RenderingManager::removeCell(const MWWorld::CellStore* store)

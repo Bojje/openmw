@@ -164,6 +164,9 @@ namespace MWRender
         /// Renderer-neutral world ownership updated by the world scene lifecycle.
         Render::WorldScene& getNeutralWorldScene() { return mWorldScene; }
 
+        /// Build the neutral terrain snapshot for a cell loaded by the world scene.
+        std::vector<Render::TerrainTile> getNeutralTerrainTiles(const MWWorld::CellStore* store);
+
         /// Collect one backend-neutral static-scene submission for a renderer.
         Render::SceneSubmission getNeutralScene() const;
 
