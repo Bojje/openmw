@@ -669,7 +669,6 @@ target_link_libraries(components ${BULLET_LIBRARIES})
 if (OPENMW_USE_VULKAN)
     add_library(openmw_vulkan STATIC ${VULKAN_COMPONENT_FILES})
     target_link_libraries(openmw_vulkan PUBLIC SDL2::SDL2 Vulkan::Vulkan)
-    target_compile_definitions(openmw_vulkan PUBLIC OPENMW_USE_VULKAN=1)
 endif()
 
 if (USE_QT)

@@ -145,7 +145,7 @@ handoff rather than only a test fixture; conversion happens on cell add/remove r
 on every frame export.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-53 files, deleting 547 lines and adding 4,820 lines (net `+4,273`). The larger Vulkan-only
+53 files, deleting 547 lines and adding 4,819 lines (net `+4,272`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
