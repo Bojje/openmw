@@ -163,9 +163,12 @@ Terrain storage now exposes neutral vertex and blendmap methods as its primary c
 `getRenderTile()` consumes those vectors directly, while the legacy OSG array/image methods
 are centralized adapters for the reference terrain renderer. The Vulkan path therefore no
 longer performs an OSG-buffer-to-neutral round trip.
+Neutral lighting and fog state now lives in `WorldScene::sceneData()` with the rest of the
+world-owned handoff. `RenderingManager` only receives a non-owning update reference, so its
+OSG state changes cannot reintroduce a second neutral scene owner.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-62 files, deleting 613 lines and adding 5,135 lines (net `+4,522`). The larger Vulkan-only
+62 files, deleting 613 lines and adding 5,156 lines (net `+4,543`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.

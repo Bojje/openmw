@@ -167,6 +167,10 @@ namespace MWRender
         /// Collect one backend-neutral static-scene submission for a renderer.
         Render::SceneSubmission getNeutralScene(const Render::WorldScene& worldScene) const;
 
+        /// Attach the world-owned neutral frame state. The manager updates this
+        /// snapshot alongside the OSG reference state but does not own it.
+        void setNeutralSceneData(Render::SceneData& sceneData) { mNeutralSceneData = &sceneData; }
+
         void enableTerrain(bool enable, ESM::RefId worldspace);
 
         void updatePtr(const MWWorld::Ptr& old, const MWWorld::Ptr& updated);
@@ -366,7 +370,7 @@ namespace MWRender
         osg::ref_ptr<SceneUtil::PerViewUniformStateUpdater> mPerViewUniformStateUpdater;
 
         osg::Vec4f mAmbientColor;
-        Render::SceneData mNeutralSceneData{};
+        Render::SceneData* mNeutralSceneData = nullptr;
         float mNightEyeFactor;
 
         float mNearClip;

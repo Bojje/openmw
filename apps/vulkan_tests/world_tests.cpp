@@ -113,7 +113,7 @@ int main()
     world.recordObject(&objectHandle, &firstCellHandle, true, 1, 2, "first", "meshes/first.nif", objectTransform, true);
 
     Render::SceneData aggregateScene = {};
-    Render::MeshInstance aggregateMesh;
+    Render::MeshInstance aggregateMesh = {};
     aggregateMesh.mesh.vertices.resize(3);
     aggregateMesh.mesh.indices = { 0, 1, 2 };
     const Render::SceneSubmission aggregate = Render::collectSceneSubmission(world, aggregateScene, "",

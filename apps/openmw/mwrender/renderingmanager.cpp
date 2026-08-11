@@ -440,7 +440,7 @@ namespace MWRender
     Render::SceneSubmission RenderingManager::getNeutralScene(const Render::WorldScene& worldScene) const
     {
         Render::SceneSubmission result;
-        result.scene = mNeutralSceneData;
+        result.scene = worldScene.sceneData();
         result.scene.view = mCamera->getNeutralViewMatrix();
         result.scene.projection = mCamera->getNeutralProjectionMatrix();
         result.scene.viewInverse = Render::invertMat4(result.scene.view);
@@ -614,7 +614,8 @@ namespace MWRender
         mPostProcessor->getStateUpdater()->setSunPos(interiorSunPos, false);
         mPostProcessor->getStateUpdater()->setSunVec(-interiorSunPos);
         mSunLight->setPosition(interiorSunPos);
-        mNeutralSceneData.sunDirection = { -interiorSunPos.x(), -interiorSunPos.y(), -interiorSunPos.z(), 0.f };
+        if (mNeutralSceneData)
+            mNeutralSceneData->sunDirection = { -interiorSunPos.x(), -interiorSunPos.y(), -interiorSunPos.z(), 0.f };
     }
 
     void RenderingManager::setSunColour(const osg::Vec4f& diffuse, const osg::Vec4f& specular, float sunVis)
@@ -622,7 +623,8 @@ namespace MWRender
         // need to wrap this in a StateUpdater?
         mSunLight->setDiffuse(diffuse);
         mSunLight->setSpecular(osg::Vec4f(specular.x(), specular.y(), specular.z(), specular.w() * sunVis));
-        mNeutralSceneData.sunColor = { diffuse.x(), diffuse.y(), diffuse.z(), diffuse.w() };
+        if (mNeutralSceneData)
+            mNeutralSceneData->sunColor = { diffuse.x(), diffuse.y(), diffuse.z(), diffuse.w() };
 
         mPostProcessor->getStateUpdater()->setSunColor(diffuse);
         mPostProcessor->getStateUpdater()->setSunVis(sunVis);
@@ -639,7 +641,8 @@ namespace MWRender
         const osg::Vec3f sunlightPos = Settings::shaders().mMatchSunlightToSun ? position : -direction;
         // need to wrap this in a StateUpdater?
         mSunLight->setPosition(osg::Vec4f(sunlightPos, 0.f));
-        mNeutralSceneData.sunDirection = { -sunlightPos.x(), -sunlightPos.y(), -sunlightPos.z(), 0.f };
+        if (mNeutralSceneData)
+            mNeutralSceneData->sunDirection = { -sunlightPos.x(), -sunlightPos.y(), -sunlightPos.z(), 0.f };
 
         mSky->setSunDirection(position);
 
@@ -810,8 +813,11 @@ namespace MWRender
         mStateUpdater->setFogStart(fogStart);
         mStateUpdater->setFogEnd(fogEnd);
         setFogColor(fogColor);
-        mNeutralSceneData.fogColor = { fogColor.r(), fogColor.g(), fogColor.b(), fogColor.a() };
-        mNeutralSceneData.fogParameters = { fogStart, fogEnd, 0.f, 0.f };
+        if (mNeutralSceneData)
+        {
+            mNeutralSceneData->fogColor = { fogColor.r(), fogColor.g(), fogColor.b(), fogColor.a() };
+            mNeutralSceneData->fogParameters = { fogStart, fogEnd, 0.f, 0.f };
+        }
 
         auto world = MWBase::Environment::get().getWorld();
         const auto& stateUpdater = mPostProcessor->getStateUpdater();
@@ -1328,7 +1334,8 @@ namespace MWRender
             color += osg::Vec4f(0.7f, 0.7f, 0.7f, 0.0f) * mNightEyeFactor;
 
         mSunLight->setAmbient(color);
-        mNeutralSceneData.ambientColor = { color.r(), color.g(), color.b(), color.a() };
+        if (mNeutralSceneData)
+            mNeutralSceneData->ambientColor = { color.r(), color.g(), color.b(), color.a() };
 
         mPostProcessor->getStateUpdater()->setAmbientColor(color);
         mStateUpdater->setAmbientColor(color);
