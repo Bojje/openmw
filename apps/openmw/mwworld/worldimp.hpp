@@ -118,7 +118,6 @@ namespace MWWorld
         MWRender::PostProcessor* mPostProcessor = nullptr;
         std::unique_ptr<MWRender::RenderingManager> mRendering;
         Render::FrameLifecycle* mFrameLifecycle = nullptr;
-        Render::SceneSynchronizer mSceneSynchronizer;
         std::unique_ptr<MWWorld::Scene> mWorldScene;
         std::unique_ptr<MWWorld::WeatherManager> mWeatherManager;
         std::unique_ptr<MWWorld::DateTimeManager> mTimeManager;

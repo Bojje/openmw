@@ -1177,8 +1177,7 @@ namespace MWWorld
         if (mNeutralTerrainRegionsDirty)
             updateNeutralTerrainRegions();
 
-        if (mSceneSynchronizer)
-            mSceneSynchronizer(mNeutralWorldScene.sceneData());
+        synchronizeNeutralScene();
 
         const auto resolveMeshes = [this](std::string_view model) -> const std::vector<Render::MeshInstance>& {
             const std::string key(model);
@@ -1250,6 +1249,12 @@ namespace MWWorld
         }
         result.textureResolver = mTextureResolver;
         return result;
+    }
+
+    void Scene::synchronizeNeutralScene()
+    {
+        if (mSceneSynchronizer)
+            mSceneSynchronizer(mNeutralWorldScene.sceneData());
     }
 
     void Scene::updateNeutralObjectCell(const void* oldObjectKey, const void* newObjectKey, const void* cellKey,

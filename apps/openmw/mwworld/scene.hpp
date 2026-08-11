@@ -191,6 +191,7 @@ namespace MWWorld
         void loadCell(CellStore& cell, Loading::Listener* loadingListener, bool respawn, const osg::Vec3f& position,
             const DetourNavigator::UpdateGuard* navigatorUpdateGuard);
         void updateNeutralTerrainRegions();
+        void synchronizeNeutralScene();
 
     public:
         Scene(MWWorld::World& world, Render::FrameLifecycle& frameLifecycle,
