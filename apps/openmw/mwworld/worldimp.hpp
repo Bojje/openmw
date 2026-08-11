@@ -684,10 +684,6 @@ namespace MWWorld
 
         bool renderFrame() override;
         bool advanceFrame(double simulationTime) override;
-        bool frameConsumesSceneSubmission() const
-        {
-            return mFrameLifecycle != nullptr && mFrameLifecycle->consumesSceneSubmission();
-        }
 
         MWRender::RenderingManager* getRenderingManager() override { return mRendering.get(); }
 

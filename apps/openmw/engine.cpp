@@ -368,7 +368,7 @@ bool OMW::Engine::frame(unsigned frameNumber, float frametime)
 
     finishLuaUpdate();
 
-    if (mValidateNeutralScene && !mWorld->frameConsumesSceneSubmission()
+    if (mValidateNeutralScene && !mPreWorldFrameLifecycle->consumesSceneSubmission()
         && mStateManager->getState() != MWBase::StateManager::State_NoGame
         && (frameNumber % 30 == 0 || mWorld->getWorldScene().hasCellChanged()))
     {
