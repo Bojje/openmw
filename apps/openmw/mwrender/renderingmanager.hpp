@@ -56,6 +56,7 @@ namespace ESM
 
 namespace Terrain
 {
+    class RenderStorage;
     class World;
 }
 
@@ -140,7 +141,7 @@ namespace MWRender
 
         SceneUtil::WorkQueue* getWorkQueue();
         Terrain::World* getTerrain();
-        TerrainStorage& getTerrainStorage();
+        Terrain::RenderStorage& getTerrainStorage();
 
         void preloadCommonAssets();
 

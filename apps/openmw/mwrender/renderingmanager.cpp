@@ -465,7 +465,7 @@ namespace MWRender
         return mTerrain;
     }
 
-    TerrainStorage& RenderingManager::getTerrainStorage()
+    Terrain::RenderStorage& RenderingManager::getTerrainStorage()
     {
         return *mTerrainStorage;
     }
