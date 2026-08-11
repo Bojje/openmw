@@ -281,12 +281,6 @@ namespace Render
             }
         }
 
-        const CellScene* findCell(const void* cellKey) const
-        {
-            const auto found = mCells.find(cellKey);
-            return found == mCells.end() ? nullptr : &found->second;
-        }
-
         // Cell insertion order is stable for the lifetime of a loaded cell.
         // Backends use this instead of iterating the unordered index so draw
         // order and image-comparison inputs remain deterministic.
