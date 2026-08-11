@@ -166,9 +166,11 @@ longer performs an OSG-buffer-to-neutral round trip.
 Neutral lighting and fog state now lives in `WorldScene::sceneData()` with the rest of the
 world-owned handoff. `RenderingManager` only receives a non-owning update reference, so its
 OSG state changes cannot reintroduce a second neutral scene owner.
+The neutral terrain tile entry point also uses a plain two-float center; OSG vector types
+remain confined to the legacy quadtree and reference-renderer methods.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-62 files, deleting 613 lines and adding 5,156 lines (net `+4,543`). The larger Vulkan-only
+62 files, deleting 613 lines and adding 5,159 lines (net `+4,546`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.

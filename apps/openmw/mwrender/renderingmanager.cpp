@@ -481,7 +481,8 @@ namespace MWRender
         if (store == nullptr || !store->getCell()->isExterior() || !mTerrainStorage || !mTerrain)
             return tiles;
 
-        const osg::Vec2f center(store->getCell()->getGridX() + 0.5f, store->getCell()->getGridY() + 0.5f);
+        const std::array<float, 2> center = { store->getCell()->getGridX() + 0.5f,
+            store->getCell()->getGridY() + 0.5f };
         const ESM::RefId worldspace = store->getCell()->getWorldSpace();
         const int cellVertices = mTerrainStorage->getCellVertices(worldspace);
         int maxLod = 0;

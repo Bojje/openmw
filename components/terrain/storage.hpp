@@ -108,7 +108,7 @@ namespace Terrain
         // path. The old methods above remain only as a centralized adapter for
         // the OSG reference terrain renderer.
         std::optional<Render::TerrainTile> getRenderTile(
-            int lodLevel, float size, const osg::Vec2f& center, ESM::RefId worldspace);
+            int lodLevel, float size, const std::array<float, 2>& center, ESM::RefId worldspace);
     };
 
 }

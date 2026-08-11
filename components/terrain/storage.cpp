@@ -53,18 +53,18 @@ namespace Terrain
     }
 
     std::optional<Render::TerrainTile> Storage::getRenderTile(
-        int lodLevel, float size, const osg::Vec2f& center, ESM::RefId worldspace)
+        int lodLevel, float size, const std::array<float, 2>& center, ESM::RefId worldspace)
     {
         if (lodLevel < 0 || size <= 0.f)
             return std::nullopt;
 
         std::vector<Render::TerrainVertex> vertices;
-        fillRenderVertexBuffers(lodLevel, size, { center.x(), center.y() }, worldspace, vertices);
+        fillRenderVertexBuffers(lodLevel, size, center, worldspace, vertices);
 
         Render::TerrainTile tile;
         tile.lod = lodLevel;
         tile.size = size;
-        tile.center = { center.x(), center.y() };
+        tile.center = center;
         tile.cellWorldSize = getCellWorldSize(worldspace);
         if (tile.cellWorldSize <= 0.f)
             return std::nullopt;
@@ -96,7 +96,7 @@ namespace Terrain
         }
         std::vector<Render::TextureData> blendmaps;
         std::vector<LayerInfo> layerList;
-        getRenderBlendmaps(size, { center.x(), center.y() }, blendmaps, layerList, worldspace);
+        getRenderBlendmaps(size, center, blendmaps, layerList, worldspace);
         // A single opaque layer intentionally has no blendmap in the legacy
         // storage contract. Preserve that layer while leaving its neutral
         // blendmap invalid; the Vulkan consumer can treat it as fully opaque.
