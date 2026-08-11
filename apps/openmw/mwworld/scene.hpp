@@ -12,6 +12,7 @@
 #include <optional>
 #include <set>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 #include <components/esm/exteriorcelllocation.hpp>
@@ -120,6 +121,8 @@ namespace MWWorld
         std::vector<ESM::RefNum> mPagedRefs;
 
         Render::WorldScene mNeutralWorldScene;
+        mutable std::unordered_map<std::string, std::weak_ptr<const std::vector<Render::MeshInstance>>>
+            mNeutralMeshCache;
 
         std::vector<osg::ref_ptr<SceneUtil::WorkItem>> mWorkItems;
 

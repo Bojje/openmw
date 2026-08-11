@@ -103,7 +103,9 @@ The Vulkan composite pass now consumes that single scene-lighting UBO directly; 
 sun push constants were removed, and ambient light is part of the neutral snapshot. The
 world-owned `Scene` now resolves loaded-world meshes and RGBA8 textures through the existing
 resource caches, giving a future Vulkan consumer a concrete full-game input without exposing
-OSG objects or restoring manager-owned scene assembly.
+OSG objects or restoring manager-owned scene assembly. Its neutral mesh lookup cache keeps weak
+references across frame exports, avoiding repeated conversion lookups without extending resource
+lifetimes beyond the resource manager.
 The neutral camera snapshot now reads the cached camera matrices instead of querying the OSG
 viewer directly, and neutral lighting/fog values are updated at their game-state setters rather
 than re-read from OSG objects during export. `Camera` now exposes neutral `Render::Mat4` snapshots
@@ -195,7 +197,7 @@ The non-owning manager update handle is private to the `Scene` owner, detached d
 teardown, and CI guards the manager header against regaining a value-owned neutral frame state.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-73 files, deleting 665 lines and adding 5,950 lines (net `+5,285`). The larger Vulkan-only
+73 files, deleting 665 lines and adding 5,959 lines (net `+5,294`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.

@@ -600,6 +600,7 @@ namespace MWWorld
         navigatorUpdateGuard.reset();
         assert(mActiveCells.empty());
         mNeutralWorldScene.clear();
+        mNeutralMeshCache.clear();
         mCurrentCell = nullptr;
         mLowestPoint = std::numeric_limits<float>::max();
 
@@ -1088,22 +1089,25 @@ namespace MWWorld
 
     Render::SceneSubmission Scene::getNeutralScene() const
     {
-        std::unordered_map<std::string, std::shared_ptr<const Resource::NifMeshManager::Meshes>> cache;
         // Dynamic objects are carried as records, but are deliberately excluded
         // from the static mesh batch until a backend owns animation and skinning.
         Render::SceneSubmission result = Render::collectSceneSubmission(
             mNeutralWorldScene, mNeutralWorldScene.sceneData(), mNeutralWorldScene.activeWorldspace(),
             [&](std::string_view model) -> const Resource::NifMeshManager::Meshes& {
-                const auto [iter, inserted] = cache.try_emplace(std::string(model));
-                if (inserted)
+                const std::string key(model);
+                const auto found = mNeutralMeshCache.find(key);
+                std::shared_ptr<const Resource::NifMeshManager::Meshes> meshes
+                    = found == mNeutralMeshCache.end() ? nullptr : found->second.lock();
+                if (!meshes)
                 {
                     const VFS::Path::Normalized path(model);
                     if (path.extension().value() == "nif")
-                        iter->second = mRendering.getResourceSystem()->getNifMeshManager()->get(path);
+                        meshes = mRendering.getResourceSystem()->getNifMeshManager()->get(path);
                     else
-                        iter->second = std::make_shared<const Resource::NifMeshManager::Meshes>();
+                        meshes = std::make_shared<const Resource::NifMeshManager::Meshes>();
+                    mNeutralMeshCache[key] = meshes;
                 }
-                return *iter->second;
+                return *meshes;
             }, true);
 
         Resource::ResourceSystem* const resourceSystem = mRendering.getResourceSystem();
