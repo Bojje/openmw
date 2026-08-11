@@ -18,6 +18,7 @@ namespace Terrain
     {
         VFS::Path::Normalized mDiffuseMap;
         VFS::Path::Normalized mNormalMap;
+        VFS::Path::Normalized mSpecularMap;
         bool mParallax = false; // Height info in normal map alpha channel?
         bool mSpecular = false; // Specular info in diffuse map alpha channel?
 

@@ -139,8 +139,8 @@ int main()
     neutralTerrain.verticesPerSide = 2;
     neutralTerrain.vertices.resize(4);
     neutralTerrain.indices = { 0, 1, 2, 2, 1, 3 };
-    neutralTerrain.layers.push_back({ .diffuseTexture = "textures/terrain.dds", .normalTexture = {}, .parallax = false,
-        .specular = false, .blendmap = {} });
+    neutralTerrain.layers.push_back({ .diffuseTexture = "textures/terrain.dds", .normalTexture = {},
+        .specularTexture = {}, .parallax = false, .specular = false, .blendmap = {} });
     world.setTerrainTiles(&firstCellHandle, { neutralTerrain });
 
     Render::SceneData aggregateScene = {};

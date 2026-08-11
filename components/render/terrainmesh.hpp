@@ -24,6 +24,7 @@ namespace Render
         result.mesh.indices = tile.indices;
         result.mesh.material.albedoTexture = layer.diffuseTexture;
         result.mesh.material.normalTexture = layer.normalTexture;
+        result.mesh.material.specularTexture = layer.specularTexture;
         result.mesh.material.terrainBlend = layer.blendmap.valid();
         result.mesh.material.terrainFirstLayer = layerIndex == 0;
         result.mesh.material.terrainNormalMap = !layer.normalTexture.empty();

@@ -50,6 +50,7 @@ namespace
             Terrain::LayerInfo layer;
             layer.mDiffuseMap = VFS::Path::Normalized("textures/grass.dds");
             layer.mNormalMap = VFS::Path::Normalized("textures/grass_n.dds");
+            layer.mSpecularMap = VFS::Path::Normalized("textures/grass_spec.dds");
             layer.mParallax = true;
             layer.mSpecular = true;
             layers.push_back(std::move(layer));
@@ -87,7 +88,8 @@ int main()
                 && tile->vertices[2].color[2] == 255,
             "terrain vertices were not converted");
         expect(tile->layers.size() == 1 && tile->layers[0].diffuseTexture == "textures/grass.dds"
-                && tile->layers[0].normalTexture == "textures/grass_n.dds" && tile->layers[0].parallax
+                && tile->layers[0].normalTexture == "textures/grass_n.dds"
+                && tile->layers[0].specularTexture == "textures/grass_spec.dds" && tile->layers[0].parallax
                 && tile->layers[0].specular,
             "terrain layer metadata was not converted");
         expect(tile->layers[0].blendmap.valid() && tile->layers[0].blendmap.pixels[3] == 191,
@@ -131,6 +133,7 @@ int main()
                 && blendedTerrainMeshes.front().mesh.material.terrainParallax
                 && blendedTerrainMeshes.front().mesh.material.terrainSpecular
                 && blendedTerrainMeshes.front().mesh.material.normalTexture == "textures/grass_n.dds"
+                && blendedTerrainMeshes.front().mesh.material.specularTexture == "textures/grass_spec.dds"
                 && blendedTerrainMeshes.front().mesh.material.alphaTexture
                 && blendedTerrainMeshes.front().mesh.material.alphaTexture->valid()
                 && blendedTerrainMeshes.front().mesh.vertices[3].texcoord[0] > 3.99f

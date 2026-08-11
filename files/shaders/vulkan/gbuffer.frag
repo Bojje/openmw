@@ -79,7 +79,7 @@ void main() {
     vec3 specularSample = fragSpecularTextureIndex == 0u
         ? vec3(1.0)
         : texture(specularTextures[fragSpecularTextureIndex], terrainTexCoord).rgb;
-    if (fragMaterial.b > 1.5)
+    if (fragMaterial.b > 1.5 && fragSpecularTextureIndex == 0u)
         specularSample = albedoSample.rgb;
 
     if ((fragMaterialFlags & 2u) != 0u)

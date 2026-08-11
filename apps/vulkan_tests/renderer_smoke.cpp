@@ -169,6 +169,7 @@ namespace
         Render::TerrainLayer firstLayer;
         firstLayer.diffuseTexture = "textures/vulkan-smoke.rgba";
         firstLayer.normalTexture = "textures/vulkan-smoke-normal.rgba";
+        firstLayer.specularTexture = "textures/vulkan-smoke-specular.rgba";
         firstLayer.parallax = true;
         firstLayer.specular = true;
         firstLayer.blendmap = std::move(firstBlendmap);

@@ -155,7 +155,8 @@ G-buffer normal path; parallax offsetting now uses the normal-map height channel
 textures use a separate linear-repeat sampler so terrain tiling is preserved, while G-buffer
 attachments remain clamped. Terrain diffuse-specular maps are consumed, and ordinary object
 specular maps now use the configured pattern, dedicated texture table, and RGB G-buffer path;
-complete terrain image coverage remains outstanding. The neutral cache now retains
+ESM4 explicit terrain specular maps now use the same neutral texture table and RGB path;
+terrain auto-detection and complete terrain image coverage remain outstanding. The neutral cache now retains
 per-cell LOD snapshots and selects one deterministically by camera distance before handoff;
 quadtree-scale streaming and composite-image coverage remain outstanding. `WorldScene` now
 records empty loaded cells as well as object-bearing cells and owns each cell's cached terrain
@@ -181,7 +182,7 @@ The non-owning manager update handle is private to the `Scene` owner, detached d
 teardown, and CI guards the manager header against regaining a value-owned neutral frame state.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-62 files, deleting 618 lines and adding 5,410 lines (net `+4,792`). The larger Vulkan-only
+62 files, deleting 620 lines and adding 5,426 lines (net `+4,806`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
@@ -195,8 +196,9 @@ the public neutral-world lookup escape hatch, and its remaining manager-only neu
 lookup, removal, cell-transfer, transform-update, reset, and terrain-snapshot wrappers. The
 world lifecycle now calls `WorldScene` directly for
 insertion, removal, active-cell transfer, transform updates, reset, and terrain snapshots. The terrain adapter is now consumed for opaque, normal-mapped, parallax, and
-blendmap/multi-layer Vulkan terrain; its remaining owner boundary is quadtree-scale
-streaming and complete image coverage. Terrain layer feature flags now default to disabled
+blendmap/multi-layer Vulkan terrain, including explicit ESM4 specular textures; its remaining
+owner boundary is quadtree-scale streaming and complete image coverage. Terrain layer feature
+flags now default to disabled
 at the shared storage boundary, preventing ESM4 default layers from acquiring undefined
 parallax or specular state.
 RGBA8 conversion is now one renderer-neutral helper shared by image resources and terrain
@@ -253,7 +255,7 @@ the game unplayable rather than reduce duplication safely.
 | Vulkan utility/queue helper paths | Removed | Complete |
 | Parsed NIF resource cache wrapper | Removed | Complete; cache now owns shared NIF files directly |
 | NIF-to-neutral mesh conversion | Renderer-neutral NIF boundary, material data, mesh cache, `SceneSubmission`, Vulkan mesh batch, standalone texture table, and full-game neutral resolver | Connect the handoff to the live full-game Vulkan frame loop, add material shading, skinning, and static-world submission |
-| Terrain geometry and layer data | Legacy OSG terrain storage/ChunkManager plus a tested neutral tile adapter, per-cell LOD selector, and Vulkan opaque/normal/parallax/blendmap/specular layer consumer | Add quadtree-scale terrain streaming and terrain image coverage |
+| Terrain geometry and layer data | Legacy OSG terrain storage/ChunkManager plus a tested neutral tile adapter, per-cell LOD selector, and Vulkan opaque/normal/parallax/blendmap/specular layer consumer, including explicit ESM4 specular textures | Add quadtree-scale terrain streaming and terrain image coverage |
 | Loaded-cell object identity, transforms, terrain snapshots, and paging state | Renderer-neutral `WorldScene`/`CellScene` snapshots updated by scene lifecycle; cell-lifecycle-cached terrain tiles flow into `SceneSubmission` | Consume snapshots from a backend and migrate visibility/paging policy |
 | GUI, loading screens, screenshots, and presentation | OSG/MyGUI path | Vulkan presentation and GUI coverage |
 
@@ -311,9 +313,9 @@ real replacement consumes its responsibility and the fast tests cover the bounda
 - Wire NIF loading and `MeshConverter` into resource management. The NIF converter now has a tested tree traversal and material boundary, `NifMeshManager` caches converted instances, image resources expose neutral RGBA8 data, and `RenderingManager` can collect a `SceneSubmission` containing static meshes and loaded exterior terrain without exposing OSG objects. The standalone Vulkan path consumes that submission and its resolved textures; a live full-game Vulkan frame consumer, shading, and complete static-world coverage are still outstanding.
 - Implement model caching, cell add/remove, transforms, textures, materials, terrain,
   interiors, and static objects. The terrain adapter now feeds opaque and ordered
-  blendmap/multi-layer Vulkan mesh consumers with normal-map sampling and height-based
-  parallax and diffuse-alpha specular data; quadtree-scale terrain streaming and full terrain
-  image coverage remain.
+  blendmap/multi-layer Vulkan mesh consumers with normal-map sampling, height-based
+  parallax, diffuse-alpha specular data, and explicit ESM4 specular textures; quadtree-scale
+  terrain streaming and full terrain image coverage remain.
 - Reach a static playable scene without OSG rendering.
 
 ### 7. Port dynamic content and presentation

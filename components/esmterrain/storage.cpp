@@ -766,6 +766,8 @@ namespace ESMTerrain
 
         if (!txst.mNormalMap.empty())
             info.mNormalMap = VFS::Path::join(textures, txst.mNormalMap);
+        if (!txst.mSpecular.empty())
+            info.mSpecularMap = VFS::Path::join(textures, txst.mSpecular);
 
         // FIXME: this flag indicates height info in alpha channel of normal map
         //        but the normal map alpha channel has specular info instead
@@ -776,8 +778,9 @@ namespace ESMTerrain
         //        (probably needs some flag in the terrain shader to fix)
         info.mSpecular = false;
 
-        // FIXME: should support other features of ESM4::TextureSet
-        //        probably need corresponding support in the terrain shader
+        // The neutral terrain path carries an explicit ESM4 specular texture
+        // separately. The legacy OSG material path still uses its diffuse-alpha
+        // convention until it gains an equivalent texture binding.
 
         return info;
     }

@@ -202,6 +202,7 @@ namespace
             {
                 addTexturePath(layer.diffuseTexture);
                 addTexturePath(layer.normalTexture);
+                addTexturePath(layer.specularTexture);
             }
 
         for (const std::string& path : texturePaths)

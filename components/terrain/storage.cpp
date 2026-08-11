@@ -109,6 +109,7 @@ namespace Terrain
             Render::TerrainLayer& layer = tile.layers.emplace_back();
             layer.diffuseTexture = layerList[i].mDiffuseMap.value();
             layer.normalTexture = layerList[i].mNormalMap.value();
+            layer.specularTexture = layerList[i].mSpecularMap.value();
             layer.parallax = layerList[i].mParallax;
             layer.specular = layerList[i].mSpecular;
             if (i < blendmaps.size())

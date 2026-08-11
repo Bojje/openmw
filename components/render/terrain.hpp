@@ -23,6 +23,7 @@ namespace Render
     {
         std::string diffuseTexture;
         std::string normalTexture;
+        std::string specularTexture;
         bool parallax = false;
         bool specular = false;
         TextureData blendmap;
