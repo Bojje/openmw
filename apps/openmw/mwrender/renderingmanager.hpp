@@ -232,7 +232,6 @@ namespace MWRender
 
         void processChangedSettings(const Settings::CategorySettingVector& settings);
 
-        float getNearClipDistance() const { return mNearClip; }
         float getViewDistance() const { return mViewDistance; }
 
         void setViewDistance(float distance, bool delay = false);
@@ -257,8 +256,6 @@ namespace MWRender
 
         void exportSceneGraph(
             const MWWorld::Ptr& ptr, const std::filesystem::path& filename, const std::string& format);
-
-        Debug::DebugDrawer& getDebugDrawer() const { return *mDebugDraw; }
 
         bool toggleBorders();
 
