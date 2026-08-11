@@ -730,7 +730,7 @@ namespace MWWorld
         mRendering.enableTerrain(true, playerCellIndex.mWorldspace);
         mRendering.setActiveGrid(newGrid);
 
-        mPreloader->setTerrain(mRendering.getTerrain());
+        mPreloader->setTerrain(mTerrain);
         if (mRendering.pagingUnlockCache())
             mPreloader->abortTerrainPreloadExcept(nullptr);
         if (!mPreloader->isTerrainLoaded(PositionCellGrid{ pos, newGrid }, mRendering.getReferenceTime()))
@@ -864,8 +864,7 @@ namespace MWWorld
             i++;
         }
 
-        mResourceSystem->getSceneManager()->setIncrementalCompileOperation(
-            mRendering.getIncrementalCompileOperation());
+        mResourceSystem->getSceneManager()->setIncrementalCompileOperation(mIncrementalCompileOperation);
         mResourceSystem->setExpiryDelay(Settings::cells().mCacheExpiryDelay);
     }
 
@@ -922,8 +921,7 @@ namespace MWWorld
             i++;
         }
 
-        mResourceSystem->getSceneManager()->setIncrementalCompileOperation(
-            mRendering.getIncrementalCompileOperation());
+        mResourceSystem->getSceneManager()->setIncrementalCompileOperation(mIncrementalCompileOperation);
         mResourceSystem->setExpiryDelay(Settings::cells().mCacheExpiryDelay);
     }
 
@@ -966,6 +964,7 @@ namespace MWWorld
     }
 
     Scene::Scene(MWWorld::World& world, MWRender::RenderingManager& rendering, MWRender::LandManager& landManager,
+        Terrain::World* terrain, osgUtil::IncrementalCompileOperation* incrementalCompileOperation,
         Terrain::RenderStorage& terrainStorage, SceneUtil::WorkQueue* workQueue, Resource::ResourceSystem* resourceSystem,
         MWPhysics::PhysicsSystem* physics,
         DetourNavigator::Navigator& navigator)
@@ -976,6 +975,8 @@ namespace MWWorld
         , mPhysics(physics)
         , mRendering(rendering)
         , mLandManager(landManager)
+        , mTerrain(terrain)
+        , mIncrementalCompileOperation(incrementalCompileOperation)
         , mTerrainStorage(terrainStorage)
         , mWorkQueue(workQueue)
         , mNavigator(navigator)
@@ -988,8 +989,7 @@ namespace MWWorld
         , mPredictionTime(Settings::cells().mPredictionTime)
         , mLowestPoint(std::numeric_limits<float>::max())
     {
-        mPreloader = std::make_unique<CellPreloader>(resourceSystem, physics->getShapeManager(), rendering.getTerrain(),
-            &mLandManager);
+        mPreloader = std::make_unique<CellPreloader>(resourceSystem, physics->getShapeManager(), mTerrain, &mLandManager);
         mPreloader->setWorkQueue(mWorkQueue);
         mPreloader->setExpiryDelay(Settings::cells().mPreloadCellExpiryDelay);
         mPreloader->setMinCacheSize(Settings::cells().mPreloadCellCacheMin);
@@ -1542,7 +1542,7 @@ namespace MWWorld
 
     void Scene::preloadTerrain(const osg::Vec3f& pos, ESM::RefId worldspace, bool sync)
     {
-        if (mRendering.getTerrain()->getWorldspace() != worldspace)
+        if (mTerrain->getWorldspace() != worldspace)
             throw std::runtime_error("preloadTerrain can only work with the current exterior worldspace");
 
         ESM::ExteriorCellLocation cellPos = ESM::positionToExteriorCellLocation(pos.x(), pos.y(), worldspace);

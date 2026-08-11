@@ -123,19 +123,16 @@ namespace MWRender
         RenderingManager(osgViewer::Viewer* viewer, osg::ref_ptr<osg::Group> rootNode,
             Resource::ResourceSystem* resourceSystem, SceneUtil::WorkQueue* workQueue,
             DetourNavigator::Navigator& navigator, const MWWorld::GroundcoverStore& groundcoverStore,
-            SceneUtil::UnrefQueue& unrefQueue, TerrainStorage& terrainStorage,
+            SceneUtil::UnrefQueue& unrefQueue, TerrainStorage& terrainStorage, Terrain::World*& terrainOutput,
+            osgUtil::IncrementalCompileOperation*& incrementalCompileOperationOutput,
             Render::FrameLifecycle& frameLifecycle);
         ~RenderingManager();
-
-        osgUtil::IncrementalCompileOperation* getIncrementalCompileOperation();
 
         /// Copy the current reference-renderer camera and environment state into
         /// the world-owned neutral frame snapshot at a frame boundary.
         void synchronizeNeutralScene(Render::SceneData& sceneData) const;
 
         MWRender::Objects& getObjects() override;
-
-        Terrain::World* getTerrain();
 
         void preloadCommonAssets();
 

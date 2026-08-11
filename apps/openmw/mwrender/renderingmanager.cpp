@@ -175,7 +175,9 @@ namespace MWRender
     RenderingManager::RenderingManager(osgViewer::Viewer* viewer, osg::ref_ptr<osg::Group> rootNode,
         Resource::ResourceSystem* resourceSystem, SceneUtil::WorkQueue* workQueue,
         DetourNavigator::Navigator& navigator, const MWWorld::GroundcoverStore& groundcoverStore,
-        SceneUtil::UnrefQueue& unrefQueue, TerrainStorage& terrainStorage, Render::FrameLifecycle& frameLifecycle)
+        SceneUtil::UnrefQueue& unrefQueue, TerrainStorage& terrainStorage, Terrain::World*& terrainOutput,
+        osgUtil::IncrementalCompileOperation*& incrementalCompileOperationOutput,
+        Render::FrameLifecycle& frameLifecycle)
         : mSkyBlending(Settings::fog().mSkyBlending)
         , mViewer(viewer)
         , mFrameLifecycle(frameLifecycle)
@@ -301,6 +303,8 @@ namespace MWRender
 
         WorldspaceChunkMgr& chunkMgr = getWorldspaceChunkMgr(ESM::Cell::sDefaultWorldspaceId);
         mTerrain = chunkMgr.mTerrain.get();
+        terrainOutput = mTerrain;
+        incrementalCompileOperationOutput = mViewer->getIncrementalCompileOperation();
         mGroundcover = chunkMgr.mGroundcover.get();
         mObjectPaging = chunkMgr.mObjectPaging.get();
 
@@ -423,19 +427,9 @@ namespace MWRender
         mWorkQueue = nullptr;
     }
 
-    osgUtil::IncrementalCompileOperation* RenderingManager::getIncrementalCompileOperation()
-    {
-        return mViewer->getIncrementalCompileOperation();
-    }
-
     MWRender::Objects& RenderingManager::getObjects()
     {
         return *mObjects.get();
-    }
-
-    Terrain::World* RenderingManager::getTerrain()
-    {
-        return mTerrain;
     }
 
     void RenderingManager::preloadCommonAssets()
