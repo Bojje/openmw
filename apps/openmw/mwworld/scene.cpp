@@ -3,7 +3,6 @@
 #include <atomic>
 #include <chrono>
 #include <limits>
-#include <unordered_map>
 
 #include <BulletCollision/CollisionDispatch/btCollisionObject.h>
 
