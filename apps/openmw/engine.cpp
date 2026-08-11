@@ -351,9 +351,6 @@ bool OMW::Engine::frame(unsigned frameNumber, float frametime)
 
     mStereoManager->updateSettings(Settings::camera().mNearClip, Settings::camera().mViewingDistance);
 
-    mViewer->eventTraversal();
-    mViewer->updateTraversal();
-
     // update focus object for GUI
     {
         ScopedProfile<UserStatsType::Focus> profile(frameStart, frameNumber, *timer, *stats);
@@ -840,7 +837,11 @@ void OMW::Engine::prepareEngine()
             if (mWorld && mWorld->getRenderingManager())
                 mWorld->getRenderingManager()->renderFrame();
             else
+            {
+                mViewer->eventTraversal();
+                mViewer->updateTraversal();
                 mViewer->renderingTraversals();
+            }
         });
     mEnvironment.setWindowManager(*mWindowManager);
 

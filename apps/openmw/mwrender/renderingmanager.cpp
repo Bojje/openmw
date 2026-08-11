@@ -434,6 +434,8 @@ namespace MWRender
 
     void RenderingManager::renderFrame()
     {
+        mViewer->eventTraversal();
+        mViewer->updateTraversal();
         mViewer->renderingTraversals();
     }
 

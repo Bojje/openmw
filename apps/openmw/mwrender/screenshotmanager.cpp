@@ -111,8 +111,6 @@ namespace MWRender
         // Ref https://gitlab.com/OpenMW/openmw/-/issues/6013
         mDrawCompleteCallback->reset(mViewer->getFrameStamp()->getFrameNumber());
         mViewer->getCamera()->setFinalDrawCallback(mDrawCompleteCallback);
-        mViewer->eventTraversal();
-        mViewer->updateTraversal();
         mFrameRenderer();
         mDrawCompleteCallback->waitTillDone();
 

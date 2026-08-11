@@ -807,8 +807,6 @@ namespace MWGui
                     std::this_thread::sleep_for(std::chrono::milliseconds(5));
                 else
                 {
-                    mViewer->eventTraversal();
-                    mViewer->updateTraversal();
                     mFrameRenderer();
                 }
                 // at the time this function is called we are in the middle of a frame,
@@ -2151,8 +2149,6 @@ namespace MWGui
 
                 mVideoWidget->commitFrame();
 
-                mViewer->eventTraversal();
-                mViewer->updateTraversal();
                 mFrameRenderer();
             }
             // at the time this function is called we are in the middle of a frame,

@@ -127,9 +127,9 @@ namespace MWRender
 
         osgUtil::IncrementalCompileOperation* getIncrementalCompileOperation();
 
-        /// Submit the completed game frame to the active renderer.
+        /// Process and submit one frame through the active renderer owner.
         /// The current implementation delegates to the OSG viewer; the Vulkan
-        /// backend will replace this owner boundary once GUI and presentation
+        /// backend will replace this lifecycle boundary once GUI and presentation
         /// services are renderer-neutral.
         void renderFrame();
 
