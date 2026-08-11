@@ -231,6 +231,9 @@ int main(int argc, char** argv)
                                                : Vk::Renderer::SurfaceMode::Window;
             auto renderer = std::make_unique<Vk::Renderer>(window, true, surfaceMode,
                 static_cast<uint32_t>(drawableWidth), static_cast<uint32_t>(drawableHeight));
+            Render::FrameLifecycle& frameOwner = *renderer;
+            if (!frameOwner.consumesSceneSubmission())
+                throw std::runtime_error("Vulkan smoke renderer did not claim the submission frame path");
             if (!renderer->validationEnabled())
             {
                 throw EnvironmentUnavailable("Vulkan smoke requires validation layers");
@@ -300,7 +303,7 @@ int main(int argc, char** argv)
 
                 if (!headless)
                     SDL_PumpEvents();
-                if ((renderWithSubmission ? renderer->renderFrame(submission) : renderer->renderFrame()))
+                if ((renderWithSubmission ? frameOwner.renderFrame(submission) : frameOwner.renderFrame()))
                 {
                     ++renderedFrames;
                     const std::optional<Render::TextureData> capture = renderer->captureFrame();
