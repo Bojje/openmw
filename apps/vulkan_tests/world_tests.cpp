@@ -30,6 +30,10 @@ int main()
     int firstCellHandle = 0;
     int secondCellHandle = 0;
     Render::WorldScene world;
+    if (!world.sceneData().valid() || world.sceneData().view.data[0] != 1.f
+        || world.sceneData().view.data[5] != 1.f || world.sceneData().view.data[10] != 1.f
+        || world.sceneData().view.data[15] != 1.f)
+        throw std::runtime_error("renderer-neutral world scene did not initialize a valid camera state");
     int emptyCellHandle = 0;
     world.recordCell(&emptyCellHandle, true, 9, 9, "empty");
     if (world.findCell(&emptyCellHandle) == nullptr || !world.findCell(&emptyCellHandle)->objects.empty())
@@ -128,7 +132,9 @@ int main()
     if (world.sceneData().view.data[12] != 4.f || world.sceneData().viewInverse.data[12] != -4.f)
         throw std::runtime_error("renderer-neutral world scene did not retain camera matrices");
     world.clear();
-    if (!world.activeWorldspace().empty())
+    if (!world.activeWorldspace().empty() || !world.sceneData().valid()
+        || world.sceneData().view.data[0] != 1.f || world.sceneData().view.data[5] != 1.f
+        || world.sceneData().view.data[10] != 1.f || world.sceneData().view.data[15] != 1.f)
         throw std::runtime_error("renderer-neutral world scene did not reset active worldspace");
     world.recordObject(&objectHandle, &firstCellHandle, true, 1, 2, "first", "meshes/first.nif", objectTransform, true);
 
@@ -143,7 +149,7 @@ int main()
         .specularTexture = {}, .parallax = false, .specular = false, .blendmap = {} });
     world.setTerrainTiles(&firstCellHandle, { neutralTerrain });
 
-    Render::SceneData aggregateScene = {};
+    Render::SceneData aggregateScene;
     Render::MeshInstance aggregateMesh = {};
     aggregateMesh.mesh.vertices.resize(3);
     aggregateMesh.mesh.indices = { 0, 1, 2 };
@@ -198,6 +204,7 @@ int main()
         throw std::runtime_error("renderer-neutral hidden dynamic mesh was selected for rasterization");
 
     Render::SceneSubmission submission;
+    submission.scene = Render::SceneData();
     submission.scene.ambientColor = { 0.2f, 0.3f, 0.4f, 1.f };
     if (submission.validationError() != "no texture resolver")
         throw std::runtime_error("renderer-neutral submission validation missed a missing resolver");

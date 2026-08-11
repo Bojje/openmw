@@ -182,12 +182,14 @@ OSG state changes cannot reintroduce a second neutral scene owner.
 The neutral terrain tile entry point also uses a plain two-float center; OSG vector types
 remain confined to the legacy quadtree and reference-renderer methods.
 Camera matrices are now synchronized into that same world-owned state after the normal game
-update, and neutral submission export no longer queries the OSG camera as a side effect.
+render traversal, and neutral submission export no longer queries the OSG camera as a side effect.
+The full-game bridge validator runs after that same render boundary, so it validates the
+camera payload that was just submitted rather than the previous frame's cached matrices.
 The non-owning manager update handle is private to the `Scene` owner, detached during `Scene`
 teardown, and CI guards the manager header against regaining a value-owned neutral frame state.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-72 files, deleting 652 lines and adding 5,893 lines (net `+5,241`). The larger Vulkan-only
+72 files, deleting 652 lines and adding 5,911 lines (net `+5,259`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
@@ -198,6 +200,9 @@ gate, including dynamic mesh textures. The latest validation checkpoint also rej
 attributes, skinning payloads, and terrain coordinates at the renderer-neutral submission boundary, before
 they reach Vulkan. This protects the backend from corrupted engine state without relying
 on GPU validation diagnostics.
+Neutral scene data now starts with identity camera and inverse matrices plus explicit safe
+lighting/fog defaults, so a world reset or pre-camera frame cannot silently submit an all-zero
+camera state. The world-scene CPU test covers both initial construction and reset.
 The latest reduction checkpoint also removed `RenderingManager`'s neutral `WorldScene` ownership,
 the public neutral-world lookup escape hatch, and its remaining manager-only neutral-object
 lookup, removal, cell-transfer, transform-update, reset, and terrain-snapshot wrappers. The

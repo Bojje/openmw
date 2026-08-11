@@ -318,14 +318,6 @@ bool OMW::Engine::frame(unsigned frameNumber, float frametime)
         Log(Debug::Error) << "Error in frame: " << e.what();
     }
 
-    if (mValidateNeutralScene && mStateManager->getState() != MWBase::StateManager::State_NoGame
-        && (frameNumber % 30 == 0 || mWorld->getWorldScene().hasCellChanged()))
-    {
-        const Render::SceneSubmission submission = mWorld->getWorldScene().getNeutralScene();
-        if (const std::string error = submission.validationError(); !error.empty())
-            throw std::runtime_error("full-game neutral scene submission: " + error);
-    }
-
     const bool reportResource = stats->collectStats("resource");
 
     if (reportResource)
@@ -361,6 +353,14 @@ bool OMW::Engine::frame(unsigned frameNumber, float frametime)
     mLuaWorker->allowUpdate(frameStart, frameNumber, *stats);
 
     mWorld->renderFrame();
+
+    if (mValidateNeutralScene && mStateManager->getState() != MWBase::StateManager::State_NoGame
+        && (frameNumber % 30 == 0 || mWorld->getWorldScene().hasCellChanged()))
+    {
+        const Render::SceneSubmission submission = mWorld->getWorldScene().getNeutralScene();
+        if (const std::string error = submission.validationError(); !error.empty())
+            throw std::runtime_error("full-game neutral scene submission: " + error);
+    }
 
     mLuaWorker->finishUpdate(frameStart, frameNumber, *stats);
 

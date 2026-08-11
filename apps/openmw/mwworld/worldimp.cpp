@@ -1599,7 +1599,6 @@ namespace MWWorld
         mWorldScene->update(duration);
 
         mRendering->update(duration, paused);
-        mWorldScene->updateNeutralCamera();
 
         updateSoundListener();
 
@@ -3820,6 +3819,12 @@ namespace MWWorld
         if (!mRendering)
             return false;
         mRendering->renderFrame();
+        // OSG updates the game camera during event traversal. Synchronize the
+        // renderer-neutral snapshot only after that traversal so the next
+        // backend receives the matrices for the frame that was actually
+        // submitted.
+        if (mWorldScene)
+            mWorldScene->updateNeutralCamera();
         return true;
     }
 

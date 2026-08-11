@@ -15,6 +15,14 @@ namespace Render
         float data[16];
     };
 
+    constexpr Mat4 identityMat4()
+    {
+        return { { 1.f, 0.f, 0.f, 0.f,
+            0.f, 1.f, 0.f, 0.f,
+            0.f, 0.f, 1.f, 0.f,
+            0.f, 0.f, 0.f, 1.f } };
+    }
+
     struct Vec4
     {
         float x, y, z, w;
@@ -58,17 +66,17 @@ namespace Render
     // Renderer-neutral per-frame data shared by backend adapters.
     struct SceneData
     {
-        Mat4 view;
-        Mat4 projection;
-        Mat4 viewInverse;
-        Mat4 projInverse;
-        Vec4 sunDirection;
-        Vec4 sunColor;
-        Vec4 ambientColor;
-        Vec4 fogColor;
+        Mat4 view = identityMat4();
+        Mat4 projection = identityMat4();
+        Mat4 viewInverse = identityMat4();
+        Mat4 projInverse = identityMat4();
+        Vec4 sunDirection{ 0.f, 0.f, -1.f, 0.f };
+        Vec4 sunColor{ 1.f, 1.f, 1.f, 1.f };
+        Vec4 ambientColor{ 0.f, 0.f, 0.f, 1.f };
+        Vec4 fogColor{ 0.f, 0.f, 0.f, 1.f };
         // x = fog start distance, y = fog end distance. A non-positive range
         // disables fog for fixtures that do not provide atmospheric state.
-        Vec4 fogParameters;
+        Vec4 fogParameters{ 0.f, 0.f, 0.f, 0.f };
 
         bool valid() const
         {
