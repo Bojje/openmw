@@ -285,7 +285,7 @@ namespace MWWorld
                 return std::shared_ptr<const Render::TextureData>();
             return resourceSystem->getImageManager()->getRenderTexture(VFS::Path::Normalized(path));
         };
-        const Render::SceneSynchronizer sceneSynchronizer = [rendering = mRendering.get()](Render::SceneData& sceneData) {
+        mSceneSynchronizer = [rendering = mRendering.get()](Render::SceneData& sceneData) {
             rendering->synchronizeNeutralScene(sceneData);
         };
         const Render::BonePoseResolver bonePoseResolver = [rendering = mRendering.get()](
@@ -296,7 +296,7 @@ namespace MWWorld
             return animation ? animation->getNeutralBoneMatrices(boneNames) : std::vector<Render::Mat4>();
         };
         mWorldScene = std::make_unique<Scene>(
-            *this, frameLifecycle, sceneSynchronizer, bonePoseResolver, meshResolver, textureResolver,
+            *this, frameLifecycle, mSceneSynchronizer, bonePoseResolver, meshResolver, textureResolver,
             mResourceSystem->getVFS(), *mRendering, *mTerrainStorage->getLandManager(), mTerrain,
             incrementalCompileOperation, *mTerrainStorage, workQueue, mResourceSystem, mPhysics.get(), *mNavigator);
     }
@@ -3868,10 +3868,10 @@ namespace MWWorld
 
         if (!mFrameLifecycle->renderFrame())
             return false;
-        if (mWorldScene)
+        if (mWorldScene && mSceneSynchronizer)
         {
             Render::SceneData& sceneData = mWorldScene->mNeutralWorldScene.sceneData();
-            mRendering->synchronizeNeutralScene(sceneData);
+            mSceneSynchronizer(sceneData);
         }
         return true;
     }
