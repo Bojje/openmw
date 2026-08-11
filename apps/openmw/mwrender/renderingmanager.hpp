@@ -271,8 +271,6 @@ namespace MWRender
 
         Debug::DebugDrawer& getDebugDrawer() const { return *mDebugDraw; }
 
-        LandManager* getLandManager() const;
-
         bool toggleBorders();
 
         void updateActorPath(const MWWorld::ConstPtr& actor, const std::deque<osg::Vec3f>& path,

@@ -49,6 +49,7 @@ namespace DetourNavigator
 
 namespace MWRender
 {
+    class LandManager;
     class SkyManager;
     class RenderingManager;
 }
@@ -109,6 +110,7 @@ namespace MWWorld
         Resource::ResourceSystem* mResourceSystem;
         MWPhysics::PhysicsSystem* mPhysics;
         MWRender::RenderingManager& mRendering;
+        MWRender::LandManager& mLandManager;
         Terrain::RenderStorage& mTerrainStorage;
         DetourNavigator::Navigator& mNavigator;
         std::unique_ptr<CellPreloader> mPreloader;
@@ -165,8 +167,9 @@ namespace MWWorld
         void updateNeutralTerrainRegions();
 
     public:
-        Scene(MWWorld::World& world, MWRender::RenderingManager& rendering, Terrain::RenderStorage& terrainStorage,
-            Resource::ResourceSystem* resourceSystem, MWPhysics::PhysicsSystem* physics,
+        Scene(MWWorld::World& world, MWRender::RenderingManager& rendering, MWRender::LandManager& landManager,
+            Terrain::RenderStorage& terrainStorage, Resource::ResourceSystem* resourceSystem,
+            MWPhysics::PhysicsSystem* physics,
             DetourNavigator::Navigator& navigator);
 
         ~Scene();

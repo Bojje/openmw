@@ -1590,11 +1590,6 @@ namespace MWRender
         SceneUtil::writeScene(node, filename, format);
     }
 
-    LandManager* RenderingManager::getLandManager() const
-    {
-        return mTerrainStorage.getLandManager();
-    }
-
     void RenderingManager::updateActorPath(const MWWorld::ConstPtr& actor, const std::deque<osg::Vec3f>& path,
         const DetourNavigator::AgentBounds& agentBounds, const osg::Vec3f& start, const osg::Vec3f& end) const
     {

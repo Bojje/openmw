@@ -514,7 +514,7 @@ namespace MWWorld
 
         if (cellVariant.isExterior())
         {
-            osg::ref_ptr<const ESMTerrain::LandObject> land = mRendering.getLandManager()->getLand(cellIndex);
+            osg::ref_ptr<const ESMTerrain::LandObject> land = mLandManager.getLand(cellIndex);
             const ESM::LandData* data = land ? land->getData(ESM::Land::DATA_VHGT) : nullptr;
             const int verts = ESM::getLandSize(worldspace);
             const int worldsize = ESM::getCellSize(worldspace);
@@ -965,8 +965,9 @@ namespace MWWorld
         mLastPlayerPos = player.getRefData().getPosition().asVec3();
     }
 
-    Scene::Scene(MWWorld::World& world, MWRender::RenderingManager& rendering, Terrain::RenderStorage& terrainStorage,
-        Resource::ResourceSystem* resourceSystem, MWPhysics::PhysicsSystem* physics,
+    Scene::Scene(MWWorld::World& world, MWRender::RenderingManager& rendering, MWRender::LandManager& landManager,
+        Terrain::RenderStorage& terrainStorage, Resource::ResourceSystem* resourceSystem,
+        MWPhysics::PhysicsSystem* physics,
         DetourNavigator::Navigator& navigator)
         : mCurrentCell(nullptr)
         , mCellChanged(false)
@@ -974,6 +975,7 @@ namespace MWWorld
         , mResourceSystem(resourceSystem)
         , mPhysics(physics)
         , mRendering(rendering)
+        , mLandManager(landManager)
         , mTerrainStorage(terrainStorage)
         , mNavigator(navigator)
         , mCellLoadingThreshold(1024.f)
@@ -985,8 +987,8 @@ namespace MWWorld
         , mPredictionTime(Settings::cells().mPredictionTime)
         , mLowestPoint(std::numeric_limits<float>::max())
     {
-        mPreloader = std::make_unique<CellPreloader>(resourceSystem, physics->getShapeManager(),
-            rendering.getTerrain(), rendering.getLandManager());
+        mPreloader = std::make_unique<CellPreloader>(resourceSystem, physics->getShapeManager(), rendering.getTerrain(),
+            &mLandManager);
         mPreloader->setWorkQueue(mRendering.getWorkQueue());
         mPreloader->setExpiryDelay(Settings::cells().mPreloadCellExpiryDelay);
         mPreloader->setMinCacheSize(Settings::cells().mPreloadCellCacheMin);
