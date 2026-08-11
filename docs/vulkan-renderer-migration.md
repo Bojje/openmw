@@ -79,7 +79,8 @@ ambient-occlusion,
 and emissive-strength channels into the composite pass. Cell object lookup and removal are
 owned by the renderer-neutral `WorldScene`/`CellScene` components rather than the OSG-facing
 manager. `MWWorld::Scene` now owns the neutral `WorldScene`; the world lifecycle writes object
-snapshots directly during insertion, unpaging, and transform updates, while the manager retains
+snapshots during insertion and unpaging, while explicit neutral transform-update methods own
+position, rotation, and scale changes. The manager retains
 only the OSG-facing object operations and submission export. `Scene` also exposes the complete
 neutral submission as the future full-game backend call site. World reset is
 also owned by `Scene::clear()` after cell teardown. Terrain tile snapshots are now requested by

@@ -56,7 +56,7 @@ int main()
 
     objectTransform.position.x = 8.f;
     world.recordObject(&objectHandle, &firstCellHandle, true, 1, 2, "first", "meshes/updated.nif", objectTransform, true);
-    Render::WorldObject* recorded = world.findObject(&objectHandle);
+    const Render::WorldObject* recorded = world.findObject(&objectHandle);
     if (recorded == nullptr || recorded->model != "meshes/updated.nif" || !recorded->visible
         || recorded->transform.position.x != 8.f)
         throw std::runtime_error("renderer-neutral world scene failed to update an object");
@@ -103,6 +103,17 @@ int main()
     world.recordObject(&objectHandle, &firstCellHandle, true, 1, 2, "first", "meshes/first.nif", objectTransform, true);
     if (world.findObject(&objectHandle) == nullptr || world.findObject(&objectHandle)->id != 1)
         throw std::runtime_error("renderer-neutral world scene did not reset object identity");
+
+    if (!world.updateObjectPosition(&objectHandle, { 1.f, 2.f, 3.f })
+        || !world.updateObjectRotation(&objectHandle, { 0.f, 0.f, 0.5f, 0.5f })
+        || !world.updateObjectScale(&objectHandle, { 2.f, 3.f, 4.f }))
+        throw std::runtime_error("renderer-neutral world scene rejected explicit transform updates");
+    const Render::WorldObject* updated = world.findObject(&objectHandle);
+    if (updated == nullptr || updated->transform.position.x != 1.f || updated->transform.position.y != 2.f
+        || updated->transform.position.z != 3.f || updated->transform.rotation.z != 0.5f
+        || updated->transform.scale.x != 2.f || updated->transform.scale.y != 3.f
+        || updated->transform.scale.z != 4.f)
+        throw std::runtime_error("renderer-neutral world scene lost explicit transform updates");
 
     world.setActiveWorldspace("active");
     if (world.activeWorldspace() != "active")

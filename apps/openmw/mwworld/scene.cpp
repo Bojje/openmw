@@ -375,8 +375,7 @@ namespace MWWorld
     {
         const auto rot = makeNodeRotation(ptr, order);
         setNodeRotation(ptr, mRendering, rot);
-        if (Render::WorldObject* object = mNeutralWorldScene.findObject(static_cast<const void*>(ptr.mRef)))
-            object->transform.rotation = toRenderQuat(rot);
+        mNeutralWorldScene.updateObjectRotation(static_cast<const void*>(ptr.mRef), toRenderQuat(rot));
         mPhysics->updateRotation(ptr, rot);
     }
 
@@ -386,8 +385,8 @@ namespace MWWorld
         osg::Vec3f scaleVec(scale, scale, scale);
         ptr.getClass().adjustScale(ptr, scaleVec, true);
         mRendering.scaleObject(ptr, scaleVec);
-        if (Render::WorldObject* object = mNeutralWorldScene.findObject(static_cast<const void*>(ptr.mRef)))
-            object->transform.scale = { scaleVec.x(), scaleVec.y(), scaleVec.z() };
+        mNeutralWorldScene.updateObjectScale(static_cast<const void*>(ptr.mRef),
+            { scaleVec.x(), scaleVec.y(), scaleVec.z() });
         mPhysics->updateScale(ptr);
     }
 

@@ -57,6 +57,14 @@ namespace Render
             return found == objects.end() ? nullptr : &*found;
         }
 
+        const WorldObject* findObject(uint64_t id) const
+        {
+            const auto found = std::find_if(objects.begin(), objects.end(), [id](const WorldObject& object) {
+                return object.id == id;
+            });
+            return found == objects.end() ? nullptr : &*found;
+        }
+
         bool eraseObject(uint64_t id)
         {
             const auto oldSize = objects.size();
@@ -106,6 +114,22 @@ namespace Render
                 return;
             mObjects.erase(oldKey);
             mObjects.emplace(newKey, location);
+        }
+
+        template <class Update>
+        bool updateObjectTransform(const void* objectKey, Update&& update)
+        {
+            const auto found = mObjects.find(objectKey);
+            if (found == mObjects.end())
+                return false;
+            const auto scene = mCells.find(found->second.cell);
+            if (scene == mCells.end())
+                return false;
+            WorldObject* object = scene->second.findObject(found->second.id);
+            if (object == nullptr)
+                return false;
+            update(object->transform);
+            return true;
         }
 
     public:
@@ -191,13 +215,28 @@ namespace Render
             mObjects.emplace(objectKey, ObjectLocation{ cellKey, id });
         }
 
-        WorldObject* findObject(const void* objectKey)
+        const WorldObject* findObject(const void* objectKey) const
         {
             const auto found = mObjects.find(objectKey);
             if (found == mObjects.end())
                 return nullptr;
             const auto scene = mCells.find(found->second.cell);
             return scene == mCells.end() ? nullptr : scene->second.findObject(found->second.id);
+        }
+
+        bool updateObjectPosition(const void* objectKey, const Vec3& position)
+        {
+            return updateObjectTransform(objectKey, [&](ObjectTransform& transform) { transform.position = position; });
+        }
+
+        bool updateObjectRotation(const void* objectKey, const Quat& rotation)
+        {
+            return updateObjectTransform(objectKey, [&](ObjectTransform& transform) { transform.rotation = rotation; });
+        }
+
+        bool updateObjectScale(const void* objectKey, const Vec3& scale)
+        {
+            return updateObjectTransform(objectKey, [&](ObjectTransform& transform) { transform.scale = scale; });
         }
 
         const CellScene* findCell(const void* cellKey) const

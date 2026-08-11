@@ -1103,9 +1103,8 @@ namespace MWWorld
         if (haveToMove && newPtr.getRefData().getBaseNode())
         {
             mRendering->moveObject(newPtr, position);
-            if (Render::WorldObject* object
-                = mWorldScene->getNeutralWorldScene().findObject(static_cast<const void*>(newPtr.mRef)))
-                object->transform.position = { position.x(), position.y(), position.z() };
+            mWorldScene->getNeutralWorldScene().updateObjectPosition(static_cast<const void*>(newPtr.mRef),
+                { position.x(), position.y(), position.z() });
             if (movePhysics)
             {
                 mPhysics->updatePosition(newPtr);
@@ -1313,9 +1312,8 @@ namespace MWWorld
             mWorldScene->removeFromPagedRefs(ptr);
 
             mRendering->rotateObject(ptr, rotate);
-            if (Render::WorldObject* object
-                = mWorldScene->getNeutralWorldScene().findObject(static_cast<const void*>(ptr.mRef)))
-                object->transform.rotation = toRenderQuat(rotate);
+            mWorldScene->getNeutralWorldScene().updateObjectRotation(static_cast<const void*>(ptr.mRef),
+                toRenderQuat(rotate));
             mPhysics->updateRotation(ptr, rotate);
 
             if (const auto object = mPhysics->getObject(ptr))
