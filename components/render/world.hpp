@@ -91,6 +91,7 @@ namespace Render
         std::unordered_map<const void*, CellScene> mCells;
         std::vector<const void*> mCellOrder;
         std::unordered_map<const void*, ObjectLocation> mObjects;
+        std::vector<TerrainRegion> mTerrainRegions;
         std::string mActiveWorldspace;
         SceneData mSceneData{};
         uint64_t mNextObjectId = 1;
@@ -169,6 +170,10 @@ namespace Render
             if (found != mCells.end())
                 found->second.terrainTiles = std::move(tiles);
         }
+
+        void setTerrainRegions(std::vector<TerrainRegion> regions) { mTerrainRegions = std::move(regions); }
+
+        const std::vector<TerrainRegion>& terrainRegions() const { return mTerrainRegions; }
 
         // Add renderer-owned static instances whose lifetime is tied to a cell
         // but which do not have an engine reference identity, such as groundcover.
@@ -395,6 +400,7 @@ namespace Render
             mCells.clear();
             mCellOrder.clear();
             mObjects.clear();
+            mTerrainRegions.clear();
             mActiveWorldspace.clear();
             mSceneData = {};
             mNextObjectId = 1;

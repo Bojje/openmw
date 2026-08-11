@@ -84,6 +84,13 @@ int main()
         expect(cellLodTiles.size() == 2 && cellLodTiles[0].lod == 0 && cellLodTiles[1].lod == 1
                 && cellLodTiles[0].center[0] == 3.5f && cellLodTiles[0].center[1] == -1.5f,
             "neutral terrain storage did not assemble deterministic cell LOD snapshots");
+        const auto regionTiles = neutralStorage.getRenderRegionTiles(0, 3, 0, 1, ESM::RefId());
+        expect(regionTiles.size() == 2 && regionTiles[0].minCellX == 0 && regionTiles[0].maxCellX == 1
+                && regionTiles[0].minCellY == 0 && regionTiles[0].maxCellY == 1 && regionTiles[1].minCellX == 2
+                && regionTiles[1].maxCellX == 3 && regionTiles[1].minCellY == 0 && regionTiles[1].maxCellY == 1
+                && regionTiles[0].lods.size() == 2 && regionTiles[0].lods[0].size == 2.f
+                && regionTiles[0].lods[1].lod == 1 && regionTiles[1].valid(),
+            "neutral terrain storage did not assemble aligned region LOD snapshots");
         expect(tile.has_value() && tile->valid(), "terrain adapter returned an invalid tile");
         expect(tile->lod == 2 && tile->size == 4.f && tile->center[0] == 3.f && tile->center[1] == -2.f
                 && tile->cellWorldSize == 1.f,

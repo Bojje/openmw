@@ -223,12 +223,21 @@ namespace Render
         {
             const float cameraX = scene.viewInverse.data[12];
             const float cameraY = scene.viewInverse.data[13];
-            for (const CellScene* cell : world.cellsInOrder(worldspace))
+            if (!world.terrainRegions().empty())
             {
-                if (!cell->exterior || cell->terrainTiles.empty())
-                    continue;
-                if (const TerrainTile* selected = selectTerrainLod(cell->terrainTiles, cameraX, cameraY))
-                    result.terrainTiles.push_back(*selected);
+                for (const TerrainRegion& region : world.terrainRegions())
+                    if (const TerrainTile* selected = selectTerrainLod(region.lods, cameraX, cameraY))
+                        result.terrainTiles.push_back(*selected);
+            }
+            else
+            {
+                for (const CellScene* cell : world.cellsInOrder(worldspace))
+                {
+                    if (!cell->exterior || cell->terrainTiles.empty())
+                        continue;
+                    if (const TerrainTile* selected = selectTerrainLod(cell->terrainTiles, cameraX, cameraY))
+                        result.terrainTiles.push_back(*selected);
+                }
             }
         }
         return result;

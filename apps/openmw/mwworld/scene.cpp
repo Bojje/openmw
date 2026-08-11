@@ -1,5 +1,6 @@
 #include "scene.hpp"
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <limits>
@@ -472,6 +473,7 @@ namespace MWWorld
 
         MWBase::Environment::get().getSoundManager()->stopSound(cell);
         mActiveCells.erase(cell);
+        mNeutralTerrainRegionsDirty = true;
         // Clean up any effects that may have been spawned while unloading all cells
         if (mActiveCells.empty())
             mRendering.notifyWorldSpaceChanged();
@@ -573,6 +575,7 @@ namespace MWWorld
             mNeutralWorldScene.setTerrainTiles(static_cast<const void*>(&cell),
                 mTerrainStorage.getRenderTiles(
                     cell.getCell()->getGridX(), cell.getCell()->getGridY(), cell.getCell()->getWorldSpace()));
+        mNeutralTerrainRegionsDirty = true;
 
         MWBase::Environment::get().getWindowManager()->addCell(&cell);
         bool waterEnabled = cellVariant.hasWater() || cell.isExterior();
@@ -615,6 +618,7 @@ namespace MWWorld
         navigatorUpdateGuard.reset();
         assert(mActiveCells.empty());
         mNeutralWorldScene.clear();
+        mNeutralTerrainRegionsDirty = false;
         mNeutralMeshCache.clear();
         mCurrentCell = nullptr;
         mLowestPoint = std::numeric_limits<float>::max();
@@ -929,6 +933,7 @@ namespace MWWorld
         mCurrentCell = &cell;
 
         mNeutralWorldScene.setActiveWorldspace(cell.getCell()->getWorldSpace().serializeText());
+        mNeutralTerrainRegionsDirty = true;
         mRendering.enableTerrain(cell.isExterior(), cell.getCell()->getWorldSpace());
 
         MWWorld::Ptr old = mWorld.getPlayerPtr();
@@ -1104,8 +1109,66 @@ namespace MWWorld
         return mCurrentCell;
     }
 
+    void Scene::updateNeutralTerrainRegions()
+    {
+        mNeutralTerrainRegionsDirty = false;
+        mNeutralWorldScene.setTerrainRegions({});
+
+        if (mActiveCells.empty() || mNeutralWorldScene.activeWorldspace().empty())
+            return;
+
+        bool foundExteriorCell = false;
+        ESM::RefId worldspace;
+        int minCellX = 0;
+        int maxCellX = 0;
+        int minCellY = 0;
+        int maxCellY = 0;
+        for (const CellStore* cell : mActiveCells)
+        {
+            if (!cell->isExterior())
+                continue;
+
+            const ESM::RefId cellWorldspace = cell->getCell()->getWorldSpace();
+            if (cellWorldspace.serializeText() != mNeutralWorldScene.activeWorldspace())
+                continue;
+
+            const int cellX = cell->getCell()->getGridX();
+            const int cellY = cell->getCell()->getGridY();
+            if (!foundExteriorCell)
+            {
+                foundExteriorCell = true;
+                worldspace = cellWorldspace;
+                minCellX = maxCellX = cellX;
+                minCellY = maxCellY = cellY;
+            }
+            else
+            {
+                minCellX = std::min(minCellX, cellX);
+                maxCellX = std::max(maxCellX, cellX);
+                minCellY = std::min(minCellY, cellY);
+                maxCellY = std::max(maxCellY, cellY);
+            }
+        }
+
+        if (!foundExteriorCell)
+            return;
+
+        std::vector<Render::TerrainRegion> regions
+            = mTerrainStorage.getRenderRegionTiles(minCellX, maxCellX, minCellY, maxCellY, worldspace);
+        if (regions.empty()
+            || !std::all_of(regions.begin(), regions.end(), [](const Render::TerrainRegion& region) {
+                   return region.valid();
+               }))
+            return;
+
+        mNeutralWorldScene.setTerrainRegions(std::move(regions));
+    }
+
     Render::SceneSubmission Scene::getNeutralScene()
     {
+        if (mNeutralTerrainRegionsDirty)
+            updateNeutralTerrainRegions();
+
         const auto resolveMeshes = [this](std::string_view model) -> const Resource::NifMeshManager::Meshes& {
             const std::string key(model);
             const auto found = mNeutralMeshCache.find(key);
@@ -1501,6 +1564,7 @@ namespace MWWorld
 
     void Scene::reloadTerrain()
     {
+        mNeutralTerrainRegionsDirty = true;
         mPreloader->setTerrainPreloadPositions({});
     }
 

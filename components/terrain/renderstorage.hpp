@@ -39,6 +39,12 @@ namespace Terrain
 
         std::vector<Render::TerrainTile> getRenderTiles(int gridX, int gridY, ESM::RefId worldspace);
 
+        // Assemble aligned square regions covering an exterior cell rectangle.
+        // Invalid regions are retained in the result so callers can reject a
+        // partial quadtree set and keep using their per-cell fallback.
+        std::vector<Render::TerrainRegion> getRenderRegionTiles(
+            int minCellX, int maxCellX, int minCellY, int maxCellY, ESM::RefId worldspace);
+
         std::optional<Render::TerrainTile> getRenderTile(
             int lodLevel, float size, const std::array<float, 2>& center, ESM::RefId worldspace);
     };

@@ -182,6 +182,24 @@ int main()
         || !aggregate.valid())
         throw std::runtime_error("renderer-neutral scene submission collector lost world state");
 
+    Render::TerrainRegion terrainRegion;
+    terrainRegion.minCellX = 0;
+    terrainRegion.maxCellX = 1;
+    terrainRegion.minCellY = 0;
+    terrainRegion.maxCellY = 1;
+    terrainRegion.lods = { neutralTerrain };
+    world.setTerrainRegions({ terrainRegion });
+    const Render::SceneSubmission regional = Render::collectSceneSubmission(world, aggregateScene, "",
+        [&](std::string_view model) -> std::vector<Render::MeshInstance> {
+            if (model != "meshes/first.nif")
+                throw std::runtime_error("region scene submission resolved an unexpected model");
+            return { aggregateMesh };
+        }, true);
+    if (regional.terrainTiles.size() != 1 || regional.terrainTiles.front().center != neutralTerrain.center
+        || !regional.valid())
+        throw std::runtime_error("renderer-neutral scene submission did not select a region terrain snapshot");
+    world.setTerrainRegions({});
+
     int activeWorldspaceCellHandle = 0;
     int inactiveWorldspaceCellHandle = 0;
     int activeWorldspaceObjectHandle = 0;

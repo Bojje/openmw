@@ -3,17 +3,35 @@
 #include <algorithm>
 #include <cmath>
 #include <optional>
+#include <set>
 #include <utility>
 
 namespace Terrain
 {
+    namespace
+    {
+        int maxTerrainLod(int cellVertices)
+        {
+            int maxLod = 0;
+            for (int vertices = std::max(cellVertices - 1, 1); vertices > 1; vertices >>= 1)
+                ++maxLod;
+            return maxLod;
+        }
+
+        int largestAlignedRegion(int x, int y, int maxCellX, int maxCellY)
+        {
+            int size = 1;
+            while (size <= (maxCellX - x) && size <= (maxCellY - y)
+                && x % (size * 2) == 0 && y % (size * 2) == 0)
+                size *= 2;
+            return size;
+        }
+    }
+
     std::vector<Render::TerrainTile> RenderStorage::getRenderTiles(int gridX, int gridY, ESM::RefId worldspace)
     {
         const std::array<float, 2> center = { gridX + 0.5f, gridY + 0.5f };
-        const int cellVertices = getCellVertices(worldspace);
-        int maxLod = 0;
-        for (int vertices = std::max(cellVertices - 1, 1); vertices > 1; vertices >>= 1)
-            ++maxLod;
+        const int maxLod = maxTerrainLod(getCellVertices(worldspace));
 
         std::vector<Render::TerrainTile> tiles;
         tiles.reserve(static_cast<std::size_t>(maxLod + 1));
@@ -25,6 +43,63 @@ namespace Terrain
                 break;
         }
         return tiles;
+    }
+
+    std::vector<Render::TerrainRegion> RenderStorage::getRenderRegionTiles(
+        int minCellX, int maxCellX, int minCellY, int maxCellY, ESM::RefId worldspace)
+    {
+        std::vector<Render::TerrainRegion> result;
+        if (minCellX > maxCellX || minCellY > maxCellY)
+            return result;
+
+        const int maxLod = maxTerrainLod(getCellVertices(worldspace));
+        std::set<std::pair<int, int>> covered;
+        for (int y = minCellY; y <= maxCellY; ++y)
+        {
+            for (int x = minCellX; x <= maxCellX; ++x)
+            {
+                if (covered.contains({ x, y }))
+                    continue;
+
+                int size = largestAlignedRegion(x, y, maxCellX, maxCellY);
+                while (size > 1)
+                {
+                    bool overlapsCoveredCell = false;
+                    for (int coveredY = y; coveredY < y + size && !overlapsCoveredCell; ++coveredY)
+                        for (int coveredX = x; coveredX < x + size; ++coveredX)
+                            if (covered.contains({ coveredX, coveredY }))
+                            {
+                                overlapsCoveredCell = true;
+                                break;
+                            }
+                    if (!overlapsCoveredCell)
+                        break;
+                    size /= 2;
+                }
+
+                Render::TerrainRegion& region = result.emplace_back();
+                region.minCellX = x;
+                region.maxCellX = x + size - 1;
+                region.minCellY = y;
+                region.maxCellY = y + size - 1;
+
+                const std::array<float, 2> center = { x + size / 2.f, y + size / 2.f };
+                for (int lod = 0; lod <= maxLod; ++lod)
+                {
+                    const std::optional<Render::TerrainTile> tile
+                        = getRenderTile(lod, static_cast<float>(size), center, worldspace);
+                    if (!tile)
+                        break;
+                    region.lods.push_back(*tile);
+                }
+
+                for (int coveredY = y; coveredY < y + size; ++coveredY)
+                    for (int coveredX = x; coveredX < x + size; ++coveredX)
+                        covered.emplace(coveredX, coveredY);
+
+            }
+        }
+        return result;
     }
 
     std::optional<Render::TerrainTile> RenderStorage::getRenderTile(

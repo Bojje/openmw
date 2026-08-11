@@ -85,6 +85,25 @@ namespace Render
             return true;
         }
     };
+
+    // A renderer-neutral quadtree region. The region owns one or more tiles
+    // for the same aligned square; the frame collector chooses one by camera
+    // distance and falls back to cell snapshots when no complete region set
+    // is available.
+    struct TerrainRegion
+    {
+        int minCellX = 0;
+        int maxCellX = -1;
+        int minCellY = 0;
+        int maxCellY = -1;
+        std::vector<TerrainTile> lods;
+
+        bool valid() const
+        {
+            return minCellX <= maxCellX && minCellY <= maxCellY && !lods.empty()
+                && std::all_of(lods.begin(), lods.end(), [](const TerrainTile& tile) { return tile.valid(); });
+        }
+    };
 }
 
 #endif

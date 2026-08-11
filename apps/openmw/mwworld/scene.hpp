@@ -129,6 +129,7 @@ namespace MWWorld
         std::vector<ESM::RefNum> mPagedRefs;
 
         Render::WorldScene mNeutralWorldScene;
+        bool mNeutralTerrainRegionsDirty = true;
         mutable std::unordered_map<std::string, std::weak_ptr<const std::vector<Render::MeshInstance>>>
             mNeutralMeshCache;
 
@@ -161,6 +162,7 @@ namespace MWWorld
         void unloadCell(CellStore* cell, const DetourNavigator::UpdateGuard* navigatorUpdateGuard);
         void loadCell(CellStore& cell, Loading::Listener* loadingListener, bool respawn, const osg::Vec3f& position,
             const DetourNavigator::UpdateGuard* navigatorUpdateGuard);
+        void updateNeutralTerrainRegions();
 
     public:
         Scene(MWWorld::World& world, MWRender::RenderingManager& rendering, Terrain::RenderStorage& terrainStorage,
