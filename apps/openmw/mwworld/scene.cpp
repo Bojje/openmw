@@ -40,6 +40,7 @@
 #include "../mwrender/camera.hpp"
 #include "../mwrender/postprocessor.hpp"
 #include "../mwrender/renderingmanager.hpp"
+#include "../mwrender/terrainstorage.hpp"
 
 #include "../mwphysics/actor.hpp"
 #include "../mwphysics/heightfield.hpp"
@@ -552,9 +553,10 @@ namespace MWWorld
         insertCell(cell, loadingListener, navigatorUpdateGuard);
 
         mRendering.addCell(&cell);
-        if (cellVariant.isExterior())
+        if (cellVariant.isExterior() && mTerrainStorage)
             mNeutralWorldScene.setTerrainTiles(static_cast<const void*>(&cell),
-                mRendering.getNeutralTerrainTiles(&cell));
+                mTerrainStorage->getRenderTiles(
+                    cell.getCell()->getGridX(), cell.getCell()->getGridY(), cell.getCell()->getWorldSpace()));
 
         MWBase::Environment::get().getWindowManager()->addCell(&cell);
         bool waterEnabled = cellVariant.hasWater() || cell.isExterior();
@@ -948,6 +950,7 @@ namespace MWWorld
         , mWorld(world)
         , mPhysics(physics)
         , mRendering(rendering)
+        , mTerrainStorage(rendering.getTerrainStorage())
         , mNavigator(navigator)
         , mCellLoadingThreshold(1024.f)
         , mPreloadDistance(Settings::cells().mPreloadDistance)

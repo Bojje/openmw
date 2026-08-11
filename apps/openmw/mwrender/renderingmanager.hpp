@@ -140,6 +140,7 @@ namespace MWRender
 
         SceneUtil::WorkQueue* getWorkQueue();
         Terrain::World* getTerrain();
+        TerrainStorage* getTerrainStorage() const;
 
         void preloadCommonAssets();
 
@@ -167,9 +168,6 @@ namespace MWRender
 
         void addCell(const MWWorld::CellStore* store);
         void removeCell(const MWWorld::CellStore* store);
-
-        /// Build the neutral terrain snapshot for a cell loaded by the world scene.
-        std::vector<Render::TerrainTile> getNeutralTerrainTiles(const MWWorld::CellStore* store);
 
         void enableTerrain(bool enable, ESM::RefId worldspace);
 

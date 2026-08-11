@@ -2,6 +2,7 @@
 #define MWRENDER_TERRAINSTORAGE_H
 
 #include <memory>
+#include <vector>
 
 #include <components/esmterrain/storage.hpp>
 
@@ -28,6 +29,9 @@ namespace MWRender
         const ESM4::TextureSet* getEsm4TextureSet(ESM::RefId txstId) const override;
 
         bool hasData(ESM::ExteriorCellLocation cellLocation) override;
+
+        /// Build neutral terrain LOD snapshots for one exterior cell.
+        std::vector<Render::TerrainTile> getRenderTiles(int gridX, int gridY, ESM::RefId worldspace);
 
         /// Get bounds of the whole terrain in cell units
         void getBounds(float& minX, float& maxX, float& minY, float& maxY, ESM::RefId worldspace) override;

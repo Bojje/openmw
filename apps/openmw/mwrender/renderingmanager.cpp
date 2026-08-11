@@ -450,30 +450,6 @@ namespace MWRender
         return *mObjects.get();
     }
 
-    std::vector<Render::TerrainTile> RenderingManager::getNeutralTerrainTiles(const MWWorld::CellStore* store)
-    {
-        std::vector<Render::TerrainTile> tiles;
-        if (store == nullptr || !store->getCell()->isExterior() || !mTerrainStorage)
-            return tiles;
-
-        const std::array<float, 2> center = { store->getCell()->getGridX() + 0.5f,
-            store->getCell()->getGridY() + 0.5f };
-        const ESM::RefId worldspace = store->getCell()->getWorldSpace();
-        const int cellVertices = mTerrainStorage->getCellVertices(worldspace);
-        int maxLod = 0;
-        for (int vertices = std::max(cellVertices - 1, 1); vertices > 1; vertices >>= 1)
-            ++maxLod;
-        for (int lod = 0; lod <= maxLod; ++lod)
-        {
-            if (std::optional<Render::TerrainTile> tile
-                = mTerrainStorage->getRenderTile(lod, 1.f, center, worldspace))
-                tiles.push_back(std::move(*tile));
-            else
-                break;
-        }
-        return tiles;
-    }
-
     Resource::ResourceSystem* RenderingManager::getResourceSystem()
     {
         return mResourceSystem;
@@ -487,6 +463,11 @@ namespace MWRender
     Terrain::World* RenderingManager::getTerrain()
     {
         return mTerrain;
+    }
+
+    TerrainStorage* RenderingManager::getTerrainStorage() const
+    {
+        return mTerrainStorage.get();
     }
 
     void RenderingManager::preloadCommonAssets()

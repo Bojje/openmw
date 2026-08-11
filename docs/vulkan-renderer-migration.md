@@ -168,10 +168,10 @@ records empty loaded cells as well as object-bearing cells and owns each cell's 
 LOD snapshots. `MWWorld::Scene::getNeutralScene()` now assembles those snapshots for loaded
 exterior cells in the active worldspace, so terrain is part of the real full-game neutral
 handoff rather than only a test fixture; conversion happens on cell add/remove rather than
-on every frame export. `RenderingManager` remains only the legacy terrain provider; it no
-longer assembles the renderer-neutral scene submission or owns its resource callbacks. Neutral
-terrain collection now depends on `TerrainStorage` and cached world tiles rather than the
-legacy OSG terrain object being active.
+on every frame export. Neutral terrain LOD assembly now belongs to `TerrainStorage`, while
+`RenderingManager` only provides that storage to the world lifecycle; it no longer assembles
+the renderer-neutral scene submission or owns its resource callbacks. Neutral terrain collection
+now depends on cached world tiles rather than the legacy OSG terrain object being active.
 Terrain storage now exposes neutral vertex and blendmap methods as its primary contract.
 `getRenderTile()` consumes those vectors directly, while the legacy OSG array/image methods
 are centralized adapters for the reference terrain renderer. The Vulkan path therefore no
@@ -187,7 +187,7 @@ The non-owning manager update handle is private to the `Scene` owner, detached d
 teardown, and CI guards the manager header against regaining a value-owned neutral frame state.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-70 files, deleting 652 lines and adding 5,881 lines (net `+5,229`). The larger Vulkan-only
+72 files, deleting 652 lines and adding 5,893 lines (net `+5,241`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
