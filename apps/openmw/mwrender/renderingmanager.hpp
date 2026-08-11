@@ -118,7 +118,7 @@ namespace MWRender
     class Groundcover;
     class PostProcessor;
 
-    class RenderingManager : public MWRender::RenderingInterface, public Render::FrameLifecycle
+    class RenderingManager : public MWRender::RenderingInterface
     {
     public:
         RenderingManager(osgViewer::Viewer* viewer, osg::ref_ptr<osg::Group> rootNode,
@@ -129,15 +129,10 @@ namespace MWRender
 
         osgUtil::IncrementalCompileOperation* getIncrementalCompileOperation();
 
-        /// Process and submit one frame through the active renderer owner.
-        /// The current implementation delegates to the OSG viewer; the Vulkan
-        /// backend will replace this lifecycle boundary once GUI and presentation
-        /// services are renderer-neutral.
-        bool renderFrame() override;
-        bool renderFrame(const Render::SceneSubmission& submission) override;
-        bool consumesSceneSubmission() const override { return false; }
-        void synchronizeScene(Render::SceneData& sceneData) override;
-        void advanceFrame(double simulationTime) override;
+        /// Return the renderer-owned frame lifecycle. The OSG implementation is
+        /// an adapter today; a Vulkan implementation can replace this object
+        /// without making the world depend on RenderingManager inheritance.
+        Render::FrameLifecycle& getFrameLifecycle() { return *mFrameLifecycle; }
 
         MWRender::Objects& getObjects() override;
 
@@ -343,6 +338,7 @@ namespace MWRender
         osg::ref_ptr<IntersectionVisitorWithIgnoreList> mIntersectionVisitor;
 
         osg::ref_ptr<osgViewer::Viewer> mViewer;
+        std::unique_ptr<Render::FrameLifecycle> mFrameLifecycle;
         osg::ref_ptr<osg::Group> mRootNode;
         osg::ref_ptr<SceneUtil::LightManager> mSceneRoot;
         Resource::ResourceSystem* mResourceSystem;

@@ -78,6 +78,7 @@
 #include "navmesh.hpp"
 #include "npcanimation.hpp"
 #include "objectpaging.hpp"
+#include "viewerframelifecycle.hpp"
 #include "pathgrid.hpp"
 #include "postprocessor.hpp"
 #include "recastmesh.hpp"
@@ -335,8 +336,20 @@ namespace MWRender
 
         mCamera = std::make_unique<Camera>(mViewer->getCamera());
 
-        mScreenshotManager = std::make_unique<ScreenshotManager>(viewer, [this] { renderFrame(); },
-            [this] { advanceFrame(mViewer->getFrameStamp()->getSimulationTime()); });
+        mFrameLifecycle = std::make_unique<ViewerFrameLifecycle>(*mViewer,
+            [this](Render::SceneData& sceneData) {
+                const MWRender::Camera* camera = getCamera();
+                if (camera == nullptr)
+                    return;
+                sceneData.view = camera->getNeutralViewMatrix();
+                sceneData.projection = camera->getNeutralProjectionMatrix();
+                sceneData.viewInverse = Render::invertMat4(sceneData.view);
+                sceneData.projInverse = Render::invertMat4(sceneData.projection);
+            });
+
+        mScreenshotManager = std::make_unique<ScreenshotManager>(viewer,
+            [this] { mFrameLifecycle->renderFrame(); },
+            [this] { mFrameLifecycle->advanceFrame(mViewer->getFrameStamp()->getSimulationTime()); });
 
         mViewer->setLightingMode(osgViewer::View::NO_LIGHT);
 
@@ -420,6 +433,7 @@ namespace MWRender
         updateProjectionMatrix();
 
         mViewer->getCamera()->setClearMask(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+
     }
 
     RenderingManager::~RenderingManager()
@@ -431,33 +445,6 @@ namespace MWRender
     osgUtil::IncrementalCompileOperation* RenderingManager::getIncrementalCompileOperation()
     {
         return mViewer->getIncrementalCompileOperation();
-    }
-
-    bool RenderingManager::renderFrame()
-    {
-        mViewer->eventTraversal();
-        mViewer->updateTraversal();
-        mViewer->renderingTraversals();
-        return true;
-    }
-
-    bool RenderingManager::renderFrame(const Render::SceneSubmission& /*submission*/)
-    {
-        return renderFrame();
-    }
-
-    void RenderingManager::synchronizeScene(Render::SceneData& sceneData)
-    {
-        const MWRender::Camera* camera = getCamera();
-        sceneData.view = camera->getNeutralViewMatrix();
-        sceneData.projection = camera->getNeutralProjectionMatrix();
-        sceneData.viewInverse = Render::invertMat4(sceneData.view);
-        sceneData.projInverse = Render::invertMat4(sceneData.projection);
-    }
-
-    void RenderingManager::advanceFrame(double simulationTime)
-    {
-        mViewer->advance(simulationTime);
     }
 
     MWRender::Objects& RenderingManager::getObjects()

@@ -153,6 +153,11 @@ jobs:
           echo "World frame traversal must go through the renderer-neutral frame lifecycle"
           exit 1
         fi
+        if rg -n 'class RenderingManager[^\n]*Render::FrameLifecycle|RenderingManager[^\n]*FrameLifecycle' \
+            apps/openmw/mwrender/renderingmanager.hpp; then
+          echo "RenderingManager must expose, not inherit, the renderer-neutral frame lifecycle"
+          exit 1
+        fi
         if readelf -d build-vulkan/openmw | grep -Eiq 'libvulkan|libOpenSceneGraph|libosg'; then
           echo "openmw must not carry Vulkan or OSG runtime dependencies in the isolated build"
           exit 1

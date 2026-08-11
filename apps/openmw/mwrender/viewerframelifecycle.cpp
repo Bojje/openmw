@@ -1,11 +1,15 @@
 #include "viewerframelifecycle.hpp"
 
+#include <utility>
+
 #include <osgViewer/Viewer>
 
 namespace MWRender
 {
-    ViewerFrameLifecycle::ViewerFrameLifecycle(osgViewer::Viewer& viewer)
+    ViewerFrameLifecycle::ViewerFrameLifecycle(osgViewer::Viewer& viewer,
+        std::function<void(Render::SceneData&)> synchronizeScene)
         : mViewer(viewer)
+        , mSynchronizeScene(std::move(synchronizeScene))
     {
     }
 
@@ -22,7 +26,11 @@ namespace MWRender
         return renderFrame();
     }
 
-    void ViewerFrameLifecycle::synchronizeScene(Render::SceneData& /*sceneData*/) {}
+    void ViewerFrameLifecycle::synchronizeScene(Render::SceneData& sceneData)
+    {
+        if (mSynchronizeScene)
+            mSynchronizeScene(sceneData);
+    }
 
     void ViewerFrameLifecycle::advanceFrame(double simulationTime)
     {
