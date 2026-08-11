@@ -56,20 +56,20 @@ int main()
 
     objectTransform.position.x = 8.f;
     world.recordObject(&objectHandle, &firstCellHandle, true, 1, 2, "first", "meshes/updated.nif", objectTransform, true);
-    const Render::WorldObject* recorded = world.findObject(&objectHandle);
-    if (recorded == nullptr || recorded->model != "meshes/updated.nif" || !recorded->visible
-        || recorded->transform.position.x != 8.f)
+    const Render::WorldObject& recorded = world.findCell(&firstCellHandle)->objects.front();
+    if (recorded.model != "meshes/updated.nif" || !recorded.visible
+        || recorded.transform.position.x != 8.f)
         throw std::runtime_error("renderer-neutral world scene failed to update an object");
 
     if (!world.updateObjectCell(&objectHandle, &updatedObjectHandle, &secondCellHandle, false, 0, 0, "second")
-        || world.findObject(&objectHandle) != nullptr || world.findObject(&updatedObjectHandle) == nullptr
-        || world.findCell(&firstCellHandle)->objects.size() != 0)
+        || world.findCell(&firstCellHandle)->objects.size() != 0
+        || world.findCell(&secondCellHandle)->objects.size() != 1)
         throw std::runtime_error("renderer-neutral world scene failed to move an object");
 
     int dynamicObjectHandle = 0;
     world.recordObject(&dynamicObjectHandle, &firstCellHandle, true, 1, 2, "first", "meshes/animated.nif",
         objectTransform, true, {}, true);
-    if (world.findObject(&dynamicObjectHandle) == nullptr || !world.findObject(&dynamicObjectHandle)->dynamic)
+    if (world.findCell(&firstCellHandle)->objects.size() != 1 || !world.findCell(&firstCellHandle)->objects.front().dynamic)
         throw std::runtime_error("renderer-neutral world scene failed to retain dynamic-object state");
     const auto dynamicObjects = world.dynamicObjectsInOrder();
     if (dynamicObjects.size() != 1 || dynamicObjects.front().model != "meshes/animated.nif"
@@ -90,29 +90,29 @@ int main()
         throw std::runtime_error("renderer-neutral world scene lost deterministic cell order");
 
     world.removeCell(&secondCellHandle);
-    if (world.findObject(&updatedObjectHandle) != nullptr || world.findCell(&secondCellHandle) != nullptr
+    if (world.findCell(&secondCellHandle) != nullptr
         || world.cellsInOrder().size() != 3 || world.cellsInOrder()[1] != world.findCell(&fourthCellHandle)
         || world.cellsInOrder()[2] != world.findCell(&thirdCellHandle))
         throw std::runtime_error("renderer-neutral world scene failed cell removal");
 
     world.clear();
-    if (world.findCell(&firstCellHandle) != nullptr || world.findObject(&objectHandle) != nullptr
+    if (world.findCell(&firstCellHandle) != nullptr
         || !world.cellsInOrder().empty())
         throw std::runtime_error("renderer-neutral world scene failed world reset");
 
     world.recordObject(&objectHandle, &firstCellHandle, true, 1, 2, "first", "meshes/first.nif", objectTransform, true);
-    if (world.findObject(&objectHandle) == nullptr || world.findObject(&objectHandle)->id != 1)
+    if (world.findCell(&firstCellHandle) == nullptr || world.findCell(&firstCellHandle)->objects.front().id != 1)
         throw std::runtime_error("renderer-neutral world scene did not reset object identity");
 
     if (!world.updateObjectPosition(&objectHandle, { 1.f, 2.f, 3.f })
         || !world.updateObjectRotation(&objectHandle, { 0.f, 0.f, 0.5f, 0.5f })
         || !world.updateObjectScale(&objectHandle, { 2.f, 3.f, 4.f }))
         throw std::runtime_error("renderer-neutral world scene rejected explicit transform updates");
-    const Render::WorldObject* updated = world.findObject(&objectHandle);
-    if (updated == nullptr || updated->transform.position.x != 1.f || updated->transform.position.y != 2.f
-        || updated->transform.position.z != 3.f || updated->transform.rotation.z != 0.5f
-        || updated->transform.scale.x != 2.f || updated->transform.scale.y != 3.f
-        || updated->transform.scale.z != 4.f)
+    const Render::WorldObject& updated = world.findCell(&firstCellHandle)->objects.front();
+    if (updated.transform.position.x != 1.f || updated.transform.position.y != 2.f
+        || updated.transform.position.z != 3.f || updated.transform.rotation.z != 0.5f
+        || updated.transform.scale.x != 2.f || updated.transform.scale.y != 3.f
+        || updated.transform.scale.z != 4.f)
         throw std::runtime_error("renderer-neutral world scene lost explicit transform updates");
 
     world.setActiveWorldspace("active");

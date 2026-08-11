@@ -180,7 +180,7 @@ The non-owning manager update handle is detached during `Scene` teardown, and CI
 manager header against regaining a value-owned neutral frame state.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-62 files, deleting 613 lines and adding 5,296 lines (net `+4,683`). The larger Vulkan-only
+62 files, deleting 613 lines and adding 5,287 lines (net `+4,674`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
@@ -189,9 +189,10 @@ The latest validation checkpoint also rejects non-finite scene matrices, transfo
 attributes, and terrain coordinates at the renderer-neutral submission boundary, before
 they reach Vulkan. This protects the backend from corrupted engine state without relying
 on GPU validation diagnostics.
-The latest reduction checkpoint also removed `RenderingManager`'s neutral `WorldScene` ownership
-and its remaining manager-only neutral-object lookup, removal, cell-transfer, transform-update,
-reset, and terrain-snapshot wrappers. The world lifecycle now calls `WorldScene` directly for
+The latest reduction checkpoint also removed `RenderingManager`'s neutral `WorldScene` ownership,
+the public neutral-world lookup escape hatch, and its remaining manager-only neutral-object
+lookup, removal, cell-transfer, transform-update, reset, and terrain-snapshot wrappers. The
+world lifecycle now calls `WorldScene` directly for
 insertion, removal, active-cell transfer, transform updates, reset, and terrain snapshots. The terrain adapter is now consumed for opaque, normal-mapped, parallax, and
 blendmap/multi-layer Vulkan terrain; its remaining owner boundary is quadtree-scale
 streaming and complete image coverage. Terrain layer feature flags now default to disabled

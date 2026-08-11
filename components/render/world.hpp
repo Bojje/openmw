@@ -215,15 +215,6 @@ namespace Render
             mObjects.emplace(objectKey, ObjectLocation{ cellKey, id });
         }
 
-        const WorldObject* findObject(const void* objectKey) const
-        {
-            const auto found = mObjects.find(objectKey);
-            if (found == mObjects.end())
-                return nullptr;
-            const auto scene = mCells.find(found->second.cell);
-            return scene == mCells.end() ? nullptr : scene->second.findObject(found->second.id);
-        }
-
         bool updateObjectPosition(const void* objectKey, const Vec3& position)
         {
             return updateObjectTransform(objectKey, [&](ObjectTransform& transform) { transform.position = position; });
