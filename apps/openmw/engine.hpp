@@ -7,6 +7,7 @@
 #include <components/debug/debuglog.hpp>
 #include <components/esm/refid.hpp>
 #include <components/files/collections.hpp>
+#include <components/render/frame.hpp>
 #include <components/settings/settings.hpp>
 #include <components/translation/translation.hpp>
 
@@ -131,6 +132,7 @@ namespace OMW
         osg::ref_ptr<SceneUtil::WorkQueue> mWorkQueue;
         std::unique_ptr<SceneUtil::UnrefQueue> mUnrefQueue;
         std::unique_ptr<MWWorld::World> mWorld;
+        std::unique_ptr<Render::FrameLifecycle> mPreWorldFrameLifecycle;
         std::unique_ptr<MWSound::SoundManager> mSoundManager;
         std::unique_ptr<MWScript::ScriptManager> mScriptManager;
         std::unique_ptr<MWGui::WindowManager> mWindowManager;

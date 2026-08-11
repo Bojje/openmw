@@ -136,13 +136,13 @@ jobs:
           exit 1
         fi
         if rg -n 'eventTraversal\(\)|updateTraversal\(\)|renderingTraversals\(\)' apps/openmw --glob '*.cpp' --glob '*.hpp' \
-            | rg -v 'apps/openmw/engine.cpp|apps/openmw/mwrender/renderingmanager.cpp'; then
-          echo "OpenMW frame traversal must go through the RenderingManager owner boundary"
+            | rg -v 'apps/openmw/mwrender/renderingmanager.cpp|apps/openmw/mwrender/viewerframelifecycle.cpp'; then
+          echo "OpenMW frame traversal must go through an explicit renderer owner boundary"
           exit 1
         fi
         if rg -n 'mViewer->advance\(' apps/openmw --glob '*.cpp' --glob '*.hpp' \
-            | rg -v 'apps/openmw/engine.cpp|apps/openmw/mwrender/renderingmanager.cpp'; then
-          echo "OpenMW frame advancement must go through the renderer owner boundary"
+            | rg -v 'apps/openmw/mwrender/renderingmanager.cpp|apps/openmw/mwrender/viewerframelifecycle.cpp'; then
+          echo "OpenMW frame advancement must go through an explicit renderer owner boundary"
           exit 1
         fi
         if rg -n 'mRendering->(renderFrame|advanceFrame)\(' apps/openmw/mwworld/worldimp.cpp; then

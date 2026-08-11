@@ -75,6 +75,7 @@
 
 #include "mwrender/renderingmanager.hpp"
 #include "mwrender/vismask.hpp"
+#include "mwrender/viewerframelifecycle.hpp"
 
 #include "mwclass/classes.hpp"
 
@@ -446,6 +447,7 @@ OMW::Engine::~Engine()
     mUnrefQueue = nullptr;
     mWorkQueue = nullptr;
 
+    mPreWorldFrameLifecycle = nullptr;
     mViewer = nullptr;
 
     mResourceSystem.reset();
@@ -847,15 +849,11 @@ void OMW::Engine::prepareEngine()
         mWorkQueue.get(), mCfgMgr.getLogPath(), mScriptConsoleMode, mTranslationDataStorage, mEncoding, mExportFonts,
         Version::getOpenmwVersionDescription(), mCfgMgr, [this] {
             if (!mWorld || !mWorld->renderFrame())
-            {
-                mViewer->eventTraversal();
-                mViewer->updateTraversal();
-                mViewer->renderingTraversals();
-            }
+                mPreWorldFrameLifecycle->renderFrame();
         }, [this] {
             const double simulationTime = mViewer->getFrameStamp()->getSimulationTime();
             if (!mWorld || !mWorld->advanceFrame(simulationTime))
-                mViewer->advance(simulationTime);
+                mPreWorldFrameLifecycle->advanceFrame(simulationTime);
         });
     mEnvironment.setWindowManager(*mWindowManager);
 
@@ -985,6 +983,7 @@ void OMW::Engine::go()
 
     // Setup viewer
     mViewer = new osgViewer::Viewer;
+    mPreWorldFrameLifecycle = std::make_unique<MWRender::ViewerFrameLifecycle>(*mViewer);
     mViewer->setReleaseContextAtEndOfFrameHint(false);
 
     // Do not try to outsmart the OS thread scheduler (see bug #4785).
