@@ -124,8 +124,9 @@ boundary now validates mesh indices and terrain snapshots before Vulkan consumes
 Vulkan call site is still intentionally absent until window, input, dynamic-content, and GUI
 services have a Vulkan owner. NIF skinning metadata now survives conversion, and resolved dynamic
 mesh payloads cross the neutral boundary into the Vulkan consumer. A deterministic CPU skinning
-helper now applies frame bone matrices for future animation integration. Unskinned dynamic meshes now enter the raster draw
-batch with their neutral transforms; skinned meshes remain outside it until per-frame bone updates are owned. Mesh submission no longer waits for the whole device or
+helper now applies frame bone matrices for future animation integration. Unskinned dynamic meshes and skinned records with a
+supplied pose now enter the raster draw batch with their neutral transforms; skinned records without a pose remain outside it
+until per-frame bone updates are owned. Mesh submission no longer waits for the whole device or
 rebuilds one global buffer: neutral mesh data is retained on the CPU and uploaded into
 the current frame slot only after its fence is waited, so a future live frame loop can
 submit scene updates without the previous device-wide stall.
