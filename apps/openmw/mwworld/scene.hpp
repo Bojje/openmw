@@ -125,6 +125,8 @@ namespace MWWorld
         bool mCellLoaded = false;
         MWWorld::World& mWorld;
         Render::FrameLifecycle& mFrameLifecycle;
+        Render::SceneSynchronizer mSceneSynchronizer;
+        Render::BonePoseResolver mBonePoseResolver;
         Render::MeshResolver mMeshResolver;
         Render::TextureResolver mTextureResolver;
         const VFS::Manager* mVfs;
@@ -191,9 +193,10 @@ namespace MWWorld
         void updateNeutralTerrainRegions();
 
     public:
-        Scene(MWWorld::World& world, Render::FrameLifecycle& frameLifecycle, Render::MeshResolver meshResolver,
-            Render::TextureResolver textureResolver, const VFS::Manager* vfs, MWRender::RenderingManager& rendering,
-            MWRender::LandManager& landManager,
+        Scene(MWWorld::World& world, Render::FrameLifecycle& frameLifecycle,
+            Render::SceneSynchronizer sceneSynchronizer, Render::BonePoseResolver bonePoseResolver,
+            Render::MeshResolver meshResolver, Render::TextureResolver textureResolver, const VFS::Manager* vfs,
+            MWRender::RenderingManager& rendering, MWRender::LandManager& landManager,
             Terrain::World*& terrain, osgUtil::IncrementalCompileOperation* incrementalCompileOperation,
             Terrain::RenderStorage& terrainStorage, SceneUtil::WorkQueue* workQueue,
             Resource::ResourceSystem* resourceSystem,

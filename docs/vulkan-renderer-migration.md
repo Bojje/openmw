@@ -216,7 +216,7 @@ The non-owning manager update handle is private to the `Scene` owner, detached d
 teardown, and CI guards the manager header against regaining a value-owned neutral frame state.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-88 files, deleting 896 lines and adding 7,018 lines (net `+6,122`). The larger Vulkan-only
+88 files, deleting 896 lines and adding 7,040 lines (net `+6,144`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
@@ -254,6 +254,8 @@ Scene/resource cache timing now comes from the renderer-neutral `FrameLifecycle`
 and Vulkan owners supplying their own reference time.
 Neutral mesh and texture resolution, including optional specular-file discovery, now crosses the
 scene boundary as injected callbacks rather than direct `ResourceSystem` calls.
+Neutral scene synchronization and bone-pose production now cross the same boundary as injected
+callbacks; the current providers remain OSG-backed until a Vulkan game owner replaces them.
 RGBA8 conversion is now one renderer-neutral helper shared by image resources and terrain
 blendmaps, so clamping, finite-value rejection, and byte quantization cannot drift between
 resource paths. The conversion helper has direct CPU coverage.

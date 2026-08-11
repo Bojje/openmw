@@ -38,7 +38,6 @@
 
 #include "../mwrender/landmanager.hpp"
 #include "../mwrender/camera.hpp"
-#include "../mwrender/animation.hpp"
 #include "../mwrender/postprocessor.hpp"
 #include "../mwrender/renderingmanager.hpp"
 #include "../mwrender/terrainstorage.hpp"
@@ -962,9 +961,10 @@ namespace MWWorld
         mLastPlayerPos = player.getRefData().getPosition().asVec3();
     }
 
-    Scene::Scene(MWWorld::World& world, Render::FrameLifecycle& frameLifecycle, Render::MeshResolver meshResolver,
-        Render::TextureResolver textureResolver, const VFS::Manager* vfs, MWRender::RenderingManager& rendering,
-        MWRender::LandManager& landManager,
+    Scene::Scene(MWWorld::World& world, Render::FrameLifecycle& frameLifecycle,
+        Render::SceneSynchronizer sceneSynchronizer, Render::BonePoseResolver bonePoseResolver,
+        Render::MeshResolver meshResolver, Render::TextureResolver textureResolver, const VFS::Manager* vfs,
+        MWRender::RenderingManager& rendering, MWRender::LandManager& landManager,
         Terrain::World*& terrain, osgUtil::IncrementalCompileOperation* incrementalCompileOperation,
         Terrain::RenderStorage& terrainStorage, SceneUtil::WorkQueue* workQueue, Resource::ResourceSystem* resourceSystem,
         MWPhysics::PhysicsSystem* physics,
@@ -973,6 +973,8 @@ namespace MWWorld
         , mCellChanged(false)
         , mWorld(world)
         , mFrameLifecycle(frameLifecycle)
+        , mSceneSynchronizer(std::move(sceneSynchronizer))
+        , mBonePoseResolver(std::move(bonePoseResolver))
         , mMeshResolver(std::move(meshResolver))
         , mTextureResolver(std::move(textureResolver))
         , mVfs(vfs)
@@ -1175,7 +1177,8 @@ namespace MWWorld
         if (mNeutralTerrainRegionsDirty)
             updateNeutralTerrainRegions();
 
-        mRendering.synchronizeNeutralScene(mNeutralWorldScene.sceneData());
+        if (mSceneSynchronizer)
+            mSceneSynchronizer(mNeutralWorldScene.sceneData());
 
         const auto resolveMeshes = [this](std::string_view model) -> const std::vector<Render::MeshInstance>& {
             const std::string key(model);
@@ -1211,9 +1214,7 @@ namespace MWWorld
             for (const std::string& boneName : skinned->mesh.skinning->boneNames)
                 boneNames.push_back(boneName);
 
-            const MWRender::Animation* animation
-                = mRendering.getAnimation(MWWorld::ConstPtr(static_cast<const LiveCellRefBase*>(objectKey)));
-            return animation ? animation->getNeutralBoneMatrices(boneNames) : std::vector<Render::Mat4>();
+            return mBonePoseResolver ? mBonePoseResolver(objectKey, boneNames) : std::vector<Render::Mat4>();
         });
 
         Render::SceneSubmission result = Render::collectSceneSubmission(

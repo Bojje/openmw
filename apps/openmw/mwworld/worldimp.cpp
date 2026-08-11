@@ -285,10 +285,20 @@ namespace MWWorld
                 return std::shared_ptr<const Render::TextureData>();
             return resourceSystem->getImageManager()->getRenderTexture(VFS::Path::Normalized(path));
         };
+        const Render::SceneSynchronizer sceneSynchronizer = [rendering = mRendering.get()](Render::SceneData& sceneData) {
+            rendering->synchronizeNeutralScene(sceneData);
+        };
+        const Render::BonePoseResolver bonePoseResolver = [rendering = mRendering.get()](
+                                                               const void* objectKey,
+                                                               std::span<const std::string_view> boneNames) {
+            const MWRender::Animation* animation
+                = rendering->getAnimation(MWWorld::ConstPtr(static_cast<const LiveCellRefBase*>(objectKey)));
+            return animation ? animation->getNeutralBoneMatrices(boneNames) : std::vector<Render::Mat4>();
+        };
         mWorldScene = std::make_unique<Scene>(
-            *this, frameLifecycle, meshResolver, textureResolver, mResourceSystem->getVFS(), *mRendering,
-            *mTerrainStorage->getLandManager(), mTerrain, incrementalCompileOperation, *mTerrainStorage, workQueue,
-            mResourceSystem, mPhysics.get(), *mNavigator);
+            *this, frameLifecycle, sceneSynchronizer, bonePoseResolver, meshResolver, textureResolver,
+            mResourceSystem->getVFS(), *mRendering, *mTerrainStorage->getLandManager(), mTerrain,
+            incrementalCompileOperation, *mTerrainStorage, workQueue, mResourceSystem, mPhysics.get(), *mNavigator);
     }
 
     void World::fillGlobalVariables()
