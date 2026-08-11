@@ -1108,24 +1108,28 @@ namespace MWWorld
         {
             const std::string& pattern = Settings::shaders().mSpecularMapPattern;
             const VFS::Manager* const vfs = resourceSystem->getVFS();
-            for (Render::MeshInstance& instance : result.meshes)
-            {
+            const auto addSpecularMap = [&](Render::MeshInstance& instance) {
                 Render::MeshMaterial& material = instance.mesh.material;
                 if (material.albedoTexture.empty() || !material.specularTexture.empty())
-                    continue;
+                    return;
 
                 const std::string specularPath
                     = Render::makeSpecularTexturePath(material.albedoTexture, pattern);
                 if (specularPath.empty())
-                    continue;
+                    return;
                 const VFS::Path::Normalized specularMap(specularPath);
                 if (!vfs->exists(specularMap))
-                    continue;
+                    return;
 
                 material.specularTexture = specularMap.value();
                 material.specularWrapU = material.albedoWrapU;
                 material.specularWrapV = material.albedoWrapV;
-            }
+            };
+            for (Render::MeshInstance& instance : result.meshes)
+                addSpecularMap(instance);
+            for (Render::DynamicMeshSubmission& dynamic : result.dynamicMeshes)
+                for (Render::MeshInstance& instance : dynamic.meshes)
+                    addSpecularMap(instance);
         }
         result.textureResolver = [resourceSystem](std::string_view path) {
             if (path.empty())
