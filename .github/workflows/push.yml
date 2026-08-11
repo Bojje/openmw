@@ -128,7 +128,8 @@ jobs:
           echo "RenderingManager must expose the neutral terrain storage contract"
           exit 1
         fi
-        if rg -n 'getResourceSystem|getWorkQueue|getLandManager' apps/openmw/mwrender/renderingmanager.hpp; then
+        if rg -n 'getResourceSystem\(|getWorkQueue\(|getLandManager\(|getLightRoot\(|getTerrain\(|getIncrementalCompileOperation\(' \
+            apps/openmw/mwrender/renderingmanager.hpp; then
           echo "RenderingManager must not expose general game-service gateways"
           exit 1
         fi
