@@ -177,7 +177,7 @@ namespace MWRender
         DetourNavigator::Navigator& navigator, const MWWorld::GroundcoverStore& groundcoverStore,
         SceneUtil::UnrefQueue& unrefQueue, TerrainStorage& terrainStorage, Terrain::World*& terrainOutput,
         osgUtil::IncrementalCompileOperation*& incrementalCompileOperationOutput,
-        SceneUtil::LightManager*& lightRootOutput, SkyManager*& skyOutput,
+        SceneUtil::LightManager*& lightRootOutput, SkyManager*& skyOutput, PostProcessor*& postProcessorOutput,
         Render::FrameLifecycle& frameLifecycle)
         : mSkyBlending(Settings::fog().mSkyBlending)
         , mViewer(viewer)
@@ -334,6 +334,7 @@ namespace MWRender
 
         mPostProcessor = new PostProcessor(*this, *mSceneRoot, *mSky, resourceSystem, viewer, mRootNode,
             resourceSystem->getVFS());
+        postProcessorOutput = mPostProcessor.get();
         resourceSystem->getSceneManager()->setOpaqueDepthTex(
             mPostProcessor->getTexture(PostProcessor::Tex_OpaqueDepth, 0),
             mPostProcessor->getTexture(PostProcessor::Tex_OpaqueDepth, 1));
@@ -1110,11 +1111,6 @@ namespace MWRender
             return mPlayerAnimation.get();
 
         return mObjects->getAnimation(ptr);
-    }
-
-    PostProcessor* RenderingManager::getPostProcessor()
-    {
-        return mPostProcessor;
     }
 
     void RenderingManager::setupPlayer(const MWWorld::Ptr& player)

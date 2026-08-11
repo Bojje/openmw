@@ -115,6 +115,7 @@ namespace MWWorld
         std::unique_ptr<MWRender::TerrainStorage> mTerrainStorage;
         Terrain::World* mTerrain = nullptr;
         MWRender::SkyManager* mSkyManager = nullptr;
+        MWRender::PostProcessor* mPostProcessor = nullptr;
         std::unique_ptr<MWRender::RenderingManager> mRendering;
         Render::FrameLifecycle* mFrameLifecycle = nullptr;
         std::unique_ptr<MWWorld::Scene> mWorldScene;

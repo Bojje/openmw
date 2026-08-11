@@ -125,7 +125,7 @@ namespace MWRender
             DetourNavigator::Navigator& navigator, const MWWorld::GroundcoverStore& groundcoverStore,
             SceneUtil::UnrefQueue& unrefQueue, TerrainStorage& terrainStorage, Terrain::World*& terrainOutput,
             osgUtil::IncrementalCompileOperation*& incrementalCompileOperationOutput,
-            SceneUtil::LightManager*& lightRootOutput, SkyManager*& skyOutput,
+            SceneUtil::LightManager*& lightRootOutput, SkyManager*& skyOutput, PostProcessor*& postProcessorOutput,
             Render::FrameLifecycle& frameLifecycle);
         ~RenderingManager();
 
@@ -217,8 +217,6 @@ namespace MWRender
 
         Animation* getAnimation(const MWWorld::Ptr& ptr);
         const Animation* getAnimation(const MWWorld::ConstPtr& ptr) const;
-
-        PostProcessor* getPostProcessor();
 
         void addWaterRippleEmitter(const MWWorld::Ptr& ptr);
         void removeWaterRippleEmitter(const MWWorld::Ptr& ptr);

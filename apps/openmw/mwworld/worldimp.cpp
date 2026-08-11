@@ -264,7 +264,7 @@ namespace MWWorld
         SceneUtil::LightManager* lightRoot = nullptr;
         mRendering = std::make_unique<MWRender::RenderingManager>(
             viewer, rootNode, mResourceSystem, workQueue, *mNavigator, mGroundcoverStore, unrefQueue, *mTerrainStorage,
-            mTerrain, incrementalCompileOperation, lightRoot, mSkyManager, frameLifecycle);
+            mTerrain, incrementalCompileOperation, lightRoot, mSkyManager, mPostProcessor, frameLifecycle);
         mFrameLifecycle = &frameLifecycle;
         mProjectileManager = std::make_unique<ProjectileManager>(
             lightRoot->asGroup(), mResourceSystem, mRendering.get(), mPhysics.get());
@@ -3862,7 +3862,7 @@ namespace MWWorld
 
     MWRender::PostProcessor* World::getPostProcessor()
     {
-        return mRendering->getPostProcessor();
+        return mPostProcessor;
     }
 
     void World::setActorActive(const MWWorld::Ptr& ptr, bool value)
