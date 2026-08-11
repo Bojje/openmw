@@ -300,7 +300,7 @@ int main(int argc, char** argv)
 
                 if (!headless)
                     SDL_PumpEvents();
-                if ((renderWithSubmission ? renderer->render(submission) : renderer->render()))
+                if ((renderWithSubmission ? renderer->renderFrame(submission) : renderer->renderFrame()))
                 {
                     ++renderedFrames;
                     const std::optional<Render::TextureData> capture = renderer->captureFrame();

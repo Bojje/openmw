@@ -433,16 +433,17 @@ namespace MWRender
         return mViewer->getIncrementalCompileOperation();
     }
 
-    void RenderingManager::renderFrame()
+    bool RenderingManager::renderFrame()
     {
         mViewer->eventTraversal();
         mViewer->updateTraversal();
         mViewer->renderingTraversals();
+        return true;
     }
 
-    void RenderingManager::renderFrame(const Render::SceneSubmission& /*submission*/)
+    bool RenderingManager::renderFrame(const Render::SceneSubmission& /*submission*/)
     {
-        renderFrame();
+        return renderFrame();
     }
 
     void RenderingManager::synchronizeScene(Render::SceneData& sceneData)

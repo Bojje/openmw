@@ -13,8 +13,8 @@ namespace Render
     public:
         virtual ~FrameLifecycle() = default;
 
-        virtual void renderFrame() = 0;
-        virtual void renderFrame(const SceneSubmission& submission) = 0;
+        virtual bool renderFrame() = 0;
+        virtual bool renderFrame(const SceneSubmission& submission) = 0;
         virtual bool consumesSceneSubmission() const = 0;
         virtual void synchronizeScene(SceneData& sceneData) = 0;
         virtual void advanceFrame(double simulationTime) = 0;

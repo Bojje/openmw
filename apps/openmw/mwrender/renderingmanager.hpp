@@ -133,8 +133,8 @@ namespace MWRender
         /// The current implementation delegates to the OSG viewer; the Vulkan
         /// backend will replace this lifecycle boundary once GUI and presentation
         /// services are renderer-neutral.
-        void renderFrame() override;
-        void renderFrame(const Render::SceneSubmission& submission) override;
+        bool renderFrame() override;
+        bool renderFrame(const Render::SceneSubmission& submission) override;
         bool consumesSceneSubmission() const override { return false; }
         void synchronizeScene(Render::SceneData& sceneData) override;
         void advanceFrame(double simulationTime) override;

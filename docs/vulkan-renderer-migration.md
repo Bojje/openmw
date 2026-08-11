@@ -116,7 +116,9 @@ consumer now exercises the same `WorldScene` to `Vk::Renderer` handoff, while th
 `collectSceneSubmission` helper owns mesh, dynamic-record, worldspace, and terrain selection.
 `Vk::Renderer::setScene` supports persistent frame-loop updates, and
 `Vk::Renderer::render(SceneSubmission)` provides the atomic one-call handoff for a future live
-backend. The submission
+backend. The standalone `Vk::Renderer` also implements `Render::FrameLifecycle`, so the smoke
+test exercises the same submission-consuming frame-owner contract used by the future game path.
+The submission
 boundary now validates mesh indices and terrain snapshots before Vulkan consumes them. The full-game
 Vulkan call site is still intentionally absent until window, input, dynamic-content, and GUI
 services have a Vulkan owner. NIF skinning metadata now survives conversion, and resolved dynamic
@@ -197,7 +199,7 @@ The non-owning manager update handle is private to the `Scene` owner, detached d
 teardown, and CI guards the manager header against regaining a value-owned neutral frame state.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-74 files, deleting 666 lines and adding 6,024 lines (net `+5,358`). The larger Vulkan-only
+74 files, deleting 667 lines and adding 6,034 lines (net `+5,367`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.

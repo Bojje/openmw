@@ -15,6 +15,7 @@
 #include <vulkan/vulkan.h>
 
 #include "vkcommon.hpp"
+#include "../render/frame.hpp"
 #include "../render/mesh.hpp"
 #include "../render/scene.hpp"
 #include "../render/submission.hpp"
@@ -53,7 +54,7 @@ namespace Vk
         VkImageView depthView = VK_NULL_HANDLE;
     };
 
-    class Renderer
+    class Renderer : public Render::FrameLifecycle
     {
     public:
         enum class SurfaceMode
@@ -71,6 +72,11 @@ namespace Vk
 
         bool render();
         bool render(const Render::SceneSubmission& submission);
+        bool renderFrame() override { return render(); }
+        bool renderFrame(const Render::SceneSubmission& submission) override { return render(submission); }
+        bool consumesSceneSubmission() const override { return true; }
+        void synchronizeScene(Render::SceneData& /*sceneData*/) override {}
+        void advanceFrame(double /*simulationTime*/) override {}
         std::optional<Render::TextureData> captureFrame();
         void resize(uint32_t width, uint32_t height);
         bool loadShadersAndCreatePipelines(const std::string& shaderDir);
