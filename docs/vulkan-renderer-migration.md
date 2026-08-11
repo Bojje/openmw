@@ -169,7 +169,7 @@ records empty loaded cells as well as object-bearing cells and owns each cell's 
 LOD snapshots. `MWWorld::Scene::getNeutralScene()` now assembles those snapshots for loaded
 exterior cells in the active worldspace, so terrain is part of the real full-game neutral
 handoff rather than only a test fixture; conversion happens on cell add/remove rather than
-on every frame export. Neutral terrain LOD assembly now belongs to `TerrainStorage`, while
+on every frame export. Neutral terrain LOD assembly now belongs to `Terrain::RenderStorage`, while
 `RenderingManager` only provides that storage to the world lifecycle; it no longer assembles
 the renderer-neutral scene submission or owns its resource callbacks. Neutral terrain collection
 now depends on cached world tiles rather than the legacy OSG terrain object being active.
