@@ -78,7 +78,8 @@ int main()
             "terrain layer feature flags must default to disabled");
 
         TestStorage storage;
-        const auto tile = storage.getRenderTile(2, 4.f, { 3.f, -2.f }, ESM::RefId());
+        Terrain::RenderStorage& neutralStorage = storage;
+        const auto tile = neutralStorage.getRenderTile(2, 4.f, { 3.f, -2.f }, ESM::RefId());
         expect(tile.has_value() && tile->valid(), "terrain adapter returned an invalid tile");
         expect(tile->lod == 2 && tile->size == 4.f && tile->center[0] == 3.f && tile->center[1] == -2.f
                 && tile->cellWorldSize == 1.f,
@@ -111,13 +112,13 @@ int main()
             "legacy terrain adapter did not preserve neutral blendmaps");
 
         storage.mOpaqueOnly = true;
-        const auto opaqueTile = storage.getRenderTile(0, 1.f, { 0.f, 0.f }, ESM::RefId());
+        const auto opaqueTile = neutralStorage.getRenderTile(0, 1.f, { 0.f, 0.f }, ESM::RefId());
         expect(opaqueTile.has_value() && opaqueTile->valid() && opaqueTile->layers.size() == 1
                 && !opaqueTile->layers[0].blendmap.valid(),
             "opaque terrain layer should not require a blendmap");
 
         storage.mEmpty = true;
-        expect(!storage.getRenderTile(0, 1.f, { 0.f, 0.f }, ESM::RefId()).has_value(),
+        expect(!neutralStorage.getRenderTile(0, 1.f, { 0.f, 0.f }, ESM::RefId()).has_value(),
             "empty terrain storage should not produce a tile");
         storage.mEmpty = false;
         const auto opaqueTerrainMeshes = Render::makeTerrainMeshes(*opaqueTile);

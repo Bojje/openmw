@@ -99,6 +99,10 @@ jobs:
           echo "renderer-neutral and Vulkan source boundaries must not depend on OSG, NIF, or shared logging"
           exit 1
         fi
+        if rg -n '#include[[:space:]]*[<"]osg|namespace[[:space:]]+osg|osg::' components/terrain/renderstorage.hpp components/terrain/renderstorage.cpp; then
+          echo "renderer-neutral terrain storage must not depend on OSG"
+          exit 1
+        fi
         if rg -n 'mWorldScene\.(record|remove|update|set|clear)' apps/openmw/mwrender/renderingmanager.cpp; then
           echo "RenderingManager must not mutate the renderer-neutral world scene; world lifecycle owns those writes"
           exit 1

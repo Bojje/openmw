@@ -1,0 +1,45 @@
+#ifndef COMPONENTS_TERRAIN_RENDERSTORAGE_H
+#define COMPONENTS_TERRAIN_RENDERSTORAGE_H
+
+#include <array>
+#include <cstdint>
+#include <optional>
+#include <utility>
+#include <vector>
+
+#include <components/esm/refid.hpp>
+#include <components/render/terrain.hpp>
+
+#include "defs.hpp"
+
+namespace Terrain
+{
+    /// Renderer-neutral terrain data source. It deliberately has no OSG
+    /// arrays, images, or scene-node types; the legacy terrain adapter derives
+    /// from it for the reference renderer.
+    class RenderStorage
+    {
+    public:
+        virtual ~RenderStorage() = default;
+
+        virtual void getBounds(float& minX, float& maxX, float& minY, float& maxY, ESM::RefId worldspace) = 0;
+
+        virtual void fillRenderVertexBuffers(int lodLevel, float size, const std::array<float, 2>& center,
+            ESM::RefId worldspace, std::vector<Render::TerrainVertex>& vertices)
+            = 0;
+
+        virtual void getRenderBlendmaps(float chunkSize, const std::array<float, 2>& chunkCenter,
+            std::vector<Render::TextureData>& blendmaps, std::vector<LayerInfo>& layerList,
+            ESM::RefId worldspace)
+            = 0;
+
+        virtual float getCellWorldSize(ESM::RefId worldspace) = 0;
+        virtual int getCellVertices(ESM::RefId worldspace) = 0;
+        virtual int getTextureTileCount(float chunkSize, ESM::RefId worldspace) = 0;
+
+        std::optional<Render::TerrainTile> getRenderTile(
+            int lodLevel, float size, const std::array<float, 2>& center, ESM::RefId worldspace);
+    };
+}
+
+#endif

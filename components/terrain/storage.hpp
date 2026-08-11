@@ -1,10 +1,6 @@
 #ifndef COMPONENTS_TERRAIN_STORAGE_H
 #define COMPONENTS_TERRAIN_STORAGE_H
 
-#include <array>
-#include <optional>
-#include <vector>
-
 #include <osg/Array>
 #include <osg/Vec2f>
 #include <osg/Vec3f>
@@ -12,9 +8,9 @@
 
 #include <components/esm/exteriorcelllocation.hpp>
 #include <components/esm/refid.hpp>
-#include <components/render/terrain.hpp>
 
 #include "defs.hpp"
+#include "renderstorage.hpp"
 
 namespace osg
 {
@@ -25,7 +21,9 @@ namespace Terrain
 {
     /// We keep storage of terrain data abstract here since we need different implementations for game and editor
     /// @note The implementation must be thread safe.
-    class Storage
+    /// Legacy OSG terrain adapter. Renderer-neutral consumers should depend on
+    /// RenderStorage instead of this interface.
+    class Storage : public RenderStorage
     {
     public:
         virtual ~Storage() = default;
@@ -53,18 +51,6 @@ namespace Terrain
         /// @return true if there was data available for this terrain chunk
         virtual bool getMinMaxHeights(
             float size, const osg::Vec2f& center, ESM::RefId worldspace, float& min, float& max)
-            = 0;
-
-        /// Fill renderer-neutral vertices for a terrain chunk.
-        /// The neutral path is the primary storage contract. It does not
-        /// expose renderer-owned arrays or image objects.
-        virtual void fillRenderVertexBuffers(int lodLevel, float size, const std::array<float, 2>& center,
-            ESM::RefId worldspace, std::vector<Render::TerrainVertex>& vertices)
-            = 0;
-
-        /// Create renderer-neutral textures holding layer blend values.
-        virtual void getRenderBlendmaps(float chunkSize, const std::array<float, 2>& chunkCenter,
-            std::vector<Render::TextureData>& blendmaps, std::vector<LayerInfo>& layerList, ESM::RefId worldspace)
             = 0;
 
         /// Legacy OSG adapter for the reference terrain renderer.
@@ -96,19 +82,6 @@ namespace Terrain
         virtual float getHeightAt(const osg::Vec3f& worldPos, ESM::RefId worldspace) = 0;
 
         /// Get the transformation factor for mapping cell units to world units.
-        virtual float getCellWorldSize(ESM::RefId worldspace) = 0;
-
-        /// Get the number of vertices on one side for each cell. Should be (power of two)+1
-        virtual int getCellVertices(ESM::RefId worldspace) = 0;
-
-        /// Get the number of texture tiles on one side per chunk (chunkSize 1.0 = 1 cell).
-        virtual int getTextureTileCount(float chunkSize, ESM::RefId worldspace) = 0;
-
-        // The neutral contract is consumed directly by the Vulkan migration
-        // path. The old methods above remain only as a centralized adapter for
-        // the OSG reference terrain renderer.
-        std::optional<Render::TerrainTile> getRenderTile(
-            int lodLevel, float size, const std::array<float, 2>& center, ESM::RefId worldspace);
     };
 
 }
