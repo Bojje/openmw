@@ -354,6 +354,8 @@ bool OMW::Engine::frame(unsigned frameNumber, float frametime)
 
     mWorld->renderFrame();
 
+    mLuaWorker->finishUpdate(frameStart, frameNumber, *stats);
+
     if (mValidateNeutralScene && mStateManager->getState() != MWBase::StateManager::State_NoGame
         && (frameNumber % 30 == 0 || mWorld->getWorldScene().hasCellChanged()))
     {
@@ -361,8 +363,6 @@ bool OMW::Engine::frame(unsigned frameNumber, float frametime)
         if (const std::string error = submission.validationError(); !error.empty())
             throw std::runtime_error("full-game neutral scene submission: " + error);
     }
-
-    mLuaWorker->finishUpdate(frameStart, frameNumber, *stats);
 
     return true;
 }
