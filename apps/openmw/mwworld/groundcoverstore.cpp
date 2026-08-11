@@ -11,6 +11,7 @@
 
 #include "store.hpp"
 
+#include <algorithm>
 #include <unordered_map>
 
 namespace MWWorld
@@ -113,6 +114,17 @@ namespace MWWorld
             if (!model.empty())
                 result.push_back({ VFS::Path::Normalized(model), ref.mPos, ref.mScale });
         }
+        std::sort(result.begin(), result.end(), [](const GroundcoverRecord& lhs, const GroundcoverRecord& rhs) {
+            if (lhs.model != rhs.model)
+                return lhs.model < rhs.model;
+            if (lhs.position.pos[0] != rhs.position.pos[0])
+                return lhs.position.pos[0] < rhs.position.pos[0];
+            if (lhs.position.pos[1] != rhs.position.pos[1])
+                return lhs.position.pos[1] < rhs.position.pos[1];
+            if (lhs.position.pos[2] != rhs.position.pos[2])
+                return lhs.position.pos[2] < rhs.position.pos[2];
+            return lhs.scale < rhs.scale;
+        });
         return result;
     }
 }
