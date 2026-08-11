@@ -17,11 +17,6 @@ namespace MWRender
         return true;
     }
 
-    bool ViewerFrameLifecycle::renderFrame(const Render::SceneSubmission& /*submission*/)
-    {
-        return renderFrame();
-    }
-
     void ViewerFrameLifecycle::advanceFrame(double simulationTime)
     {
         mViewer.advance(simulationTime);

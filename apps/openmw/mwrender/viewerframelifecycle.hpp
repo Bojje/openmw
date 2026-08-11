@@ -18,7 +18,6 @@ namespace MWRender
         explicit ViewerFrameLifecycle(osgViewer::Viewer& viewer);
 
         bool renderFrame() override;
-        bool renderFrame(const Render::SceneSubmission& submission) override;
         bool consumesSceneSubmission() const override { return false; }
         void advanceFrame(double simulationTime) override;
 
