@@ -3843,7 +3843,7 @@ namespace MWWorld
             return false;
         if (mWorldScene)
         {
-            Render::SceneData& sceneData = mWorldScene->getFrameSceneData();
+            Render::SceneData& sceneData = mWorldScene->mNeutralWorldScene.sceneData();
             mRendering->synchronizeNeutralScene(sceneData);
         }
         return true;

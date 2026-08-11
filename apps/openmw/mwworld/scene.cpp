@@ -1252,11 +1252,6 @@ namespace MWWorld
         return result;
     }
 
-    Render::SceneData& Scene::getFrameSceneData()
-    {
-        return mNeutralWorldScene.sceneData();
-    }
-
     void Scene::updateNeutralObjectCell(const void* oldObjectKey, const void* newObjectKey, const void* cellKey,
         bool exterior, int gridX, int gridY, std::string_view cellName, std::string_view worldspace)
     {

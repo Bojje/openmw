@@ -211,10 +211,6 @@ namespace MWWorld
         /// Export the current loaded-world state for a renderer backend.
         Render::SceneSubmission getNeutralScene();
 
-    private:
-        /// Access the world-owned neutral frame state for renderer synchronization.
-        Render::SceneData& getFrameSceneData();
-
     public:
         void markCellAsUnchanged();
 
