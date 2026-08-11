@@ -30,10 +30,12 @@
 namespace MWGui
 {
 
-    LoadingScreen::LoadingScreen(Resource::ResourceSystem* resourceSystem, osgViewer::Viewer* viewer)
+    LoadingScreen::LoadingScreen(Resource::ResourceSystem* resourceSystem, osgViewer::Viewer* viewer,
+        std::function<void()> frameRenderer)
         : WindowBase("openmw_loading_screen.layout")
         , mResourceSystem(resourceSystem)
         , mViewer(viewer)
+        , mFrameRenderer(std::move(frameRenderer))
         , mTargetFrameRate(120.0)
         , mLastWallpaperChangeTime(0.0)
         , mLastRenderTime(0.0)
@@ -350,7 +352,7 @@ namespace MWGui
         // refer to the advance() and frame() order in Engine::go()
         mViewer->eventTraversal();
         mViewer->updateTraversal();
-        mViewer->renderingTraversals();
+        mFrameRenderer();
         mViewer->advance(mViewer->getFrameStamp()->getSimulationTime());
 
         mLastRenderTime = mTimer.time_m();

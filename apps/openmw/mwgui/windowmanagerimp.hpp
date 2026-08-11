@@ -7,6 +7,7 @@
    and retrieving information from the Gui.
 **/
 
+#include <functional>
 #include <memory>
 #include <vector>
 
@@ -131,7 +132,7 @@ namespace MWGui
             Resource::ResourceSystem* resourceSystem, SceneUtil::WorkQueue* workQueue,
             const std::filesystem::path& logpath, bool consoleOnlyScripts, Translation::Storage& translationDataStorage,
             ToUTF8::FromType encoding, bool exportFonts, const std::string& versionDescription,
-            Files::ConfigurationManager& cfgMgr);
+            Files::ConfigurationManager& cfgMgr, std::function<void()> frameRenderer);
         virtual ~WindowManager();
 
         /// Set the ESMStore to use for retrieving of GUI-related strings.
@@ -421,6 +422,7 @@ namespace MWGui
 
         std::unique_ptr<MyGUIPlatform::Platform> mGuiPlatform;
         osgViewer::Viewer* mViewer;
+        std::function<void()> mFrameRenderer;
 
         std::unique_ptr<Gui::FontLoader> mFontLoader;
         std::unique_ptr<StatsWatcher> mStatsWatcher;

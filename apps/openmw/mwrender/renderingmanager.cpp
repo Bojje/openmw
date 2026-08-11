@@ -335,7 +335,7 @@ namespace MWRender
 
         mCamera = std::make_unique<Camera>(mViewer->getCamera());
 
-        mScreenshotManager = std::make_unique<ScreenshotManager>(viewer);
+        mScreenshotManager = std::make_unique<ScreenshotManager>(viewer, [this] { renderFrame(); });
 
         mViewer->setLightingMode(osgViewer::View::NO_LIGHT);
 

@@ -89,8 +89,9 @@ namespace MWRender
         osg::ref_ptr<osg::Image> mImage;
     };
 
-    ScreenshotManager::ScreenshotManager(osgViewer::Viewer* viewer)
+    ScreenshotManager::ScreenshotManager(osgViewer::Viewer* viewer, std::function<void()> frameRenderer)
         : mViewer(viewer)
+        , mFrameRenderer(std::move(frameRenderer))
         , mDrawCompleteCallback(new NotifyDrawCompletedCallback)
     {
     }
@@ -112,7 +113,7 @@ namespace MWRender
         mViewer->getCamera()->setFinalDrawCallback(mDrawCompleteCallback);
         mViewer->eventTraversal();
         mViewer->updateTraversal();
-        mViewer->renderingTraversals();
+        mFrameRenderer();
         mDrawCompleteCallback->waitTillDone();
 
         // now that we've "used up" the current frame, get a fresh frame number for the next frame() following after the

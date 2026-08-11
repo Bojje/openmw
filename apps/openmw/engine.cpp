@@ -836,7 +836,12 @@ void OMW::Engine::prepareEngine()
 
     mWindowManager = std::make_unique<MWGui::WindowManager>(mWindow, mViewer, guiRoot, mResourceSystem.get(),
         mWorkQueue.get(), mCfgMgr.getLogPath(), mScriptConsoleMode, mTranslationDataStorage, mEncoding, mExportFonts,
-        Version::getOpenmwVersionDescription(), mCfgMgr);
+        Version::getOpenmwVersionDescription(), mCfgMgr, [this] {
+            if (mWorld)
+                mWorld->getRenderingManager()->renderFrame();
+            else
+                mViewer->renderingTraversals();
+        });
     mEnvironment.setWindowManager(*mWindowManager);
 
     mInputManager = std::make_unique<MWInput::InputManager>(mWindow, mViewer, mScreenCaptureHandler, keybinderUser,
