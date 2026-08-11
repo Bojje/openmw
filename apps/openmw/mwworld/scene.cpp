@@ -801,9 +801,9 @@ namespace MWWorld
     void Scene::testExteriorCells()
     {
         // Note: temporary disable ICO to decrease memory usage
-        mRendering.getResourceSystem()->getSceneManager()->setIncrementalCompileOperation(nullptr);
+        mResourceSystem->getSceneManager()->setIncrementalCompileOperation(nullptr);
 
-        mRendering.getResourceSystem()->setExpiryDelay(1.f);
+        mResourceSystem->setExpiryDelay(1.f);
 
         const MWWorld::Store<ESM::Cell>& cells = mWorld.getStore().get<ESM::Cell>();
 
@@ -853,23 +853,23 @@ namespace MWWorld
                 ++iter;
             }
 
-            mRendering.getResourceSystem()->updateCache(mRendering.getReferenceTime());
+            mResourceSystem->updateCache(mRendering.getReferenceTime());
 
             loadingListener->increaseProgress(1);
             i++;
         }
 
-        mRendering.getResourceSystem()->getSceneManager()->setIncrementalCompileOperation(
+        mResourceSystem->getSceneManager()->setIncrementalCompileOperation(
             mRendering.getIncrementalCompileOperation());
-        mRendering.getResourceSystem()->setExpiryDelay(Settings::cells().mCacheExpiryDelay);
+        mResourceSystem->setExpiryDelay(Settings::cells().mCacheExpiryDelay);
     }
 
     void Scene::testInteriorCells()
     {
         // Note: temporary disable ICO to decrease memory usage
-        mRendering.getResourceSystem()->getSceneManager()->setIncrementalCompileOperation(nullptr);
+        mResourceSystem->getSceneManager()->setIncrementalCompileOperation(nullptr);
 
-        mRendering.getResourceSystem()->setExpiryDelay(1.f);
+        mResourceSystem->setExpiryDelay(1.f);
 
         const MWWorld::Store<ESM::Cell>& cells = mWorld.getStore().get<ESM::Cell>();
 
@@ -911,15 +911,15 @@ namespace MWWorld
                 ++iter;
             }
 
-            mRendering.getResourceSystem()->updateCache(mRendering.getReferenceTime());
+            mResourceSystem->updateCache(mRendering.getReferenceTime());
 
             loadingListener->increaseProgress(1);
             i++;
         }
 
-        mRendering.getResourceSystem()->getSceneManager()->setIncrementalCompileOperation(
+        mResourceSystem->getSceneManager()->setIncrementalCompileOperation(
             mRendering.getIncrementalCompileOperation());
-        mRendering.getResourceSystem()->setExpiryDelay(Settings::cells().mCacheExpiryDelay);
+        mResourceSystem->setExpiryDelay(Settings::cells().mCacheExpiryDelay);
     }
 
     void Scene::changePlayerCell(CellStore& cell, const ESM::Position& pos, bool adjustPlayerPos)
@@ -959,11 +959,12 @@ namespace MWWorld
         mLastPlayerPos = player.getRefData().getPosition().asVec3();
     }
 
-    Scene::Scene(MWWorld::World& world, MWRender::RenderingManager& rendering, MWPhysics::PhysicsSystem* physics,
-        DetourNavigator::Navigator& navigator)
+    Scene::Scene(MWWorld::World& world, MWRender::RenderingManager& rendering, Resource::ResourceSystem* resourceSystem,
+        MWPhysics::PhysicsSystem* physics, DetourNavigator::Navigator& navigator)
         : mCurrentCell(nullptr)
         , mCellChanged(false)
         , mWorld(world)
+        , mResourceSystem(resourceSystem)
         , mPhysics(physics)
         , mRendering(rendering)
         , mTerrainStorage(rendering.getTerrainStorage())
@@ -978,7 +979,7 @@ namespace MWWorld
         , mLowestPoint(std::numeric_limits<float>::max())
     {
         mRendering.setNeutralSceneData(mNeutralWorldScene.sceneData());
-        mPreloader = std::make_unique<CellPreloader>(rendering.getResourceSystem(), physics->getShapeManager(),
+        mPreloader = std::make_unique<CellPreloader>(resourceSystem, physics->getShapeManager(),
             rendering.getTerrain(), rendering.getLandManager());
         mPreloader->setWorkQueue(mRendering.getWorkQueue());
         mPreloader->setExpiryDelay(Settings::cells().mPreloadCellExpiryDelay);
@@ -1116,7 +1117,7 @@ namespace MWWorld
                 {
                     const VFS::Path::Normalized path(model);
                     if (path.extension().value() == "nif")
-                        meshes = mRendering.getResourceSystem()->getNifMeshManager()->get(path);
+                        meshes = mResourceSystem->getNifMeshManager()->get(path);
                     else
                         meshes = std::make_shared<const Resource::NifMeshManager::Meshes>();
                     mNeutralMeshCache[key] = meshes;
@@ -1124,12 +1125,11 @@ namespace MWWorld
                 return *meshes;
             }, true);
 
-        Resource::ResourceSystem* const resourceSystem = mRendering.getResourceSystem();
         if (Settings::shaders().mAutoUseObjectSpecularMaps
             && !Settings::shaders().mSpecularMapPattern.get().empty())
         {
             const std::string& pattern = Settings::shaders().mSpecularMapPattern;
-            const VFS::Manager* const vfs = resourceSystem->getVFS();
+            const VFS::Manager* const vfs = mResourceSystem->getVFS();
             const auto addSpecularMap = [&](Render::MeshInstance& instance) {
                 Render::MeshMaterial& material = instance.mesh.material;
                 if (material.albedoTexture.empty() || !material.specularTexture.empty())
@@ -1153,7 +1153,7 @@ namespace MWWorld
                 for (Render::MeshInstance& instance : dynamic.meshes)
                     addSpecularMap(instance);
         }
-        result.textureResolver = [resourceSystem](std::string_view path) {
+        result.textureResolver = [resourceSystem = mResourceSystem](std::string_view path) {
             if (path.empty())
                 return std::shared_ptr<const Render::TextureData>();
             return resourceSystem->getImageManager()->getRenderTexture(VFS::Path::Normalized(path));
@@ -1285,14 +1285,14 @@ namespace MWWorld
     {
         const VFS::Path::Normalized meshPath = useAnim
             ? Misc::ResourceHelpers::correctActorModelPath(
-                VFS::Path::toNormalized(mesh), mRendering.getResourceSystem()->getVFS())
+                VFS::Path::toNormalized(mesh), mResourceSystem->getVFS())
             : VFS::Path::toNormalized(mesh);
 
-        if (mRendering.getResourceSystem()->getSceneManager()->checkLoaded(meshPath, mRendering.getReferenceTime()))
+        if (mResourceSystem->getSceneManager()->checkLoaded(meshPath, mRendering.getReferenceTime()))
             return;
 
         osg::ref_ptr<PreloadMeshItem> item(
-            new PreloadMeshItem(meshPath, mRendering.getResourceSystem()->getSceneManager()));
+            new PreloadMeshItem(meshPath, mResourceSystem->getSceneManager()));
         mRendering.getWorkQueue()->addWorkItem(item);
         const auto isDone = [](const osg::ref_ptr<SceneUtil::WorkItem>& v) { return v->isDone(); };
         mWorkItems.erase(std::remove_if(mWorkItems.begin(), mWorkItems.end(), isDone), mWorkItems.end());

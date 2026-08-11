@@ -131,6 +131,10 @@ jobs:
           echo "RenderingManager must not assemble renderer-neutral terrain snapshots"
           exit 1
         fi
+        if rg -n 'mRendering\.getResourceSystem\(\)' apps/openmw/mwworld/scene.cpp; then
+          echo "Scene neutral/resource paths must not use RenderingManager as their resource gateway"
+          exit 1
+        fi
         if rg -n 'getNeutralWorldScene' apps/openmw --glob '*.cpp' --glob '*.hpp'; then
           echo "OpenMW production code must use Scene neutral-state APIs instead of exposing WorldScene ownership"
           exit 1

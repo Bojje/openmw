@@ -58,6 +58,11 @@ namespace Terrain
     class RenderStorage;
 }
 
+namespace Resource
+{
+    class ResourceSystem;
+}
+
 namespace MWPhysics
 {
     class PhysicsSystem;
@@ -101,6 +106,7 @@ namespace MWWorld
         bool mCellChanged;
         bool mCellLoaded = false;
         MWWorld::World& mWorld;
+        Resource::ResourceSystem* mResourceSystem;
         MWPhysics::PhysicsSystem* mPhysics;
         MWRender::RenderingManager& mRendering;
         Terrain::RenderStorage& mTerrainStorage;
@@ -157,8 +163,8 @@ namespace MWWorld
             const DetourNavigator::UpdateGuard* navigatorUpdateGuard);
 
     public:
-        Scene(MWWorld::World& world, MWRender::RenderingManager& rendering, MWPhysics::PhysicsSystem* physics,
-            DetourNavigator::Navigator& navigator);
+        Scene(MWWorld::World& world, MWRender::RenderingManager& rendering, Resource::ResourceSystem* resourceSystem,
+            MWPhysics::PhysicsSystem* physics, DetourNavigator::Navigator& navigator);
 
         ~Scene();
 

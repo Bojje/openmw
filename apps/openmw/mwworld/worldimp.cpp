@@ -261,7 +261,7 @@ namespace MWWorld
 
         mWeatherManager = std::make_unique<MWWorld::WeatherManager>(*mRendering, mStore);
 
-        mWorldScene = std::make_unique<Scene>(*this, *mRendering.get(), mPhysics.get(), *mNavigator);
+        mWorldScene = std::make_unique<Scene>(*this, *mRendering.get(), mResourceSystem, mPhysics.get(), *mNavigator);
     }
 
     void World::fillGlobalVariables()

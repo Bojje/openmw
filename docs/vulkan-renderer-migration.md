@@ -201,7 +201,7 @@ The non-owning manager update handle is private to the `Scene` owner, detached d
 teardown, and CI guards the manager header against regaining a value-owned neutral frame state.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-81 files, deleting 742 lines and adding 6,359 lines (net `+5,617`). The larger Vulkan-only
+81 files, deleting 761 lines and adding 6,390 lines (net `+5,629`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
@@ -230,6 +230,8 @@ owner boundary is quadtree-scale streaming and complete image coverage. Terrain 
 flags now default to disabled
 at the shared storage boundary, preventing ESM4 default layers from acquiring undefined
 parallax or specular state.
+Neutral scene export receives the world-owned `ResourceSystem` directly for mesh and texture
+resolution, so `RenderingManager` is not used as that renderer-neutral resource gateway.
 RGBA8 conversion is now one renderer-neutral helper shared by image resources and terrain
 blendmaps, so clamping, finite-value rejection, and byte quantization cannot drift between
 resource paths. The conversion helper has direct CPU coverage.
