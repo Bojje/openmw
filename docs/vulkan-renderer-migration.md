@@ -179,9 +179,10 @@ specular maps now use the configured pattern, dedicated texture table, and RGB G
 ESM4 explicit and auto-detected terrain specular maps now use the same neutral texture table and RGB path;
 complete terrain image coverage remains outstanding. The neutral cache now retains
 per-cell LOD snapshots and also assembles aligned multi-cell region snapshots, selecting one
-region LOD deterministically by camera distance before handoff; incomplete regions fall back
-to the per-cell path. Neighbor stitching, quadtree streaming policy, and composite-image
-coverage remain outstanding. `WorldScene` now
+region LOD deterministically by camera distance before handoff; adjacent regions are constrained
+to at most a one-level LOD gap to reduce cracks. Incomplete regions fall back to the per-cell
+path. Geometry neighbor stitching, quadtree streaming policy, and composite-image coverage
+remain outstanding. `WorldScene` now
 records empty loaded cells as well as object-bearing cells and owns each cell's cached terrain
 LOD snapshots. `MWWorld::Scene::getNeutralScene()` now assembles those snapshots for loaded
 exterior cells in the active worldspace, so terrain is part of the real full-game neutral
@@ -215,7 +216,7 @@ The non-owning manager update handle is private to the `Scene` owner, detached d
 teardown, and CI guards the manager header against regaining a value-owned neutral frame state.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-83 files, deleting 779 lines and adding 6,796 lines (net `+6,017`). The larger Vulkan-only
+83 files, deleting 779 lines and adding 6,868 lines (net `+6,089`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.

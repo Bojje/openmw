@@ -183,7 +183,8 @@ int main()
         const std::vector<Render::TerrainTile> lodTiles = { *opaqueTile, lodOne, lodTwo };
         expect(Render::selectTerrainLod(lodTiles, 0.f, 0.f)->lod == 0
                 && Render::selectTerrainLod(lodTiles, 40.f, 0.f)->lod == 1
-                && Render::selectTerrainLod(lodTiles, 80.f, 0.f)->lod == 2,
+                && Render::selectTerrainLod(lodTiles, 80.f, 0.f)->lod == 2
+                && Render::selectTerrainLod(lodTiles, 80.f, 0.f, 1)->lod == 1,
             "terrain LOD selection did not follow deterministic distance thresholds");
 
         std::cout << "Vulkan terrain snapshot tests passed\n";

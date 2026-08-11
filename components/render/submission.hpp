@@ -17,6 +17,15 @@
 
 namespace Render
 {
+    inline bool terrainRegionsAdjacent(const TerrainRegion& lhs, const TerrainRegion& rhs)
+    {
+        const bool horizontal = (lhs.maxCellX + 1 == rhs.minCellX || rhs.maxCellX + 1 == lhs.minCellX)
+            && lhs.minCellY <= rhs.maxCellY && rhs.minCellY <= lhs.maxCellY;
+        const bool vertical = (lhs.maxCellY + 1 == rhs.minCellY || rhs.maxCellY + 1 == lhs.minCellY)
+            && lhs.minCellX <= rhs.maxCellX && rhs.minCellX <= lhs.maxCellX;
+        return horizontal || vertical;
+    }
+
     inline bool validMeshInstance(const MeshInstance& instance, bool allowEmptyIndices)
     {
         if (instance.mesh.indices.empty())
@@ -228,9 +237,39 @@ namespace Render
                     [](const TerrainRegion& region) { return region.valid(); });
             if (hasCompleteRegions)
             {
+                std::vector<const TerrainTile*> selected;
+                selected.reserve(world.terrainRegions().size());
                 for (const TerrainRegion& region : world.terrainRegions())
-                    if (const TerrainTile* selected = selectTerrainLod(region.lods, cameraX, cameraY))
-                        result.terrainTiles.push_back(*selected);
+                    selected.push_back(selectTerrainLod(region.lods, cameraX, cameraY));
+
+                bool changed = true;
+                while (changed)
+                {
+                    changed = false;
+                    for (std::size_t i = 0; i < world.terrainRegions().size(); ++i)
+                        for (std::size_t j = i + 1; j < world.terrainRegions().size(); ++j)
+                        {
+                            if (!selected[i] || !selected[j]
+                                || !terrainRegionsAdjacent(world.terrainRegions()[i], world.terrainRegions()[j]))
+                                continue;
+                            if (std::abs(selected[i]->lod - selected[j]->lod) <= 1)
+                                continue;
+
+                            const std::size_t coarse = selected[i]->lod > selected[j]->lod ? i : j;
+                            const int maximumLod = selected[coarse == i ? j : i]->lod + 1;
+                            const TerrainTile* constrained
+                                = selectTerrainLod(world.terrainRegions()[coarse].lods, cameraX, cameraY, maximumLod);
+                            if (constrained != nullptr && constrained->lod != selected[coarse]->lod)
+                            {
+                                selected[coarse] = constrained;
+                                changed = true;
+                            }
+                        }
+                }
+
+                for (const TerrainTile* tile : selected)
+                    if (tile != nullptr)
+                        result.terrainTiles.push_back(*tile);
             }
             else
             {

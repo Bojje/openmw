@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <limits>
 #include <vector>
 
 #include "terrain.hpp"
@@ -13,15 +14,22 @@ namespace Render
     // Choose one cached LOD for a loaded cell. The source owns the cache and
     // supplies tiles in ascending LOD order; the renderer receives only the
     // selected snapshot, so no backend needs to know about legacy paging.
-    inline const TerrainTile* selectTerrainLod(
-        const std::vector<TerrainTile>& tiles, float cameraX, float cameraY)
+    inline const TerrainTile* selectTerrainLod(const std::vector<TerrainTile>& tiles, float cameraX, float cameraY,
+        int maximumLod = std::numeric_limits<int>::max())
     {
         if (tiles.empty())
             return nullptr;
 
-        const TerrainTile* result = &tiles.front();
+        const TerrainTile* result = nullptr;
         for (const TerrainTile& candidate : tiles)
         {
+            if (candidate.lod > maximumLod)
+                continue;
+            if (result == nullptr)
+            {
+                result = &candidate;
+                continue;
+            }
             const float dx = cameraX - candidate.center[0] * candidate.cellWorldSize;
             const float dy = cameraY - candidate.center[1] * candidate.cellWorldSize;
             const float distance = std::sqrt(dx * dx + dy * dy);

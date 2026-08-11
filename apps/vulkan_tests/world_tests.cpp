@@ -200,6 +200,29 @@ int main()
     if (regional.terrainTiles.size() != 1 || regional.terrainTiles.front().center != regionTerrain.center
         || !regional.valid())
         throw std::runtime_error("renderer-neutral scene submission did not select a region terrain snapshot");
+    Render::TerrainTile regionLodOne = regionTerrain;
+    regionLodOne.lod = 1;
+    Render::TerrainTile regionLodTwo = regionTerrain;
+    regionLodTwo.lod = 2;
+    Render::TerrainRegion detailedRegion = terrainRegion;
+    detailedRegion.lods = { regionTerrain, regionLodOne, regionLodTwo };
+    Render::TerrainRegion adjacentRegion = terrainRegion;
+    adjacentRegion.minCellX = 2;
+    adjacentRegion.maxCellX = 3;
+    adjacentRegion.lods = { regionTerrain };
+    adjacentRegion.lods.front().center = { 3.f, 1.f };
+    aggregateScene.viewInverse.data[12] = 200.f;
+    world.setTerrainRegions({ detailedRegion, adjacentRegion });
+    const Render::SceneSubmission stitchedRegions = Render::collectSceneSubmission(world, aggregateScene, "",
+        [&](std::string_view model) -> std::vector<Render::MeshInstance> {
+            if (model != "meshes/first.nif")
+                throw std::runtime_error("neighboring region test resolved an unexpected model");
+            return { aggregateMesh };
+        }, true);
+    if (stitchedRegions.terrainTiles.size() != 2 || stitchedRegions.terrainTiles[0].lod != 1
+        || stitchedRegions.terrainTiles[1].lod != 0)
+        throw std::runtime_error("renderer-neutral terrain regions did not constrain neighboring LOD gaps");
+    aggregateScene.viewInverse.data[12] = 0.f;
     terrainRegion.maxCellX = 2;
     world.setTerrainRegions({ terrainRegion });
     const Render::SceneSubmission malformedRegionFallback = Render::collectSceneSubmission(world, aggregateScene, "",
