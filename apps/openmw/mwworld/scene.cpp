@@ -38,6 +38,7 @@
 
 #include "../mwrender/landmanager.hpp"
 #include "../mwrender/camera.hpp"
+#include "../mwrender/animation.hpp"
 #include "../mwrender/postprocessor.hpp"
 #include "../mwrender/renderingmanager.hpp"
 #include "../mwrender/terrainstorage.hpp"
@@ -1102,28 +1103,54 @@ namespace MWWorld
         return mCurrentCell;
     }
 
-    Render::SceneSubmission Scene::getNeutralScene() const
+    Render::SceneSubmission Scene::getNeutralScene()
     {
-        // Dynamic objects are carried as records, but are deliberately excluded
-        // from the static mesh batch until a backend owns animation and skinning.
+        const auto resolveMeshes = [this](std::string_view model) -> const Resource::NifMeshManager::Meshes& {
+            const std::string key(model);
+            const auto found = mNeutralMeshCache.find(key);
+            std::shared_ptr<const Resource::NifMeshManager::Meshes> meshes
+                = found == mNeutralMeshCache.end() ? nullptr : found->second.lock();
+            if (!meshes)
+            {
+                const VFS::Path::Normalized path(model);
+                if (path.extension().value() == "nif")
+                    meshes = mResourceSystem->getNifMeshManager()->get(path);
+                else
+                    meshes = std::make_shared<const Resource::NifMeshManager::Meshes>();
+                mNeutralMeshCache[key] = meshes;
+            }
+            return *meshes;
+        };
+
+        mNeutralWorldScene.updateDynamicPoses([&](const void* objectKey, const Render::WorldObject& object) {
+            const Resource::NifMeshManager::Meshes& meshes = resolveMeshes(object.model);
+            const auto skinned = std::find_if(meshes.begin(), meshes.end(), [](const Render::MeshInstance& mesh) {
+                return mesh.mesh.skinning && !mesh.mesh.skinning->boneNames.empty();
+            });
+            if (skinned == meshes.end())
+                return std::vector<Render::Mat4>();
+
+            for (const Render::MeshInstance& mesh : meshes)
+            {
+                if (mesh.mesh.skinning
+                    && (mesh.mesh.skinning->boneNames.empty()
+                        || mesh.mesh.skinning->boneNames != skinned->mesh.skinning->boneNames))
+                    return std::vector<Render::Mat4>();
+            }
+
+            std::vector<std::string_view> boneNames;
+            boneNames.reserve(skinned->mesh.skinning->boneNames.size());
+            for (const std::string& boneName : skinned->mesh.skinning->boneNames)
+                boneNames.push_back(boneName);
+
+            const MWRender::Animation* animation
+                = mRendering.getAnimation(MWWorld::ConstPtr(static_cast<const LiveCellRefBase*>(objectKey)));
+            return animation ? animation->getNeutralBoneMatrices(boneNames) : std::vector<Render::Mat4>();
+        });
+
         Render::SceneSubmission result = Render::collectSceneSubmission(
-            mNeutralWorldScene, mNeutralWorldScene.sceneData(), mNeutralWorldScene.activeWorldspace(),
-            [&](std::string_view model) -> const Resource::NifMeshManager::Meshes& {
-                const std::string key(model);
-                const auto found = mNeutralMeshCache.find(key);
-                std::shared_ptr<const Resource::NifMeshManager::Meshes> meshes
-                    = found == mNeutralMeshCache.end() ? nullptr : found->second.lock();
-                if (!meshes)
-                {
-                    const VFS::Path::Normalized path(model);
-                    if (path.extension().value() == "nif")
-                        meshes = mResourceSystem->getNifMeshManager()->get(path);
-                    else
-                        meshes = std::make_shared<const Resource::NifMeshManager::Meshes>();
-                    mNeutralMeshCache[key] = meshes;
-                }
-                return *meshes;
-            }, true);
+            mNeutralWorldScene, mNeutralWorldScene.sceneData(), mNeutralWorldScene.activeWorldspace(), resolveMeshes,
+            true);
 
         if (Settings::shaders().mAutoUseObjectSpecularMaps
             && !Settings::shaders().mSpecularMapPattern.get().empty())

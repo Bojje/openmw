@@ -206,7 +206,7 @@ namespace MWWorld
         void updateNeutralObjectPose(const void* objectKey, std::vector<Render::Mat4> boneMatrices);
 
         /// Export the current loaded-world state for a renderer backend.
-        Render::SceneSubmission getNeutralScene() const;
+        Render::SceneSubmission getNeutralScene();
 
     private:
         /// Access the world-owned neutral frame state for renderer synchronization.

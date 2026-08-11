@@ -271,6 +271,21 @@ namespace Render
             return true;
         }
 
+        template <class ResolvePose>
+        void updateDynamicPoses(ResolvePose&& resolvePose)
+        {
+            for (const auto& [objectKey, location] : mObjects)
+            {
+                const auto scene = mCells.find(location.cell);
+                if (scene == mCells.end())
+                    continue;
+                WorldObject* object = scene->second.findObject(location.id);
+                if (object == nullptr || !object->dynamic)
+                    continue;
+                object->boneMatrices = resolvePose(objectKey, *object);
+            }
+        }
+
         const CellScene* findCell(const void* cellKey) const
         {
             const auto found = mCells.find(cellKey);

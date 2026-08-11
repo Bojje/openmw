@@ -1872,6 +1872,29 @@ namespace MWRender
             return found->second;
     }
 
+    std::vector<Render::Mat4> Animation::getNeutralBoneMatrices(
+        std::span<const std::string_view> boneNames) const
+    {
+        if (mSkeleton == nullptr || boneNames.empty())
+            return {};
+
+        std::vector<Render::Mat4> result;
+        result.reserve(boneNames.size());
+        for (const std::string_view boneName : boneNames)
+        {
+            SceneUtil::Bone* bone = mSkeleton->getBone(std::string(boneName));
+            if (bone == nullptr)
+                return {};
+
+            Render::Mat4 matrix = {};
+            for (int row = 0; row < 4; ++row)
+                for (int column = 0; column < 4; ++column)
+                    matrix.data[column * 4 + row] = bone->mMatrixInSkeletonSpace(row, column);
+            result.push_back(matrix);
+        }
+        return result;
+    }
+
     void Animation::setAlpha(float alpha)
     {
         if (alpha == mAlpha || !mObjectRoot)
