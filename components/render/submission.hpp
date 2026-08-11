@@ -101,12 +101,6 @@ namespace Render
                 }
             }
 
-            for (const DynamicMeshSubmission& dynamic : dynamicMeshes)
-            {
-                if (!dynamic.object.dynamic || dynamic.object.model.empty() || !dynamic.object.transform.valid())
-                    return false;
-            }
-
             return std::all_of(terrainTiles.begin(), terrainTiles.end(), [](const TerrainTile& tile) {
                 return tile.valid();
             });
