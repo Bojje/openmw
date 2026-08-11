@@ -172,12 +172,12 @@ namespace Vk
         VkPhysicalDeviceProperties props;
         vkGetPhysicalDeviceProperties(device, &props);
 
-        // The G-buffer uses four 64-entry sampled-image arrays. Reject a device
+        // The G-buffer uses five 64-entry sampled-image arrays. Reject a device
         // that cannot represent the fixed shader ABI before logical-device
         // creation reaches descriptor allocation or pipeline validation. The
         // descriptor-set limits are per set; the composite set is smaller.
         constexpr uint32_t sceneDescriptors = maxSceneTextures * sceneTextureBindingCount;
-        constexpr uint32_t compositeDescriptors = 4;
+        constexpr uint32_t compositeDescriptors = 5;
         constexpr uint32_t requiredDescriptors
             = sceneDescriptors > compositeDescriptors ? sceneDescriptors : compositeDescriptors;
         return props.limits.maxPerStageDescriptorSampledImages >= sceneDescriptors

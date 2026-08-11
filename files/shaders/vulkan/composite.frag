@@ -6,6 +6,7 @@ layout(set = 0, binding = 0) uniform sampler2D gbufferAlbedo;
 layout(set = 0, binding = 1) uniform sampler2D gbufferNormal;
 layout(set = 0, binding = 2) uniform sampler2D gbufferDepth;
 layout(set = 0, binding = 5) uniform sampler2D gbufferMaterial;
+layout(set = 0, binding = 6) uniform sampler2D gbufferSpecular;
 
 layout(set = 0, binding = 4) uniform SceneUBO {
     mat4 view;
@@ -34,6 +35,7 @@ void main() {
     vec4 albedoSample = texture(gbufferAlbedo, fragTexCoord);
     vec4 normalSample = texture(gbufferNormal, fragTexCoord);
     vec4 materialSample = texture(gbufferMaterial, fragTexCoord);
+    vec3 specularColor = texture(gbufferSpecular, fragTexCoord).rgb;
     float depthSample = texture(gbufferDepth, fragTexCoord).r;
 
     if (depthSample >= 1.0) {
@@ -55,7 +57,8 @@ void main() {
     vec3 reflectionColor = vec3(0.0);
 
     float roughness = clamp(materialSample.r, 0.05, 1.0);
-    bool terrainSpecular = materialSample.b > 1.5;
+    bool terrainSpecular = materialSample.b > 1.5 && materialSample.b < 2.5;
+    bool objectSpecular = materialSample.b > 2.5;
     float ao = clamp(materialSample.b, 0.0, 1.0);
     float emission = max(materialSample.a, 0.0);
     vec3 ambient = albedo * scene.ambientColor.rgb * ao;
@@ -69,11 +72,12 @@ void main() {
     vec4 worldPos4 = scene.viewInverse * viewPos;
     vec3 worldPos = worldPos4.xyz;
 
-    float specularStrength = terrainSpecular ? materialSample.g : 0.3 * (1.0 - roughness);
+    float specularStrength = objectSpecular ? 1.0
+        : terrainSpecular ? materialSample.g : 0.3 * (1.0 - roughness);
     vec3 V = normalize(scene.viewInverse[3].xyz - worldPos);
     vec3 H = normalize(L + V);
     float spec = pow(max(dot(N, H), 0.0), mix(128.0, 1.0, roughness));
-    vec3 specular = sunCol * spec * specularStrength * shadow;
+    vec3 specular = specularColor * sunCol * spec * specularStrength * shadow;
 
     vec3 color = ambient + diffuse + specular + reflectionColor + albedo * emission;
 

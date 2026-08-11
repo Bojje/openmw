@@ -12,11 +12,13 @@ layout(location = 8) in vec2 fragAlphaTexCoord;
 layout(location = 9) flat in uint fragNormalTextureIndex;
 layout(location = 10) in vec4 fragTangent;
 layout(location = 11) flat in uint fragEmissiveTextureIndex;
+layout(location = 12) flat in uint fragSpecularTextureIndex;
 
 layout(set = 0, binding = 1) uniform sampler2D albedoTextures[64];
 layout(set = 0, binding = 2) uniform sampler2D alphaTextures[64];
 layout(set = 0, binding = 3) uniform sampler2D normalTextures[64];
 layout(set = 0, binding = 4) uniform sampler2D emissiveTextures[64];
+layout(set = 0, binding = 5) uniform sampler2D specularTextures[64];
 
 layout(set = 0, binding = 0) uniform CameraUBO {
     mat4 view;
@@ -31,6 +33,7 @@ layout(set = 0, binding = 0) uniform CameraUBO {
 layout(location = 0) out vec4 outAlbedo;
 layout(location = 1) out vec4 outNormal;
 layout(location = 2) out vec4 outMaterial;
+layout(location = 3) out vec4 outSpecular;
 
 void main() {
     vec2 terrainTexCoord = fragTexCoord;
@@ -73,6 +76,11 @@ void main() {
     vec3 emissiveSample = fragEmissiveTextureIndex == 0u
         ? vec3(0.0)
         : texture(emissiveTextures[fragEmissiveTextureIndex], terrainTexCoord).rgb;
+    vec3 specularSample = fragSpecularTextureIndex == 0u
+        ? vec3(1.0)
+        : texture(specularTextures[fragSpecularTextureIndex], terrainTexCoord).rgb;
+    if (fragMaterial.b > 1.5)
+        specularSample = albedoSample.rgb;
 
     if ((fragMaterialFlags & 2u) != 0u)
         albedo.a *= texture(alphaTextures[fragAlphaTextureIndex], fragAlphaTexCoord).a;
@@ -92,10 +100,13 @@ void main() {
         N = normalize(tangent * sampledNormal.x + bitangent * sampledNormal.y + N * sampledNormal.z);
     }
     outNormal = vec4(N * 0.5 + 0.5, 1.0);
+    outSpecular = vec4(specularSample, albedo.a);
 
     outMaterial = fragMaterial;
     if (fragEmissiveTextureIndex != 0u)
         outMaterial.a = max(outMaterial.a, max(max(emissiveSample.r, emissiveSample.g), emissiveSample.b));
     if (fragMaterial.b > 1.5)
         outMaterial.g = albedoSample.a;
+    else if (fragSpecularTextureIndex != 0u)
+        outMaterial.b = 3.0;
 }

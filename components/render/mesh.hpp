@@ -16,11 +16,25 @@
 
 namespace Render
 {
+    inline std::string makeSpecularTexturePath(std::string_view albedoTexture, std::string_view pattern)
+    {
+        if (albedoTexture.empty() || pattern.empty())
+            return {};
+
+        std::string result(albedoTexture);
+        const std::size_t extension = result.rfind('.');
+        if (extension == std::string::npos)
+            return {};
+        result.replace(extension, 1, std::string(pattern) + '.');
+        return result;
+    }
+
     struct MeshMaterial
     {
         std::string albedoTexture;
         std::string normalTexture;
         std::string emissiveTexture;
+        std::string specularTexture;
         Vec4 diffuse{ 1.f, 1.f, 1.f, 1.f };
         Vec4 emissive{};
         float glossiness = 0.f;
@@ -33,6 +47,8 @@ namespace Render
         bool normalWrapV = true;
         bool emissiveWrapU = true;
         bool emissiveWrapV = true;
+        bool specularWrapU = true;
+        bool specularWrapV = true;
         uint8_t alphaTestThreshold = 0;
         bool terrainBlend = false;
         bool terrainFirstLayer = false;

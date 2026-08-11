@@ -26,6 +26,7 @@
 #include <components/sceneutil/positionattitudetransform.hpp>
 #include <components/settings/values.hpp>
 #include <components/terrain/terraingrid.hpp>
+#include <components/vfs/manager.hpp>
 #include <components/vfs/pathutil.hpp>
 
 #include "../mwbase/environment.hpp"
@@ -1095,6 +1096,30 @@ namespace MWWorld
             }, true);
 
         Resource::ResourceSystem* const resourceSystem = mRendering.getResourceSystem();
+        if (Settings::shaders().mAutoUseObjectSpecularMaps
+            && !Settings::shaders().mSpecularMapPattern.get().empty())
+        {
+            const std::string& pattern = Settings::shaders().mSpecularMapPattern;
+            const VFS::Manager* const vfs = resourceSystem->getVFS();
+            for (Render::MeshInstance& instance : result.meshes)
+            {
+                Render::MeshMaterial& material = instance.mesh.material;
+                if (material.albedoTexture.empty() || !material.specularTexture.empty())
+                    continue;
+
+                const std::string specularPath
+                    = Render::makeSpecularTexturePath(material.albedoTexture, pattern);
+                if (specularPath.empty())
+                    continue;
+                const VFS::Path::Normalized specularMap(specularPath);
+                if (!vfs->exists(specularMap))
+                    continue;
+
+                material.specularTexture = specularMap.value();
+                material.specularWrapU = material.albedoWrapU;
+                material.specularWrapV = material.albedoWrapV;
+            }
+        }
         result.textureResolver = [resourceSystem](std::string_view path) {
             if (path.empty())
                 return std::shared_ptr<const Render::TextureData>();

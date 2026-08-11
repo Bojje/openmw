@@ -96,6 +96,7 @@ namespace
         {
             data.material.albedoTexture = "textures/vulkan-smoke.rgba";
             data.material.emissiveTexture = "textures/vulkan-smoke-glow.rgba";
+            data.material.specularTexture = "textures/vulkan-smoke-specular.rgba";
         }
         else
             throw std::runtime_error("Vulkan smoke requested an unexpected model");
@@ -106,7 +107,8 @@ namespace
     {
         if (path != "textures/vulkan-smoke.rgba" && path != "textures/vulkan-smoke-alt.rgba"
             && path != "textures/vulkan-smoke-glow.rgba"
-            && path != "textures/vulkan-smoke-normal.rgba")
+            && path != "textures/vulkan-smoke-normal.rgba"
+            && path != "textures/vulkan-smoke-specular.rgba")
             throw std::runtime_error("Vulkan smoke requested an unexpected texture");
 
         auto texture = std::make_shared<Render::TextureData>();
@@ -116,6 +118,11 @@ namespace
             ? std::vector<uint8_t>{
                   128, 128, 255, 255, 128, 128, 255, 255,
                   128, 128, 255, 255, 128, 128, 255, 255,
+              }
+            : path == "textures/vulkan-smoke-specular.rgba"
+            ? std::vector<uint8_t>{
+                  255, 255, 255, 255, 64, 32, 16, 255,
+                  16, 32, 64, 255, 128, 96, 32, 255,
               }
             : path == "textures/vulkan-smoke-glow.rgba"
             ? std::vector<uint8_t>{

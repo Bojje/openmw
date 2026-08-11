@@ -20,6 +20,11 @@ namespace
 
 int main()
 {
+    if (Render::makeSpecularTexturePath("textures/stone.dds", "_spec") != "textures/stone_spec.dds"
+        || !Render::makeSpecularTexturePath("textures/stone", "_spec").empty()
+        || !Render::makeSpecularTexturePath("textures/stone.dds", "").empty())
+        throw std::runtime_error("specular texture pattern mapping is not deterministic");
+
     Render::TextureData invalidTexture;
     if (invalidTexture.valid())
         throw std::runtime_error("empty neutral texture was marked valid");

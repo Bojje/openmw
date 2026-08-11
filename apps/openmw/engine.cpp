@@ -195,6 +195,7 @@ namespace
             addTexturePath(instance.mesh.material.albedoTexture);
             addTexturePath(instance.mesh.material.normalTexture);
             addTexturePath(instance.mesh.material.emissiveTexture);
+            addTexturePath(instance.mesh.material.specularTexture);
         }
         for (const Render::TerrainTile& tile : submission.terrainTiles)
             for (const Render::TerrainLayer& layer : tile.layers)

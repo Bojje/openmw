@@ -408,6 +408,12 @@ namespace Vk
             mGBuffer.normalImage, mGBuffer.normalMemory);
         mGBuffer.normalView = createImageView(mGBuffer.normalImage, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_ASPECT_COLOR_BIT);
 
+        createImage(extent.width, extent.height, VK_FORMAT_R16G16B16A16_SFLOAT,
+            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+            mGBuffer.specularImage, mGBuffer.specularMemory);
+        mGBuffer.specularView
+            = createImageView(mGBuffer.specularImage, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_ASPECT_COLOR_BIT);
+
         createImage(extent.width, extent.height, VK_FORMAT_R8G8B8A8_UNORM,
             VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
             mGBuffer.materialImage, mGBuffer.materialMemory);
@@ -432,6 +438,7 @@ namespace Vk
 
         destroyAttachment(mGBuffer.albedoImage, mGBuffer.albedoMemory, mGBuffer.albedoView);
         destroyAttachment(mGBuffer.normalImage, mGBuffer.normalMemory, mGBuffer.normalView);
+        destroyAttachment(mGBuffer.specularImage, mGBuffer.specularMemory, mGBuffer.specularView);
         destroyAttachment(mGBuffer.materialImage, mGBuffer.materialMemory, mGBuffer.materialView);
         destroyAttachment(mGBuffer.depthImage, mGBuffer.depthMemory, mGBuffer.depthView);
     }
@@ -442,7 +449,7 @@ namespace Vk
     {
         VkFormat depthFormat = findDepthFormat();
 
-        std::array<VkAttachmentDescription, 4> attachments = {};
+        std::array<VkAttachmentDescription, 5> attachments = {};
 
         // Albedo
         attachments[0].format = VK_FORMAT_R8G8B8A8_UNORM;
@@ -474,8 +481,8 @@ namespace Vk
         attachments[2].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         attachments[2].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-        // Depth
-        attachments[3].format = depthFormat;
+        // Specular color
+        attachments[3].format = VK_FORMAT_R16G16B16A16_SFLOAT;
         attachments[3].samples = VK_SAMPLE_COUNT_1_BIT;
         attachments[3].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
         attachments[3].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -484,12 +491,23 @@ namespace Vk
         attachments[3].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         attachments[3].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-        std::array<VkAttachmentReference, 3> colorRefs = {};
+        // Depth
+        attachments[4].format = depthFormat;
+        attachments[4].samples = VK_SAMPLE_COUNT_1_BIT;
+        attachments[4].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        attachments[4].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        attachments[4].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        attachments[4].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        attachments[4].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        attachments[4].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+        std::array<VkAttachmentReference, 4> colorRefs = {};
         colorRefs[0] = { 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
         colorRefs[1] = { 1, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
         colorRefs[2] = { 2, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
+        colorRefs[3] = { 3, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
 
-        VkAttachmentReference depthRef = { 3, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL };
+        VkAttachmentReference depthRef = { 4, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL };
 
         VkSubpassDescription subpass = {};
         subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
@@ -561,10 +579,11 @@ namespace Vk
     void Renderer::createGBufferFramebuffer()
     {
         VkExtent2D extent = mSwapchain->extent();
-        std::array<VkImageView, 4> attachments = {
+        std::array<VkImageView, 5> attachments = {
             mGBuffer.albedoView,
             mGBuffer.normalView,
             mGBuffer.materialView,
+            mGBuffer.specularView,
             mGBuffer.depthView
         };
 
@@ -721,6 +740,7 @@ namespace Vk
             writeSceneTextureDescriptor(frameIndex, 2, textureIndex, view);
             writeSceneTextureDescriptor(frameIndex, 3, textureIndex, view);
             writeSceneTextureDescriptor(frameIndex, 4, textureIndex, view);
+            writeSceneTextureDescriptor(frameIndex, 5, textureIndex, view);
         }
     }
 
@@ -729,9 +749,9 @@ namespace Vk
     void Renderer::createDescriptorSetLayouts()
     {
         // Scene layout (set 0 for G-buffer pass): camera UBO and indexed
-        // albedo/terrain blendmap textures.
+        // albedo, alpha, normal, emissive, and specular textures.
         {
-            std::array<VkDescriptorSetLayoutBinding, 5> bindings = {};
+            std::array<VkDescriptorSetLayoutBinding, 6> bindings = {};
             bindings[0].binding = 0;
             bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
             bindings[0].descriptorCount = 1;
@@ -757,6 +777,11 @@ namespace Vk
             bindings[4].descriptorCount = maxTextures;
             bindings[4].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
+            bindings[5].binding = 5;
+            bindings[5].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            bindings[5].descriptorCount = maxTextures;
+            bindings[5].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
             VkDescriptorSetLayoutCreateInfo layoutInfo = {};
             layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
             layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
@@ -767,7 +792,7 @@ namespace Vk
 
         // Composite layout: G-buffer textures, scene UBO, and material data
         {
-            std::array<VkDescriptorSetLayoutBinding, 5> bindings = {};
+            std::array<VkDescriptorSetLayoutBinding, 6> bindings = {};
 
             // Albedo
             bindings[0].binding = 0;
@@ -799,6 +824,12 @@ namespace Vk
             bindings[4].descriptorCount = 1;
             bindings[4].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
+            // Specular color
+            bindings[5].binding = 6;
+            bindings[5].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            bindings[5].descriptorCount = 1;
+            bindings[5].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
             VkDescriptorSetLayoutCreateInfo layoutInfo = {};
             layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
             layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
@@ -815,7 +846,7 @@ namespace Vk
     {
         std::vector<VkDescriptorPoolSize> poolSizes = {
             { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, maxFramesInFlight * 2 },
-            { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, maxTextures * maxFramesInFlight * 4 + maxFramesInFlight * 4 },
+            { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, maxTextures * maxFramesInFlight * 5 + maxFramesInFlight * 5 },
         };
 
         const uint32_t maxSets = maxFramesInFlight * 2;
@@ -902,6 +933,7 @@ namespace Vk
             writeCompositeDescriptor(1, mGBuffer.normalView);
             writeCompositeDescriptor(2, mGBuffer.depthView);
             writeCompositeDescriptor(5, mGBuffer.materialView);
+            writeCompositeDescriptor(6, mGBuffer.specularView);
 
             // Bind the scene UBO to each per-frame composite descriptor set
             for (uint32_t i = 0; i < maxFramesInFlight; i++)
@@ -1040,7 +1072,7 @@ namespace Vk
             depthStencil.depthWriteEnable = VK_TRUE;
             depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
 
-            std::array<VkPipelineColorBlendAttachmentState, 3> blendAttachments = {};
+            std::array<VkPipelineColorBlendAttachmentState, 4> blendAttachments = {};
             for (auto& att : blendAttachments)
             {
                 att.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT
@@ -1087,6 +1119,13 @@ namespace Vk
             blendAttachments[0].srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
             blendAttachments[0].dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
             blendAttachments[0].alphaBlendOp = VK_BLEND_OP_ADD;
+            blendAttachments[3].blendEnable = VK_TRUE;
+            blendAttachments[3].srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+            blendAttachments[3].dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+            blendAttachments[3].colorBlendOp = VK_BLEND_OP_ADD;
+            blendAttachments[3].srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+            blendAttachments[3].dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+            blendAttachments[3].alphaBlendOp = VK_BLEND_OP_ADD;
             depthStencil.depthWriteEnable = VK_FALSE;
 
             VK_CHECK(vkCreateGraphicsPipelines(mDevice->handle(), VK_NULL_HANDLE, 1,
@@ -1102,6 +1141,7 @@ namespace Vk
             // same depth and add their weighted color in submission order.
             blendAttachments[0].dstColorBlendFactor = VK_BLEND_FACTOR_ZERO;
             blendAttachments[0].dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+            blendAttachments[3].blendEnable = VK_FALSE;
             blendAttachments[1].blendEnable = VK_FALSE;
             blendAttachments[2].blendEnable = VK_FALSE;
             depthStencil.depthWriteEnable = VK_TRUE;
@@ -1112,6 +1152,9 @@ namespace Vk
 
             blendAttachments[0].dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
             blendAttachments[0].dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+            blendAttachments[3].blendEnable = VK_TRUE;
+            blendAttachments[3].dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
+            blendAttachments[3].dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
             depthStencil.depthWriteEnable = VK_FALSE;
             depthStencil.depthCompareOp = VK_COMPARE_OP_EQUAL;
 
@@ -1300,11 +1343,12 @@ namespace Vk
 
         // 1. G-buffer pass
         {
-            std::array<VkClearValue, 4> clearValues = {};
+            std::array<VkClearValue, 5> clearValues = {};
             clearValues[0].color = {{ 0.0f, 0.0f, 0.0f, 0.0f }};
             clearValues[1].color = {{ 0.0f, 0.0f, 0.0f, 0.0f }};
             clearValues[2].color = {{ 0.0f, 0.0f, 0.0f, 0.0f }};
-            clearValues[3].depthStencil = { 1.0f, 0 };
+            clearValues[3].color = {{ 1.0f, 1.0f, 1.0f, 1.0f }};
+            clearValues[4].depthStencil = { 1.0f, 0 };
 
             VkRenderPassBeginInfo renderPassInfo = {};
             renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -1382,7 +1426,8 @@ namespace Vk
                             materialFlags,
                             mMeshTextureIndices[drawIndex] | (mMeshAlphaTextureIndices[drawIndex] << 6u)
                                 | (mMeshNormalTextureIndices[drawIndex] << 12u)
-                                | (mMeshEmissiveTextureIndices[drawIndex] << 18u),
+                                | (mMeshEmissiveTextureIndices[drawIndex] << 18u)
+                                | (mMeshSpecularTextureIndices[drawIndex] << 24u),
                         };
                         vkCmdPushConstants(cmd, mGBufferPipelineLayout,
                             VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
@@ -1546,6 +1591,7 @@ namespace Vk
         writeCompositeDescriptor(1, mGBuffer.normalView);
         writeCompositeDescriptor(2, mGBuffer.depthView);
         writeCompositeDescriptor(5, mGBuffer.materialView);
+        writeCompositeDescriptor(6, mGBuffer.specularView);
     }
 
     void Renderer::setScene(const Render::SceneSubmission& submission)
@@ -1579,10 +1625,12 @@ namespace Vk
         std::vector<uint32_t> alphaTextureIndices;
         std::vector<uint32_t> normalTextureIndices;
         std::vector<uint32_t> emissiveTextureIndices;
+        std::vector<uint32_t> specularTextureIndices;
         textureIndices.reserve(batch.draws.size());
         alphaTextureIndices.reserve(batch.draws.size());
         normalTextureIndices.reserve(batch.draws.size());
         emissiveTextureIndices.reserve(batch.draws.size());
+        specularTextureIndices.reserve(batch.draws.size());
 
         const auto resolveTexture = [&](std::string_view path, bool wrapU, bool wrapV) {
             if (path.empty() || !textureResolver)
@@ -1621,6 +1669,9 @@ namespace Vk
 
             emissiveTextureIndices.push_back(
                 resolveTexture(draw.material.emissiveTexture, draw.material.emissiveWrapU, draw.material.emissiveWrapV));
+            specularTextureIndices.push_back(
+                resolveTexture(draw.material.specularTexture, draw.material.specularWrapU,
+                    draw.material.specularWrapV));
         }
 
         for (const Render::MeshDraw& draw : batch.draws)
@@ -1652,6 +1703,7 @@ namespace Vk
         mMeshAlphaTextureIndices = std::move(alphaTextureIndices);
         mMeshNormalTextureIndices = std::move(normalTextureIndices);
         mMeshEmissiveTextureIndices = std::move(emissiveTextureIndices);
+        mMeshSpecularTextureIndices = std::move(specularTextureIndices);
         ++mMeshRevision;
         if (mMeshRevision == 0)
             ++mMeshRevision;
@@ -1713,6 +1765,7 @@ namespace Vk
         mMeshTextureIndices.clear();
         mMeshAlphaTextureIndices.clear();
         mMeshNormalTextureIndices.clear();
+        mMeshSpecularTextureIndices.clear();
         mDynamicObjects.clear();
     }
 

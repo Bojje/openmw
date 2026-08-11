@@ -12,7 +12,7 @@ namespace Vk
 {
     constexpr uint32_t maxFramesInFlight = 2;
     constexpr uint32_t maxSceneTextures = 64;
-    constexpr uint32_t sceneTextureBindingCount = 4;
+    constexpr uint32_t sceneTextureBindingCount = 5;
 
     inline const char* vkResultToString(VkResult result)
     {

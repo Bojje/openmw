@@ -40,6 +40,10 @@ namespace Vk
         VkDeviceMemory normalMemory = VK_NULL_HANDLE;
         VkImageView normalView = VK_NULL_HANDLE;
 
+        VkImage specularImage = VK_NULL_HANDLE;
+        VkDeviceMemory specularMemory = VK_NULL_HANDLE;
+        VkImageView specularView = VK_NULL_HANDLE;
+
         VkImage materialImage = VK_NULL_HANDLE;
         VkDeviceMemory materialMemory = VK_NULL_HANDLE;
         VkImageView materialView = VK_NULL_HANDLE;
@@ -184,6 +188,7 @@ namespace Vk
         std::vector<uint32_t> mMeshAlphaTextureIndices;
         std::vector<uint32_t> mMeshNormalTextureIndices;
         std::vector<uint32_t> mMeshEmissiveTextureIndices;
+        std::vector<uint32_t> mMeshSpecularTextureIndices;
 
         struct MeshBuffers
         {
