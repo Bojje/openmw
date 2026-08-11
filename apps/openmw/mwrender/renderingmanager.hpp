@@ -140,7 +140,7 @@ namespace MWRender
 
         SceneUtil::WorkQueue* getWorkQueue();
         Terrain::World* getTerrain();
-        TerrainStorage* getTerrainStorage() const;
+        TerrainStorage& getTerrainStorage();
 
         void preloadCommonAssets();
 

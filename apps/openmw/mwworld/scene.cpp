@@ -553,9 +553,9 @@ namespace MWWorld
         insertCell(cell, loadingListener, navigatorUpdateGuard);
 
         mRendering.addCell(&cell);
-        if (cellVariant.isExterior() && mTerrainStorage)
+        if (cellVariant.isExterior())
             mNeutralWorldScene.setTerrainTiles(static_cast<const void*>(&cell),
-                mTerrainStorage->getRenderTiles(
+                mTerrainStorage.getRenderTiles(
                     cell.getCell()->getGridX(), cell.getCell()->getGridY(), cell.getCell()->getWorldSpace()));
 
         MWBase::Environment::get().getWindowManager()->addCell(&cell);

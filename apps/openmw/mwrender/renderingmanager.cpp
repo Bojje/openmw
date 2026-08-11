@@ -465,9 +465,9 @@ namespace MWRender
         return mTerrain;
     }
 
-    TerrainStorage* RenderingManager::getTerrainStorage() const
+    TerrainStorage& RenderingManager::getTerrainStorage()
     {
-        return mTerrainStorage.get();
+        return *mTerrainStorage;
     }
 
     void RenderingManager::preloadCommonAssets()

@@ -96,7 +96,7 @@ namespace MWWorld
         MWWorld::World& mWorld;
         MWPhysics::PhysicsSystem* mPhysics;
         MWRender::RenderingManager& mRendering;
-        MWRender::TerrainStorage* mTerrainStorage;
+        MWRender::TerrainStorage& mTerrainStorage;
         DetourNavigator::Navigator& mNavigator;
         std::unique_ptr<CellPreloader> mPreloader;
         float mCellLoadingThreshold;
