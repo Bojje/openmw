@@ -45,6 +45,11 @@ namespace SceneUtil
     class UnrefQueue;
 }
 
+namespace MWRender
+{
+    class TerrainStorage;
+}
+
 namespace ESM
 {
     struct Position;
@@ -102,6 +107,7 @@ namespace MWWorld
         std::unique_ptr<MWWorld::Player> mPlayer;
         std::unique_ptr<MWPhysics::PhysicsSystem> mPhysics;
         std::unique_ptr<DetourNavigator::Navigator> mNavigator;
+        std::unique_ptr<MWRender::TerrainStorage> mTerrainStorage;
         std::unique_ptr<MWRender::RenderingManager> mRendering;
         Render::FrameLifecycle* mFrameLifecycle = nullptr;
         std::unique_ptr<MWWorld::Scene> mWorldScene;

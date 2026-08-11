@@ -81,6 +81,7 @@
 #include "../mwrender/npcanimation.hpp"
 #include "../mwrender/postprocessor.hpp"
 #include "../mwrender/renderingmanager.hpp"
+#include "../mwrender/terrainstorage.hpp"
 #include "../mwrender/vismask.hpp"
 
 #include "../mwscript/globalscripts.hpp"
@@ -252,8 +253,15 @@ namespace MWWorld
             mNavigator = DetourNavigator::makeNavigatorStub();
         }
 
+        const std::string& normalMapPattern = Settings::shaders().mNormalMapPattern;
+        const std::string& heightMapPattern = Settings::shaders().mNormalHeightMapPattern;
+        const std::string& specularMapPattern = Settings::shaders().mTerrainSpecularMapPattern;
+        mTerrainStorage = std::make_unique<MWRender::TerrainStorage>(mResourceSystem, normalMapPattern,
+            heightMapPattern, Settings::shaders().mAutoUseTerrainNormalMaps, specularMapPattern,
+            Settings::shaders().mAutoUseTerrainSpecularMaps);
+
         mRendering = std::make_unique<MWRender::RenderingManager>(
-            viewer, rootNode, mResourceSystem, workQueue, *mNavigator, mGroundcoverStore, unrefQueue);
+            viewer, rootNode, mResourceSystem, workQueue, *mNavigator, mGroundcoverStore, unrefQueue, *mTerrainStorage);
         mFrameLifecycle = &mRendering->getFrameLifecycle();
         mProjectileManager = std::make_unique<ProjectileManager>(
             mRendering->getLightRoot()->asGroup(), mResourceSystem, mRendering.get(), mPhysics.get());
@@ -262,7 +270,7 @@ namespace MWWorld
         mWeatherManager = std::make_unique<MWWorld::WeatherManager>(*mRendering, mStore);
 
         mWorldScene = std::make_unique<Scene>(
-            *this, *mRendering, mRendering->getTerrainStorage(), mResourceSystem, mPhysics.get(), *mNavigator);
+            *this, *mRendering, *mTerrainStorage, mResourceSystem, mPhysics.get(), *mNavigator);
     }
 
     void World::fillGlobalVariables()

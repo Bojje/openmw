@@ -57,7 +57,6 @@ namespace ESM
 
 namespace Terrain
 {
-    class RenderStorage;
     class World;
 }
 
@@ -124,7 +123,7 @@ namespace MWRender
         RenderingManager(osgViewer::Viewer* viewer, osg::ref_ptr<osg::Group> rootNode,
             Resource::ResourceSystem* resourceSystem, SceneUtil::WorkQueue* workQueue,
             DetourNavigator::Navigator& navigator, const MWWorld::GroundcoverStore& groundcoverStore,
-            SceneUtil::UnrefQueue& unrefQueue);
+            SceneUtil::UnrefQueue& unrefQueue, TerrainStorage& terrainStorage);
         ~RenderingManager();
 
         osgUtil::IncrementalCompileOperation* getIncrementalCompileOperation();
@@ -144,7 +143,6 @@ namespace MWRender
 
         SceneUtil::WorkQueue* getWorkQueue();
         Terrain::World* getTerrain();
-        Terrain::RenderStorage& getTerrainStorage();
 
         void preloadCommonAssets();
 
@@ -355,7 +353,7 @@ namespace MWRender
         std::unique_ptr<Water> mWater;
         std::unordered_map<ESM::RefId, WorldspaceChunkMgr> mWorldspaceChunks;
         Terrain::World* mTerrain;
-        std::unique_ptr<TerrainStorage> mTerrainStorage;
+        TerrainStorage& mTerrainStorage;
         ObjectPaging* mObjectPaging;
         Groundcover* mGroundcover;
         std::unique_ptr<SkyManager> mSky;

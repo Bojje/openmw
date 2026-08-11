@@ -176,13 +176,14 @@ namespace MWRender
     RenderingManager::RenderingManager(osgViewer::Viewer* viewer, osg::ref_ptr<osg::Group> rootNode,
         Resource::ResourceSystem* resourceSystem, SceneUtil::WorkQueue* workQueue,
         DetourNavigator::Navigator& navigator, const MWWorld::GroundcoverStore& groundcoverStore,
-        SceneUtil::UnrefQueue& unrefQueue)
+        SceneUtil::UnrefQueue& unrefQueue, TerrainStorage& terrainStorage)
         : mSkyBlending(Settings::fog().mSkyBlending)
         , mViewer(viewer)
         , mRootNode(rootNode)
         , mResourceSystem(resourceSystem)
         , mWorkQueue(workQueue)
         , mNavigator(navigator)
+        , mTerrainStorage(terrainStorage)
         , mNightEyeFactor(0.f)
         // TODO: Near clip should not need to be bounded like this, but too small values break OSG shadow calculations
         // CPU-side. See issue: #6072
@@ -297,15 +298,6 @@ namespace MWRender
         mResourceSystem->getSceneManager()->setIncrementalCompileOperation(mViewer->getIncrementalCompileOperation());
 
         mEffectManager = std::make_unique<EffectManager>(sceneRoot, mResourceSystem);
-
-        const std::string& normalMapPattern = Settings::shaders().mNormalMapPattern;
-        const std::string& heightMapPattern = Settings::shaders().mNormalHeightMapPattern;
-        const std::string& specularMapPattern = Settings::shaders().mTerrainSpecularMapPattern;
-        const bool useTerrainNormalMaps = Settings::shaders().mAutoUseTerrainNormalMaps;
-        const bool useTerrainSpecularMaps = Settings::shaders().mAutoUseTerrainSpecularMaps;
-
-        mTerrainStorage = std::make_unique<TerrainStorage>(mResourceSystem, normalMapPattern, heightMapPattern,
-            useTerrainNormalMaps, specularMapPattern, useTerrainSpecularMaps);
 
         WorldspaceChunkMgr& chunkMgr = getWorldspaceChunkMgr(ESM::Cell::sDefaultWorldspaceId);
         mTerrain = chunkMgr.mTerrain.get();
@@ -457,11 +449,6 @@ namespace MWRender
     Terrain::World* RenderingManager::getTerrain()
     {
         return mTerrain;
-    }
-
-    Terrain::RenderStorage& RenderingManager::getTerrainStorage()
-    {
-        return *mTerrainStorage;
     }
 
     void RenderingManager::preloadCommonAssets()
@@ -1334,7 +1321,7 @@ namespace MWRender
             const float maxCompGeometrySize = Settings::terrain().mMaxCompositeGeometrySize;
             const bool debugChunks = Settings::terrain().mDebugChunks;
             auto quadTreeWorld = std::make_unique<Terrain::QuadTreeWorld>(mSceneRoot, mRootNode, mResourceSystem,
-                mTerrainStorage.get(), Mask_Terrain, Mask_PreCompile, Mask_Debug, compMapResolution, compMapLevel,
+                &mTerrainStorage, Mask_Terrain, Mask_PreCompile, Mask_Debug, compMapResolution, compMapLevel,
                 lodFactor, vertexLodMod, maxCompGeometrySize, debugChunks, worldspace, expiryDelay);
             if (Settings::terrain().mObjectPaging)
             {
@@ -1357,7 +1344,7 @@ namespace MWRender
         }
         else
             newChunkMgr.mTerrain = std::make_unique<Terrain::TerrainGrid>(mSceneRoot, mRootNode, mResourceSystem,
-                mTerrainStorage.get(), Mask_Terrain, worldspace, expiryDelay, Mask_PreCompile, Mask_Debug);
+                &mTerrainStorage, Mask_Terrain, worldspace, expiryDelay, Mask_PreCompile, Mask_Debug);
 
         newChunkMgr.mTerrain->setTargetFrameRate(Settings::cells().mTargetFramerate);
         float distanceMult = std::cos(osg::DegreesToRadians(std::min(mFieldOfView, 140.f)) / 2.f);
@@ -1608,7 +1595,7 @@ namespace MWRender
 
     LandManager* RenderingManager::getLandManager() const
     {
-        return mTerrainStorage->getLandManager();
+        return mTerrainStorage.getLandManager();
     }
 
     void RenderingManager::updateActorPath(const MWWorld::ConstPtr& actor, const std::deque<osg::Vec3f>& path,
