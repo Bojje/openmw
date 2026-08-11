@@ -84,6 +84,7 @@ namespace DetourNavigator
 
 namespace MWWorld
 {
+    class Scene;
     class GroundcoverStore;
     class Cell;
     class CellStore;
@@ -162,11 +163,6 @@ namespace MWRender
 
         /// Build the neutral terrain snapshot for a cell loaded by the world scene.
         std::vector<Render::TerrainTile> getNeutralTerrainTiles(const MWWorld::CellStore* store);
-
-        /// Attach the world-owned neutral frame state. The manager updates this
-        /// snapshot alongside the OSG reference state but does not own it.
-        void setNeutralSceneData(Render::SceneData& sceneData) { mNeutralSceneData = &sceneData; }
-        void clearNeutralSceneData() { mNeutralSceneData = nullptr; }
 
         void enableTerrain(bool enable, ESM::RefId worldspace);
 
@@ -303,6 +299,13 @@ namespace MWRender
         osg::Vec2f getProjectionOffset() const { return mProjectionOffset; }
 
     private:
+        friend class MWWorld::Scene;
+
+        /// Attach the world-owned neutral frame state without exposing its
+        /// lifetime bridge to other renderer clients.
+        void setNeutralSceneData(Render::SceneData& sceneData) { mNeutralSceneData = &sceneData; }
+        void clearNeutralSceneData() { mNeutralSceneData = nullptr; }
+
         void updateTextureFiltering();
         void updateAmbient();
         void setFogColor(const osg::Vec4f& color);
