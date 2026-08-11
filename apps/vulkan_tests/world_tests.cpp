@@ -163,6 +163,27 @@ int main()
         || !aggregate.valid())
         throw std::runtime_error("renderer-neutral scene submission collector lost world state");
 
+    int activeWorldspaceCellHandle = 0;
+    int inactiveWorldspaceCellHandle = 0;
+    int activeWorldspaceObjectHandle = 0;
+    int inactiveWorldspaceObjectHandle = 0;
+    world.recordCell(&activeWorldspaceCellHandle, true, 20, 20, "active-space", "space-a");
+    world.recordCell(&inactiveWorldspaceCellHandle, true, 21, 21, "inactive-space", "space-b");
+    world.recordObject(&activeWorldspaceObjectHandle, &activeWorldspaceCellHandle, true, 20, 20, "active-space",
+        "meshes/active-space.nif", objectTransform, true, "space-a");
+    world.recordObject(&inactiveWorldspaceObjectHandle, &inactiveWorldspaceCellHandle, true, 21, 21,
+        "inactive-space", "meshes/inactive-space.nif", objectTransform, true, "space-b");
+    const Render::SceneSubmission activeWorldspace = Render::collectSceneSubmission(world, aggregateScene, "space-a",
+        [&](std::string_view model) -> std::vector<Render::MeshInstance> {
+            if (model != "meshes/active-space.nif")
+                throw std::runtime_error("scene submission leaked an inactive worldspace model");
+            return { aggregateMesh };
+        }, false);
+    if (activeWorldspace.meshes.size() != 1 || activeWorldspace.unresolvedModels.size() != 0)
+        throw std::runtime_error("renderer-neutral scene submission did not filter active worldspace");
+    world.removeCell(&activeWorldspaceCellHandle);
+    world.removeCell(&inactiveWorldspaceCellHandle);
+
     const Render::SceneSubmission unresolved = Render::collectSceneSubmission(world, aggregateScene, "",
         [](std::string_view) { return std::vector<Render::MeshInstance>(); }, false);
     if (unresolved.unresolvedModels.size() != 1 || unresolved.unresolvedModels.front() != "meshes/first.nif"
