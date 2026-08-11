@@ -985,7 +985,6 @@ namespace MWWorld
         , mPredictionTime(Settings::cells().mPredictionTime)
         , mLowestPoint(std::numeric_limits<float>::max())
     {
-        mRendering.setNeutralSceneData(mNeutralWorldScene.sceneData());
         mPreloader = std::make_unique<CellPreloader>(resourceSystem, physics->getShapeManager(),
             rendering.getTerrain(), rendering.getLandManager());
         mPreloader->setWorkQueue(mRendering.getWorkQueue());
@@ -1003,7 +1002,6 @@ namespace MWWorld
         for (const osg::ref_ptr<SceneUtil::WorkItem>& v : mWorkItems)
             v->waitTillDone();
 
-        mRendering.clearNeutralSceneData();
     }
 
     bool Scene::hasCellChanged() const
@@ -1168,6 +1166,8 @@ namespace MWWorld
     {
         if (mNeutralTerrainRegionsDirty)
             updateNeutralTerrainRegions();
+
+        mRendering.synchronizeNeutralScene(mNeutralWorldScene.sceneData());
 
         const auto resolveMeshes = [this](std::string_view model) -> const Resource::NifMeshManager::Meshes& {
             const std::string key(model);

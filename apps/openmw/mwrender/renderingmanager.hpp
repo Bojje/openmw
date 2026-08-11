@@ -134,6 +134,10 @@ namespace MWRender
         /// without making the world depend on RenderingManager inheritance.
         Render::FrameLifecycle& getFrameLifecycle() { return *mFrameLifecycle; }
 
+        /// Copy the current reference-renderer camera and environment state into
+        /// the world-owned neutral frame snapshot at a frame boundary.
+        void synchronizeNeutralScene(Render::SceneData& sceneData) const;
+
         MWRender::Objects& getObjects() override;
 
         Resource::ResourceSystem* getResourceSystem();
@@ -254,6 +258,7 @@ namespace MWRender
 
         // camera stuff
         Camera* getCamera() { return mCamera.get(); }
+        const Camera* getCamera() const { return mCamera.get(); }
 
         /// temporarily override the field of view with given value.
         void overrideFieldOfView(float val);
@@ -304,13 +309,6 @@ namespace MWRender
         osg::Vec2f getProjectionOffset() const { return mProjectionOffset; }
 
     private:
-        friend class MWWorld::Scene;
-
-        /// Attach the world-owned neutral frame state without exposing its
-        /// lifetime bridge to other renderer clients.
-        void setNeutralSceneData(Render::SceneData& sceneData) { mNeutralSceneData = &sceneData; }
-        void clearNeutralSceneData() { mNeutralSceneData = nullptr; }
-
         void updateTextureFiltering();
         void updateAmbient();
         void setFogColor(const osg::Vec4f& color);
@@ -376,7 +374,6 @@ namespace MWRender
         osg::ref_ptr<SceneUtil::PerViewUniformStateUpdater> mPerViewUniformStateUpdater;
 
         osg::Vec4f mAmbientColor;
-        Render::SceneData* mNeutralSceneData = nullptr;
         float mNightEyeFactor;
 
         float mNearClip;
