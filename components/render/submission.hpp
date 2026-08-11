@@ -15,6 +15,45 @@
 
 namespace Render
 {
+    inline bool validMeshInstance(const MeshInstance& instance, bool allowEmptyIndices)
+    {
+        if (instance.mesh.indices.empty())
+            return allowEmptyIndices;
+        if (instance.mesh.vertices.empty() || !Render::valid(instance.transform)
+            || !Render::valid(instance.mesh.material.diffuse) || !Render::valid(instance.mesh.material.emissive)
+            || !std::isfinite(instance.mesh.material.glossiness)
+            || (instance.mesh.skinning && !instance.mesh.skinning->valid(instance.mesh.vertices.size())))
+            return false;
+
+        for (const MeshVertex& vertex : instance.mesh.vertices)
+        {
+            for (const float value : vertex.position)
+                if (!std::isfinite(value))
+                    return false;
+            for (const float value : vertex.normal)
+                if (!std::isfinite(value))
+                    return false;
+            for (const float value : vertex.texcoord)
+                if (!std::isfinite(value))
+                    return false;
+            for (const float value : vertex.blendTexcoord)
+                if (!std::isfinite(value))
+                    return false;
+            for (const float value : vertex.color)
+                if (!std::isfinite(value))
+                    return false;
+            for (const float value : vertex.material)
+                if (!std::isfinite(value))
+                    return false;
+            for (const float value : vertex.tangent)
+                if (!std::isfinite(value))
+                    return false;
+        }
+        return std::all_of(instance.mesh.indices.begin(), instance.mesh.indices.end(), [&](std::uint32_t index) {
+            return index < instance.mesh.vertices.size();
+        });
+    }
+
     struct DynamicMeshSubmission
     {
         WorldObject object;
@@ -50,57 +89,8 @@ namespace Render
 
             for (const MeshInstance& instance : meshes)
             {
-                if (instance.mesh.indices.empty())
-                    continue;
-                if (instance.mesh.vertices.empty() || !Render::valid(instance.transform)
-                    || !Render::valid(instance.mesh.material.diffuse) || !Render::valid(instance.mesh.material.emissive)
-                    || !std::isfinite(instance.mesh.material.glossiness))
+                if (!validMeshInstance(instance, true))
                     return false;
-                if (instance.mesh.skinning && !instance.mesh.skinning->valid(instance.mesh.vertices.size()))
-                    return false;
-                for (const MeshVertex& vertex : instance.mesh.vertices)
-                {
-                    for (const float value : vertex.position)
-                    {
-                        if (!std::isfinite(value))
-                            return false;
-                    }
-                    for (const float value : vertex.normal)
-                    {
-                        if (!std::isfinite(value))
-                            return false;
-                    }
-                    for (const float value : vertex.texcoord)
-                    {
-                        if (!std::isfinite(value))
-                            return false;
-                    }
-                    for (const float value : vertex.blendTexcoord)
-                    {
-                        if (!std::isfinite(value))
-                            return false;
-                    }
-                    for (const float value : vertex.color)
-                    {
-                        if (!std::isfinite(value))
-                            return false;
-                    }
-                    for (const float value : vertex.material)
-                    {
-                        if (!std::isfinite(value))
-                            return false;
-                    }
-                    for (const float value : vertex.tangent)
-                    {
-                        if (!std::isfinite(value))
-                            return false;
-                    }
-                }
-                for (const std::uint32_t index : instance.mesh.indices)
-                {
-                    if (index >= instance.mesh.vertices.size())
-                        return false;
-                }
             }
 
             for (const DynamicMeshSubmission& dynamic : dynamicMeshes)
@@ -109,42 +99,8 @@ namespace Render
                     return false;
                 for (const MeshInstance& instance : dynamic.meshes)
                 {
-                    if (instance.mesh.vertices.empty() || instance.mesh.indices.empty()
-                        || !Render::valid(instance.transform)
-                        || !Render::valid(instance.mesh.material.diffuse)
-                        || !Render::valid(instance.mesh.material.emissive)
-                        || !std::isfinite(instance.mesh.material.glossiness)
-                        || (instance.mesh.skinning && !instance.mesh.skinning->valid(instance.mesh.vertices.size())))
+                    if (!validMeshInstance(instance, false))
                         return false;
-                    for (const MeshVertex& vertex : instance.mesh.vertices)
-                    {
-                        for (const float value : vertex.position)
-                            if (!std::isfinite(value))
-                                return false;
-                        for (const float value : vertex.normal)
-                            if (!std::isfinite(value))
-                                return false;
-                        for (const float value : vertex.texcoord)
-                            if (!std::isfinite(value))
-                                return false;
-                        for (const float value : vertex.blendTexcoord)
-                            if (!std::isfinite(value))
-                                return false;
-                        for (const float value : vertex.color)
-                            if (!std::isfinite(value))
-                                return false;
-                        for (const float value : vertex.material)
-                            if (!std::isfinite(value))
-                                return false;
-                        for (const float value : vertex.tangent)
-                            if (!std::isfinite(value))
-                                return false;
-                    }
-                    for (const std::uint32_t index : instance.mesh.indices)
-                    {
-                        if (index >= instance.mesh.vertices.size())
-                            return false;
-                    }
                 }
             }
 

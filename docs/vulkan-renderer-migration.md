@@ -46,11 +46,12 @@ cache owned by `ResourceSystem`; its cache lifecycle is now forwarded explicitly
 the OSG `BaseResourceManager` interface. The renderer-mesh CPU test exercises that cache
 boundary, while the presentation smoke submits neutral mesh instances directly. Loaded world references now also have a renderer-neutral
 cell snapshot: the scene lifecycle records model identity, position, orientation, scale,
-visibility, cell transfer, and removal independently of the OSG node tree. Paged references
-remain in the snapshot with `visible == false` until the scene activates them. OSG still consumes the same
-events, but it no longer needs to be the only source of object transform state. The neutral
-world path resolves loaded-cell snapshots through cached NIF meshes, filters paged objects by
-neutral visibility, and composes object transforms with NIF node transforms before batching;
+visibility, cell transfer, and removal independently of the OSG node tree. Legacy-paged
+references remain in the snapshot, but active-cell static references are submitted to the neutral
+backend without inheriting OSG paging visibility. OSG still consumes the same events, but it no
+longer needs to be the only source of object transform state. The neutral world path resolves
+loaded-cell snapshots through cached NIF meshes, filters hidden and dynamic objects from the
+static batch, and composes object transforms with NIF node transforms before batching;
 animated objects are explicitly retained as dynamic snapshots, but are excluded from the static
 mesh batch until a skinning/animation consumer owns them; an ordered dynamic-object view provides
 that future backend with the retained visibility, transform, model, and cell ordering, and each
@@ -186,7 +187,7 @@ The non-owning manager update handle is private to the `Scene` owner, detached d
 teardown, and CI guards the manager header against regaining a value-owned neutral frame state.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-62 files, deleting 620 lines and adding 5,746 lines (net `+5,126`). The larger Vulkan-only
+62 files, deleting 620 lines and adding 5,703 lines (net `+5,083`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
