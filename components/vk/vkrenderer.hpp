@@ -76,7 +76,6 @@ namespace Vk
         bool loadShadersAndCreatePipelines(const std::string& shaderDir);
         bool validationEnabled() const;
         uint32_t validationErrorCount() const;
-        std::size_t dynamicObjectCount() const { return mDynamicObjects.size(); }
         std::size_t dynamicMeshCount() const { return mDynamicMeshes.size(); }
 
         void setScene(const Render::SceneSubmission& submission);
@@ -207,7 +206,6 @@ namespace Vk
         std::array<uint64_t, maxFramesInFlight> mUploadedMeshRevisions = {};
 
         std::vector<Render::MeshDraw> mMeshDraws;
-        std::vector<Render::WorldObject> mDynamicObjects;
         std::vector<Render::DynamicMeshSubmission> mDynamicMeshes;
 
         std::vector<VkCommandBuffer> mCommandBuffers;

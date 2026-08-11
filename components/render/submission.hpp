@@ -71,14 +71,9 @@ namespace Render
         std::vector<MeshInstance> meshes;
         std::vector<TerrainTile> terrainTiles;
         std::vector<std::string> unresolvedModels;
-        // Dynamic records are copied into the submission so a backend can
-        // retain a frame payload without borrowing WorldScene storage. They
-        // are not part of the static mesh batch until a skinning/animation
-        // consumer is available.
-        std::vector<WorldObject> dynamicObjects;
-        // Resolved dynamic meshes are carried separately so a future
-        // animation backend can consume skinning data without re-resolving
-        // assets or falling back to static bind-pose rendering.
+        // Dynamic records and their resolved meshes cross the frame boundary
+        // together, so a future animation backend can consume skinning data
+        // without borrowing WorldScene storage or re-resolving assets.
         std::vector<DynamicMeshSubmission> dynamicMeshes;
         TextureResolver textureResolver;
 
@@ -106,18 +101,9 @@ namespace Render
                 }
             }
 
-            for (const WorldObject& object : dynamicObjects)
+            for (const DynamicMeshSubmission& dynamic : dynamicMeshes)
             {
-                if (!object.dynamic || object.model.empty() || !object.transform.valid())
-                    return false;
-            }
-            if (dynamicMeshes.size() != dynamicObjects.size())
-                return false;
-            for (std::size_t index = 0; index < dynamicObjects.size(); ++index)
-            {
-                if (dynamicMeshes[index].object.id != dynamicObjects[index].id
-                    || dynamicMeshes[index].object.model != dynamicObjects[index].model
-                    || dynamicMeshes[index].object.dynamic != dynamicObjects[index].dynamic)
+                if (!dynamic.object.dynamic || dynamic.object.model.empty() || !dynamic.object.transform.valid())
                     return false;
             }
 
@@ -197,23 +183,23 @@ namespace Render
         SceneSubmission result;
         result.scene = scene;
         result.meshes = collectWorldMeshes(world, resolveMeshes, worldspace, &result.unresolvedModels);
-        result.dynamicObjects = world.dynamicObjectsInOrder(worldspace);
-        for (const WorldObject& object : result.dynamicObjects)
-        {
-            DynamicMeshSubmission dynamic;
-            dynamic.object = object;
-            if (!object.visible)
+        for (const CellScene* cell : world.cellsInOrder(worldspace))
+            for (const WorldObject& object : cell->objects)
             {
+                if (!object.dynamic)
+                    continue;
+                DynamicMeshSubmission dynamic;
+                dynamic.object = object;
+                if (object.visible)
+                {
+                    const std::vector<MeshInstance> resolvedMeshes = resolveMeshes(object.model);
+                    if (resolvedMeshes.empty())
+                        result.unresolvedModels.push_back(object.model);
+                    for (const MeshInstance& mesh : resolvedMeshes)
+                        dynamic.meshes.push_back(transformMeshInstance(object, mesh));
+                }
                 result.dynamicMeshes.push_back(std::move(dynamic));
-                continue;
             }
-            const std::vector<MeshInstance> resolvedMeshes = resolveMeshes(object.model);
-            if (resolvedMeshes.empty())
-                result.unresolvedModels.push_back(object.model);
-            for (const MeshInstance& mesh : resolvedMeshes)
-                dynamic.meshes.push_back(transformMeshInstance(object, mesh));
-            result.dynamicMeshes.push_back(std::move(dynamic));
-        }
 
         if (includeTerrain)
         {

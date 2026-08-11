@@ -273,12 +273,10 @@ int main(int argc, char** argv)
             };
             Render::SceneSubmission submission
                 = Render::collectSceneSubmission(world, scene, {}, resolveMeshes, true);
-            if (submission.dynamicObjects.size() != 1)
+            if (submission.dynamicMeshes.size() != 1)
                 throw std::runtime_error("Vulkan smoke lost the neutral dynamic-object snapshot");
             submission.textureResolver = smokeTexture;
             renderer->setScene(submission);
-            if (renderer->dynamicObjectCount() != submission.dynamicObjects.size())
-                throw std::runtime_error("Vulkan renderer dropped dynamic-object records");
             if (renderer->dynamicMeshCount() != submission.dynamicMeshes.size())
                 throw std::runtime_error("Vulkan renderer dropped dynamic mesh payloads");
 

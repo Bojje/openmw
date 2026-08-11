@@ -75,9 +75,9 @@ int main()
         objectTransform, true, {}, true);
     if (world.findCell(&firstCellHandle)->objects.size() != 1 || !world.findCell(&firstCellHandle)->objects.front().dynamic)
         throw std::runtime_error("renderer-neutral world scene failed to retain dynamic-object state");
-    const auto dynamicObjects = world.dynamicObjectsInOrder();
-    if (dynamicObjects.size() != 1 || dynamicObjects.front().model != "meshes/animated.nif"
-        || !dynamicObjects.front().visible)
+    const auto& dynamicObject = world.findCell(&firstCellHandle)->objects.front();
+    if (world.findCell(&firstCellHandle)->objects.size() != 1 || dynamicObject.model != "meshes/animated.nif"
+        || !dynamicObject.visible)
         throw std::runtime_error("renderer-neutral world scene failed dynamic-object handoff");
 
     int thirdCellHandle = 0;
@@ -159,7 +159,7 @@ int main()
                 throw std::runtime_error("scene submission collector resolved an unexpected model");
             return { aggregateMesh };
         }, true);
-    if (aggregate.meshes.size() != 1 || aggregate.dynamicObjects.size() != 0 || aggregate.terrainTiles.size() != 1
+    if (aggregate.meshes.size() != 1 || aggregate.dynamicMeshes.size() != 0 || aggregate.terrainTiles.size() != 1
         || !aggregate.valid())
         throw std::runtime_error("renderer-neutral scene submission collector lost world state");
 
@@ -179,7 +179,7 @@ int main()
                 throw std::runtime_error("dynamic scene submission resolved an unexpected model");
             return { aggregateMesh };
         }, false);
-    if (dynamicSubmission.dynamicObjects.size() != 1 || dynamicSubmission.dynamicMeshes.size() != 1
+    if (dynamicSubmission.dynamicMeshes.size() != 1
         || dynamicSubmission.dynamicMeshes.front().meshes.size() != 1
         || dynamicSubmission.referencedTexturePaths().size() != 1
         || dynamicSubmission.referencedTexturePaths().front() != "textures/dynamic.dds" || !dynamicSubmission.valid())
@@ -196,7 +196,7 @@ int main()
                 throw std::runtime_error("hidden dynamic scene submission resolved an invisible model");
             return { aggregateMesh };
         }, false);
-    if (hiddenDynamicSubmission.dynamicObjects.size() != 2 || hiddenDynamicSubmission.dynamicMeshes.size() != 2
+    if (hiddenDynamicSubmission.dynamicMeshes.size() != 2
         || hiddenDynamicSubmission.dynamicMeshes.back().object.model != "meshes/missing.nif"
         || !hiddenDynamicSubmission.dynamicMeshes.back().meshes.empty() || !hiddenDynamicSubmission.valid())
         throw std::runtime_error("renderer-neutral dynamic visibility policy was not preserved");
@@ -222,16 +222,15 @@ int main()
         || !submission.valid() || !submission.validationError().empty())
         throw std::runtime_error("renderer-neutral scene submission failed resource handoff");
 
-    submission.dynamicObjects.push_back({ 17, "meshes/animated.nif", objectTransform, true, true });
-    submission.dynamicMeshes.push_back({ submission.dynamicObjects.front(), {} });
-    if (submission.dynamicObjects.size() != 1 || !submission.dynamicObjects.front().dynamic
-        || submission.dynamicObjects.front().model != "meshes/animated.nif" || !submission.valid())
+    submission.dynamicMeshes.push_back({ { 17, "meshes/animated.nif", objectTransform, true, true }, {} });
+    if (submission.dynamicMeshes.size() != 1 || !submission.dynamicMeshes.front().object.dynamic
+        || submission.dynamicMeshes.front().object.model != "meshes/animated.nif" || !submission.valid())
         throw std::runtime_error("renderer-neutral scene submission lost dynamic records");
 
-    submission.dynamicObjects.front().dynamic = false;
+    submission.dynamicMeshes.front().object.dynamic = false;
     if (submission.valid())
         throw std::runtime_error("renderer-neutral scene submission accepted a static dynamic record");
-    submission.dynamicObjects.front().dynamic = true;
+    submission.dynamicMeshes.front().object.dynamic = true;
 
     Render::MeshInstance malformedMesh;
     malformedMesh.mesh.vertices.resize(1);

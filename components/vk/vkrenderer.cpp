@@ -1607,7 +1607,6 @@ namespace Vk
 
         mSceneData = submission.scene;
         mHasSceneData = true;
-        mDynamicObjects = submission.dynamicObjects;
         mDynamicMeshes = submission.dynamicMeshes;
         std::vector<Render::MeshInstance> meshes = submission.meshes;
         for (const Render::TerrainTile& tile : submission.terrainTiles)
@@ -1770,7 +1769,6 @@ namespace Vk
         mMeshAlphaTextureIndices.clear();
         mMeshNormalTextureIndices.clear();
         mMeshSpecularTextureIndices.clear();
-        mDynamicObjects.clear();
         mDynamicMeshes.clear();
     }
 
