@@ -840,6 +840,10 @@ void OMW::Engine::prepareEngine()
                 mViewer->updateTraversal();
                 mViewer->renderingTraversals();
             }
+        }, [this] {
+            const double simulationTime = mViewer->getFrameStamp()->getSimulationTime();
+            if (!mWorld || !mWorld->advanceFrame(simulationTime))
+                mViewer->advance(simulationTime);
         });
     mEnvironment.setWindowManager(*mWindowManager);
 
@@ -1052,7 +1056,7 @@ void OMW::Engine::go()
                               .count()
             * timeManager.getSimulationTimeScale();
 
-        mViewer->advance(timeManager.getRenderingSimulationTime());
+        mWorld->advanceFrame(timeManager.getRenderingSimulationTime());
 
         const unsigned frameNumber = mViewer->getFrameStamp()->getFrameNumber();
 

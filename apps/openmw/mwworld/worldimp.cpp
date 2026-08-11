@@ -3823,6 +3823,14 @@ namespace MWWorld
         return true;
     }
 
+    bool World::advanceFrame(double simulationTime)
+    {
+        if (!mRendering)
+            return false;
+        mRendering->advanceFrame(simulationTime);
+        return true;
+    }
+
     MWRender::PostProcessor* World::getPostProcessor()
     {
         return mRendering->getPostProcessor();

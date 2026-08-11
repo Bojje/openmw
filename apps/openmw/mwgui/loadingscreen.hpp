@@ -35,7 +35,7 @@ namespace MWGui
     {
     public:
         LoadingScreen(Resource::ResourceSystem* resourceSystem, osgViewer::Viewer* viewer,
-            std::function<void()> frameRenderer);
+            std::function<void()> frameRenderer, std::function<void()> frameAdvancer);
         virtual ~LoadingScreen();
 
         /// Overridden from Loading::Listener, see the Loading::Listener documentation for usage details
@@ -59,6 +59,7 @@ namespace MWGui
         Resource::ResourceSystem* mResourceSystem;
         osg::ref_ptr<osgViewer::Viewer> mViewer;
         std::function<void()> mFrameRenderer;
+        std::function<void()> mFrameAdvancer;
 
         double mTargetFrameRate;
 

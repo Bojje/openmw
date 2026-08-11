@@ -132,6 +132,7 @@ namespace MWRender
         /// backend will replace this lifecycle boundary once GUI and presentation
         /// services are renderer-neutral.
         void renderFrame();
+        void advanceFrame(double simulationTime);
 
         MWRender::Objects& getObjects() override;
 

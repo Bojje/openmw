@@ -335,7 +335,8 @@ namespace MWRender
 
         mCamera = std::make_unique<Camera>(mViewer->getCamera());
 
-        mScreenshotManager = std::make_unique<ScreenshotManager>(viewer, [this] { renderFrame(); });
+        mScreenshotManager = std::make_unique<ScreenshotManager>(viewer, [this] { renderFrame(); },
+            [this] { advanceFrame(mViewer->getFrameStamp()->getSimulationTime()); });
 
         mViewer->setLightingMode(osgViewer::View::NO_LIGHT);
 
@@ -437,6 +438,11 @@ namespace MWRender
         mViewer->eventTraversal();
         mViewer->updateTraversal();
         mViewer->renderingTraversals();
+    }
+
+    void RenderingManager::advanceFrame(double simulationTime)
+    {
+        mViewer->advance(simulationTime);
     }
 
     MWRender::Objects& RenderingManager::getObjects()

@@ -674,6 +674,7 @@ namespace MWWorld
         Misc::Rng::Generator& getPrng() override;
 
         bool renderFrame() override;
+        bool advanceFrame(double simulationTime) override;
 
         MWRender::RenderingManager* getRenderingManager() override { return mRendering.get(); }
 

@@ -605,6 +605,10 @@ namespace MWBase
         /// has been initialized yet.
         virtual bool renderFrame() = 0;
 
+        /// Advance the selected renderer's frame state before processing it.
+        /// Returns false while the world is being constructed.
+        virtual bool advanceFrame(double simulationTime) = 0;
+
         virtual MWRender::RenderingManager* getRenderingManager() = 0;
 
         virtual MWRender::PostProcessor* getPostProcessor() = 0;

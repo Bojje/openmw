@@ -151,7 +151,7 @@ namespace MWGui
         Resource::ResourceSystem* resourceSystem, SceneUtil::WorkQueue* workQueue, const std::filesystem::path& logpath,
         bool consoleOnlyScripts, Translation::Storage& translationDataStorage, ToUTF8::FromType encoding,
         bool exportFonts, const std::string& versionDescription, Files::ConfigurationManager& cfgMgr,
-        std::function<void()> frameRenderer)
+        std::function<void()> frameRenderer, std::function<void()> frameAdvancer)
         : mOldUpdateMask(0)
         , mOldCullMask(0)
         , mStore(nullptr)
@@ -159,6 +159,7 @@ namespace MWGui
         , mWorkQueue(workQueue)
         , mViewer(viewer)
         , mFrameRenderer(std::move(frameRenderer))
+        , mFrameAdvancer(std::move(frameAdvancer))
         , mConsoleOnlyScripts(consoleOnlyScripts)
         , mCurrentModals()
         , mHud(nullptr)
@@ -261,7 +262,7 @@ namespace MWGui
         mKeyboardNavigation->setEnabled(keyboardNav);
         Gui::ImageButton::setDefaultNeedKeyFocus(keyboardNav);
 
-        auto loadingScreen = std::make_unique<LoadingScreen>(mResourceSystem, mViewer, mFrameRenderer);
+        auto loadingScreen = std::make_unique<LoadingScreen>(mResourceSystem, mViewer, mFrameRenderer, mFrameAdvancer);
         mLoadingScreen = loadingScreen.get();
         mWindows.push_back(std::move(loadingScreen));
 
@@ -812,7 +813,7 @@ namespace MWGui
                 // at the time this function is called we are in the middle of a frame,
                 // so out of order calls are necessary to get a correct frameNumber for the next frame.
                 // refer to the advance() and frame() order in Engine::go()
-                mViewer->advance(mViewer->getFrameStamp()->getSimulationTime());
+                mFrameAdvancer();
 
                 frameRateLimiter.limit();
             }
@@ -2154,7 +2155,7 @@ namespace MWGui
             // at the time this function is called we are in the middle of a frame,
             // so out of order calls are necessary to get a correct frameNumber for the next frame.
             // refer to the advance() and frame() order in Engine::go()
-            mViewer->advance(mViewer->getFrameStamp()->getSimulationTime());
+            mFrameAdvancer();
 
             frameRateLimiter.limit();
         }

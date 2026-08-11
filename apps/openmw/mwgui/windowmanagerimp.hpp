@@ -132,7 +132,8 @@ namespace MWGui
             Resource::ResourceSystem* resourceSystem, SceneUtil::WorkQueue* workQueue,
             const std::filesystem::path& logpath, bool consoleOnlyScripts, Translation::Storage& translationDataStorage,
             ToUTF8::FromType encoding, bool exportFonts, const std::string& versionDescription,
-            Files::ConfigurationManager& cfgMgr, std::function<void()> frameRenderer);
+            Files::ConfigurationManager& cfgMgr, std::function<void()> frameRenderer,
+            std::function<void()> frameAdvancer);
         virtual ~WindowManager();
 
         /// Set the ESMStore to use for retrieving of GUI-related strings.
@@ -423,6 +424,7 @@ namespace MWGui
         std::unique_ptr<MyGUIPlatform::Platform> mGuiPlatform;
         osgViewer::Viewer* mViewer;
         std::function<void()> mFrameRenderer;
+        std::function<void()> mFrameAdvancer;
 
         std::unique_ptr<Gui::FontLoader> mFontLoader;
         std::unique_ptr<StatsWatcher> mStatsWatcher;

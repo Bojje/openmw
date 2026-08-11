@@ -31,11 +31,12 @@ namespace MWGui
 {
 
     LoadingScreen::LoadingScreen(Resource::ResourceSystem* resourceSystem, osgViewer::Viewer* viewer,
-        std::function<void()> frameRenderer)
+        std::function<void()> frameRenderer, std::function<void()> frameAdvancer)
         : WindowBase("openmw_loading_screen.layout")
         , mResourceSystem(resourceSystem)
         , mViewer(viewer)
         , mFrameRenderer(std::move(frameRenderer))
+        , mFrameAdvancer(std::move(frameAdvancer))
         , mTargetFrameRate(120.0)
         , mLastWallpaperChangeTime(0.0)
         , mLastRenderTime(0.0)
@@ -351,7 +352,7 @@ namespace MWGui
         // so out of order calls are necessary to get a correct frameNumber for the next frame.
         // refer to the advance() and frame() order in Engine::go()
         mFrameRenderer();
-        mViewer->advance(mViewer->getFrameStamp()->getSimulationTime());
+        mFrameAdvancer();
 
         mLastRenderTime = mTimer.time_m();
     }

@@ -124,6 +124,11 @@ jobs:
           echo "OpenMW frame traversal must go through the RenderingManager owner boundary"
           exit 1
         fi
+        if rg -n 'mViewer->advance\(' apps/openmw --glob '*.cpp' --glob '*.hpp' \
+            | rg -v 'apps/openmw/engine.cpp|apps/openmw/mwrender/renderingmanager.cpp'; then
+          echo "OpenMW frame advancement must go through the renderer owner boundary"
+          exit 1
+        fi
         if readelf -d build-vulkan/openmw | grep -Eiq 'libvulkan|libOpenSceneGraph|libosg'; then
           echo "openmw must not carry Vulkan or OSG runtime dependencies in the isolated build"
           exit 1

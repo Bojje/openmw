@@ -89,9 +89,11 @@ namespace MWRender
         osg::ref_ptr<osg::Image> mImage;
     };
 
-    ScreenshotManager::ScreenshotManager(osgViewer::Viewer* viewer, std::function<void()> frameRenderer)
+    ScreenshotManager::ScreenshotManager(osgViewer::Viewer* viewer, std::function<void()> frameRenderer,
+        std::function<void()> frameAdvancer)
         : mViewer(viewer)
         , mFrameRenderer(std::move(frameRenderer))
+        , mFrameAdvancer(std::move(frameAdvancer))
         , mDrawCompleteCallback(new NotifyDrawCompletedCallback)
     {
     }
@@ -116,7 +118,7 @@ namespace MWRender
 
         // now that we've "used up" the current frame, get a fresh frame number for the next frame() following after the
         // screenshot is completed
-        mViewer->advance(mViewer->getFrameStamp()->getSimulationTime());
+        mFrameAdvancer();
         camera->removeChild(tempDrw);
     }
 }

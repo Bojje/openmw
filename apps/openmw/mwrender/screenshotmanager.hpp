@@ -13,7 +13,8 @@ namespace MWRender
     class ScreenshotManager
     {
     public:
-        ScreenshotManager(osgViewer::Viewer* viewer, std::function<void()> frameRenderer);
+        ScreenshotManager(osgViewer::Viewer* viewer, std::function<void()> frameRenderer,
+            std::function<void()> frameAdvancer);
         ~ScreenshotManager();
 
         void screenshot(osg::Image* image, int w, int h);
@@ -21,6 +22,7 @@ namespace MWRender
     private:
         osg::ref_ptr<osgViewer::Viewer> mViewer;
         std::function<void()> mFrameRenderer;
+        std::function<void()> mFrameAdvancer;
         osg::ref_ptr<NotifyDrawCompletedCallback> mDrawCompleteCallback;
     };
 }
