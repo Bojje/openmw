@@ -71,9 +71,12 @@ namespace Vk
         Renderer& operator=(const Renderer&) = delete;
 
         bool render();
-        bool render(const Render::SceneSubmission& submission);
         bool renderFrame() override { return render(); }
-        bool renderFrame(const Render::SceneSubmission& submission) override { return render(submission); }
+        bool renderFrame(const Render::SceneSubmission& submission) override
+        {
+            setScene(submission);
+            return render();
+        }
         bool consumesSceneSubmission() const override { return true; }
         void synchronizeScene(Render::SceneData& /*sceneData*/) override {}
         void advanceFrame(double /*simulationTime*/) override {}

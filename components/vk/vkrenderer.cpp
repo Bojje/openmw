@@ -1482,12 +1482,6 @@ namespace Vk
         return endFrame();
     }
 
-    bool Renderer::render(const Render::SceneSubmission& submission)
-    {
-        setScene(submission);
-        return render();
-    }
-
     std::optional<Render::TextureData> Renderer::captureFrame()
     {
         if (!mHasSubmittedFrame || mHeadless)
