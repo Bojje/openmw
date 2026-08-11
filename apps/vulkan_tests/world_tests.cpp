@@ -173,13 +173,16 @@ int main()
         "meshes/active-space.nif", objectTransform, true, "space-a");
     world.recordObject(&inactiveWorldspaceObjectHandle, &inactiveWorldspaceCellHandle, true, 21, 21,
         "inactive-space", "meshes/inactive-space.nif", objectTransform, true, "space-b");
+    world.setTerrainTiles(&activeWorldspaceCellHandle, { neutralTerrain });
+    world.setTerrainTiles(&inactiveWorldspaceCellHandle, { neutralTerrain });
     const Render::SceneSubmission activeWorldspace = Render::collectSceneSubmission(world, aggregateScene, "space-a",
         [&](std::string_view model) -> std::vector<Render::MeshInstance> {
             if (model != "meshes/active-space.nif")
                 throw std::runtime_error("scene submission leaked an inactive worldspace model");
             return { aggregateMesh };
-        }, false);
-    if (activeWorldspace.meshes.size() != 1 || activeWorldspace.unresolvedModels.size() != 0)
+        }, true);
+    if (activeWorldspace.meshes.size() != 1 || activeWorldspace.terrainTiles.size() != 1
+        || activeWorldspace.unresolvedModels.size() != 0)
         throw std::runtime_error("renderer-neutral scene submission did not filter active worldspace");
     world.removeCell(&activeWorldspaceCellHandle);
     world.removeCell(&inactiveWorldspaceCellHandle);
