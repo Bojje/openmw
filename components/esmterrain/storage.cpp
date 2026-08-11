@@ -725,6 +725,7 @@ namespace ESMTerrain
             VFS::Path::Normalized specularMap(std::move(specularMapValue));
             if (mVFS->exists(specularMap))
             {
+                info.mSpecularMap = specularMap;
                 info.mDiffuseMap = std::move(specularMap);
                 info.mSpecular = true;
             }

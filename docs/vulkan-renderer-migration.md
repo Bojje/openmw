@@ -160,8 +160,8 @@ G-buffer normal path; parallax offsetting now uses the normal-map height channel
 textures use a separate linear-repeat sampler so terrain tiling is preserved, while G-buffer
 attachments remain clamped. Terrain diffuse-specular maps are consumed, and ordinary object
 specular maps now use the configured pattern, dedicated texture table, and RGB G-buffer path;
-ESM4 explicit terrain specular maps now use the same neutral texture table and RGB path;
-terrain auto-detection and complete terrain image coverage remain outstanding. The neutral cache now retains
+ESM4 explicit and auto-detected terrain specular maps now use the same neutral texture table and RGB path;
+complete terrain image coverage remains outstanding. The neutral cache now retains
 per-cell LOD snapshots and selects one deterministically by camera distance before handoff;
 quadtree-scale streaming and composite-image coverage remain outstanding. `WorldScene` now
 records empty loaded cells as well as object-bearing cells and owns each cell's cached terrain
@@ -187,7 +187,7 @@ The non-owning manager update handle is private to the `Scene` owner, detached d
 teardown, and CI guards the manager header against regaining a value-owned neutral frame state.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-62 files, deleting 620 lines and adding 5,703 lines (net `+5,083`). The larger Vulkan-only
+62 files, deleting 620 lines and adding 5,704 lines (net `+5,084`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
@@ -201,7 +201,7 @@ the public neutral-world lookup escape hatch, and its remaining manager-only neu
 lookup, removal, cell-transfer, transform-update, reset, and terrain-snapshot wrappers. The
 world lifecycle now calls `WorldScene` directly for
 insertion, removal, active-cell transfer, transform updates, reset, and terrain snapshots. Active-cell static references are now submitted even when legacy OSG object paging places them in a paged node; the neutral backend therefore does not inherit an invisible-object hole from the reference renderer. The terrain adapter is now consumed for opaque, normal-mapped, parallax, and
-blendmap/multi-layer Vulkan terrain, including explicit ESM4 specular textures; its remaining
+blendmap/multi-layer Vulkan terrain, including explicit ESM4 and auto-detected specular textures; its remaining
 owner boundary is quadtree-scale streaming and complete image coverage. Terrain layer feature
 flags now default to disabled
 at the shared storage boundary, preventing ESM4 default layers from acquiring undefined
