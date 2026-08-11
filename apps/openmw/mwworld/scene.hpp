@@ -59,6 +59,11 @@ namespace Terrain
     class RenderStorage;
 }
 
+namespace SceneUtil
+{
+    class WorkQueue;
+}
+
 namespace Resource
 {
     class ResourceSystem;
@@ -112,6 +117,7 @@ namespace MWWorld
         MWRender::RenderingManager& mRendering;
         MWRender::LandManager& mLandManager;
         Terrain::RenderStorage& mTerrainStorage;
+        SceneUtil::WorkQueue* mWorkQueue;
         DetourNavigator::Navigator& mNavigator;
         std::unique_ptr<CellPreloader> mPreloader;
         float mCellLoadingThreshold;
@@ -168,7 +174,8 @@ namespace MWWorld
 
     public:
         Scene(MWWorld::World& world, MWRender::RenderingManager& rendering, MWRender::LandManager& landManager,
-            Terrain::RenderStorage& terrainStorage, Resource::ResourceSystem* resourceSystem,
+            Terrain::RenderStorage& terrainStorage, SceneUtil::WorkQueue* workQueue,
+            Resource::ResourceSystem* resourceSystem,
             MWPhysics::PhysicsSystem* physics,
             DetourNavigator::Navigator& navigator);
 

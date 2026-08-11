@@ -433,11 +433,6 @@ namespace MWRender
         return *mObjects.get();
     }
 
-    SceneUtil::WorkQueue* RenderingManager::getWorkQueue()
-    {
-        return mWorkQueue.get();
-    }
-
     Terrain::World* RenderingManager::getTerrain()
     {
         return mTerrain;

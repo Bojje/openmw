@@ -966,7 +966,7 @@ namespace MWWorld
     }
 
     Scene::Scene(MWWorld::World& world, MWRender::RenderingManager& rendering, MWRender::LandManager& landManager,
-        Terrain::RenderStorage& terrainStorage, Resource::ResourceSystem* resourceSystem,
+        Terrain::RenderStorage& terrainStorage, SceneUtil::WorkQueue* workQueue, Resource::ResourceSystem* resourceSystem,
         MWPhysics::PhysicsSystem* physics,
         DetourNavigator::Navigator& navigator)
         : mCurrentCell(nullptr)
@@ -977,6 +977,7 @@ namespace MWWorld
         , mRendering(rendering)
         , mLandManager(landManager)
         , mTerrainStorage(terrainStorage)
+        , mWorkQueue(workQueue)
         , mNavigator(navigator)
         , mCellLoadingThreshold(1024.f)
         , mPreloadDistance(Settings::cells().mPreloadDistance)
@@ -989,7 +990,7 @@ namespace MWWorld
     {
         mPreloader = std::make_unique<CellPreloader>(resourceSystem, physics->getShapeManager(), rendering.getTerrain(),
             &mLandManager);
-        mPreloader->setWorkQueue(mRendering.getWorkQueue());
+        mPreloader->setWorkQueue(mWorkQueue);
         mPreloader->setExpiryDelay(Settings::cells().mPreloadCellExpiryDelay);
         mPreloader->setMinCacheSize(Settings::cells().mPreloadCellCacheMin);
         mPreloader->setMaxCacheSize(Settings::cells().mPreloadCellCacheMax);
@@ -1386,7 +1387,7 @@ namespace MWWorld
 
         osg::ref_ptr<PreloadMeshItem> item(
             new PreloadMeshItem(meshPath, mResourceSystem->getSceneManager()));
-        mRendering.getWorkQueue()->addWorkItem(item);
+        mWorkQueue->addWorkItem(item);
         const auto isDone = [](const osg::ref_ptr<SceneUtil::WorkItem>& v) { return v->isDone(); };
         mWorkItems.erase(std::remove_if(mWorkItems.begin(), mWorkItems.end(), isDone), mWorkItems.end());
         mWorkItems.emplace_back(std::move(item));
