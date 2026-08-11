@@ -1,5 +1,6 @@
 #include "meshconverter.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <stdexcept>
@@ -356,9 +357,18 @@ namespace Nif
 
             auto result = std::make_shared<Render::SkinningData>();
             result->vertices.resize(vertexCount);
+            const bool hasBoneNames = std::all_of(geometry.mSkin->mBones.begin(), geometry.mSkin->mBones.end(),
+                [](const auto& bone) { return !bone.empty() && !bone->mName.empty(); });
+            if (hasBoneNames)
+                result->boneNames.reserve(geometry.mSkin->mBones.size());
             result->inverseBindMatrices.reserve(source.mBones.size());
-            for (const NiSkinData::BoneInfo& bone : source.mBones)
+            for (std::size_t boneIndex = 0; boneIndex < source.mBones.size(); ++boneIndex)
+            {
+                const auto& bone = source.mBones[boneIndex];
+                if (hasBoneNames)
+                    result->boneNames.push_back(geometry.mSkin->mBones[boneIndex]->mName);
                 result->inverseBindMatrices.push_back(toRenderMatrix(bone.mTransform));
+            }
 
             for (std::size_t boneIndex = 0; boneIndex < source.mBones.size(); ++boneIndex)
             {

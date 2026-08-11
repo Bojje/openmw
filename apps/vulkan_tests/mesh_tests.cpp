@@ -37,6 +37,7 @@ int main()
     auto skinning = std::make_shared<Render::SkinningData>();
     skinning->vertices.resize(1);
     skinning->vertices.front().weights[0] = 1.f;
+    skinning->boneNames.push_back("Root Bone");
     Render::Mat4 identity = {};
     identity.data[0] = identity.data[5] = identity.data[10] = identity.data[15] = 1.f;
     skinning->inverseBindMatrices.push_back(identity);
@@ -152,6 +153,9 @@ int main()
     Nif::NiSkinInstance skin;
     skin.mData = &skinData;
     skin.mBones.resize(1);
+    Nif::NiNode skinBone;
+    skinBone.mName = "Root Bone";
+    skin.mBones.front() = &skinBone;
     shape.mSkin = &skin;
     Nif::NiNode root;
     root.mTransform = Nif::NiTransform::getIdentity();
@@ -176,7 +180,8 @@ int main()
         || instances.front().mesh.material.normalWrapU || !instances.front().mesh.material.normalWrapV)
         throw std::runtime_error("NIF material conversion lost texture or alpha state");
     if (!instances.front().mesh.skinning || !instances.front().mesh.skinning->valid(3)
-        || instances.front().mesh.skinning->vertices[1].weights[0] != 1.f)
+        || instances.front().mesh.skinning->vertices[1].weights[0] != 1.f
+        || instances.front().mesh.skinning->boneNames != std::vector<std::string>{ "Root Bone" })
         throw std::runtime_error("NIF skinning metadata was not preserved at the neutral boundary");
     if (!instances.front().mesh.material.emissiveWrapU || instances.front().mesh.material.emissiveWrapV)
         throw std::runtime_error("NIF material conversion lost emissive texture wrapping");

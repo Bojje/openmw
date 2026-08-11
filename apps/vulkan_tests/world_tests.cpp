@@ -257,6 +257,7 @@ int main()
     dynamicSkinning->vertices.resize(3);
     for (Render::SkinVertex& vertex : dynamicSkinning->vertices)
         vertex.weights[0] = 1.f;
+    dynamicSkinning->boneNames.push_back("Root Bone");
     dynamicSkinning->inverseBindMatrices.push_back(Render::identityMat4());
     Render::MeshInstance skinnedDynamicMesh = aggregateMesh;
     skinnedDynamicMesh.mesh.skinning = dynamicSkinning;

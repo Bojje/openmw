@@ -71,11 +71,21 @@ namespace Render
     struct SkinningData
     {
         std::vector<SkinVertex> vertices;
+        // Optional source names in the same order as inverseBindMatrices.
+        // Keeping them here lets an animation producer map a pose by name
+        // without exposing a scene-graph bone type to the renderer.
+        std::vector<std::string> boneNames;
         std::vector<Mat4> inverseBindMatrices;
 
         bool valid(std::size_t vertexCount) const
         {
             if (vertices.size() != vertexCount || inverseBindMatrices.empty())
+                return false;
+            if (!boneNames.empty()
+                && (boneNames.size() != inverseBindMatrices.size()
+                    || std::any_of(boneNames.begin(), boneNames.end(), [](const std::string& name) {
+                           return name.empty();
+                       })))
                 return false;
 
             for (const SkinVertex& vertex : vertices)

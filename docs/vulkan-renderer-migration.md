@@ -102,8 +102,9 @@ teardown, so a game/world unload cannot retain stale object identities, terrain 
 ordering.
 Dynamic `WorldObject` records now own an optional neutral bone-pose snapshot and expose an explicit
 pose-update operation; `SceneSubmission` carries that pose beside each resolved dynamic mesh. The
-live animation producer, skin-order mapping, animation timing, and animation-specific shading remain
-outstanding, but the future producer no longer needs to extend the renderer boundary or borrow OSG types.
+live animation producer, animation timing, and animation-specific shading remain outstanding. NIF
+skinning metadata now also preserves source bone names beside inverse-bind matrices, making the
+future name-to-pose mapping deterministic without borrowing OSG types.
 The Vulkan composite pass now consumes that single scene-lighting UBO directly; duplicated
 sun push constants were removed, and ambient light is part of the neutral snapshot. The
 world-owned `Scene` now resolves loaded-world meshes and RGBA8 textures through the existing
@@ -205,7 +206,7 @@ The non-owning manager update handle is private to the `Scene` owner, detached d
 teardown, and CI guards the manager header against regaining a value-owned neutral frame state.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-81 files, deleting 760 lines and adding 6,432 lines (net `+5,672`). The larger Vulkan-only
+81 files, deleting 760 lines and adding 6,459 lines (net `+5,699`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
