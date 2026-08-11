@@ -70,6 +70,7 @@ namespace Vk
         Renderer& operator=(const Renderer&) = delete;
 
         bool render();
+        bool render(const Render::SceneSubmission& submission);
         std::optional<Render::TextureData> captureFrame();
         void resize(uint32_t width, uint32_t height);
         bool loadShadersAndCreatePipelines(const std::string& shaderDir);

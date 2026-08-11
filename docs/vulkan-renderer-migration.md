@@ -108,9 +108,10 @@ for this path while retaining legacy OSG getters for the reference backend. This
 backend-specific type from the future Vulkan handoff.
 Those inputs can now be collected as one `Render::SceneSubmission`; the standalone smoke
 consumer now exercises the same `WorldScene` to `Vk::Renderer` handoff, while the renderer-neutral
-`collectSceneSubmission` helper owns mesh, dynamic-record, worldspace, and terrain selection,
-while `Vk::Renderer::setScene` consumes that handoff in the standalone path and the smoke test
-exercises it. The submission
+`collectSceneSubmission` helper owns mesh, dynamic-record, worldspace, and terrain selection.
+`Vk::Renderer::setScene` supports persistent frame-loop updates, and
+`Vk::Renderer::render(SceneSubmission)` provides the atomic one-call handoff for a future live
+backend. The submission
 boundary now validates mesh indices and terrain snapshots before Vulkan consumes them. The full-game
 Vulkan call site is still intentionally absent until window, input, dynamic-content, and GUI
 services have a Vulkan owner. Mesh submission no longer waits for the whole device or
@@ -182,7 +183,7 @@ The non-owning manager update handle is private to the `Scene` owner, detached d
 teardown, and CI guards the manager header against regaining a value-owned neutral frame state.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-62 files, deleting 620 lines and adding 5,433 lines (net `+4,813`). The larger Vulkan-only
+62 files, deleting 620 lines and adding 5,441 lines (net `+4,821`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.

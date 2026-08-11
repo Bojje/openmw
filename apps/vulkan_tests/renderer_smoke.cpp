@@ -291,6 +291,7 @@ int main(int argc, char** argv)
             std::optional<Render::TextureData> previousCapture;
             for (unsigned int frame = 0; frame < frames; ++frame)
             {
+                bool renderWithSubmission = frame == 0;
                 if (!reference && frames > 2 && frame == frames / 2)
                 {
                     renderer->setScene(alternateSubmission);
@@ -299,7 +300,7 @@ int main(int argc, char** argv)
 
                 if (!headless)
                     SDL_PumpEvents();
-                if (renderer->render())
+                if ((renderWithSubmission ? renderer->render(submission) : renderer->render()))
                 {
                     ++renderedFrames;
                     const std::optional<Render::TextureData> capture = renderer->captureFrame();
