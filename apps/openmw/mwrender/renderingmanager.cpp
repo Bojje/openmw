@@ -432,6 +432,11 @@ namespace MWRender
         return mViewer->getIncrementalCompileOperation();
     }
 
+    void RenderingManager::renderFrame()
+    {
+        mViewer->renderingTraversals();
+    }
+
     MWRender::Objects& RenderingManager::getObjects()
     {
         return *mObjects.get();

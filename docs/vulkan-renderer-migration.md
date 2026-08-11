@@ -187,7 +187,7 @@ The non-owning manager update handle is private to the `Scene` owner, detached d
 teardown, and CI guards the manager header against regaining a value-owned neutral frame state.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-62 files, deleting 621 lines and adding 5,763 lines (net `+5,142`). The larger Vulkan-only
+62 files, deleting 622 lines and adding 5,778 lines (net `+5,156`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
@@ -362,4 +362,7 @@ Normal development should use this order:
 When scene-bridge changes are in progress, enable `OPENMW_VALIDATE_NEUTRAL_SCENE=1` for
 the full-game smoke run; it checks the neutral payload every 30 frames and after cell changes.
 
-The full game should not be repeatedly started for every change.
+The full game should not be repeatedly started for every change. The main engine loop now
+delegates final frame submission through `RenderingManager::renderFrame()`, establishing the
+replacement point for a future Vulkan frame owner while the current OSG reference behavior
+remains unchanged.
