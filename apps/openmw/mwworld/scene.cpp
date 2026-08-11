@@ -1146,10 +1146,9 @@ namespace MWWorld
         return result;
     }
 
-    void Scene::updateNeutralCamera()
+    Render::SceneData& Scene::getNeutralWorldSceneData()
     {
-        const MWRender::Camera* camera = mRendering.getCamera();
-        mNeutralWorldScene.setCameraMatrices(camera->getNeutralViewMatrix(), camera->getNeutralProjectionMatrix());
+        return mNeutralWorldScene.sceneData();
     }
 
     void Scene::updateNeutralObjectCell(const void* oldObjectKey, const void* newObjectKey, const void* cellKey,

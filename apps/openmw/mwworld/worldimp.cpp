@@ -1,6 +1,7 @@
 #include "worldimp.hpp"
 
 #include <charconv>
+#include <stdexcept>
 #include <vector>
 
 #include <osg/ComputeBoundsVisitor>
@@ -3819,13 +3820,22 @@ namespace MWWorld
     {
         if (!mFrameLifecycle)
             return false;
+        if (mFrameLifecycle->consumesSceneSubmission())
+        {
+            if (!mWorldScene)
+                return false;
+
+            mFrameLifecycle->synchronizeScene(mWorldScene->getNeutralWorldSceneData());
+            Render::SceneSubmission submission = mWorldScene->getNeutralScene();
+            if (const std::string error = submission.validationError(); !error.empty())
+                throw std::runtime_error("full-game neutral scene submission: " + error);
+            mFrameLifecycle->renderFrame(submission);
+            return true;
+        }
+
         mFrameLifecycle->renderFrame();
-        // OSG updates the game camera during event traversal. Synchronize the
-        // renderer-neutral snapshot only after that traversal so the next
-        // backend receives the matrices for the frame that was actually
-        // submitted.
         if (mWorldScene)
-            mWorldScene->updateNeutralCamera();
+            mFrameLifecycle->synchronizeScene(mWorldScene->getNeutralWorldSceneData());
         return true;
     }
 

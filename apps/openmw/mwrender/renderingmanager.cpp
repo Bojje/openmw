@@ -440,6 +440,20 @@ namespace MWRender
         mViewer->renderingTraversals();
     }
 
+    void RenderingManager::renderFrame(const Render::SceneSubmission& /*submission*/)
+    {
+        renderFrame();
+    }
+
+    void RenderingManager::synchronizeScene(Render::SceneData& sceneData)
+    {
+        const MWRender::Camera* camera = getCamera();
+        sceneData.view = camera->getNeutralViewMatrix();
+        sceneData.projection = camera->getNeutralProjectionMatrix();
+        sceneData.viewInverse = Render::invertMat4(sceneData.view);
+        sceneData.projInverse = Render::invertMat4(sceneData.projection);
+    }
+
     void RenderingManager::advanceFrame(double simulationTime)
     {
         mViewer->advance(simulationTime);
