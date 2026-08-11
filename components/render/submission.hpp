@@ -111,7 +111,7 @@ namespace Render
     {
         SceneSubmission result;
         result.scene = scene;
-        result.meshes = collectWorldMeshes(world, resolveMeshes, worldspace, true, &result.unresolvedModels);
+        result.meshes = collectWorldMeshes(world, resolveMeshes, worldspace, &result.unresolvedModels);
         result.dynamicObjects = world.dynamicObjectsInOrder(worldspace);
 
         if (includeTerrain)

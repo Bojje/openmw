@@ -1080,10 +1080,8 @@ namespace MWWorld
         result.scene = mNeutralWorldScene.sceneData();
 
         std::unordered_map<std::string, std::shared_ptr<const Resource::NifMeshManager::Meshes>> cache;
-        // Until the Vulkan animation consumer is available, dynamic objects use
-        // their converted bind-pose geometry. Keep the dynamic records below so
-        // the eventual skinned path can replace this fallback without changing
-        // the scene bridge.
+        // Dynamic objects are carried as records, but are deliberately excluded
+        // from the static mesh batch until a backend owns animation and skinning.
         result = Render::collectSceneSubmission(mNeutralWorldScene, result.scene,
             mNeutralWorldScene.activeWorldspace(),
             [&](std::string_view model) -> const Resource::NifMeshManager::Meshes& {

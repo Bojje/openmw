@@ -51,13 +51,12 @@ remain in the snapshot with `visible == false` until the scene activates them. O
 events, but it no longer needs to be the only source of object transform state. The neutral
 world path resolves loaded-cell snapshots through cached NIF meshes, filters paged objects by
 neutral visibility, and composes object transforms with NIF node transforms before batching;
-animated objects are explicitly retained as dynamic snapshots and now also contribute converted
-bind-pose geometry to the Vulkan batch as a fallback until a skinning/animation consumer owns
-them; an ordered dynamic-object view provides that future backend with the retained visibility,
-transform, model, and cell ordering, and each `SceneSubmission` copies those records across the
-frame boundary. The standalone Vulkan consumer now retains those ordered dynamic records while
-rendering their bind-pose geometry as a fallback; skinning and animation remain outstanding
-until the live game backend consumes them.
+animated objects are explicitly retained as dynamic snapshots, but are excluded from the static
+mesh batch until a skinning/animation consumer owns them; an ordered dynamic-object view provides
+that future backend with the retained visibility, transform, model, and cell ordering, and each
+`SceneSubmission` copies those records across the frame boundary. The standalone Vulkan consumer
+retains those ordered dynamic records without pretending unskinned geometry is a finished dynamic
+renderer; skinning and animation remain outstanding until the live game backend consumes them.
 NIF classic texture, diffuse/emissive, glossiness, and alpha properties now cross the
 renderer-neutral mesh boundary and survive batching; the neutral batch applies diffuse
 and alpha to vertex color output. NIF bump/normal texture slots now cross the same boundary

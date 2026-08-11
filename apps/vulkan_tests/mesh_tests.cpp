@@ -245,15 +245,6 @@ int main()
         });
     if (visibleMeshes.size() != 1)
         throw std::runtime_error("cell mesh collection did not filter hidden objects");
-    const std::vector<Render::MeshInstance> allMeshes = Render::collectCellMeshes(
-        scene, [&](std::string_view model) -> const Resource::NifMeshManager::Meshes& {
-            if (model != "synthetic.nif" && model != "animated.nif")
-                throw std::runtime_error("dynamic mesh collection resolved an unexpected model");
-            return *cached;
-        }, true);
-    if (allMeshes.size() != 2)
-        throw std::runtime_error("cell mesh collection could not opt into dynamic objects");
-
     int worldObjectHandle = 0;
     int worldCellHandle = 0;
     int foreignObjectHandle = 0;
@@ -272,18 +263,6 @@ int main()
     if (worldMeshes.size() != 1 || world.cellsInOrder("world-a").size() != 1
         || world.cellsInOrder("world-b").size() != 1)
         throw std::runtime_error("world mesh collection did not filter loaded worldspaces");
-
-    int dynamicWorldObjectHandle = 0;
-    world.recordObject(&dynamicWorldObjectHandle, &worldCellHandle, true, 0, 0, "world", "animated.nif",
-        object.transform, true, "world-a", true);
-    const std::vector<Render::MeshInstance> worldMeshesWithDynamic = Render::collectWorldMeshes(
-        world, [&](std::string_view model) -> const Resource::NifMeshManager::Meshes& {
-            if (model != "synthetic.nif" && model != "animated.nif")
-                throw std::runtime_error("dynamic world mesh collection resolved an unexpected model");
-            return *cached;
-        }, "world-a", true);
-    if (worldMeshesWithDynamic.size() != 2)
-        throw std::runtime_error("world mesh collection did not include dynamic fallback geometry");
 
     Render::MeshInstance invalidBatch = instances.front();
     invalidBatch.mesh.indices = { 3 };
