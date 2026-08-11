@@ -352,9 +352,20 @@ bool OMW::Engine::frame(unsigned frameNumber, float frametime)
     // if there is a separate Lua thread, it starts the update now
     mLuaWorker->allowUpdate(frameStart, frameNumber, *stats);
 
-    mWorld->renderFrame();
+    const auto finishLuaUpdate = [this, &frameStart, frameNumber, stats] {
+        mLuaWorker->finishUpdate(frameStart, frameNumber, *stats);
+    };
+    try
+    {
+        mWorld->renderFrame();
+    }
+    catch (...)
+    {
+        finishLuaUpdate();
+        throw;
+    }
 
-    mLuaWorker->finishUpdate(frameStart, frameNumber, *stats);
+    finishLuaUpdate();
 
     if (mValidateNeutralScene && mStateManager->getState() != MWBase::StateManager::State_NoGame
         && (frameNumber % 30 == 0 || mWorld->getWorldScene().hasCellChanged()))
