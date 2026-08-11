@@ -163,8 +163,9 @@ namespace MWWorld
             const DetourNavigator::UpdateGuard* navigatorUpdateGuard);
 
     public:
-        Scene(MWWorld::World& world, MWRender::RenderingManager& rendering, Resource::ResourceSystem* resourceSystem,
-            MWPhysics::PhysicsSystem* physics, DetourNavigator::Navigator& navigator);
+        Scene(MWWorld::World& world, MWRender::RenderingManager& rendering, Terrain::RenderStorage& terrainStorage,
+            Resource::ResourceSystem* resourceSystem, MWPhysics::PhysicsSystem* physics,
+            DetourNavigator::Navigator& navigator);
 
         ~Scene();
 
@@ -210,7 +211,7 @@ namespace MWWorld
 
     private:
         /// Access the world-owned neutral frame state for renderer synchronization.
-        Render::SceneData& getNeutralWorldSceneData();
+        Render::SceneData& getFrameSceneData();
 
     public:
         void markCellAsUnchanged();

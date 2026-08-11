@@ -55,11 +55,11 @@ static batch, and composes object transforms with NIF node transforms before bat
 animated objects are explicitly retained as dynamic snapshots, but are excluded from the static
 mesh batch until a skinning/animation consumer owns them; the ordered `dynamicMeshes` payload provides
 that future backend with the retained visibility, transform, model, and cell ordering together with
-any resolved mesh data. A producer that owns a frame pose can now attach neutral bone matrices, and
-the Vulkan consumer applies those matrices through the renderer-neutral CPU skinning helper before
-rasterization. Live-game bone production, animation timing, and animation-specific shading remain
-outstanding, so records without a supplied pose are still deliberately excluded rather than silently
-rendered in a bind pose.
+any resolved mesh data. A transitional OSG-backed producer now attaches current neutral bone matrices
+after reference traversal, and the Vulkan consumer applies supplied poses through the
+renderer-neutral CPU skinning helper before rasterization. Full-game Vulkan pose timing and
+animation-specific shading remain outstanding, so records without a supplied pose are still
+deliberately excluded rather than silently rendered in a bind pose.
 NIF classic texture, diffuse/emissive, glossiness, and alpha properties now cross the
 renderer-neutral mesh boundary and survive batching; the neutral batch applies diffuse
 and alpha to vertex color output. NIF bump/normal texture slots now cross the same boundary
@@ -189,13 +189,14 @@ on every frame export. Neutral terrain LOD assembly now belongs to `Terrain::Ren
 the renderer-neutral scene submission or owns its resource callbacks. Neutral terrain collection
 now depends on cached world tiles rather than the legacy OSG terrain object being active.
 `Terrain::RenderStorage` is now the renderer-neutral terrain contract, including neutral
-per-cell LOD assembly. The legacy
+per-cell LOD assembly. `MWWorld::Scene` receives that contract explicitly at construction,
+so its neutral terrain paths do not call back into `RenderingManager`. The legacy
 `Terrain::Storage` derives from it and contains only the OSG-facing array, image, and height
 adapters needed by the reference renderer. `RenderStorage::getRenderTile()` consumes neutral
 vertices and blendmaps directly, so the Vulkan path no longer performs an OSG-buffer-to-neutral
 round trip and can depend on the contract without including OSG headers. `RenderingManager`
-exposes that neutral contract while retaining the concrete adapter privately for the reference
-terrain implementation.
+still retains the concrete adapter privately for the reference terrain implementation and passes
+the neutral contract to the world lifecycle.
 Neutral lighting and fog state now lives in `WorldScene::sceneData()` with the rest of the
 world-owned handoff. `RenderingManager` only receives a non-owning update reference, so its
 OSG state changes cannot reintroduce a second neutral scene owner.
@@ -209,7 +210,7 @@ The non-owning manager update handle is private to the `Scene` owner, detached d
 teardown, and CI guards the manager header against regaining a value-owned neutral frame state.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-83 files, deleting 760 lines and adding 6,533 lines (net `+5,773`). The larger Vulkan-only
+83 files, deleting 758 lines and adding 6,539 lines (net `+5,781`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.

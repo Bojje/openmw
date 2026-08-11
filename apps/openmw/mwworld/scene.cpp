@@ -960,15 +960,16 @@ namespace MWWorld
         mLastPlayerPos = player.getRefData().getPosition().asVec3();
     }
 
-    Scene::Scene(MWWorld::World& world, MWRender::RenderingManager& rendering, Resource::ResourceSystem* resourceSystem,
-        MWPhysics::PhysicsSystem* physics, DetourNavigator::Navigator& navigator)
+    Scene::Scene(MWWorld::World& world, MWRender::RenderingManager& rendering, Terrain::RenderStorage& terrainStorage,
+        Resource::ResourceSystem* resourceSystem, MWPhysics::PhysicsSystem* physics,
+        DetourNavigator::Navigator& navigator)
         : mCurrentCell(nullptr)
         , mCellChanged(false)
         , mWorld(world)
         , mResourceSystem(resourceSystem)
         , mPhysics(physics)
         , mRendering(rendering)
-        , mTerrainStorage(rendering.getTerrainStorage())
+        , mTerrainStorage(terrainStorage)
         , mNavigator(navigator)
         , mCellLoadingThreshold(1024.f)
         , mPreloadDistance(Settings::cells().mPreloadDistance)
@@ -1188,7 +1189,7 @@ namespace MWWorld
         return result;
     }
 
-    Render::SceneData& Scene::getNeutralWorldSceneData()
+    Render::SceneData& Scene::getFrameSceneData()
     {
         return mNeutralWorldScene.sceneData();
     }

@@ -261,7 +261,8 @@ namespace MWWorld
 
         mWeatherManager = std::make_unique<MWWorld::WeatherManager>(*mRendering, mStore);
 
-        mWorldScene = std::make_unique<Scene>(*this, *mRendering.get(), mResourceSystem, mPhysics.get(), *mNavigator);
+        mWorldScene = std::make_unique<Scene>(
+            *this, *mRendering, mRendering->getTerrainStorage(), mResourceSystem, mPhysics.get(), *mNavigator);
     }
 
     void World::fillGlobalVariables()
@@ -3825,7 +3826,7 @@ namespace MWWorld
             if (!mWorldScene)
                 return false;
 
-            mFrameLifecycle->synchronizeScene(mWorldScene->getNeutralWorldSceneData());
+            mFrameLifecycle->synchronizeScene(mWorldScene->getFrameSceneData());
             Render::SceneSubmission submission = mWorldScene->getNeutralScene();
             return mFrameLifecycle->renderFrame(submission);
         }
@@ -3833,7 +3834,7 @@ namespace MWWorld
         if (!mFrameLifecycle->renderFrame())
             return false;
         if (mWorldScene)
-            mFrameLifecycle->synchronizeScene(mWorldScene->getNeutralWorldSceneData());
+            mFrameLifecycle->synchronizeScene(mWorldScene->getFrameSceneData());
         return true;
     }
 

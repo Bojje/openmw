@@ -153,6 +153,10 @@ jobs:
           echo "World frame traversal must go through the renderer-neutral frame lifecycle"
           exit 1
         fi
+        if rg -n 'mRendering\.getTerrainStorage\(\)' apps/openmw/mwworld/scene.cpp; then
+          echo "Scene neutral terrain paths must use their injected RenderStorage contract"
+          exit 1
+        fi
         if rg -n 'class RenderingManager[^\n]*Render::FrameLifecycle|RenderingManager[^\n]*FrameLifecycle' \
             apps/openmw/mwrender/renderingmanager.hpp; then
           echo "RenderingManager must expose, not inherit, the renderer-neutral frame lifecycle"
