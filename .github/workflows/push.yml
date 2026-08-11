@@ -115,6 +115,10 @@ jobs:
           echo "RenderingManager must not own the renderer-neutral frame state"
           exit 1
         fi
+        if rg -n 'MWRender::TerrainStorage' apps/openmw/mwworld/scene.hpp apps/openmw/mwworld/scene.cpp; then
+          echo "World scene must depend on the neutral terrain storage contract"
+          exit 1
+        fi
         if rg -n 'getNeutralScene\(' apps/openmw/mwrender/renderingmanager.hpp apps/openmw/mwrender/renderingmanager.cpp; then
           echo "RenderingManager must not assemble renderer-neutral scene submissions"
           exit 1
