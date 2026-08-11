@@ -440,7 +440,7 @@ namespace MWRender
     std::vector<Render::TerrainTile> RenderingManager::getNeutralTerrainTiles(const MWWorld::CellStore* store)
     {
         std::vector<Render::TerrainTile> tiles;
-        if (store == nullptr || !store->getCell()->isExterior() || !mTerrainStorage || !mTerrain)
+        if (store == nullptr || !store->getCell()->isExterior() || !mTerrainStorage)
             return tiles;
 
         const std::array<float, 2> center = { store->getCell()->getGridX() + 0.5f,

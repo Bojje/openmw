@@ -159,7 +159,9 @@ LOD snapshots. `MWWorld::Scene::getNeutralScene()` now assembles those snapshots
 exterior cells in the active worldspace, so terrain is part of the real full-game neutral
 handoff rather than only a test fixture; conversion happens on cell add/remove rather than
 on every frame export. `RenderingManager` remains only the legacy terrain provider; it no
-longer assembles the renderer-neutral scene submission or owns its resource callbacks.
+longer assembles the renderer-neutral scene submission or owns its resource callbacks. Neutral
+terrain collection now depends on `TerrainStorage` and cached world tiles rather than the
+legacy OSG terrain object being active.
 Terrain storage now exposes neutral vertex and blendmap methods as its primary contract.
 `getRenderTile()` consumes those vectors directly, while the legacy OSG array/image methods
 are centralized adapters for the reference terrain renderer. The Vulkan path therefore no

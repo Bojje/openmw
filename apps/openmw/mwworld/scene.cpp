@@ -1098,7 +1098,7 @@ namespace MWWorld
                         iter->second = std::make_shared<const Resource::NifMeshManager::Meshes>();
                 }
                 return *iter->second;
-            }, mRendering.getTerrain() != nullptr);
+            }, true);
 
         Resource::ResourceSystem* const resourceSystem = mRendering.getResourceSystem();
         result.textureResolver = [resourceSystem](std::string_view path) {
