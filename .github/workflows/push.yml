@@ -172,6 +172,16 @@ jobs:
           echo "The renderer manager must not create or expose a duplicate frame lifecycle"
           exit 1
         fi
+        frame_lifecycle_count=$(rg -n 'make_unique<[^>]*FrameLifecycle' apps/openmw/engine.cpp | wc -l)
+        if [ "$frame_lifecycle_count" -ne 1 ]; then
+          echo "The engine must construct exactly one renderer frame lifecycle"
+          exit 1
+        fi
+        if rg -n 'make_unique<[^>]*FrameLifecycle' apps/openmw --glob '*.cpp' --glob '*.hpp' \
+            | rg -v 'apps/openmw/engine.cpp'; then
+          echo "No OpenMW production file other than the engine may construct a frame lifecycle"
+          exit 1
+        fi
         if readelf -d build-vulkan/openmw | grep -Eiq 'libvulkan|libOpenSceneGraph|libosg'; then
           echo "openmw must not carry Vulkan or OSG runtime dependencies in the isolated build"
           exit 1
