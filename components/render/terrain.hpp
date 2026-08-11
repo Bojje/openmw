@@ -100,8 +100,23 @@ namespace Render
 
         bool valid() const
         {
-            return minCellX <= maxCellX && minCellY <= maxCellY && !lods.empty()
-                && std::all_of(lods.begin(), lods.end(), [](const TerrainTile& tile) { return tile.valid(); });
+            const std::int64_t width = static_cast<std::int64_t>(maxCellX) - minCellX + 1;
+            const std::int64_t height = static_cast<std::int64_t>(maxCellY) - minCellY + 1;
+            if (minCellX > maxCellX || minCellY > maxCellY || width != height || width <= 0
+                || (width & (width - 1)) != 0
+                || lods.empty())
+                return false;
+
+            const float expectedCenterX = static_cast<float>(minCellX) + width / 2.f;
+            const float expectedCenterY = static_cast<float>(minCellY) + width / 2.f;
+            int expectedLod = 0;
+            return std::all_of(lods.begin(), lods.end(), [&](const TerrainTile& tile) {
+                const bool matchingRegion = std::abs(tile.size - static_cast<float>(width)) < 0.0001f
+                    && std::abs(tile.center[0] - expectedCenterX) < 0.0001f
+                    && std::abs(tile.center[1] - expectedCenterY) < 0.0001f && tile.lod == expectedLod;
+                ++expectedLod;
+                return matchingRegion && tile.valid();
+            });
         }
     };
 }

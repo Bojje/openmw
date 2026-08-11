@@ -171,7 +171,6 @@ int main()
     Render::MeshInstance aggregateMesh = {};
     aggregateMesh.mesh.vertices.resize(3);
     aggregateMesh.mesh.indices = { 0, 1, 2 };
-    aggregateMesh.mesh.indices = { 0, 1, 2 };
     const Render::SceneSubmission aggregate = Render::collectSceneSubmission(world, aggregateScene, "",
         [&](std::string_view model) -> std::vector<Render::MeshInstance> {
             if (model != "meshes/first.nif")
@@ -187,7 +186,10 @@ int main()
     terrainRegion.maxCellX = 1;
     terrainRegion.minCellY = 0;
     terrainRegion.maxCellY = 1;
-    terrainRegion.lods = { neutralTerrain };
+    Render::TerrainTile regionTerrain = neutralTerrain;
+    regionTerrain.size = 2.f;
+    regionTerrain.center = { 1.f, 1.f };
+    terrainRegion.lods = { regionTerrain };
     world.setTerrainRegions({ terrainRegion });
     const Render::SceneSubmission regional = Render::collectSceneSubmission(world, aggregateScene, "",
         [&](std::string_view model) -> std::vector<Render::MeshInstance> {
@@ -195,9 +197,19 @@ int main()
                 throw std::runtime_error("region scene submission resolved an unexpected model");
             return { aggregateMesh };
         }, true);
-    if (regional.terrainTiles.size() != 1 || regional.terrainTiles.front().center != neutralTerrain.center
+    if (regional.terrainTiles.size() != 1 || regional.terrainTiles.front().center != regionTerrain.center
         || !regional.valid())
         throw std::runtime_error("renderer-neutral scene submission did not select a region terrain snapshot");
+    terrainRegion.maxCellX = 2;
+    world.setTerrainRegions({ terrainRegion });
+    const Render::SceneSubmission malformedRegionFallback = Render::collectSceneSubmission(world, aggregateScene, "",
+        [&](std::string_view model) -> std::vector<Render::MeshInstance> {
+            if (model != "meshes/first.nif")
+                throw std::runtime_error("malformed region fallback resolved an unexpected model");
+            return { aggregateMesh };
+        }, true);
+    if (malformedRegionFallback.terrainTiles.size() != 1 || !malformedRegionFallback.valid())
+        throw std::runtime_error("renderer-neutral scene submission accepted malformed terrain-region metadata");
     world.setTerrainRegions({ Render::TerrainRegion{} });
     const Render::SceneSubmission regionFallback = Render::collectSceneSubmission(world, aggregateScene, "",
         [&](std::string_view model) -> std::vector<Render::MeshInstance> {
