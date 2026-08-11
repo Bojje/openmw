@@ -146,7 +146,10 @@ int main()
     cameraMatrix.data[10] = 1.f;
     cameraMatrix.data[12] = 4.f;
     cameraMatrix.data[15] = 1.f;
-    world.setCameraMatrices(cameraMatrix, cameraMatrix);
+    world.sceneData().view = cameraMatrix;
+    world.sceneData().projection = cameraMatrix;
+    world.sceneData().viewInverse = Render::invertMat4(cameraMatrix);
+    world.sceneData().projInverse = Render::invertMat4(cameraMatrix);
     if (world.sceneData().view.data[12] != 4.f || world.sceneData().viewInverse.data[12] != -4.f)
         throw std::runtime_error("renderer-neutral world scene did not retain camera matrices");
     world.clear();
