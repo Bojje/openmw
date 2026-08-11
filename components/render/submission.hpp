@@ -154,6 +154,21 @@ namespace Render
                 }
             return result;
         }
+
+        std::string validationError() const
+        {
+            if (!valid())
+                return "invalid geometry";
+            if (!textureResolver)
+                return "no texture resolver";
+            for (const std::string& path : referencedTexturePaths())
+            {
+                const std::shared_ptr<const TextureData> texture = textureResolver(path);
+                if (!texture || !texture->valid())
+                    return "invalid texture resource for '" + path + "'";
+            }
+            return {};
+        }
     };
 
     inline std::vector<MeshInstance> collectUnskinnedDynamicMeshes(const SceneSubmission& submission)

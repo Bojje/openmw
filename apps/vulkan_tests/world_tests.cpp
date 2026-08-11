@@ -199,6 +199,8 @@ int main()
 
     Render::SceneSubmission submission;
     submission.scene.ambientColor = { 0.2f, 0.3f, 0.4f, 1.f };
+    if (submission.validationError() != "no texture resolver")
+        throw std::runtime_error("renderer-neutral submission validation missed a missing resolver");
     bool resolverCalled = false;
     submission.textureResolver = [&resolverCalled](std::string_view path) {
         if (path != "textures/submission.dds")
@@ -210,7 +212,7 @@ int main()
     };
     const auto resolvedTexture = submission.textureResolver("textures/submission.dds");
     if (!resolverCalled || !resolvedTexture || !resolvedTexture->valid() || submission.scene.ambientColor.y != 0.3f
-        || !submission.valid())
+        || !submission.valid() || !submission.validationError().empty())
         throw std::runtime_error("renderer-neutral scene submission failed resource handoff");
 
     submission.dynamicObjects.push_back({ 17, "meshes/animated.nif", objectTransform, true, true });

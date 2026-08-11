@@ -187,12 +187,14 @@ The non-owning manager update handle is private to the `Scene` owner, detached d
 teardown, and CI guards the manager header against regaining a value-owned neutral frame state.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-62 files, deleting 620 lines and adding 5,757 lines (net `+5,137`). The larger Vulkan-only
+62 files, deleting 621 lines and adding 5,763 lines (net `+5,142`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
 
-The latest validation checkpoint also rejects non-finite scene matrices, transforms, vertex
+Submission validation now lives on the renderer-neutral `SceneSubmission` boundary: the
+full-game bridge and Vulkan consumer use the same geometry, resolver, and texture-resource
+gate, including dynamic mesh textures. The latest validation checkpoint also rejects non-finite scene matrices, transforms, vertex
 attributes, skinning payloads, and terrain coordinates at the renderer-neutral submission boundary, before
 they reach Vulkan. This protects the backend from corrupted engine state without relying
 on GPU validation diagnostics.

@@ -29,8 +29,6 @@
 #include <components/resource/resourcesystem.hpp>
 #include <components/resource/scenemanager.hpp>
 #include <components/resource/stats.hpp>
-#include <components/render/submission.hpp>
-
 #include <components/compiler/extensions0.hpp>
 
 #include <components/stereo/stereomanager.hpp>
@@ -179,18 +177,8 @@ namespace
 
     void validateNeutralSubmission(const Render::SceneSubmission& submission)
     {
-        if (!submission.valid())
-            throw std::runtime_error("full-game neutral scene submission is invalid");
-        if (!submission.textureResolver)
-            throw std::runtime_error("full-game neutral scene submission has no texture resolver");
-
-        for (const std::string& path : submission.referencedTexturePaths())
-        {
-            const auto texture = submission.textureResolver(path);
-            if (!texture || !texture->valid())
-                throw std::runtime_error("full-game neutral scene texture resolver returned invalid data for '"
-                    + path + "'");
-        }
+        if (const std::string error = submission.validationError(); !error.empty())
+            throw std::runtime_error("full-game neutral scene submission: " + error);
     }
 }
 
