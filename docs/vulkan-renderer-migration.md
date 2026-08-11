@@ -24,7 +24,8 @@ single-backend while the scene bridge is incomplete. The standalone Vulkan smoke
 now links only SDL2 and Vulkan at runtime; no OSG library or renderer symbol is present.
 Vulkan configuration also probes `glslangValidator --version` and rejects a missing or
 no-op shader compiler, so a successful build cannot silently omit the SPIR-V artifacts.
-Its fixture submits renderer-neutral mesh and terrain data directly, while the separate
+Its fixture now builds a renderer-neutral `WorldScene`, collects a `SceneSubmission`, and
+feeds that aggregate to Vulkan, while the separate
 renderer-mesh CPU test retains coverage for NIF conversion, material extraction, and the
 path-keyed mesh cache. This makes the presentation validation process independent of the
 legacy NIF/OSG object model.
@@ -105,7 +106,8 @@ viewer directly, and neutral lighting/fog values are updated at their game-state
 than re-read from OSG objects during export. `Camera` now exposes neutral `Render::Mat4` snapshots
 for this path while retaining legacy OSG getters for the reference backend. This removes another
 backend-specific type from the future Vulkan handoff.
-Those inputs can now be collected as one `Render::SceneSubmission`; the renderer-neutral
+Those inputs can now be collected as one `Render::SceneSubmission`; the standalone smoke
+consumer now exercises the same `WorldScene` to `Vk::Renderer` handoff, while the renderer-neutral
 `collectSceneSubmission` helper owns mesh, dynamic-record, worldspace, and terrain selection,
 while `Vk::Renderer::setScene` consumes that handoff in the standalone path and the smoke test
 exercises it. The submission
@@ -178,7 +180,7 @@ The non-owning manager update handle is detached during `Scene` teardown, and CI
 manager header against regaining a value-owned neutral frame state.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-62 files, deleting 613 lines and adding 5,279 lines (net `+4,666`). The larger Vulkan-only
+62 files, deleting 613 lines and adding 5,296 lines (net `+4,683`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.

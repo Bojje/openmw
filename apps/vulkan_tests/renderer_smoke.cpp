@@ -14,6 +14,7 @@
 
 #include <components/render/imagecomparison.hpp>
 #include <components/render/mesh.hpp>
+#include <components/render/submission.hpp>
 #include <components/vk/vkrenderer.hpp>
 
 #ifndef OPENMW_VULKAN_SHADER_DIR
@@ -72,7 +73,7 @@ namespace
         return directory;
     }
 
-    std::shared_ptr<const std::vector<Render::MeshInstance>> smokeMeshes()
+    Render::MeshInstance smokeMesh(std::string_view model)
     {
         Render::MeshData data;
         data.vertices = {
@@ -85,24 +86,20 @@ namespace
         };
         data.indices = { 0, 1, 2 };
 
-        std::vector<Render::MeshInstance> result;
-        result.push_back({ data, identityMatrix() });
-        result.push_back({ data, identityMatrix() });
-        result[0].transform.data[12] = 0.5f;
-        result[1].transform.data[12] = 0.75f;
-        for (std::size_t i = 0; i < result.size(); ++i)
+        if (model == "meshes/vulkan-smoke-alpha.nif")
         {
-            Render::MeshInstance& mesh = result[i];
-            mesh.mesh.material.albedoTexture = "textures/vulkan-smoke.rgba";
-            if (i == 0)
-            {
-                mesh.mesh.material.alphaBlend = true;
-                mesh.mesh.material.diffuse.w = 0.75f;
-            }
-            else
-                mesh.mesh.material.emissiveTexture = "textures/vulkan-smoke-glow.rgba";
+            data.material.albedoTexture = "textures/vulkan-smoke.rgba";
+            data.material.alphaBlend = true;
+            data.material.diffuse.w = 0.75f;
         }
-        return std::make_shared<const std::vector<Render::MeshInstance>>(std::move(result));
+        else if (model == "meshes/vulkan-smoke-emissive.nif")
+        {
+            data.material.albedoTexture = "textures/vulkan-smoke.rgba";
+            data.material.emissiveTexture = "textures/vulkan-smoke-glow.rgba";
+        }
+        else
+            throw std::runtime_error("Vulkan smoke requested an unexpected model");
+        return { std::move(data), identityMatrix() };
     }
 
     std::shared_ptr<const Render::TextureData> smokeTexture(std::string_view path)
@@ -199,7 +196,6 @@ int main(int argc, char** argv)
         const std::filesystem::path captures = captureDirectory(argc, argv);
         if (headless && reference)
             throw std::invalid_argument("headless Vulkan smoke does not support image capture references");
-        const auto meshes = smokeMeshes();
         const auto texture = smokeTexture("textures/vulkan-smoke.rgba");
         if (!texture || !texture->valid())
             throw std::runtime_error("Vulkan smoke texture resolver returned invalid data");
@@ -234,6 +230,22 @@ int main(int argc, char** argv)
             if (!renderer->loadShadersAndCreatePipelines(shaderDir))
                 throw std::runtime_error("Vulkan smoke test could not load the raster shaders");
 
+            Render::WorldScene world;
+            int cellKey = 0;
+            int alphaObjectKey = 1;
+            int emissiveObjectKey = 2;
+            world.recordCell(&cellKey, true, 0, 0, "Vulkan smoke");
+
+            Render::ObjectTransform alphaTransform;
+            alphaTransform.position.x = 0.5f;
+            world.recordObject(&alphaObjectKey, &cellKey, true, 0, 0, "Vulkan smoke",
+                "meshes/vulkan-smoke-alpha.nif", alphaTransform, true);
+            Render::ObjectTransform emissiveTransform;
+            emissiveTransform.position.x = 0.75f;
+            world.recordObject(&emissiveObjectKey, &cellKey, true, 0, 0, "Vulkan smoke",
+                "meshes/vulkan-smoke-emissive.nif", emissiveTransform, true);
+            world.setTerrainTiles(&cellKey, { smokeTerrain() });
+
             Render::SceneData scene = {};
             scene.view = identityMatrix();
             scene.projection = identityMatrix();
@@ -243,10 +255,13 @@ int main(int argc, char** argv)
             scene.sunColor = { 1.0f, 1.0f, 1.0f, 1.0f };
             scene.ambientColor = { 0.15f, 0.15f, 0.15f, 1.0f };
 
-            Render::SceneSubmission submission;
-            submission.scene = scene;
-            submission.meshes = *meshes;
-            submission.terrainTiles.push_back(smokeTerrain());
+            const auto resolveMeshes = [](std::string_view model) -> std::vector<Render::MeshInstance> {
+                if (model != "meshes/vulkan-smoke-alpha.nif" && model != "meshes/vulkan-smoke-emissive.nif")
+                    return {};
+                return { smokeMesh(model) };
+            };
+            Render::SceneSubmission submission
+                = Render::collectSceneSubmission(world, scene, {}, resolveMeshes, true);
             submission.textureResolver = smokeTexture;
             renderer->setScene(submission);
 
