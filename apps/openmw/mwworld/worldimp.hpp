@@ -50,6 +50,11 @@ namespace MWRender
     class TerrainStorage;
 }
 
+namespace Terrain
+{
+    class World;
+}
+
 namespace ESM
 {
     struct Position;
@@ -108,6 +113,7 @@ namespace MWWorld
         std::unique_ptr<MWPhysics::PhysicsSystem> mPhysics;
         std::unique_ptr<DetourNavigator::Navigator> mNavigator;
         std::unique_ptr<MWRender::TerrainStorage> mTerrainStorage;
+        Terrain::World* mTerrain = nullptr;
         std::unique_ptr<MWRender::RenderingManager> mRendering;
         Render::FrameLifecycle* mFrameLifecycle = nullptr;
         std::unique_ptr<MWWorld::Scene> mWorldScene;

@@ -187,6 +187,7 @@ namespace MWRender
         , mWorkQueue(workQueue)
         , mNavigator(navigator)
         , mTerrainStorage(terrainStorage)
+        , mTerrainOutput(&terrainOutput)
         , mNightEyeFactor(0.f)
         // TODO: Near clip should not need to be bounded like this, but too small values break OSG shadow calculations
         // CPU-side. See issue: #6072
@@ -629,6 +630,7 @@ namespace MWRender
             {
                 mTerrain->enable(false);
                 mTerrain = newChunks.mTerrain.get();
+                *mTerrainOutput = mTerrain;
                 mGroundcover = newChunks.mGroundcover.get();
                 mObjectPaging = newChunks.mObjectPaging.get();
             }

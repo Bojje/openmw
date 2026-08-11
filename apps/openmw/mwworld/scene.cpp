@@ -964,7 +964,7 @@ namespace MWWorld
     }
 
     Scene::Scene(MWWorld::World& world, MWRender::RenderingManager& rendering, MWRender::LandManager& landManager,
-        Terrain::World* terrain, osgUtil::IncrementalCompileOperation* incrementalCompileOperation,
+        Terrain::World*& terrain, osgUtil::IncrementalCompileOperation* incrementalCompileOperation,
         Terrain::RenderStorage& terrainStorage, SceneUtil::WorkQueue* workQueue, Resource::ResourceSystem* resourceSystem,
         MWPhysics::PhysicsSystem* physics,
         DetourNavigator::Navigator& navigator)

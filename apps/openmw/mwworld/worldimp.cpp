@@ -260,12 +260,11 @@ namespace MWWorld
             heightMapPattern, Settings::shaders().mAutoUseTerrainNormalMaps, specularMapPattern,
             Settings::shaders().mAutoUseTerrainSpecularMaps);
 
-        Terrain::World* terrain = nullptr;
         osgUtil::IncrementalCompileOperation* incrementalCompileOperation = nullptr;
         SceneUtil::LightManager* lightRoot = nullptr;
         mRendering = std::make_unique<MWRender::RenderingManager>(
             viewer, rootNode, mResourceSystem, workQueue, *mNavigator, mGroundcoverStore, unrefQueue, *mTerrainStorage,
-            terrain, incrementalCompileOperation, lightRoot, frameLifecycle);
+            mTerrain, incrementalCompileOperation, lightRoot, frameLifecycle);
         mFrameLifecycle = &frameLifecycle;
         mProjectileManager = std::make_unique<ProjectileManager>(
             lightRoot->asGroup(), mResourceSystem, mRendering.get(), mPhysics.get());
@@ -274,8 +273,8 @@ namespace MWWorld
         mWeatherManager = std::make_unique<MWWorld::WeatherManager>(*mRendering, mStore);
 
         mWorldScene = std::make_unique<Scene>(
-            *this, *mRendering, *mTerrainStorage->getLandManager(), terrain, incrementalCompileOperation, *mTerrainStorage,
-            workQueue, mResourceSystem, mPhysics.get(), *mNavigator);
+            *this, *mRendering, *mTerrainStorage->getLandManager(), mTerrain, incrementalCompileOperation,
+            *mTerrainStorage, workQueue, mResourceSystem, mPhysics.get(), *mNavigator);
     }
 
     void World::fillGlobalVariables()

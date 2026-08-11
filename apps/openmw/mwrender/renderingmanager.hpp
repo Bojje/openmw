@@ -341,6 +341,7 @@ namespace MWRender
         std::unordered_map<ESM::RefId, WorldspaceChunkMgr> mWorldspaceChunks;
         Terrain::World* mTerrain;
         TerrainStorage& mTerrainStorage;
+        Terrain::World** mTerrainOutput;
         ObjectPaging* mObjectPaging;
         Groundcover* mGroundcover;
         std::unique_ptr<SkyManager> mSky;

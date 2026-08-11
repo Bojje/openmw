@@ -122,7 +122,7 @@ namespace MWWorld
         MWPhysics::PhysicsSystem* mPhysics;
         MWRender::RenderingManager& mRendering;
         MWRender::LandManager& mLandManager;
-        Terrain::World* mTerrain;
+        Terrain::World*& mTerrain;
         osgUtil::IncrementalCompileOperation* mIncrementalCompileOperation;
         Terrain::RenderStorage& mTerrainStorage;
         SceneUtil::WorkQueue* mWorkQueue;
@@ -182,7 +182,7 @@ namespace MWWorld
 
     public:
         Scene(MWWorld::World& world, MWRender::RenderingManager& rendering, MWRender::LandManager& landManager,
-            Terrain::World* terrain, osgUtil::IncrementalCompileOperation* incrementalCompileOperation,
+            Terrain::World*& terrain, osgUtil::IncrementalCompileOperation* incrementalCompileOperation,
             Terrain::RenderStorage& terrainStorage, SceneUtil::WorkQueue* workQueue,
             Resource::ResourceSystem* resourceSystem,
             MWPhysics::PhysicsSystem* physics,
