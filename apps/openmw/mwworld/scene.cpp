@@ -1076,14 +1076,11 @@ namespace MWWorld
 
     Render::SceneSubmission Scene::getNeutralScene() const
     {
-        Render::SceneSubmission result;
-        result.scene = mNeutralWorldScene.sceneData();
-
         std::unordered_map<std::string, std::shared_ptr<const Resource::NifMeshManager::Meshes>> cache;
         // Dynamic objects are carried as records, but are deliberately excluded
         // from the static mesh batch until a backend owns animation and skinning.
-        result = Render::collectSceneSubmission(mNeutralWorldScene, result.scene,
-            mNeutralWorldScene.activeWorldspace(),
+        Render::SceneSubmission result = Render::collectSceneSubmission(
+            mNeutralWorldScene, mNeutralWorldScene.sceneData(), mNeutralWorldScene.activeWorldspace(),
             [&](std::string_view model) -> const Resource::NifMeshManager::Meshes& {
                 const auto [iter, inserted] = cache.try_emplace(std::string(model));
                 if (inserted)

@@ -153,8 +153,9 @@ texture table, legacy-compatible UV transforms, and separate first-layer/equal-d
 terrain pipelines. Terrain normal maps now flow through the same neutral texture table and
 G-buffer normal path; parallax offsetting now uses the normal-map height channel. Scene
 textures use a separate linear-repeat sampler so terrain tiling is preserved, while G-buffer
-attachments remain clamped. Specular
-maps and complete terrain image coverage remain outstanding. The neutral cache now retains
+attachments remain clamped. Terrain diffuse-specular maps are consumed; ordinary object
+specular-map discovery/shading and complete terrain image coverage remain outstanding. The
+neutral cache now retains
 per-cell LOD snapshots and selects one deterministically by camera distance before handoff;
 quadtree-scale streaming and composite-image coverage remain outstanding. `WorldScene` now
 records empty loaded cells as well as object-bearing cells and owns each cell's cached terrain
