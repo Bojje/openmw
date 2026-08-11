@@ -41,6 +41,8 @@
 
 #include <components/resource/bulletshape.hpp>
 #include <components/resource/resourcesystem.hpp>
+#include <components/resource/imagemanager.hpp>
+#include <components/resource/nifmeshmanager.hpp>
 
 #include <components/sceneutil/lightmanager.hpp>
 #include <components/sceneutil/positionattitudetransform.hpp>
@@ -272,9 +274,21 @@ namespace MWWorld
 
         mWeatherManager = std::make_unique<MWWorld::WeatherManager>(*mRendering, *mSkyManager, mStore);
 
+        const Render::MeshResolver meshResolver = [resourceSystem = mResourceSystem](std::string_view model) {
+            const VFS::Path::Normalized path(model);
+            if (path.extension().value() == "nif")
+                return resourceSystem->getNifMeshManager()->get(path);
+            return std::make_shared<const std::vector<Render::MeshInstance>>();
+        };
+        const Render::TextureResolver textureResolver = [resourceSystem = mResourceSystem](std::string_view path) {
+            if (path.empty())
+                return std::shared_ptr<const Render::TextureData>();
+            return resourceSystem->getImageManager()->getRenderTexture(VFS::Path::Normalized(path));
+        };
         mWorldScene = std::make_unique<Scene>(
-            *this, frameLifecycle, *mRendering, *mTerrainStorage->getLandManager(), mTerrain, incrementalCompileOperation,
-            *mTerrainStorage, workQueue, mResourceSystem, mPhysics.get(), *mNavigator);
+            *this, frameLifecycle, meshResolver, textureResolver, mResourceSystem->getVFS(), *mRendering,
+            *mTerrainStorage->getLandManager(), mTerrain, incrementalCompileOperation, *mTerrainStorage, workQueue,
+            mResourceSystem, mPhysics.get(), *mNavigator);
     }
 
     void World::fillGlobalVariables()

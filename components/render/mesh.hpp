@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstdint>
 #include <algorithm>
+#include <functional>
 #include <iterator>
 #include <limits>
 #include <memory>
@@ -205,6 +206,8 @@ namespace Render
         MeshData mesh;
         Mat4 transform;
     };
+
+    using MeshResolver = std::function<std::shared_ptr<const std::vector<MeshInstance>>(std::string_view)>;
 
     struct MeshDraw
     {

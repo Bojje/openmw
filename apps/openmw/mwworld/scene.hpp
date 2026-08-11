@@ -76,6 +76,11 @@ namespace Resource
     class ResourceSystem;
 }
 
+namespace VFS
+{
+    class Manager;
+}
+
 namespace MWPhysics
 {
     class PhysicsSystem;
@@ -120,6 +125,9 @@ namespace MWWorld
         bool mCellLoaded = false;
         MWWorld::World& mWorld;
         Render::FrameLifecycle& mFrameLifecycle;
+        Render::MeshResolver mMeshResolver;
+        Render::TextureResolver mTextureResolver;
+        const VFS::Manager* mVfs;
         Resource::ResourceSystem* mResourceSystem;
         MWPhysics::PhysicsSystem* mPhysics;
         MWRender::RenderingManager& mRendering;
@@ -183,7 +191,8 @@ namespace MWWorld
         void updateNeutralTerrainRegions();
 
     public:
-        Scene(MWWorld::World& world, Render::FrameLifecycle& frameLifecycle, MWRender::RenderingManager& rendering,
+        Scene(MWWorld::World& world, Render::FrameLifecycle& frameLifecycle, Render::MeshResolver meshResolver,
+            Render::TextureResolver textureResolver, const VFS::Manager* vfs, MWRender::RenderingManager& rendering,
             MWRender::LandManager& landManager,
             Terrain::World*& terrain, osgUtil::IncrementalCompileOperation* incrementalCompileOperation,
             Terrain::RenderStorage& terrainStorage, SceneUtil::WorkQueue* workQueue,

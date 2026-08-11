@@ -21,7 +21,6 @@
 #include <components/misc/resourcehelpers.hpp>
 #include <components/resource/resourcesystem.hpp>
 #include <components/resource/imagemanager.hpp>
-#include <components/resource/nifmeshmanager.hpp>
 #include <components/resource/scenemanager.hpp>
 #include <components/sceneutil/positionattitudetransform.hpp>
 #include <components/settings/values.hpp>
@@ -963,7 +962,8 @@ namespace MWWorld
         mLastPlayerPos = player.getRefData().getPosition().asVec3();
     }
 
-    Scene::Scene(MWWorld::World& world, Render::FrameLifecycle& frameLifecycle, MWRender::RenderingManager& rendering,
+    Scene::Scene(MWWorld::World& world, Render::FrameLifecycle& frameLifecycle, Render::MeshResolver meshResolver,
+        Render::TextureResolver textureResolver, const VFS::Manager* vfs, MWRender::RenderingManager& rendering,
         MWRender::LandManager& landManager,
         Terrain::World*& terrain, osgUtil::IncrementalCompileOperation* incrementalCompileOperation,
         Terrain::RenderStorage& terrainStorage, SceneUtil::WorkQueue* workQueue, Resource::ResourceSystem* resourceSystem,
@@ -973,6 +973,9 @@ namespace MWWorld
         , mCellChanged(false)
         , mWorld(world)
         , mFrameLifecycle(frameLifecycle)
+        , mMeshResolver(std::move(meshResolver))
+        , mTextureResolver(std::move(textureResolver))
+        , mVfs(vfs)
         , mResourceSystem(resourceSystem)
         , mPhysics(physics)
         , mRendering(rendering)
@@ -1174,25 +1177,21 @@ namespace MWWorld
 
         mRendering.synchronizeNeutralScene(mNeutralWorldScene.sceneData());
 
-        const auto resolveMeshes = [this](std::string_view model) -> const Resource::NifMeshManager::Meshes& {
+        const auto resolveMeshes = [this](std::string_view model) -> const std::vector<Render::MeshInstance>& {
             const std::string key(model);
             const auto found = mNeutralMeshCache.find(key);
-            std::shared_ptr<const Resource::NifMeshManager::Meshes> meshes
+            std::shared_ptr<const std::vector<Render::MeshInstance>> meshes
                 = found == mNeutralMeshCache.end() ? nullptr : found->second.lock();
+            if (!meshes && mMeshResolver)
+                meshes = mMeshResolver(model);
             if (!meshes)
-            {
-                const VFS::Path::Normalized path(model);
-                if (path.extension().value() == "nif")
-                    meshes = mResourceSystem->getNifMeshManager()->get(path);
-                else
-                    meshes = std::make_shared<const Resource::NifMeshManager::Meshes>();
-                mNeutralMeshCache[key] = meshes;
-            }
+                meshes = std::make_shared<const std::vector<Render::MeshInstance>>();
+            mNeutralMeshCache[key] = meshes;
             return *meshes;
         };
 
         mNeutralWorldScene.updateDynamicPoses([&](const void* objectKey, const Render::WorldObject& object) {
-            const Resource::NifMeshManager::Meshes& meshes = resolveMeshes(object.model);
+            const std::vector<Render::MeshInstance>& meshes = resolveMeshes(object.model);
             const auto skinned = std::find_if(meshes.begin(), meshes.end(), [](const Render::MeshInstance& mesh) {
                 return mesh.mesh.skinning && !mesh.mesh.skinning->boneNames.empty();
             });
@@ -1225,7 +1224,6 @@ namespace MWWorld
             && !Settings::shaders().mSpecularMapPattern.get().empty())
         {
             const std::string& pattern = Settings::shaders().mSpecularMapPattern;
-            const VFS::Manager* const vfs = mResourceSystem->getVFS();
             const auto addSpecularMap = [&](Render::MeshInstance& instance) {
                 Render::MeshMaterial& material = instance.mesh.material;
                 if (material.albedoTexture.empty() || !material.specularTexture.empty())
@@ -1236,7 +1234,7 @@ namespace MWWorld
                 if (specularPath.empty())
                     return;
                 const VFS::Path::Normalized specularMap(specularPath);
-                if (!vfs->exists(specularMap))
+                if (mVfs == nullptr || !mVfs->exists(specularMap))
                     return;
 
                 material.specularTexture = specularMap.value();
@@ -1249,11 +1247,7 @@ namespace MWWorld
                 for (Render::MeshInstance& instance : dynamic.meshes)
                     addSpecularMap(instance);
         }
-        result.textureResolver = [resourceSystem = mResourceSystem](std::string_view path) {
-            if (path.empty())
-                return std::shared_ptr<const Render::TextureData>();
-            return resourceSystem->getImageManager()->getRenderTexture(VFS::Path::Normalized(path));
-        };
+        result.textureResolver = mTextureResolver;
         return result;
     }
 
