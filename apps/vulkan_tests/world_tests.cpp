@@ -198,6 +198,16 @@ int main()
     if (regional.terrainTiles.size() != 1 || regional.terrainTiles.front().center != neutralTerrain.center
         || !regional.valid())
         throw std::runtime_error("renderer-neutral scene submission did not select a region terrain snapshot");
+    world.setTerrainRegions({ Render::TerrainRegion{} });
+    const Render::SceneSubmission regionFallback = Render::collectSceneSubmission(world, aggregateScene, "",
+        [&](std::string_view model) -> std::vector<Render::MeshInstance> {
+            if (model != "meshes/first.nif")
+                throw std::runtime_error("region fallback resolved an unexpected model");
+            return { aggregateMesh };
+        }, true);
+    if (regionFallback.terrainTiles.size() != 1 || regionFallback.terrainTiles.front().center != neutralTerrain.center
+        || !regionFallback.valid())
+        throw std::runtime_error("renderer-neutral scene submission did not fall back from invalid regions");
     world.setTerrainRegions({});
 
     int activeWorldspaceCellHandle = 0;

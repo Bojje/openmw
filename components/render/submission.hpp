@@ -223,7 +223,10 @@ namespace Render
         {
             const float cameraX = scene.viewInverse.data[12];
             const float cameraY = scene.viewInverse.data[13];
-            if (!world.terrainRegions().empty())
+            const bool hasCompleteRegions = !world.terrainRegions().empty()
+                && std::all_of(world.terrainRegions().begin(), world.terrainRegions().end(),
+                    [](const TerrainRegion& region) { return region.valid(); });
+            if (hasCompleteRegions)
             {
                 for (const TerrainRegion& region : world.terrainRegions())
                     if (const TerrainTile* selected = selectTerrainLod(region.lods, cameraX, cameraY))
