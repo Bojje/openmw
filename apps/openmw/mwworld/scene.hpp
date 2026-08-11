@@ -11,6 +11,7 @@
 #include <memory>
 #include <optional>
 #include <set>
+#include <string_view>
 #include <vector>
 
 #include <components/esm/exteriorcelllocation.hpp>
@@ -180,9 +181,11 @@ namespace MWWorld
         void clear();
         ///< Change into a void
 
-        /// Renderer-neutral world ownership updated by this scene lifecycle.
-        Render::WorldScene& getNeutralWorldScene() { return mNeutralWorldScene; }
-        const Render::WorldScene& getNeutralWorldScene() const { return mNeutralWorldScene; }
+        /// Update renderer-neutral state through the world-scene owner.
+        void updateNeutralObjectCell(const void* oldObjectKey, const void* newObjectKey, const void* cellKey,
+            bool exterior, int gridX, int gridY, std::string_view cellName, std::string_view worldspace);
+        void updateNeutralObjectPosition(const void* objectKey, const Render::Vec3& position);
+        void updateNeutralObjectRotation(const void* objectKey, const Render::Quat& rotation);
 
         /// Export the current loaded-world state for a renderer backend.
         Render::SceneSubmission getNeutralScene() const;

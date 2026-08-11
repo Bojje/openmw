@@ -1074,7 +1074,7 @@ namespace MWWorld
                     if (!ptr.isEmpty() && !newPtr.isEmpty())
                     {
                         const MWWorld::CellStore* destinationCell = newPtr.getCell();
-                        mWorldScene->getNeutralWorldScene().updateObjectCell(static_cast<const void*>(ptr.mRef),
+                        mWorldScene->updateNeutralObjectCell(static_cast<const void*>(ptr.mRef),
                             static_cast<const void*>(newPtr.mRef), static_cast<const void*>(destinationCell),
                             destinationCell->getCell()->isExterior(), destinationCell->getCell()->getGridX(),
                             destinationCell->getCell()->getGridY(), destinationCell->getCell()->getNameId(),
@@ -1103,7 +1103,7 @@ namespace MWWorld
         if (haveToMove && newPtr.getRefData().getBaseNode())
         {
             mRendering->moveObject(newPtr, position);
-            mWorldScene->getNeutralWorldScene().updateObjectPosition(static_cast<const void*>(newPtr.mRef),
+            mWorldScene->updateNeutralObjectPosition(static_cast<const void*>(newPtr.mRef),
                 { position.x(), position.y(), position.z() });
             if (movePhysics)
             {
@@ -1312,7 +1312,7 @@ namespace MWWorld
             mWorldScene->removeFromPagedRefs(ptr);
 
             mRendering->rotateObject(ptr, rotate);
-            mWorldScene->getNeutralWorldScene().updateObjectRotation(static_cast<const void*>(ptr.mRef),
+            mWorldScene->updateNeutralObjectRotation(static_cast<const void*>(ptr.mRef),
                 toRenderQuat(rotate));
             mPhysics->updateRotation(ptr, rotate);
 
