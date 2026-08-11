@@ -24,6 +24,7 @@ namespace Render
         if (instance.mesh.vertices.empty() || !Render::valid(instance.transform)
             || !Render::valid(instance.mesh.material.diffuse) || !Render::valid(instance.mesh.material.emissive)
             || !std::isfinite(instance.mesh.material.glossiness)
+            || (instance.mesh.material.alphaTexture && !instance.mesh.material.alphaTexture->valid())
             || (instance.mesh.skinning && !instance.mesh.skinning->valid(instance.mesh.vertices.size())))
             return false;
 

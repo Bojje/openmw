@@ -236,6 +236,13 @@ int main()
     if (Render::collectRasterDynamicMeshes(dynamicSubmission).size() != 1)
         throw std::runtime_error("renderer-neutral unskinned dynamic mesh was not selected for rasterization");
 
+    Render::SceneSubmission invalidAlphaSubmission = dynamicSubmission;
+    invalidAlphaSubmission.meshes.push_back(aggregateMesh);
+    invalidAlphaSubmission.meshes.back().mesh.material.alphaTexture
+        = std::make_shared<const Render::TextureData>();
+    if (invalidAlphaSubmission.valid())
+        throw std::runtime_error("renderer-neutral scene submission accepted an invalid alpha texture");
+
     auto dynamicSkinning = std::make_shared<Render::SkinningData>();
     dynamicSkinning->vertices.resize(3);
     for (Render::SkinVertex& vertex : dynamicSkinning->vertices)
