@@ -53,11 +53,11 @@ longer needs to be the only source of object transform state. The neutral world 
 loaded-cell snapshots through cached NIF meshes, filters hidden and dynamic objects from the
 static batch, and composes object transforms with NIF node transforms before batching;
 animated objects are explicitly retained as dynamic snapshots, but are excluded from the static
-mesh batch until a skinning/animation consumer owns them; an ordered dynamic-object view provides
-that future backend with the retained visibility, transform, model, and cell ordering, and each
-`SceneSubmission` copies those records across the frame boundary. The standalone Vulkan consumer
-retains those ordered dynamic records without pretending unskinned geometry is a finished dynamic
-renderer; skinning and animation remain outstanding until the live game backend consumes them.
+mesh batch until a skinning/animation consumer owns them; the ordered `dynamicMeshes` payload provides
+that future backend with the retained visibility, transform, model, and cell ordering together with
+any resolved mesh data. The standalone Vulkan consumer retains those ordered dynamic records without
+pretending unskinned geometry is a finished dynamic renderer; skinning and animation remain
+outstanding until the live game backend consumes them.
 NIF classic texture, diffuse/emissive, glossiness, and alpha properties now cross the
 renderer-neutral mesh boundary and survive batching; the neutral batch applies diffuse
 and alpha to vertex color output. NIF bump/normal texture slots now cross the same boundary
