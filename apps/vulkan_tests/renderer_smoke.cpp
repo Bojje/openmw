@@ -279,6 +279,8 @@ int main(int argc, char** argv)
             renderer->setScene(submission);
             if (renderer->dynamicObjectCount() != submission.dynamicObjects.size())
                 throw std::runtime_error("Vulkan renderer dropped dynamic-object records");
+            if (renderer->dynamicMeshCount() != submission.dynamicMeshes.size())
+                throw std::runtime_error("Vulkan renderer dropped dynamic mesh payloads");
 
             // Replace the scene once in the same renderer process. This
             // exercises descriptor growth and per-frame mesh replacement; a

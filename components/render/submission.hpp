@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cmath>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "mesh.hpp"
@@ -14,6 +15,12 @@
 
 namespace Render
 {
+    struct DynamicMeshSubmission
+    {
+        WorldObject object;
+        std::vector<MeshInstance> meshes;
+    };
+
     // One backend-neutral frame submission. Resource resolution remains a
     // callback because resource ownership belongs to the game/resource layer;
     // the renderer receives no OSG scene objects.
@@ -28,6 +35,10 @@ namespace Render
         // are not part of the static mesh batch until a skinning/animation
         // consumer is available.
         std::vector<WorldObject> dynamicObjects;
+        // Resolved dynamic meshes are carried separately so a future
+        // animation backend can consume skinning data without re-resolving
+        // assets or falling back to static bind-pose rendering.
+        std::vector<DynamicMeshSubmission> dynamicMeshes;
         TextureResolver textureResolver;
 
         bool valid() const
@@ -44,6 +55,8 @@ namespace Render
                 if (instance.mesh.vertices.empty() || !Render::valid(instance.transform)
                     || !Render::valid(instance.mesh.material.diffuse) || !Render::valid(instance.mesh.material.emissive)
                     || !std::isfinite(instance.mesh.material.glossiness))
+                    return false;
+                if (instance.mesh.skinning && !instance.mesh.skinning->valid(instance.mesh.vertices.size()))
                     return false;
                 for (const MeshVertex& vertex : instance.mesh.vertices)
                 {
@@ -90,9 +103,63 @@ namespace Render
                 }
             }
 
+            for (const DynamicMeshSubmission& dynamic : dynamicMeshes)
+            {
+                if (!dynamic.object.dynamic || dynamic.object.model.empty() || !dynamic.object.transform.valid())
+                    return false;
+                for (const MeshInstance& instance : dynamic.meshes)
+                {
+                    if (instance.mesh.vertices.empty() || instance.mesh.indices.empty()
+                        || !Render::valid(instance.transform)
+                        || !Render::valid(instance.mesh.material.diffuse)
+                        || !Render::valid(instance.mesh.material.emissive)
+                        || !std::isfinite(instance.mesh.material.glossiness)
+                        || (instance.mesh.skinning && !instance.mesh.skinning->valid(instance.mesh.vertices.size())))
+                        return false;
+                    for (const MeshVertex& vertex : instance.mesh.vertices)
+                    {
+                        for (const float value : vertex.position)
+                            if (!std::isfinite(value))
+                                return false;
+                        for (const float value : vertex.normal)
+                            if (!std::isfinite(value))
+                                return false;
+                        for (const float value : vertex.texcoord)
+                            if (!std::isfinite(value))
+                                return false;
+                        for (const float value : vertex.blendTexcoord)
+                            if (!std::isfinite(value))
+                                return false;
+                        for (const float value : vertex.color)
+                            if (!std::isfinite(value))
+                                return false;
+                        for (const float value : vertex.material)
+                            if (!std::isfinite(value))
+                                return false;
+                        for (const float value : vertex.tangent)
+                            if (!std::isfinite(value))
+                                return false;
+                    }
+                    for (const std::uint32_t index : instance.mesh.indices)
+                    {
+                        if (index >= instance.mesh.vertices.size())
+                            return false;
+                    }
+                }
+            }
+
             for (const WorldObject& object : dynamicObjects)
             {
                 if (!object.dynamic || object.model.empty() || !object.transform.valid())
+                    return false;
+            }
+            if (dynamicMeshes.size() != dynamicObjects.size())
+                return false;
+            for (std::size_t index = 0; index < dynamicObjects.size(); ++index)
+            {
+                if (dynamicMeshes[index].object.id != dynamicObjects[index].id
+                    || dynamicMeshes[index].object.model != dynamicObjects[index].model
+                    || dynamicMeshes[index].object.dynamic != dynamicObjects[index].dynamic)
                     return false;
             }
 
@@ -113,6 +180,17 @@ namespace Render
         result.scene = scene;
         result.meshes = collectWorldMeshes(world, resolveMeshes, worldspace, &result.unresolvedModels);
         result.dynamicObjects = world.dynamicObjectsInOrder(worldspace);
+        for (const WorldObject& object : result.dynamicObjects)
+        {
+            DynamicMeshSubmission dynamic;
+            dynamic.object = object;
+            const std::vector<MeshInstance> resolvedMeshes = resolveMeshes(object.model);
+            if (resolvedMeshes.empty())
+                result.unresolvedModels.push_back(object.model);
+            for (const MeshInstance& mesh : resolvedMeshes)
+                dynamic.meshes.push_back(transformMeshInstance(object, mesh));
+            result.dynamicMeshes.push_back(std::move(dynamic));
+        }
 
         if (includeTerrain)
         {

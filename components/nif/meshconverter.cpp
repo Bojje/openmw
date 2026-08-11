@@ -16,6 +16,8 @@ namespace Nif
 {
     namespace
     {
+        Render::Mat4 toRenderMatrix(const NiTransform& transform);
+
         Render::MeshData convertVertices(const NiGeometryData& source)
         {
             Render::MeshData result;
@@ -341,6 +343,57 @@ namespace Nif
 
             return result;
         }
+
+        std::shared_ptr<const Render::SkinningData> convertSkinning(const NiGeometry& geometry,
+            std::size_t vertexCount)
+        {
+            if (geometry.mSkin.empty() || geometry.mSkin->mData.empty())
+                return {};
+
+            const NiSkinData& source = *geometry.mSkin->mData.getPtr();
+            if (source.mBones.empty() || geometry.mSkin->mBones.size() != source.mBones.size())
+                return {};
+
+            auto result = std::make_shared<Render::SkinningData>();
+            result->vertices.resize(vertexCount);
+            result->inverseBindMatrices.reserve(source.mBones.size());
+            for (const NiSkinData::BoneInfo& bone : source.mBones)
+                result->inverseBindMatrices.push_back(toRenderMatrix(bone.mTransform));
+
+            for (std::size_t boneIndex = 0; boneIndex < source.mBones.size(); ++boneIndex)
+            {
+                for (const auto [vertexIndex, weight] : source.mBones[boneIndex].mWeights)
+                {
+                    if (vertexIndex >= result->vertices.size() || !std::isfinite(weight) || weight <= 0.f)
+                        continue;
+
+                    Render::SkinVertex& vertex = result->vertices[vertexIndex];
+                    std::size_t slot = 0;
+                    for (std::size_t influence = 1; influence < vertex.weights.size(); ++influence)
+                    {
+                        if (vertex.weights[influence] < vertex.weights[slot])
+                            slot = influence;
+                    }
+                    if (weight > vertex.weights[slot])
+                    {
+                        vertex.boneIndices[slot] = static_cast<std::uint16_t>(boneIndex);
+                        vertex.weights[slot] = weight;
+                    }
+                }
+            }
+
+            for (Render::SkinVertex& vertex : result->vertices)
+            {
+                float total = 0.f;
+                for (const float weight : vertex.weights)
+                    total += weight;
+                if (total <= 0.f)
+                    return {};
+                for (float& weight : vertex.weights)
+                    weight /= total;
+            }
+            return result;
+        }
     }
 
     Render::MeshData convertMesh(const NiTriShapeData& source)
@@ -409,7 +462,7 @@ namespace Nif
         }
 
         void collectMeshInstances(const NiAVObject& object, const Render::Mat4& parentTransform,
-            std::vector<Render::MeshInstance>& meshes)
+            std::vector<Render::MeshInstance>& meshes, bool allowSkinning)
         {
             const Render::Mat4 transform = Render::multiply(parentTransform, toRenderMatrix(object.mTransform));
             if (const auto* geometry = dynamic_cast<const NiGeometry*>(&object))
@@ -420,12 +473,16 @@ namespace Nif
                     {
                         Render::MeshData mesh = convertMesh(*shapeData);
                         mesh.material = convertMaterial(*geometry);
+                        if (allowSkinning)
+                            mesh.skinning = convertSkinning(*geometry, mesh.vertices.size());
                         meshes.push_back({ std::move(mesh), transform });
                     }
                     else if (const auto* stripsData = dynamic_cast<const NiTriStripsData*>(&geometry->mData.get()))
                     {
                         Render::MeshData mesh = convertMesh(*stripsData);
                         mesh.material = convertMaterial(*geometry);
+                        if (allowSkinning)
+                            mesh.skinning = convertSkinning(*geometry, mesh.vertices.size());
                         meshes.push_back({ std::move(mesh), transform });
                     }
                 }
@@ -436,7 +493,7 @@ namespace Nif
                 for (const auto& child : node->mChildren)
                 {
                     if (!child.empty())
-                        collectMeshInstances(*child.getPtr(), transform, meshes);
+                        collectMeshInstances(*child.getPtr(), transform, meshes, allowSkinning);
                 }
             }
         }
@@ -454,7 +511,7 @@ namespace Nif
         for (std::size_t i = 0; i < file.numRoots(); ++i)
         {
             if (const auto* root = dynamic_cast<const NiAVObject*>(file.getRoot(i)))
-                collectMeshInstances(*root, identity, meshes);
+                collectMeshInstances(*root, identity, meshes, file.getUseSkinning());
         }
         return meshes;
     }

@@ -163,6 +163,19 @@ int main()
         || unresolved.valid())
         throw std::runtime_error("renderer-neutral scene submission hid an unresolved visible model");
 
+    int dynamicSubmissionHandle = 0;
+    world.recordObject(&dynamicSubmissionHandle, &firstCellHandle, true, 1, 2, "first", "meshes/first.nif",
+        objectTransform, true, {}, true);
+    const Render::SceneSubmission dynamicSubmission = Render::collectSceneSubmission(world, aggregateScene, "",
+        [&](std::string_view model) -> std::vector<Render::MeshInstance> {
+            if (model != "meshes/first.nif")
+                throw std::runtime_error("dynamic scene submission resolved an unexpected model");
+            return { aggregateMesh };
+        }, false);
+    if (dynamicSubmission.dynamicObjects.size() != 1 || dynamicSubmission.dynamicMeshes.size() != 1
+        || dynamicSubmission.dynamicMeshes.front().meshes.size() != 1 || !dynamicSubmission.valid())
+        throw std::runtime_error("renderer-neutral dynamic mesh payload was not collected");
+
     Render::SceneSubmission submission;
     submission.scene.ambientColor = { 0.2f, 0.3f, 0.4f, 1.f };
     bool resolverCalled = false;
@@ -180,6 +193,7 @@ int main()
         throw std::runtime_error("renderer-neutral scene submission failed resource handoff");
 
     submission.dynamicObjects.push_back({ 17, "meshes/animated.nif", objectTransform, true, true });
+    submission.dynamicMeshes.push_back({ submission.dynamicObjects.front(), {} });
     if (submission.dynamicObjects.size() != 1 || !submission.dynamicObjects.front().dynamic
         || submission.dynamicObjects.front().model != "meshes/animated.nif" || !submission.valid())
         throw std::runtime_error("renderer-neutral scene submission lost dynamic records");

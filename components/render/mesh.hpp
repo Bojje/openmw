@@ -1,6 +1,8 @@
 #ifndef OPENMW_COMPONENTS_RENDER_MESH_H
 #define OPENMW_COMPONENTS_RENDER_MESH_H
 
+#include <array>
+#include <cmath>
 #include <cstdint>
 #include <algorithm>
 #include <iterator>
@@ -59,6 +61,41 @@ namespace Render
         std::shared_ptr<const TextureData> alphaTexture;
     };
 
+    struct SkinVertex
+    {
+        std::array<std::uint16_t, 4> boneIndices{};
+        std::array<float, 4> weights{};
+    };
+
+    struct SkinningData
+    {
+        std::vector<SkinVertex> vertices;
+        std::vector<Mat4> inverseBindMatrices;
+
+        bool valid(std::size_t vertexCount) const
+        {
+            if (vertices.size() != vertexCount || inverseBindMatrices.empty())
+                return false;
+
+            for (const SkinVertex& vertex : vertices)
+            {
+                float weightSum = 0.f;
+                for (std::size_t influence = 0; influence < vertex.weights.size(); ++influence)
+                {
+                    if (!std::isfinite(vertex.weights[influence]) || vertex.weights[influence] < 0.f
+                        || vertex.boneIndices[influence] >= inverseBindMatrices.size())
+                        return false;
+                    weightSum += vertex.weights[influence];
+                }
+                if (!std::isfinite(weightSum) || weightSum <= 0.999f || weightSum > 1.001f)
+                    return false;
+            }
+
+            return std::all_of(inverseBindMatrices.begin(), inverseBindMatrices.end(),
+                [](const Mat4& matrix) { return Render::valid(matrix); });
+        }
+    };
+
     struct MeshVertex
     {
         float position[3];
@@ -77,6 +114,7 @@ namespace Render
         std::vector<MeshVertex> vertices;
         std::vector<uint32_t> indices;
         MeshMaterial material;
+        std::shared_ptr<const SkinningData> skinning;
     };
 
     struct MeshInstance

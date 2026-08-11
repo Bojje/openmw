@@ -34,6 +34,18 @@ int main()
     if (!invalidTexture.valid())
         throw std::runtime_error("valid neutral texture was rejected");
 
+    auto skinning = std::make_shared<Render::SkinningData>();
+    skinning->vertices.resize(1);
+    skinning->vertices.front().weights[0] = 1.f;
+    Render::Mat4 identity = {};
+    identity.data[0] = identity.data[5] = identity.data[10] = identity.data[15] = 1.f;
+    skinning->inverseBindMatrices.push_back(identity);
+    if (!skinning->valid(1))
+        throw std::runtime_error("valid neutral skinning data was rejected");
+    skinning->vertices.front().weights[0] = 0.f;
+    if (skinning->valid(1))
+        throw std::runtime_error("neutral skinning data without an influence was accepted");
+
     Nif::NiTriShapeData source;
     source.mVertices = { { 1.0f, 2.0f, 3.0f }, { 4.0f, 5.0f, 6.0f }, { 7.0f, 8.0f, 9.0f } };
     source.mNormals = { { 0.0f, 0.0f, 1.0f }, { 0.0f, 1.0f, 0.0f }, { 1.0f, 0.0f, 0.0f } };
@@ -122,11 +134,20 @@ int main()
     shape.mProperties.push_back(&texturing);
     shape.mProperties.push_back(&material);
     shape.mAlphaProperty = &alpha;
+    Nif::NiSkinData skinData;
+    skinData.mBones.resize(1);
+    skinData.mBones.front().mTransform = Nif::NiTransform::getIdentity();
+    skinData.mBones.front().mWeights = { { 0, 1.f }, { 1, 1.f }, { 2, 1.f } };
+    Nif::NiSkinInstance skin;
+    skin.mData = &skinData;
+    skin.mBones.resize(1);
+    shape.mSkin = &skin;
     Nif::NiNode root;
     root.mTransform = Nif::NiTransform::getIdentity();
     root.mTransform.mTranslation.x() = 10.0f;
     root.mChildren.push_back(&shape);
     auto file = std::make_shared<Nif::NIFFile>(VFS::Path::Normalized("synthetic.nif"));
+    file->mUseSkinning = true;
     file->mRoots.push_back(&root);
 
     const std::vector<Render::MeshInstance> instances = Nif::collectMeshInstances(Nif::FileView(*file));
@@ -143,6 +164,9 @@ int main()
         || instances.front().mesh.material.albedoWrapU || instances.front().mesh.material.albedoWrapV
         || instances.front().mesh.material.normalWrapU || !instances.front().mesh.material.normalWrapV)
         throw std::runtime_error("NIF material conversion lost texture or alpha state");
+    if (!instances.front().mesh.skinning || !instances.front().mesh.skinning->valid(3)
+        || instances.front().mesh.skinning->vertices[1].weights[0] != 1.f)
+        throw std::runtime_error("NIF skinning metadata was not preserved at the neutral boundary");
     if (!instances.front().mesh.material.emissiveWrapU || instances.front().mesh.material.emissiveWrapV)
         throw std::runtime_error("NIF material conversion lost emissive texture wrapping");
     expectNear(instances.front().mesh.material.diffuse.x, 0.25f, "material diffuse red");

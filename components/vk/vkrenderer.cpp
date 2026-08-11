@@ -1608,6 +1608,7 @@ namespace Vk
         mSceneData = submission.scene;
         mHasSceneData = true;
         mDynamicObjects = submission.dynamicObjects;
+        mDynamicMeshes = submission.dynamicMeshes;
         if (submission.terrainTiles.empty())
         {
             setMeshes(submission.meshes, submission.textureResolver);
@@ -1773,6 +1774,7 @@ namespace Vk
         mMeshNormalTextureIndices.clear();
         mMeshSpecularTextureIndices.clear();
         mDynamicObjects.clear();
+        mDynamicMeshes.clear();
     }
 
     void Renderer::destroyMesh(uint32_t frameIndex)

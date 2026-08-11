@@ -114,7 +114,9 @@ consumer now exercises the same `WorldScene` to `Vk::Renderer` handoff, while th
 backend. The submission
 boundary now validates mesh indices and terrain snapshots before Vulkan consumes them. The full-game
 Vulkan call site is still intentionally absent until window, input, dynamic-content, and GUI
-services have a Vulkan owner. Mesh submission no longer waits for the whole device or
+services have a Vulkan owner. NIF skinning metadata now survives conversion, and resolved dynamic
+mesh payloads cross the neutral boundary into the Vulkan consumer, but remain outside the raster
+draw batch until per-frame bone updates are owned. Mesh submission no longer waits for the whole device or
 rebuilds one global buffer: neutral mesh data is retained on the CPU and uploaded into
 the current frame slot only after its fence is waited, so a future live frame loop can
 submit scene updates without the previous device-wide stall.
@@ -183,13 +185,13 @@ The non-owning manager update handle is private to the `Scene` owner, detached d
 teardown, and CI guards the manager header against regaining a value-owned neutral frame state.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-62 files, deleting 620 lines and adding 5,441 lines (net `+4,821`). The larger Vulkan-only
+62 files, deleting 620 lines and adding 5,661 lines (net `+5,041`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
 
 The latest validation checkpoint also rejects non-finite scene matrices, transforms, vertex
-attributes, and terrain coordinates at the renderer-neutral submission boundary, before
+attributes, skinning payloads, and terrain coordinates at the renderer-neutral submission boundary, before
 they reach Vulkan. This protects the backend from corrupted engine state without relying
 on GPU validation diagnostics.
 The latest reduction checkpoint also removed `RenderingManager`'s neutral `WorldScene` ownership,
@@ -255,7 +257,7 @@ the game unplayable rather than reduce duplication safely.
 | Inactive raster ray-tracing scaffold | Removed | Reintroduce only with a complete RT pipeline |
 | Vulkan utility/queue helper paths | Removed | Complete |
 | Parsed NIF resource cache wrapper | Removed | Complete; cache now owns shared NIF files directly |
-| NIF-to-neutral mesh conversion | Renderer-neutral NIF boundary, material data, mesh cache, `SceneSubmission`, Vulkan mesh batch, standalone texture table, and full-game neutral resolver | Connect the handoff to the live full-game Vulkan frame loop, add material shading, skinning, and static-world submission |
+| NIF-to-neutral mesh conversion | Renderer-neutral NIF boundary, material data, mesh cache, skinning metadata, dynamic mesh payloads, `SceneSubmission`, Vulkan mesh batch, standalone texture table, and full-game neutral resolver | Connect the handoff to the live full-game Vulkan frame loop, add per-frame bone updates and dynamic shading |
 | Terrain geometry and layer data | Legacy OSG terrain storage/ChunkManager plus a tested neutral tile adapter, per-cell LOD selector, and Vulkan opaque/normal/parallax/blendmap/specular layer consumer, including explicit ESM4 specular textures | Add quadtree-scale terrain streaming and terrain image coverage |
 | Loaded-cell object identity, transforms, terrain snapshots, and paging state | Renderer-neutral `WorldScene`/`CellScene` snapshots updated by scene lifecycle; active-cell static references bypass legacy OSG paging visibility, and cell-lifecycle-cached terrain tiles flow into `SceneSubmission` | Consume snapshots from a backend and migrate visibility/paging policy |
 | GUI, loading screens, screenshots, and presentation | OSG/MyGUI path | Vulkan presentation and GUI coverage |
