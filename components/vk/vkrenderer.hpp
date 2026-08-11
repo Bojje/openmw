@@ -70,7 +70,6 @@ namespace Vk
         Renderer(const Renderer&) = delete;
         Renderer& operator=(const Renderer&) = delete;
 
-        bool render();
         bool renderFrame() override { return render(); }
         bool renderFrame(const Render::SceneSubmission& submission) override
         {
@@ -89,6 +88,8 @@ namespace Vk
         void setScene(const Render::SceneSubmission& submission);
 
     private:
+        bool render();
+
         static constexpr uint32_t maxTextures = maxSceneTextures;
 
         struct TextureResource

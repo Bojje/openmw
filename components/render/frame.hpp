@@ -15,7 +15,7 @@ namespace Render
         virtual ~FrameLifecycle() = default;
 
         virtual bool renderFrame() = 0;
-        virtual bool renderFrame(const SceneSubmission& /*submission*/) { return renderFrame(); }
+        virtual bool renderFrame(const SceneSubmission& /*submission*/) { return false; }
         virtual bool consumesSceneSubmission() const = 0;
         virtual void advanceFrame(double simulationTime) = 0;
     };

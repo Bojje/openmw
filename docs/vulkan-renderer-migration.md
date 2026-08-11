@@ -102,7 +102,7 @@ teardown, so a game/world unload cannot retain stale object identities, terrain 
 ordering.
 Dynamic `WorldObject` records now own an optional neutral bone-pose snapshot and expose an explicit
 pose-update operation; `SceneSubmission` carries that pose beside each resolved dynamic mesh. The
-The neutral export now has a transitional OSG-backed pose producer: after the reference traversal,
+neutral export now has a transitional OSG-backed pose producer: after the reference traversal,
 it maps named NIF skin bones to current animation skeleton matrices and carries matching poses into
 dynamic submissions. The full-game Vulkan frame loop still lacks this producer, animation timing
 ownership, and animation-specific shading; mismatched multi-part skin orders are intentionally left
@@ -215,7 +215,7 @@ The non-owning manager update handle is private to the `Scene` owner, detached d
 teardown, and CI guards the manager header against regaining a value-owned neutral frame state.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-83 files, deleting 785 lines and adding 6,804 lines (net `+6,019`). The larger Vulkan-only
+83 files, deleting 779 lines and adding 6,799 lines (net `+6,020`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
