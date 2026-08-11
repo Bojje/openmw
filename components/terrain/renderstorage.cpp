@@ -1,10 +1,32 @@
 #include "renderstorage.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <optional>
+#include <utility>
 
 namespace Terrain
 {
+    std::vector<Render::TerrainTile> RenderStorage::getRenderTiles(int gridX, int gridY, ESM::RefId worldspace)
+    {
+        const std::array<float, 2> center = { gridX + 0.5f, gridY + 0.5f };
+        const int cellVertices = getCellVertices(worldspace);
+        int maxLod = 0;
+        for (int vertices = std::max(cellVertices - 1, 1); vertices > 1; vertices >>= 1)
+            ++maxLod;
+
+        std::vector<Render::TerrainTile> tiles;
+        tiles.reserve(static_cast<std::size_t>(maxLod + 1));
+        for (int lod = 0; lod <= maxLod; ++lod)
+        {
+            if (std::optional<Render::TerrainTile> tile = getRenderTile(lod, 1.f, center, worldspace))
+                tiles.push_back(std::move(*tile));
+            else
+                break;
+        }
+        return tiles;
+    }
+
     std::optional<Render::TerrainTile> RenderStorage::getRenderTile(
         int lodLevel, float size, const std::array<float, 2>& center, ESM::RefId worldspace)
     {

@@ -25,6 +25,7 @@
 #include <components/resource/scenemanager.hpp>
 #include <components/sceneutil/positionattitudetransform.hpp>
 #include <components/settings/values.hpp>
+#include <components/terrain/renderstorage.hpp>
 #include <components/terrain/terraingrid.hpp>
 #include <components/vfs/manager.hpp>
 #include <components/vfs/pathutil.hpp>

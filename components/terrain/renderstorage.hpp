@@ -37,6 +37,8 @@ namespace Terrain
         virtual int getCellVertices(ESM::RefId worldspace) = 0;
         virtual int getTextureTileCount(float chunkSize, ESM::RefId worldspace) = 0;
 
+        std::vector<Render::TerrainTile> getRenderTiles(int gridX, int gridY, ESM::RefId worldspace);
+
         std::optional<Render::TerrainTile> getRenderTile(
             int lodLevel, float size, const std::array<float, 2>& center, ESM::RefId worldspace);
     };
