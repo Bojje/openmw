@@ -161,22 +161,6 @@ namespace Render
         }
     };
 
-    inline std::vector<MeshInstance> collectUnskinnedDynamicMeshes(const SceneSubmission& submission)
-    {
-        std::vector<MeshInstance> result;
-        for (const DynamicMeshSubmission& dynamic : submission.dynamicMeshes)
-        {
-            if (!dynamic.object.visible)
-                continue;
-            for (const MeshInstance& instance : dynamic.meshes)
-            {
-                if (!instance.mesh.skinning)
-                    result.push_back(instance);
-            }
-        }
-        return result;
-    }
-
     inline std::vector<MeshInstance> collectRasterDynamicMeshes(const SceneSubmission& submission)
     {
         std::vector<MeshInstance> result;

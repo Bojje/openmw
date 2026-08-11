@@ -220,7 +220,7 @@ int main()
         || dynamicSubmission.referencedTexturePaths().size() != 1
         || dynamicSubmission.referencedTexturePaths().front() != "textures/dynamic.dds" || !dynamicSubmission.valid())
         throw std::runtime_error("renderer-neutral dynamic mesh payload was not collected");
-    if (Render::collectUnskinnedDynamicMeshes(dynamicSubmission).size() != 1)
+    if (Render::collectRasterDynamicMeshes(dynamicSubmission).size() != 1)
         throw std::runtime_error("renderer-neutral unskinned dynamic mesh was not selected for rasterization");
 
     auto dynamicSkinning = std::make_shared<Render::SkinningData>();
@@ -267,7 +267,7 @@ int main()
         || hiddenDynamicSubmission.dynamicMeshes.back().object.model != "meshes/missing.nif"
         || !hiddenDynamicSubmission.dynamicMeshes.back().meshes.empty() || !hiddenDynamicSubmission.valid())
         throw std::runtime_error("renderer-neutral dynamic visibility policy was not preserved");
-    if (Render::collectUnskinnedDynamicMeshes(hiddenDynamicSubmission).size() != 1)
+    if (Render::collectRasterDynamicMeshes(hiddenDynamicSubmission).size() != 1)
         throw std::runtime_error("renderer-neutral hidden dynamic mesh was selected for rasterization");
 
     Render::SceneSubmission submission;
