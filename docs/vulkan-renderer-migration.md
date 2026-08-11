@@ -55,9 +55,10 @@ static batch, and composes object transforms with NIF node transforms before bat
 animated objects are explicitly retained as dynamic snapshots, but are excluded from the static
 mesh batch until a skinning/animation consumer owns them; the ordered `dynamicMeshes` payload provides
 that future backend with the retained visibility, transform, model, and cell ordering together with
-any resolved mesh data. The standalone Vulkan consumer retains those ordered dynamic records without
-pretending unskinned geometry is a finished dynamic renderer; skinning and animation remain
-outstanding until the live game backend consumes them.
+any resolved mesh data. The standalone Vulkan consumer consumes only currently supported unskinned
+geometry and records the payload count for validation; it does not copy or pretend to consume the
+ordered dynamic records as a finished animation renderer. Skinning and animation remain outstanding
+until the live game backend consumes them.
 NIF classic texture, diffuse/emissive, glossiness, and alpha properties now cross the
 renderer-neutral mesh boundary and survive batching; the neutral batch applies diffuse
 and alpha to vertex color output. NIF bump/normal texture slots now cross the same boundary

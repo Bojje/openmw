@@ -1607,7 +1607,7 @@ namespace Vk
 
         mSceneData = submission.scene;
         mHasSceneData = true;
-        mDynamicMeshes = submission.dynamicMeshes;
+        mDynamicMeshCount = submission.dynamicMeshes.size();
         std::vector<Render::MeshInstance> meshes = submission.meshes;
         for (const Render::TerrainTile& tile : submission.terrainTiles)
         {
@@ -1769,7 +1769,7 @@ namespace Vk
         mMeshAlphaTextureIndices.clear();
         mMeshNormalTextureIndices.clear();
         mMeshSpecularTextureIndices.clear();
-        mDynamicMeshes.clear();
+        mDynamicMeshCount = 0;
     }
 
     void Renderer::destroyMesh(uint32_t frameIndex)
