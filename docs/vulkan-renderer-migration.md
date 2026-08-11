@@ -182,7 +182,7 @@ The non-owning manager update handle is private to the `Scene` owner, detached d
 teardown, and CI guards the manager header against regaining a value-owned neutral frame state.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-62 files, deleting 620 lines and adding 5,426 lines (net `+4,806`). The larger Vulkan-only
+62 files, deleting 620 lines and adding 5,433 lines (net `+4,813`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
@@ -195,7 +195,7 @@ The latest reduction checkpoint also removed `RenderingManager`'s neutral `World
 the public neutral-world lookup escape hatch, and its remaining manager-only neutral-object
 lookup, removal, cell-transfer, transform-update, reset, and terrain-snapshot wrappers. The
 world lifecycle now calls `WorldScene` directly for
-insertion, removal, active-cell transfer, transform updates, reset, and terrain snapshots. The terrain adapter is now consumed for opaque, normal-mapped, parallax, and
+insertion, removal, active-cell transfer, transform updates, reset, and terrain snapshots. Active-cell static references are now submitted even when legacy OSG object paging places them in a paged node; the neutral backend therefore does not inherit an invisible-object hole from the reference renderer. The terrain adapter is now consumed for opaque, normal-mapped, parallax, and
 blendmap/multi-layer Vulkan terrain, including explicit ESM4 specular textures; its remaining
 owner boundary is quadtree-scale streaming and complete image coverage. Terrain layer feature
 flags now default to disabled
@@ -256,7 +256,7 @@ the game unplayable rather than reduce duplication safely.
 | Parsed NIF resource cache wrapper | Removed | Complete; cache now owns shared NIF files directly |
 | NIF-to-neutral mesh conversion | Renderer-neutral NIF boundary, material data, mesh cache, `SceneSubmission`, Vulkan mesh batch, standalone texture table, and full-game neutral resolver | Connect the handoff to the live full-game Vulkan frame loop, add material shading, skinning, and static-world submission |
 | Terrain geometry and layer data | Legacy OSG terrain storage/ChunkManager plus a tested neutral tile adapter, per-cell LOD selector, and Vulkan opaque/normal/parallax/blendmap/specular layer consumer, including explicit ESM4 specular textures | Add quadtree-scale terrain streaming and terrain image coverage |
-| Loaded-cell object identity, transforms, terrain snapshots, and paging state | Renderer-neutral `WorldScene`/`CellScene` snapshots updated by scene lifecycle; cell-lifecycle-cached terrain tiles flow into `SceneSubmission` | Consume snapshots from a backend and migrate visibility/paging policy |
+| Loaded-cell object identity, transforms, terrain snapshots, and paging state | Renderer-neutral `WorldScene`/`CellScene` snapshots updated by scene lifecycle; active-cell static references bypass legacy OSG paging visibility, and cell-lifecycle-cached terrain tiles flow into `SceneSubmission` | Consume snapshots from a backend and migrate visibility/paging policy |
 | GUI, loading screens, screenshots, and presentation | OSG/MyGUI path | Vulkan presentation and GUI coverage |
 
 This ledger is intentionally conservative: a subsystem is marked removable only after a

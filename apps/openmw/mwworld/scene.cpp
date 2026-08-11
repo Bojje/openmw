@@ -163,7 +163,14 @@ namespace
             ptr.getRefData().setBaseNode(pagedNode);
         setNodeRotation(ptr, rendering, rotation);
         if (!model.empty())
-            recordNeutralObject(ptr, model.view(), !isPaged, neutralWorld);
+        {
+            // OSG paging is a legacy scene-node optimization. The neutral
+            // backend owns visibility for active-cell static references, so
+            // do not hide a valid static model merely because OSG placed it
+            // in a paged node. Dynamic records remain separate until a
+            // backend can consume animation and skinning data.
+            recordNeutralObject(ptr, model.view(), true, neutralWorld);
+        }
 
         if (ptr.getClass().useAnim())
             MWBase::Environment::get().getMechanicsManager()->add(ptr);
