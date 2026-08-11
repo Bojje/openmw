@@ -35,6 +35,10 @@ namespace Render
         ObjectTransform transform;
         bool visible = true;
         bool dynamic = false;
+        // Optional frame pose supplied by the animation owner. The matrices
+        // use the skinning order of the resolved mesh and contain no backend
+        // or scene-graph types.
+        std::vector<Mat4> boneMatrices;
     };
 
     // A cell snapshot is updated by the world lifecycle, not by a renderer.
@@ -216,6 +220,8 @@ namespace Render
                         object->transform = transform;
                         object->visible = visible;
                         object->dynamic = dynamic;
+                        if (!dynamic)
+                            object->boneMatrices.clear();
                         return;
                     }
                 }
@@ -248,6 +254,21 @@ namespace Render
         bool updateObjectScale(const void* objectKey, const Vec3& scale)
         {
             return updateObjectTransform(objectKey, [&](ObjectTransform& transform) { transform.scale = scale; });
+        }
+
+        bool updateObjectPose(const void* objectKey, std::vector<Mat4> boneMatrices)
+        {
+            const auto found = mObjects.find(objectKey);
+            if (found == mObjects.end())
+                return false;
+            const auto scene = mCells.find(found->second.cell);
+            if (scene == mCells.end())
+                return false;
+            WorldObject* object = scene->second.findObject(found->second.id);
+            if (object == nullptr || !object->dynamic)
+                return false;
+            object->boneMatrices = std::move(boneMatrices);
+            return true;
         }
 
         const CellScene* findCell(const void* cellKey) const

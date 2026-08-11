@@ -1183,6 +1183,11 @@ namespace MWWorld
         mNeutralWorldScene.updateObjectRotation(objectKey, rotation);
     }
 
+    void Scene::updateNeutralObjectPose(const void* objectKey, std::vector<Render::Mat4> boneMatrices)
+    {
+        mNeutralWorldScene.updateObjectPose(objectKey, std::move(boneMatrices));
+    }
+
     void Scene::markCellAsUnchanged()
     {
         mCellChanged = false;
