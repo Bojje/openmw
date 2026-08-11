@@ -119,9 +119,9 @@ jobs:
           echo "OpenMW production code must use Scene neutral-state APIs instead of exposing WorldScene ownership"
           exit 1
         fi
-        if rg -n 'renderingTraversals\(\)' apps/openmw --glob '*.cpp' --glob '*.hpp' \
+        if rg -n 'eventTraversal\(\)|updateTraversal\(\)|renderingTraversals\(\)' apps/openmw --glob '*.cpp' --glob '*.hpp' \
             | rg -v 'apps/openmw/engine.cpp|apps/openmw/mwrender/renderingmanager.cpp'; then
-          echo "OpenMW frame submission must go through the RenderingManager owner boundary"
+          echo "OpenMW frame traversal must go through the RenderingManager owner boundary"
           exit 1
         fi
         if readelf -d build-vulkan/openmw | grep -Eiq 'libvulkan|libOpenSceneGraph|libosg'; then
