@@ -178,8 +178,10 @@ attachments remain clamped. Terrain diffuse-specular maps are consumed, and ordi
 specular maps now use the configured pattern, dedicated texture table, and RGB G-buffer path;
 ESM4 explicit and auto-detected terrain specular maps now use the same neutral texture table and RGB path;
 complete terrain image coverage remains outstanding. The neutral cache now retains
-per-cell LOD snapshots and selects one deterministically by camera distance before handoff;
-quadtree-scale streaming and composite-image coverage remain outstanding. `WorldScene` now
+per-cell LOD snapshots and also assembles aligned multi-cell region snapshots, selecting one
+region LOD deterministically by camera distance before handoff; incomplete regions fall back
+to the per-cell path. Neighbor stitching, quadtree streaming policy, and composite-image
+coverage remain outstanding. `WorldScene` now
 records empty loaded cells as well as object-bearing cells and owns each cell's cached terrain
 LOD snapshots. `MWWorld::Scene::getNeutralScene()` now assembles those snapshots for loaded
 exterior cells in the active worldspace, so terrain is part of the real full-game neutral
@@ -198,19 +200,21 @@ round trip and can depend on the contract without including OSG headers. `Render
 still retains the concrete adapter privately for the reference terrain implementation and passes
 the neutral contract to the world lifecycle.
 Neutral lighting and fog state now lives in `WorldScene::sceneData()` with the rest of the
-world-owned handoff. `RenderingManager` only receives a non-owning update reference, so its
-OSG state changes cannot reintroduce a second neutral scene owner.
+world-owned handoff. `RenderingManager` exposes an explicit frame-boundary synchronization
+operation, so its OSG state changes cannot reintroduce a second neutral scene owner or retain
+a pointer into the world scene.
 The neutral terrain tile entry point also uses a plain two-float center; OSG vector types
 remain confined to the legacy quadtree and reference-renderer methods.
-Camera matrices are now synchronized into that same world-owned state after the normal game
-render traversal, and neutral submission export no longer queries the OSG camera as a side effect.
+Camera and environment state are synchronized into that same world-owned state at the renderer
+frame boundary; neutral submission export uses the same explicit synchronization operation for
+a submission-consuming backend.
 The full-game bridge validator runs after that same render boundary, so it validates the
 camera payload that was just submitted rather than the previous frame's cached matrices.
 The non-owning manager update handle is private to the `Scene` owner, detached during `Scene`
 teardown, and CI guards the manager header against regaining a value-owned neutral frame state.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-83 files, deleting 758 lines and adding 6,539 lines (net `+5,781`). The larger Vulkan-only
+83 files, deleting 758 lines and adding 6,753 lines (net `+5,995`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
