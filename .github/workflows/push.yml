@@ -164,7 +164,12 @@ jobs:
         fi
         if rg -n 'class RenderingManager[^\n]*Render::FrameLifecycle|RenderingManager[^\n]*FrameLifecycle' \
             apps/openmw/mwrender/renderingmanager.hpp; then
-          echo "RenderingManager must expose, not inherit, the renderer-neutral frame lifecycle"
+          echo "RenderingManager must not inherit the renderer-neutral frame lifecycle"
+          exit 1
+        fi
+        if rg -n 'getFrameLifecycle|make_unique<[^>]*FrameLifecycle' \
+            apps/openmw/mwrender/renderingmanager.hpp apps/openmw/mwrender/renderingmanager.cpp; then
+          echo "The renderer manager must not create or expose a duplicate frame lifecycle"
           exit 1
         fi
         if readelf -d build-vulkan/openmw | grep -Eiq 'libvulkan|libOpenSceneGraph|libosg'; then

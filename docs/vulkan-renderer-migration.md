@@ -215,7 +215,7 @@ The non-owning manager update handle is private to the `Scene` owner, detached d
 teardown, and CI guards the manager header against regaining a value-owned neutral frame state.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-83 files, deleting 774 lines and adding 6,787 lines (net `+6,013`). The larger Vulkan-only
+83 files, deleting 779 lines and adding 6,796 lines (net `+6,017`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
@@ -406,13 +406,13 @@ the full-game smoke run; it checks the neutral payload every 30 frames and after
 
 The full game should not be repeatedly started for every change. The main engine loop, loading
 screen, modal/video loops, and screenshot capture now delegate frame advancement, event processing,
-update traversal, and frame submission through the world-owned boundaries. The current OSG
-`RenderingManager` owns a separate `ViewerFrameLifecycle` adapter and exposes it through an explicit
-frame-lifecycle accessor; it no longer implements the renderer-neutral interface itself. Direct OSG
-frame operations remain only in that adapter, while bootstrap callbacks use the same small OSG
-frame-owner type that can be replaced with the Vulkan presentation owner. This
-establishes the replacement point for a future Vulkan frame owner while current OSG behavior
-remains unchanged. The interface now has an explicit submission-consuming path: a Vulkan owner
+update traversal, and frame submission through one engine-owned frame lifecycle. The engine creates
+one OSG `ViewerFrameLifecycle` before world initialization and passes that service explicitly to
+`World` and `RenderingManager`; no second OSG lifecycle adapter is constructed by the manager.
+Direct OSG frame operations remain only in that adapter, while bootstrap callbacks use the same small
+frame-owner type that can be replaced with the Vulkan presentation owner. This establishes the
+replacement point for a future Vulkan frame owner while current OSG behavior remains unchanged.
+The interface now has an explicit submission-consuming path: a Vulkan owner
 will receive a synchronized `SceneSubmission` from `World` and validate it before upload, while the OSG owner
 explicitly reports that it does not consume submissions and continues its legacy traversal.
 The engine-side periodic bridge validator skips its duplicate export when that path is active,

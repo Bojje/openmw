@@ -78,7 +78,6 @@
 #include "navmesh.hpp"
 #include "npcanimation.hpp"
 #include "objectpaging.hpp"
-#include "viewerframelifecycle.hpp"
 #include "pathgrid.hpp"
 #include "postprocessor.hpp"
 #include "recastmesh.hpp"
@@ -176,9 +175,10 @@ namespace MWRender
     RenderingManager::RenderingManager(osgViewer::Viewer* viewer, osg::ref_ptr<osg::Group> rootNode,
         Resource::ResourceSystem* resourceSystem, SceneUtil::WorkQueue* workQueue,
         DetourNavigator::Navigator& navigator, const MWWorld::GroundcoverStore& groundcoverStore,
-        SceneUtil::UnrefQueue& unrefQueue, TerrainStorage& terrainStorage)
+        SceneUtil::UnrefQueue& unrefQueue, TerrainStorage& terrainStorage, Render::FrameLifecycle& frameLifecycle)
         : mSkyBlending(Settings::fog().mSkyBlending)
         , mViewer(viewer)
+        , mFrameLifecycle(frameLifecycle)
         , mRootNode(rootNode)
         , mResourceSystem(resourceSystem)
         , mWorkQueue(workQueue)
@@ -328,12 +328,9 @@ namespace MWRender
 
         mCamera = std::make_unique<Camera>(mViewer->getCamera());
 
-        mFrameLifecycle = std::make_unique<ViewerFrameLifecycle>(*mViewer,
-            [this](Render::SceneData& sceneData) { synchronizeNeutralScene(sceneData); });
-
         mScreenshotManager = std::make_unique<ScreenshotManager>(viewer,
-            [this] { mFrameLifecycle->renderFrame(); },
-            [this] { mFrameLifecycle->advanceFrame(mViewer->getFrameStamp()->getSimulationTime()); });
+            [this] { mFrameLifecycle.renderFrame(); },
+            [this] { mFrameLifecycle.advanceFrame(mViewer->getFrameStamp()->getSimulationTime()); });
 
         mViewer->setLightingMode(osgViewer::View::NO_LIGHT);
 

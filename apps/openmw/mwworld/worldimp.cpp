@@ -237,8 +237,8 @@ namespace MWWorld
         mSwimHeightScale = mStore.get<ESM::GameSetting>().find("fSwimHeightScale")->mValue.getFloat();
     }
 
-    void World::init(Debug::Level maxRecastLogLevel, osgViewer::Viewer* viewer, osg::ref_ptr<osg::Group> rootNode,
-        SceneUtil::WorkQueue* workQueue, SceneUtil::UnrefQueue& unrefQueue)
+    void World::init(Debug::Level maxRecastLogLevel, osgViewer::Viewer* viewer, Render::FrameLifecycle& frameLifecycle,
+        osg::ref_ptr<osg::Group> rootNode, SceneUtil::WorkQueue* workQueue, SceneUtil::UnrefQueue& unrefQueue)
     {
         mPhysics = std::make_unique<MWPhysics::PhysicsSystem>(mResourceSystem, rootNode);
 
@@ -261,8 +261,9 @@ namespace MWWorld
             Settings::shaders().mAutoUseTerrainSpecularMaps);
 
         mRendering = std::make_unique<MWRender::RenderingManager>(
-            viewer, rootNode, mResourceSystem, workQueue, *mNavigator, mGroundcoverStore, unrefQueue, *mTerrainStorage);
-        mFrameLifecycle = &mRendering->getFrameLifecycle();
+            viewer, rootNode, mResourceSystem, workQueue, *mNavigator, mGroundcoverStore, unrefQueue, *mTerrainStorage,
+            frameLifecycle);
+        mFrameLifecycle = &frameLifecycle;
         mProjectileManager = std::make_unique<ProjectileManager>(
             mRendering->getLightRoot()->asGroup(), mResourceSystem, mRendering.get(), mPhysics.get());
         mRendering->preloadCommonAssets();
@@ -3842,7 +3843,11 @@ namespace MWWorld
         if (!mFrameLifecycle->renderFrame())
             return false;
         if (mWorldScene)
-            mFrameLifecycle->synchronizeScene(mWorldScene->getFrameSceneData());
+        {
+            Render::SceneData& sceneData = mWorldScene->getFrameSceneData();
+            mFrameLifecycle->synchronizeScene(sceneData);
+            mRendering->synchronizeNeutralScene(sceneData);
+        }
         return true;
     }
 

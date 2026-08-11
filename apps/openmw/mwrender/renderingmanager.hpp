@@ -123,15 +123,11 @@ namespace MWRender
         RenderingManager(osgViewer::Viewer* viewer, osg::ref_ptr<osg::Group> rootNode,
             Resource::ResourceSystem* resourceSystem, SceneUtil::WorkQueue* workQueue,
             DetourNavigator::Navigator& navigator, const MWWorld::GroundcoverStore& groundcoverStore,
-            SceneUtil::UnrefQueue& unrefQueue, TerrainStorage& terrainStorage);
+            SceneUtil::UnrefQueue& unrefQueue, TerrainStorage& terrainStorage,
+            Render::FrameLifecycle& frameLifecycle);
         ~RenderingManager();
 
         osgUtil::IncrementalCompileOperation* getIncrementalCompileOperation();
-
-        /// Return the renderer-owned frame lifecycle. The OSG implementation is
-        /// an adapter today; a Vulkan implementation can replace this object
-        /// without making the world depend on RenderingManager inheritance.
-        Render::FrameLifecycle& getFrameLifecycle() { return *mFrameLifecycle; }
 
         /// Copy the current reference-renderer camera and environment state into
         /// the world-owned neutral frame snapshot at a frame boundary.
@@ -334,7 +330,7 @@ namespace MWRender
         osg::ref_ptr<IntersectionVisitorWithIgnoreList> mIntersectionVisitor;
 
         osg::ref_ptr<osgViewer::Viewer> mViewer;
-        std::unique_ptr<Render::FrameLifecycle> mFrameLifecycle;
+        Render::FrameLifecycle& mFrameLifecycle;
         osg::ref_ptr<osg::Group> mRootNode;
         osg::ref_ptr<SceneUtil::LightManager> mSceneRoot;
         Resource::ResourceSystem* mResourceSystem;
