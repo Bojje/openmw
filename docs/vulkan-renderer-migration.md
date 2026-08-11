@@ -117,8 +117,8 @@ boundary now validates mesh indices and terrain snapshots before Vulkan consumes
 Vulkan call site is still intentionally absent until window, input, dynamic-content, and GUI
 services have a Vulkan owner. NIF skinning metadata now survives conversion, and resolved dynamic
 mesh payloads cross the neutral boundary into the Vulkan consumer. A deterministic CPU skinning
-helper now applies frame bone matrices for future animation integration, but dynamic meshes remain
-outside the raster draw batch until per-frame bone updates are owned. Mesh submission no longer waits for the whole device or
+helper now applies frame bone matrices for future animation integration. Unskinned dynamic meshes now enter the raster draw
+batch with their neutral transforms; skinned meshes remain outside it until per-frame bone updates are owned. Mesh submission no longer waits for the whole device or
 rebuilds one global buffer: neutral mesh data is retained on the CPU and uploaded into
 the current frame slot only after its fence is waited, so a future live frame loop can
 submit scene updates without the previous device-wide stall.
@@ -187,7 +187,7 @@ The non-owning manager update handle is private to the `Scene` owner, detached d
 teardown, and CI guards the manager header against regaining a value-owned neutral frame state.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-62 files, deleting 620 lines and adding 5,740 lines (net `+5,120`). The larger Vulkan-only
+62 files, deleting 620 lines and adding 5,757 lines (net `+5,137`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.

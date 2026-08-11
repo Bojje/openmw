@@ -178,6 +178,8 @@ int main()
         || dynamicSubmission.referencedTexturePaths().size() != 1
         || dynamicSubmission.referencedTexturePaths().front() != "textures/dynamic.dds" || !dynamicSubmission.valid())
         throw std::runtime_error("renderer-neutral dynamic mesh payload was not collected");
+    if (Render::collectUnskinnedDynamicMeshes(dynamicSubmission).size() != 1)
+        throw std::runtime_error("renderer-neutral unskinned dynamic mesh was not selected for rasterization");
 
     int hiddenDynamicHandle = 0;
     world.recordObject(&hiddenDynamicHandle, &firstCellHandle, true, 1, 2, "first", "meshes/missing.nif",
@@ -192,6 +194,8 @@ int main()
         || hiddenDynamicSubmission.dynamicMeshes.back().object.model != "meshes/missing.nif"
         || !hiddenDynamicSubmission.dynamicMeshes.back().meshes.empty() || !hiddenDynamicSubmission.valid())
         throw std::runtime_error("renderer-neutral dynamic visibility policy was not preserved");
+    if (Render::collectUnskinnedDynamicMeshes(hiddenDynamicSubmission).size() != 1)
+        throw std::runtime_error("renderer-neutral hidden dynamic mesh was selected for rasterization");
 
     Render::SceneSubmission submission;
     submission.scene.ambientColor = { 0.2f, 0.3f, 0.4f, 1.f };

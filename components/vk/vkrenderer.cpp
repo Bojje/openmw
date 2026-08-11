@@ -1609,12 +1609,6 @@ namespace Vk
         mHasSceneData = true;
         mDynamicObjects = submission.dynamicObjects;
         mDynamicMeshes = submission.dynamicMeshes;
-        if (submission.terrainTiles.empty())
-        {
-            setMeshes(submission.meshes, submission.textureResolver);
-            return;
-        }
-
         std::vector<Render::MeshInstance> meshes = submission.meshes;
         for (const Render::TerrainTile& tile : submission.terrainTiles)
         {
@@ -1622,6 +1616,9 @@ namespace Vk
             meshes.insert(meshes.end(), std::make_move_iterator(terrain.begin()),
                 std::make_move_iterator(terrain.end()));
         }
+        std::vector<Render::MeshInstance> unskinnedDynamic = Render::collectUnskinnedDynamicMeshes(submission);
+        meshes.insert(meshes.end(), std::make_move_iterator(unskinnedDynamic.begin()),
+            std::make_move_iterator(unskinnedDynamic.end()));
         setMeshes(meshes, submission.textureResolver);
     }
 

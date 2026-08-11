@@ -156,6 +156,22 @@ namespace Render
         }
     };
 
+    inline std::vector<MeshInstance> collectUnskinnedDynamicMeshes(const SceneSubmission& submission)
+    {
+        std::vector<MeshInstance> result;
+        for (const DynamicMeshSubmission& dynamic : submission.dynamicMeshes)
+        {
+            if (!dynamic.object.visible)
+                continue;
+            for (const MeshInstance& instance : dynamic.meshes)
+            {
+                if (!instance.mesh.skinning)
+                    result.push_back(instance);
+            }
+        }
+        return result;
+    }
+
     // Build the backend-neutral portion of a frame from the scene owner. The
     // resource resolver remains supplied by the game layer, while mesh and
     // terrain collection stay independent of any renderer implementation.
