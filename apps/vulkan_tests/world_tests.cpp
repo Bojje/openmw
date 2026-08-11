@@ -223,6 +223,37 @@ int main()
     if (Render::collectUnskinnedDynamicMeshes(dynamicSubmission).size() != 1)
         throw std::runtime_error("renderer-neutral unskinned dynamic mesh was not selected for rasterization");
 
+    auto dynamicSkinning = std::make_shared<Render::SkinningData>();
+    dynamicSkinning->vertices.resize(3);
+    for (Render::SkinVertex& vertex : dynamicSkinning->vertices)
+        vertex.weights[0] = 1.f;
+    dynamicSkinning->inverseBindMatrices.push_back(Render::identityMat4());
+    Render::MeshInstance skinnedDynamicMesh = aggregateMesh;
+    skinnedDynamicMesh.mesh.skinning = dynamicSkinning;
+    Render::DynamicMeshSubmission posedDynamic;
+    posedDynamic.object = dynamicSubmission.dynamicMeshes.front().object;
+    posedDynamic.meshes.push_back(skinnedDynamicMesh);
+    Render::Mat4 bone = Render::identityMat4();
+    bone.data[12] = 2.f;
+    posedDynamic.boneMatrices.push_back(bone);
+    Render::SceneSubmission posedDynamicSubmission = dynamicSubmission;
+    posedDynamicSubmission.dynamicMeshes = { std::move(posedDynamic) };
+    const std::vector<Render::MeshInstance> rasterDynamic
+        = Render::collectRasterDynamicMeshes(posedDynamicSubmission);
+    if (rasterDynamic.size() != 1 || rasterDynamic.front().mesh.skinning
+        || rasterDynamic.front().mesh.vertices.front().position[0] != 2.f)
+        throw std::runtime_error("renderer-neutral posed dynamic mesh was not rasterized");
+
+    posedDynamicSubmission.dynamicMeshes.front().boneMatrices.clear();
+    if (!Render::collectRasterDynamicMeshes(posedDynamicSubmission).empty())
+        throw std::runtime_error("renderer-neutral skinned dynamic mesh without a pose was rasterized");
+
+    posedDynamicSubmission.dynamicMeshes.front().boneMatrices.push_back(bone);
+    posedDynamicSubmission.dynamicMeshes.front().boneMatrices.front().data[0]
+        = std::numeric_limits<float>::quiet_NaN();
+    if (posedDynamicSubmission.valid())
+        throw std::runtime_error("renderer-neutral dynamic submission accepted a non-finite bone pose");
+
     int hiddenDynamicHandle = 0;
     world.recordObject(&hiddenDynamicHandle, &firstCellHandle, true, 1, 2, "first", "meshes/missing.nif",
         objectTransform, false, {}, true);
@@ -258,7 +289,7 @@ int main()
         || !submission.valid() || !submission.validationError().empty())
         throw std::runtime_error("renderer-neutral scene submission failed resource handoff");
 
-    submission.dynamicMeshes.push_back({ { 17, "meshes/animated.nif", objectTransform, true, true }, {} });
+    submission.dynamicMeshes.push_back({ { 17, "meshes/animated.nif", objectTransform, true, true }, {}, {} });
     if (submission.dynamicMeshes.size() != 1 || !submission.dynamicMeshes.front().object.dynamic
         || submission.dynamicMeshes.front().object.model != "meshes/animated.nif" || !submission.valid())
         throw std::runtime_error("renderer-neutral scene submission lost dynamic records");

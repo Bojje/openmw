@@ -1609,9 +1609,9 @@ namespace Vk
             meshes.insert(meshes.end(), std::make_move_iterator(terrain.begin()),
                 std::make_move_iterator(terrain.end()));
         }
-        std::vector<Render::MeshInstance> unskinnedDynamic = Render::collectUnskinnedDynamicMeshes(submission);
-        meshes.insert(meshes.end(), std::make_move_iterator(unskinnedDynamic.begin()),
-            std::make_move_iterator(unskinnedDynamic.end()));
+        std::vector<Render::MeshInstance> rasterDynamic = Render::collectRasterDynamicMeshes(submission);
+        meshes.insert(meshes.end(), std::make_move_iterator(rasterDynamic.begin()),
+            std::make_move_iterator(rasterDynamic.end()));
         setMeshes(meshes, submission.textureResolver);
     }
 

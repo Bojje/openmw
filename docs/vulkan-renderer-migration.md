@@ -55,10 +55,11 @@ static batch, and composes object transforms with NIF node transforms before bat
 animated objects are explicitly retained as dynamic snapshots, but are excluded from the static
 mesh batch until a skinning/animation consumer owns them; the ordered `dynamicMeshes` payload provides
 that future backend with the retained visibility, transform, model, and cell ordering together with
-any resolved mesh data. The standalone Vulkan consumer consumes only currently supported unskinned
-geometry and records the payload count for validation; it does not copy or pretend to consume the
-ordered dynamic records as a finished animation renderer. Skinning and animation remain outstanding
-until the live game backend consumes them.
+any resolved mesh data. A producer that owns a frame pose can now attach neutral bone matrices, and
+the Vulkan consumer applies those matrices through the renderer-neutral CPU skinning helper before
+rasterization. Live-game bone production, animation timing, and animation-specific shading remain
+outstanding, so records without a supplied pose are still deliberately excluded rather than silently
+rendered in a bind pose.
 NIF classic texture, diffuse/emissive, glossiness, and alpha properties now cross the
 renderer-neutral mesh boundary and survive batching; the neutral batch applies diffuse
 and alpha to vertex color output. NIF bump/normal texture slots now cross the same boundary
@@ -199,7 +200,7 @@ The non-owning manager update handle is private to the `Scene` owner, detached d
 teardown, and CI guards the manager header against regaining a value-owned neutral frame state.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-79 files, deleting 742 lines and adding 6,210 lines (net `+5,468`). The larger Vulkan-only
+81 files, deleting 742 lines and adding 6,340 lines (net `+5,598`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.

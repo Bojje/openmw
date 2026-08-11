@@ -60,6 +60,10 @@ namespace Render
     {
         WorldObject object;
         std::vector<MeshInstance> meshes;
+        // A producer that owns animation may provide the current pose here.
+        // Keeping the pose beside the dynamic record lets a backend consume
+        // skinned meshes without borrowing an animation or scene-graph type.
+        std::vector<Mat4> boneMatrices;
     };
 
     // One backend-neutral frame submission. Resource resolution remains a
@@ -94,9 +98,15 @@ namespace Render
             {
                 if (!dynamic.object.dynamic || dynamic.object.model.empty() || !dynamic.object.transform.valid())
                     return false;
+                if (!std::all_of(dynamic.boneMatrices.begin(), dynamic.boneMatrices.end(),
+                        [](const Mat4& matrix) { return Render::valid(matrix); }))
+                    return false;
                 for (const MeshInstance& instance : dynamic.meshes)
                 {
                     if (!validMeshInstance(instance, false))
+                        return false;
+                    if (instance.mesh.skinning && !dynamic.boneMatrices.empty()
+                        && dynamic.boneMatrices.size() < instance.mesh.skinning->inverseBindMatrices.size())
                         return false;
                 }
             }
@@ -162,6 +172,32 @@ namespace Render
             {
                 if (!instance.mesh.skinning)
                     result.push_back(instance);
+            }
+        }
+        return result;
+    }
+
+    inline std::vector<MeshInstance> collectRasterDynamicMeshes(const SceneSubmission& submission)
+    {
+        std::vector<MeshInstance> result;
+        for (const DynamicMeshSubmission& dynamic : submission.dynamicMeshes)
+        {
+            if (!dynamic.object.visible)
+                continue;
+            for (const MeshInstance& instance : dynamic.meshes)
+            {
+                if (!instance.mesh.skinning)
+                {
+                    result.push_back(instance);
+                    continue;
+                }
+
+                if (dynamic.boneMatrices.empty())
+                    continue;
+
+                MeshInstance posed = instance;
+                posed.mesh = skinMesh(instance.mesh, dynamic.boneMatrices);
+                result.push_back(std::move(posed));
             }
         }
         return result;
