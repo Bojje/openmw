@@ -115,6 +115,10 @@ jobs:
           echo "RenderingManager must not assemble renderer-neutral scene submissions"
           exit 1
         fi
+        if rg -n 'getNeutralWorldScene\(\)\.findObject' apps/openmw --glob '*.cpp' --glob '*.hpp'; then
+          echo "OpenMW production code must use WorldScene transform-update APIs instead of mutable object lookup"
+          exit 1
+        fi
         if readelf -d build-vulkan/openmw | grep -Eiq 'libvulkan|libOpenSceneGraph|libosg'; then
           echo "openmw must not carry Vulkan or OSG runtime dependencies in the isolated build"
           exit 1
