@@ -5,6 +5,7 @@
 #include "renderinginterface.hpp"
 #include "rendermode.hpp"
 
+#include <components/render/frame.hpp>
 #include <components/render/scene.hpp>
 #include <components/render/terrainpaging.hpp>
 
@@ -117,7 +118,7 @@ namespace MWRender
     class Groundcover;
     class PostProcessor;
 
-    class RenderingManager : public MWRender::RenderingInterface
+    class RenderingManager : public MWRender::RenderingInterface, public Render::FrameLifecycle
     {
     public:
         RenderingManager(osgViewer::Viewer* viewer, osg::ref_ptr<osg::Group> rootNode,
@@ -132,8 +133,8 @@ namespace MWRender
         /// The current implementation delegates to the OSG viewer; the Vulkan
         /// backend will replace this lifecycle boundary once GUI and presentation
         /// services are renderer-neutral.
-        void renderFrame();
-        void advanceFrame(double simulationTime);
+        void renderFrame() override;
+        void advanceFrame(double simulationTime) override;
 
         MWRender::Objects& getObjects() override;
 

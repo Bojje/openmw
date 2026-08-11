@@ -197,7 +197,7 @@ The non-owning manager update handle is private to the `Scene` owner, detached d
 teardown, and CI guards the manager header against regaining a value-owned neutral frame state.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-73 files, deleting 665 lines and adding 5,958 lines (net `+5,293`). The larger Vulkan-only
+74 files, deleting 666 lines and adding 5,986 lines (net `+5,320`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
@@ -378,7 +378,7 @@ the full-game smoke run; it checks the neutral payload every 30 frames and after
 The full game should not be repeatedly started for every change. The main engine loop, loading
 screen, modal/video loops, and screenshot capture now delegate frame advancement, event processing,
 update traversal, and frame submission through the world-owned boundaries. The current OSG
-`RenderingManager` is only the reference implementation behind those boundaries; direct OSG frame
+`RenderingManager` implements the renderer-neutral `Render::FrameLifecycle` owner; direct OSG frame
 operations remain only in that implementation and the pre-world initialization fallback. This
 establishes the replacement point for a future Vulkan frame owner while current OSG behavior
 remains unchanged.

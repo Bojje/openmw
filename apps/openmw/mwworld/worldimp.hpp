@@ -7,6 +7,7 @@
 #include <components/debug/debuglog.hpp>
 #include <components/esm3/readerscache.hpp>
 #include <components/misc/rng.hpp>
+#include <components/render/frame.hpp>
 #include <components/settings/settings.hpp>
 #include <components/vfs/pathutil.hpp>
 
@@ -102,6 +103,7 @@ namespace MWWorld
         std::unique_ptr<MWPhysics::PhysicsSystem> mPhysics;
         std::unique_ptr<DetourNavigator::Navigator> mNavigator;
         std::unique_ptr<MWRender::RenderingManager> mRendering;
+        Render::FrameLifecycle* mFrameLifecycle = nullptr;
         std::unique_ptr<MWWorld::Scene> mWorldScene;
         std::unique_ptr<MWWorld::WeatherManager> mWeatherManager;
         std::unique_ptr<MWWorld::DateTimeManager> mTimeManager;

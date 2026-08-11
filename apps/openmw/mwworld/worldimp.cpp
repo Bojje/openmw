@@ -253,6 +253,7 @@ namespace MWWorld
 
         mRendering = std::make_unique<MWRender::RenderingManager>(
             viewer, rootNode, mResourceSystem, workQueue, *mNavigator, mGroundcoverStore, unrefQueue);
+        mFrameLifecycle = mRendering.get();
         mProjectileManager = std::make_unique<ProjectileManager>(
             mRendering->getLightRoot()->asGroup(), mResourceSystem, mRendering.get(), mPhysics.get());
         mRendering->preloadCommonAssets();
@@ -3816,9 +3817,9 @@ namespace MWWorld
 
     bool World::renderFrame()
     {
-        if (!mRendering)
+        if (!mFrameLifecycle)
             return false;
-        mRendering->renderFrame();
+        mFrameLifecycle->renderFrame();
         // OSG updates the game camera during event traversal. Synchronize the
         // renderer-neutral snapshot only after that traversal so the next
         // backend receives the matrices for the frame that was actually
@@ -3830,9 +3831,9 @@ namespace MWWorld
 
     bool World::advanceFrame(double simulationTime)
     {
-        if (!mRendering)
+        if (!mFrameLifecycle)
             return false;
-        mRendering->advanceFrame(simulationTime);
+        mFrameLifecycle->advanceFrame(simulationTime);
         return true;
     }
 

@@ -523,6 +523,7 @@ add_component_dir(testing
 )
 
 add_component_dir(render
+    frame
     scene
     math
     mesh
