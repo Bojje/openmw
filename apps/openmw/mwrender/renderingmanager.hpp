@@ -5,7 +5,6 @@
 #include "renderinginterface.hpp"
 #include "rendermode.hpp"
 
-#include <components/render/submission.hpp>
 #include <components/render/terrainpaging.hpp>
 #include <components/render/world.hpp>
 
@@ -163,9 +162,6 @@ namespace MWRender
 
         /// Build the neutral terrain snapshot for a cell loaded by the world scene.
         std::vector<Render::TerrainTile> getNeutralTerrainTiles(const MWWorld::CellStore* store);
-
-        /// Collect one backend-neutral static-scene submission for a renderer.
-        Render::SceneSubmission getNeutralScene(const Render::WorldScene& worldScene) const;
 
         /// Attach the world-owned neutral frame state. The manager updates this
         /// snapshot alongside the OSG reference state but does not own it.

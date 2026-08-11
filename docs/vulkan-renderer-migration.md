@@ -155,10 +155,11 @@ maps and complete terrain image coverage remain outstanding. The neutral cache n
 per-cell LOD snapshots and selects one deterministically by camera distance before handoff;
 quadtree-scale streaming and composite-image coverage remain outstanding. `WorldScene` now
 records empty loaded cells as well as object-bearing cells and owns each cell's cached terrain
-LOD snapshots. `RenderingManager::getNeutralScene()` collects those snapshots for loaded
+LOD snapshots. `MWWorld::Scene::getNeutralScene()` now assembles those snapshots for loaded
 exterior cells in the active worldspace, so terrain is part of the real full-game neutral
 handoff rather than only a test fixture; conversion happens on cell add/remove rather than
-on every frame export.
+on every frame export. `RenderingManager` remains only the legacy terrain provider; it no
+longer assembles the renderer-neutral scene submission or owns its resource callbacks.
 Terrain storage now exposes neutral vertex and blendmap methods as its primary contract.
 `getRenderTile()` consumes those vectors directly, while the legacy OSG array/image methods
 are centralized adapters for the reference terrain renderer. The Vulkan path therefore no

@@ -3,6 +3,7 @@
 #include <atomic>
 #include <chrono>
 #include <limits>
+#include <unordered_map>
 
 #include <BulletCollision/CollisionDispatch/btCollisionObject.h>
 
@@ -19,6 +20,8 @@
 #include <components/misc/convert.hpp>
 #include <components/misc/resourcehelpers.hpp>
 #include <components/resource/resourcesystem.hpp>
+#include <components/resource/imagemanager.hpp>
+#include <components/resource/nifmeshmanager.hpp>
 #include <components/resource/scenemanager.hpp>
 #include <components/sceneutil/positionattitudetransform.hpp>
 #include <components/settings/values.hpp>
@@ -1074,7 +1077,36 @@ namespace MWWorld
 
     Render::SceneSubmission Scene::getNeutralScene() const
     {
-        return mRendering.getNeutralScene(mNeutralWorldScene);
+        Render::SceneSubmission result;
+        result.scene = mNeutralWorldScene.sceneData();
+
+        std::unordered_map<std::string, std::shared_ptr<const Resource::NifMeshManager::Meshes>> cache;
+        // Until the Vulkan animation consumer is available, dynamic objects use
+        // their converted bind-pose geometry. Keep the dynamic records below so
+        // the eventual skinned path can replace this fallback without changing
+        // the scene bridge.
+        result = Render::collectSceneSubmission(mNeutralWorldScene, result.scene,
+            mNeutralWorldScene.activeWorldspace(),
+            [&](std::string_view model) -> const Resource::NifMeshManager::Meshes& {
+                const auto [iter, inserted] = cache.try_emplace(std::string(model));
+                if (inserted)
+                {
+                    const VFS::Path::Normalized path(model);
+                    if (path.extension().value() == "nif")
+                        iter->second = mRendering.getResourceSystem()->getNifMeshManager()->get(path);
+                    else
+                        iter->second = std::make_shared<const Resource::NifMeshManager::Meshes>();
+                }
+                return *iter->second;
+            }, mRendering.getTerrain() != nullptr);
+
+        Resource::ResourceSystem* const resourceSystem = mRendering.getResourceSystem();
+        result.textureResolver = [resourceSystem](std::string_view path) {
+            if (path.empty())
+                return std::shared_ptr<const Render::TextureData>();
+            return resourceSystem->getImageManager()->getRenderTexture(VFS::Path::Normalized(path));
+        };
+        return result;
     }
 
     void Scene::updateNeutralCamera()

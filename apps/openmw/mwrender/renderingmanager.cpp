@@ -437,40 +437,6 @@ namespace MWRender
         return *mObjects.get();
     }
 
-    Render::SceneSubmission RenderingManager::getNeutralScene(const Render::WorldScene& worldScene) const
-    {
-        Render::SceneSubmission result;
-        result.scene = worldScene.sceneData();
-
-        std::unordered_map<std::string, std::shared_ptr<const Resource::NifMeshManager::Meshes>> cache;
-        // Until the Vulkan animation consumer is available, dynamic objects use
-        // their converted bind-pose geometry. Keep the dynamic records below so
-        // the eventual skinned path can replace this fallback without changing
-        // the scene bridge.
-        result = Render::collectSceneSubmission(worldScene, result.scene, worldScene.activeWorldspace(),
-            [&](std::string_view model)
-            -> const Resource::NifMeshManager::Meshes& {
-            const auto [iter, inserted] = cache.try_emplace(std::string(model));
-            if (inserted)
-            {
-                const VFS::Path::Normalized path(model);
-                if (path.extension().value() == "nif")
-                    iter->second = mResourceSystem->getNifMeshManager()->get(path);
-                else
-                    iter->second = std::make_shared<const Resource::NifMeshManager::Meshes>();
-            }
-            return *iter->second;
-            }, mTerrain != nullptr);
-
-        Resource::ResourceSystem* const resourceSystem = mResourceSystem;
-        result.textureResolver = [resourceSystem](std::string_view path) {
-            if (path.empty())
-                return std::shared_ptr<const Render::TextureData>();
-            return resourceSystem->getImageManager()->getRenderTexture(VFS::Path::Normalized(path));
-        };
-        return result;
-    }
-
     std::vector<Render::TerrainTile> RenderingManager::getNeutralTerrainTiles(const MWWorld::CellStore* store)
     {
         std::vector<Render::TerrainTile> tiles;
