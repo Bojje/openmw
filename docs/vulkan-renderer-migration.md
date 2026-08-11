@@ -55,8 +55,9 @@ animated objects are explicitly retained as dynamic snapshots and now also contr
 bind-pose geometry to the Vulkan batch as a fallback until a skinning/animation consumer owns
 them; an ordered dynamic-object view provides that future backend with the retained visibility,
 transform, model, and cell ordering, and each `SceneSubmission` copies those records across the
-frame boundary. That handoff remains covered by the CPU tests until a live Vulkan game consumer
-is connected.
+frame boundary. The standalone Vulkan consumer now retains those ordered dynamic records while
+rendering their bind-pose geometry as a fallback; skinning and animation remain outstanding
+until the live game backend consumes them.
 NIF classic texture, diffuse/emissive, glossiness, and alpha properties now cross the
 renderer-neutral mesh boundary and survive batching; the neutral batch applies diffuse
 and alpha to vertex color output. NIF bump/normal texture slots now cross the same boundary
@@ -180,7 +181,7 @@ The non-owning manager update handle is private to the `Scene` owner, detached d
 teardown, and CI guards the manager header against regaining a value-owned neutral frame state.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-62 files, deleting 613 lines and adding 5,291 lines (net `+4,678`). The larger Vulkan-only
+62 files, deleting 613 lines and adding 5,304 lines (net `+4,691`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.

@@ -234,6 +234,7 @@ int main(int argc, char** argv)
             int cellKey = 0;
             int alphaObjectKey = 1;
             int emissiveObjectKey = 2;
+            int dynamicObjectKey = 3;
             world.recordCell(&cellKey, true, 0, 0, "Vulkan smoke");
 
             Render::ObjectTransform alphaTransform;
@@ -244,6 +245,8 @@ int main(int argc, char** argv)
             emissiveTransform.position.x = 0.75f;
             world.recordObject(&emissiveObjectKey, &cellKey, true, 0, 0, "Vulkan smoke",
                 "meshes/vulkan-smoke-emissive.nif", emissiveTransform, true);
+            world.recordObject(&dynamicObjectKey, &cellKey, true, 0, 0, "Vulkan smoke",
+                "meshes/vulkan-smoke-emissive.nif", emissiveTransform, false, {}, true);
             world.setTerrainTiles(&cellKey, { smokeTerrain() });
 
             Render::SceneData scene = {};
@@ -262,8 +265,12 @@ int main(int argc, char** argv)
             };
             Render::SceneSubmission submission
                 = Render::collectSceneSubmission(world, scene, {}, resolveMeshes, true);
+            if (submission.dynamicObjects.size() != 1)
+                throw std::runtime_error("Vulkan smoke lost the neutral dynamic-object snapshot");
             submission.textureResolver = smokeTexture;
             renderer->setScene(submission);
+            if (renderer->dynamicObjectCount() != submission.dynamicObjects.size())
+                throw std::runtime_error("Vulkan renderer dropped dynamic-object records");
 
             // Replace the scene once in the same renderer process. This
             // exercises descriptor growth and per-frame mesh replacement; a

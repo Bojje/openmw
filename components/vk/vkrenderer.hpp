@@ -2,6 +2,7 @@
 #define OPENMW_COMPONENTS_VK_VKRENDERER_H
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <optional>
@@ -70,6 +71,7 @@ namespace Vk
         bool loadShadersAndCreatePipelines(const std::string& shaderDir);
         bool validationEnabled() const;
         uint32_t validationErrorCount() const;
+        std::size_t dynamicObjectCount() const { return mDynamicObjects.size(); }
 
         void setScene(const Render::SceneSubmission& submission);
 
@@ -198,6 +200,7 @@ namespace Vk
         std::array<uint64_t, maxFramesInFlight> mUploadedMeshRevisions = {};
 
         std::vector<Render::MeshDraw> mMeshDraws;
+        std::vector<Render::WorldObject> mDynamicObjects;
 
         std::vector<VkCommandBuffer> mCommandBuffers;
 
