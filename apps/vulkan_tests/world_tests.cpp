@@ -166,6 +166,7 @@ int main()
     int dynamicSubmissionHandle = 0;
     world.recordObject(&dynamicSubmissionHandle, &firstCellHandle, true, 1, 2, "first", "meshes/first.nif",
         objectTransform, true, {}, true);
+    aggregateMesh.mesh.material.albedoTexture = "textures/dynamic.dds";
     const Render::SceneSubmission dynamicSubmission = Render::collectSceneSubmission(world, aggregateScene, "",
         [&](std::string_view model) -> std::vector<Render::MeshInstance> {
             if (model != "meshes/first.nif")
@@ -173,7 +174,9 @@ int main()
             return { aggregateMesh };
         }, false);
     if (dynamicSubmission.dynamicObjects.size() != 1 || dynamicSubmission.dynamicMeshes.size() != 1
-        || dynamicSubmission.dynamicMeshes.front().meshes.size() != 1 || !dynamicSubmission.valid())
+        || dynamicSubmission.dynamicMeshes.front().meshes.size() != 1
+        || dynamicSubmission.referencedTexturePaths().size() != 1
+        || dynamicSubmission.referencedTexturePaths().front() != "textures/dynamic.dds" || !dynamicSubmission.valid())
         throw std::runtime_error("renderer-neutral dynamic mesh payload was not collected");
 
     int hiddenDynamicHandle = 0;

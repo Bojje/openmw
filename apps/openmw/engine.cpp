@@ -7,7 +7,6 @@
 #include <cstdlib>
 #include <future>
 #include <system_error>
-#include <unordered_set>
 
 #include <osgDB/ReaderWriter>
 #include <osgDB/Registry>
@@ -185,27 +184,7 @@ namespace
         if (!submission.textureResolver)
             throw std::runtime_error("full-game neutral scene submission has no texture resolver");
 
-        std::unordered_set<std::string> texturePaths;
-        const auto addTexturePath = [&texturePaths](std::string_view path) {
-            if (!path.empty())
-                texturePaths.emplace(path);
-        };
-        for (const Render::MeshInstance& instance : submission.meshes)
-        {
-            addTexturePath(instance.mesh.material.albedoTexture);
-            addTexturePath(instance.mesh.material.normalTexture);
-            addTexturePath(instance.mesh.material.emissiveTexture);
-            addTexturePath(instance.mesh.material.specularTexture);
-        }
-        for (const Render::TerrainTile& tile : submission.terrainTiles)
-            for (const Render::TerrainLayer& layer : tile.layers)
-            {
-                addTexturePath(layer.diffuseTexture);
-                addTexturePath(layer.normalTexture);
-                addTexturePath(layer.specularTexture);
-            }
-
-        for (const std::string& path : texturePaths)
+        for (const std::string& path : submission.referencedTexturePaths())
         {
             const auto texture = submission.textureResolver(path);
             if (!texture || !texture->valid())

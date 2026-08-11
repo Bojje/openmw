@@ -3,7 +3,9 @@
 
 #include <algorithm>
 #include <cmath>
+#include <string>
 #include <string_view>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -122,6 +124,35 @@ namespace Render
             return std::all_of(terrainTiles.begin(), terrainTiles.end(), [](const TerrainTile& tile) {
                 return tile.valid();
             });
+        }
+
+        std::vector<std::string> referencedTexturePaths() const
+        {
+            std::unordered_set<std::string> seen;
+            std::vector<std::string> result;
+            const auto add = [&](std::string_view path) {
+                if (!path.empty() && seen.emplace(path).second)
+                    result.emplace_back(path);
+            };
+            const auto addMesh = [&add](const MeshInstance& instance) {
+                add(instance.mesh.material.albedoTexture);
+                add(instance.mesh.material.normalTexture);
+                add(instance.mesh.material.emissiveTexture);
+                add(instance.mesh.material.specularTexture);
+            };
+            for (const MeshInstance& instance : meshes)
+                addMesh(instance);
+            for (const DynamicMeshSubmission& dynamic : dynamicMeshes)
+                for (const MeshInstance& instance : dynamic.meshes)
+                    addMesh(instance);
+            for (const TerrainTile& tile : terrainTiles)
+                for (const TerrainLayer& layer : tile.layers)
+                {
+                    add(layer.diffuseTexture);
+                    add(layer.normalTexture);
+                    add(layer.specularTexture);
+                }
+            return result;
         }
     };
 
