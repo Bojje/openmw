@@ -1601,6 +1601,7 @@ namespace MWWorld
         mWorldScene->update(duration);
 
         mRendering->update(duration, paused);
+        mWorldScene->updateNeutralCamera();
 
         updateSoundListener();
 

@@ -187,6 +187,9 @@ namespace MWWorld
         /// Export the current loaded-world state for a renderer backend.
         Render::SceneSubmission getNeutralScene() const;
 
+        /// Copy the post-update camera matrices into the world-owned frame state.
+        void updateNeutralCamera();
+
         void markCellAsUnchanged();
 
         void update(float duration);

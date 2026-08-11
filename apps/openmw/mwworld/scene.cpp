@@ -33,6 +33,7 @@
 #include "../mwbase/world.hpp"
 
 #include "../mwrender/landmanager.hpp"
+#include "../mwrender/camera.hpp"
 #include "../mwrender/postprocessor.hpp"
 #include "../mwrender/renderingmanager.hpp"
 
@@ -1072,6 +1073,12 @@ namespace MWWorld
     Render::SceneSubmission Scene::getNeutralScene() const
     {
         return mRendering.getNeutralScene(mNeutralWorldScene);
+    }
+
+    void Scene::updateNeutralCamera()
+    {
+        const MWRender::Camera* camera = mRendering.getCamera();
+        mNeutralWorldScene.setCameraMatrices(camera->getNeutralViewMatrix(), camera->getNeutralProjectionMatrix());
     }
 
     void Scene::markCellAsUnchanged()

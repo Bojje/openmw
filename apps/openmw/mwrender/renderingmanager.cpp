@@ -441,10 +441,6 @@ namespace MWRender
     {
         Render::SceneSubmission result;
         result.scene = worldScene.sceneData();
-        result.scene.view = mCamera->getNeutralViewMatrix();
-        result.scene.projection = mCamera->getNeutralProjectionMatrix();
-        result.scene.viewInverse = Render::invertMat4(result.scene.view);
-        result.scene.projInverse = Render::invertMat4(result.scene.projection);
 
         std::unordered_map<std::string, std::shared_ptr<const Resource::NifMeshManager::Meshes>> cache;
         // Until the Vulkan animation consumer is available, dynamic objects use

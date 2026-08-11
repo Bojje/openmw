@@ -117,6 +117,14 @@ namespace Render
 
         const SceneData& sceneData() const { return mSceneData; }
 
+        void setCameraMatrices(const Mat4& view, const Mat4& projection)
+        {
+            mSceneData.view = view;
+            mSceneData.projection = projection;
+            mSceneData.viewInverse = invertMat4(view);
+            mSceneData.projInverse = invertMat4(projection);
+        }
+
         void recordCell(const void* cellKey, bool exterior, int gridX, int gridY, std::string_view name,
             std::string_view worldspace = {})
         {

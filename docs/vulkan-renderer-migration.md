@@ -168,9 +168,11 @@ world-owned handoff. `RenderingManager` only receives a non-owning update refere
 OSG state changes cannot reintroduce a second neutral scene owner.
 The neutral terrain tile entry point also uses a plain two-float center; OSG vector types
 remain confined to the legacy quadtree and reference-renderer methods.
+Camera matrices are now synchronized into that same world-owned state after the normal game
+update, and neutral submission export no longer queries the OSG camera as a side effect.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-62 files, deleting 613 lines and adding 5,159 lines (net `+4,546`). The larger Vulkan-only
+62 files, deleting 613 lines and adding 5,185 lines (net `+4,572`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.

@@ -107,6 +107,15 @@ int main()
     world.setActiveWorldspace("active");
     if (world.activeWorldspace() != "active")
         throw std::runtime_error("renderer-neutral world scene did not retain active worldspace");
+    Render::Mat4 cameraMatrix = {};
+    cameraMatrix.data[0] = 1.f;
+    cameraMatrix.data[5] = 1.f;
+    cameraMatrix.data[10] = 1.f;
+    cameraMatrix.data[12] = 4.f;
+    cameraMatrix.data[15] = 1.f;
+    world.setCameraMatrices(cameraMatrix, cameraMatrix);
+    if (world.sceneData().view.data[12] != 4.f || world.sceneData().viewInverse.data[12] != -4.f)
+        throw std::runtime_error("renderer-neutral world scene did not retain camera matrices");
     world.clear();
     if (!world.activeWorldspace().empty())
         throw std::runtime_error("renderer-neutral world scene did not reset active worldspace");
