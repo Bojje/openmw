@@ -177,6 +177,7 @@ namespace MWRender
         DetourNavigator::Navigator& navigator, const MWWorld::GroundcoverStore& groundcoverStore,
         SceneUtil::UnrefQueue& unrefQueue, TerrainStorage& terrainStorage, Terrain::World*& terrainOutput,
         osgUtil::IncrementalCompileOperation*& incrementalCompileOperationOutput,
+        SceneUtil::LightManager*& lightRootOutput,
         Render::FrameLifecycle& frameLifecycle)
         : mSkyBlending(Settings::fog().mSkyBlending)
         , mViewer(viewer)
@@ -228,6 +229,7 @@ namespace MWRender
 
         sceneRoot->setLightingMask(Mask_Lighting);
         mSceneRoot = sceneRoot;
+        lightRootOutput = mSceneRoot.get();
         sceneRoot->setNodeMask(Mask_Scene);
         sceneRoot->setName("Scene Root");
 
@@ -319,7 +321,8 @@ namespace MWRender
                 Shader::ShaderManager::Slot::OpaqueDepthTexture));
         rootNode->addCullCallback(mPerViewUniformStateUpdater);
 
-        mPostProcessor = new PostProcessor(*this, resourceSystem, viewer, mRootNode, resourceSystem->getVFS());
+        mPostProcessor = new PostProcessor(*this, *mSceneRoot, resourceSystem, viewer, mRootNode,
+            resourceSystem->getVFS());
         resourceSystem->getSceneManager()->setOpaqueDepthTex(
             mPostProcessor->getTexture(PostProcessor::Tex_OpaqueDepth, 0),
             mPostProcessor->getTexture(PostProcessor::Tex_OpaqueDepth, 1));
@@ -484,11 +487,6 @@ namespace MWRender
         const osg::Vec4f fogColor = mFog->getFogColor(underwater);
         sceneData.fogColor = { fogColor.r(), fogColor.g(), fogColor.b(), fogColor.a() };
         sceneData.fogParameters = { fogStart, fogEnd, 0.f, 0.f };
-    }
-
-    SceneUtil::LightManager* RenderingManager::getLightRoot()
-    {
-        return mSceneRoot.get();
     }
 
     void RenderingManager::setNightEyeFactor(float factor)
@@ -1417,7 +1415,7 @@ namespace MWRender
                     lightManagersUpdated = true;
 
                     auto defines = mResourceSystem->getSceneManager()->getShaderManager().getGlobalDefines();
-                    for (const auto& [name, key] : getLightRoot()->getLightDefines())
+                    for (const auto& [name, key] : mSceneRoot->getLightDefines())
                         defines[name] = key;
                     defines["particlePointLighting"] = Settings::shaders().mParticlePointLighting ? "1" : "0";
                     mResourceSystem->getSceneManager()->getShaderManager().setGlobalDefines(defines);

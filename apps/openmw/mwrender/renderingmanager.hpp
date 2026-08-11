@@ -125,6 +125,7 @@ namespace MWRender
             DetourNavigator::Navigator& navigator, const MWWorld::GroundcoverStore& groundcoverStore,
             SceneUtil::UnrefQueue& unrefQueue, TerrainStorage& terrainStorage, Terrain::World*& terrainOutput,
             osgUtil::IncrementalCompileOperation*& incrementalCompileOperationOutput,
+            SceneUtil::LightManager*& lightRootOutput,
             Render::FrameLifecycle& frameLifecycle);
         ~RenderingManager();
 
@@ -137,8 +138,6 @@ namespace MWRender
         void preloadCommonAssets();
 
         double getReferenceTime() const;
-
-        SceneUtil::LightManager* getLightRoot();
 
         void setNightEyeFactor(float factor);
 

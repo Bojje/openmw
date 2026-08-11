@@ -262,12 +262,13 @@ namespace MWWorld
 
         Terrain::World* terrain = nullptr;
         osgUtil::IncrementalCompileOperation* incrementalCompileOperation = nullptr;
+        SceneUtil::LightManager* lightRoot = nullptr;
         mRendering = std::make_unique<MWRender::RenderingManager>(
             viewer, rootNode, mResourceSystem, workQueue, *mNavigator, mGroundcoverStore, unrefQueue, *mTerrainStorage,
-            terrain, incrementalCompileOperation, frameLifecycle);
+            terrain, incrementalCompileOperation, lightRoot, frameLifecycle);
         mFrameLifecycle = &frameLifecycle;
         mProjectileManager = std::make_unique<ProjectileManager>(
-            mRendering->getLightRoot()->asGroup(), mResourceSystem, mRendering.get(), mPhysics.get());
+            lightRoot->asGroup(), mResourceSystem, mRendering.get(), mPhysics.get());
         mRendering->preloadCommonAssets();
 
         mWeatherManager = std::make_unique<MWWorld::WeatherManager>(*mRendering, mStore);

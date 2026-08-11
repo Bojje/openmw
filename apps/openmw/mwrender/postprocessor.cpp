@@ -114,12 +114,14 @@ namespace
 
 namespace MWRender
 {
-    PostProcessor::PostProcessor(RenderingManager& rendering, Resource::ResourceSystem* resourceSystem,
-        osgViewer::Viewer* viewer, osg::Group* rootNode, const VFS::Manager* vfs)
+    PostProcessor::PostProcessor(RenderingManager& rendering, SceneUtil::LightManager& lightRoot,
+        Resource::ResourceSystem* resourceSystem, osgViewer::Viewer* viewer, osg::Group* rootNode,
+        const VFS::Manager* vfs)
         : osg::Group()
         , mRootNode(rootNode)
         , mHUDCamera(new osg::Camera)
         , mRendering(rendering)
+        , mLightRoot(lightRoot)
         , mResourceSystem(resourceSystem)
         , mViewer(viewer)
         , mVFS(vfs)
@@ -421,8 +423,8 @@ namespace MWRender
                 shaderManager.setGlobalDefines(defines);
             }
 
-            mRendering.getLightRoot()->setCollectPPLights(mPassLights);
-            mStateUpdater->bindPointLights(mPassLights ? mRendering.getLightRoot()->getPPLightsBuffer() : nullptr);
+            mLightRoot.setCollectPPLights(mPassLights);
+            mStateUpdater->bindPointLights(mPassLights ? mLightRoot.getPPLightsBuffer() : nullptr);
             mStateUpdater->reset();
 
             mViewer->startThreading();
