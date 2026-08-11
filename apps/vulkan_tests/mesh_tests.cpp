@@ -46,6 +46,17 @@ int main()
     if (skinning->valid(1))
         throw std::runtime_error("neutral skinning data without an influence was accepted");
 
+    skinning->vertices.front().weights[0] = 1.f;
+    Render::MeshData skinnedMesh;
+    skinnedMesh.vertices.push_back({ { 1.f, 0.f, 0.f }, { 0.f, 0.f, 1.f }, {}, {}, {}, {}, {} });
+    skinnedMesh.skinning = std::make_shared<const Render::SkinningData>(*skinning);
+    Render::Mat4 bone = identity;
+    bone.data[12] = 2.f;
+    const Render::MeshData posedMesh = Render::skinMesh(skinnedMesh, std::span(&bone, 1));
+    if (posedMesh.skinning || posedMesh.vertices.front().position[0] != 3.f
+        || posedMesh.vertices.front().position[1] != 0.f)
+        throw std::runtime_error("neutral CPU skinning did not apply the bone transform");
+
     Nif::NiTriShapeData source;
     source.mVertices = { { 1.0f, 2.0f, 3.0f }, { 4.0f, 5.0f, 6.0f }, { 7.0f, 8.0f, 9.0f } };
     source.mNormals = { { 0.0f, 0.0f, 1.0f }, { 0.0f, 1.0f, 0.0f }, { 1.0f, 0.0f, 0.0f } };

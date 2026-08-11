@@ -8,6 +8,7 @@
 #include <iterator>
 #include <limits>
 #include <memory>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -116,6 +117,57 @@ namespace Render
         MeshMaterial material;
         std::shared_ptr<const SkinningData> skinning;
     };
+
+    inline MeshData skinMesh(const MeshData& source, std::span<const Mat4> boneMatrices)
+    {
+        if (!source.skinning || !source.skinning->valid(source.vertices.size()))
+            throw std::invalid_argument("Cannot skin mesh without valid skinning data");
+        if (boneMatrices.size() < source.skinning->inverseBindMatrices.size())
+            throw std::invalid_argument("Bone matrix payload is smaller than the mesh skin");
+
+        MeshData result = source;
+        result.skinning.reset();
+        for (std::size_t vertexIndex = 0; vertexIndex < result.vertices.size(); ++vertexIndex)
+        {
+            const MeshVertex sourceVertex = source.vertices[vertexIndex];
+            MeshVertex& vertex = result.vertices[vertexIndex];
+            std::array<float, 3> position{};
+            std::array<float, 3> normal{};
+            std::array<float, 3> tangent{};
+            const SkinVertex& skin = source.skinning->vertices[vertexIndex];
+            for (std::size_t influence = 0; influence < skin.weights.size(); ++influence)
+            {
+                const float weight = skin.weights[influence];
+                if (weight <= 0.f)
+                    continue;
+
+                const Mat4 skinMatrix = multiply(boneMatrices[skin.boneIndices[influence]],
+                    source.skinning->inverseBindMatrices[skin.boneIndices[influence]]);
+                const auto addTransformed = [weight, &skinMatrix](std::array<float, 3>& target,
+                                                const float* value, float homogeneous) {
+                    target[0] += weight
+                        * (skinMatrix.data[0] * value[0] + skinMatrix.data[4] * value[1]
+                            + skinMatrix.data[8] * value[2] + skinMatrix.data[12] * homogeneous);
+                    target[1] += weight
+                        * (skinMatrix.data[1] * value[0] + skinMatrix.data[5] * value[1]
+                            + skinMatrix.data[9] * value[2] + skinMatrix.data[13] * homogeneous);
+                    target[2] += weight
+                        * (skinMatrix.data[2] * value[0] + skinMatrix.data[6] * value[1]
+                            + skinMatrix.data[10] * value[2] + skinMatrix.data[14] * homogeneous);
+                };
+                addTransformed(position, sourceVertex.position, 1.f);
+                addTransformed(normal, sourceVertex.normal, 0.f);
+                addTransformed(tangent, sourceVertex.tangent, 0.f);
+            }
+            for (std::size_t axis = 0; axis < 3; ++axis)
+            {
+                vertex.position[axis] = position[axis];
+                vertex.normal[axis] = normal[axis];
+                vertex.tangent[axis] = tangent[axis];
+            }
+        }
+        return result;
+    }
 
     struct MeshInstance
     {
