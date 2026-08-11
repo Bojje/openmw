@@ -165,6 +165,7 @@ int main()
     Render::MeshInstance aggregateMesh = {};
     aggregateMesh.mesh.vertices.resize(3);
     aggregateMesh.mesh.indices = { 0, 1, 2 };
+    aggregateMesh.mesh.indices = { 0, 1, 2 };
     const Render::SceneSubmission aggregate = Render::collectSceneSubmission(world, aggregateScene, "",
         [&](std::string_view model) -> std::vector<Render::MeshInstance> {
             if (model != "meshes/first.nif")
@@ -204,6 +205,18 @@ int main()
     if (unresolved.unresolvedModels.size() != 1 || unresolved.unresolvedModels.front() != "meshes/first.nif"
         || unresolved.valid())
         throw std::runtime_error("renderer-neutral scene submission hid an unresolved visible model");
+
+    Render::MeshInstance emptyGeometry = aggregateMesh;
+    emptyGeometry.mesh.vertices.clear();
+    emptyGeometry.mesh.indices.clear();
+    const Render::SceneSubmission emptyGeometrySubmission = Render::collectSceneSubmission(world, aggregateScene, "",
+        [&](std::string_view model) -> std::vector<Render::MeshInstance> {
+            if (model != "meshes/first.nif")
+                throw std::runtime_error("empty renderer-neutral geometry resolved an unexpected model");
+            return { emptyGeometry };
+        }, false);
+    if (emptyGeometrySubmission.unresolvedModels.size() != 1 || emptyGeometrySubmission.valid())
+        throw std::runtime_error("renderer-neutral scene submission accepted a visible empty mesh batch");
 
     int dynamicSubmissionHandle = 0;
     world.recordObject(&dynamicSubmissionHandle, &firstCellHandle, true, 1, 2, "first", "meshes/first.nif",

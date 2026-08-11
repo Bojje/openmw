@@ -213,6 +213,11 @@ namespace Render
         std::vector<MeshDraw> draws;
     };
 
+    inline bool hasRenderableGeometry(const MeshInstance& instance)
+    {
+        return !instance.mesh.vertices.empty() && !instance.mesh.indices.empty();
+    }
+
     /// Flatten independent mesh instances into one indexed batch for a renderer backend.
     inline MeshBatch batchMeshes(const std::vector<MeshInstance>& meshes)
     {
@@ -281,7 +286,8 @@ namespace Render
                 continue;
 
             const std::vector<MeshInstance> resolvedMeshes = resolveMeshes(object.model);
-            if (resolvedMeshes.empty() && unresolvedModels != nullptr)
+            const bool hasGeometry = std::any_of(resolvedMeshes.begin(), resolvedMeshes.end(), hasRenderableGeometry);
+            if (!hasGeometry && unresolvedModels != nullptr)
                 unresolvedModels->push_back(object.model);
             for (const MeshInstance& mesh : resolvedMeshes)
                 result.push_back(transformMeshInstance(object, mesh));

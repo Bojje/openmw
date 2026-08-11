@@ -207,7 +207,9 @@ namespace Render
                 if (object.visible)
                 {
                     const std::vector<MeshInstance> resolvedMeshes = resolveMeshes(object.model);
-                    if (resolvedMeshes.empty())
+                    const bool hasGeometry
+                        = std::any_of(resolvedMeshes.begin(), resolvedMeshes.end(), hasRenderableGeometry);
+                    if (!hasGeometry)
                         result.unresolvedModels.push_back(object.model);
                     for (const MeshInstance& mesh : resolvedMeshes)
                         dynamic.meshes.push_back(transformMeshInstance(object, mesh));
