@@ -494,6 +494,21 @@ namespace MWWorld
         mNeutralWorldScene.recordCell(static_cast<const void*>(&cell), cellVariant.isExterior(), cellX,
             cellY, cellVariant.getNameId(), worldspace.serializeText());
 
+        if (cellVariant.isExterior() && Settings::groundcover().mEnabled
+            && worldspace == ESM::Cell::sDefaultWorldspaceId)
+        {
+            for (const GroundcoverRecord& record : mWorld.getGroundcoverStore().getCellRecords(
+                     cellX, cellY, Settings::groundcover().mDensity))
+            {
+                Render::ObjectTransform transform;
+                transform.position = { record.position.pos[0], record.position.pos[1], record.position.pos[2] };
+                transform.rotation = toRenderQuat(Misc::Convert::makeOsgQuat(record.position));
+                transform.scale = { record.scale, record.scale, record.scale };
+                mNeutralWorldScene.recordStaticObject(static_cast<const void*>(&cell), true, cellX, cellY,
+                    cellVariant.getNameId(), record.model.value(), transform, true, worldspace.serializeText());
+            }
+        }
+
         if (cellVariant.isExterior())
         {
             osg::ref_ptr<const ESMTerrain::LandObject> land = mRendering.getLandManager()->getLand(cellIndex);

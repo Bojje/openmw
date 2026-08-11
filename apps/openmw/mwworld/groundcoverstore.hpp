@@ -2,6 +2,7 @@
 #define GAME_MWWORLD_GROUNDCOVER_STORE_H
 
 #include <components/esm/refid.hpp>
+#include <components/esm3/loadcell.hpp>
 #include <components/vfs/pathutil.hpp>
 
 #include <map>
@@ -32,6 +33,13 @@ namespace ToUTF8
 
 namespace MWWorld
 {
+    struct GroundcoverRecord
+    {
+        VFS::Path::Normalized model;
+        ESM::Position position;
+        float scale = 1.f;
+    };
+
     template <class T>
     class Store;
 
@@ -55,6 +63,8 @@ namespace MWWorld
         }
 
         void initCell(ESM::Cell& cell, int cellX, int cellY) const;
+
+        std::vector<GroundcoverRecord> getCellRecords(int cellX, int cellY, float density) const;
     };
 }
 

@@ -39,9 +39,9 @@ namespace MWRender
             ESM::Position mPos;
             float mScale;
 
-            GroundcoverEntry(const ESM::CellRef& ref)
-                : mPos(ref.mPos)
-                , mScale(ref.mScale)
+            GroundcoverEntry(const ESM::Position& position, float scale)
+                : mPos(position)
+                , mScale(scale)
             {
             }
         };

@@ -199,7 +199,7 @@ The non-owning manager update handle is private to the `Scene` owner, detached d
 teardown, and CI guards the manager header against regaining a value-owned neutral frame state.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-74 files, deleting 667 lines and adding 6,058 lines (net `+5,391`). The larger Vulkan-only
+78 files, deleting 741 lines and adding 6,187 lines (net `+5,446`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
@@ -232,6 +232,10 @@ RGBA8 resources.
 The scene collector also carries visible models that resolve to no converted geometry as
 explicit unresolved entries; submission validation rejects those entries instead of silently
 dropping world references.
+Groundcover records are now density-filtered at the world adapter, converted into neutral
+cell-owned static instances, and sent through the same mesh/material resolver as ordinary
+static references; the standalone Vulkan consumer therefore has a neutral groundcover input
+without depending on the OSG chunk manager.
 The Vulkan renderer now accepts only the aggregate `SceneSubmission`; its duplicate resolver
 argument and local resolver type alias were removed.
 Physical-device selection now checks the fixed G-buffer texture-array descriptor budget before

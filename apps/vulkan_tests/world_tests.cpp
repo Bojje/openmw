@@ -50,6 +50,18 @@ int main()
         throw std::runtime_error("renderer-neutral world scene failed to own terrain snapshots");
     world.removeCell(&emptyCellHandle);
 
+    int staticCellHandle = 0;
+    Render::ObjectTransform staticTransform;
+    staticTransform.position = { 3.f, 4.f, 5.f };
+    world.recordStaticObject(&staticCellHandle, true, 4, 5, "static", "grass/test.nif", staticTransform, true,
+        "Tamriel");
+    const Render::CellScene* staticCell = world.findCell(&staticCellHandle);
+    if (staticCell == nullptr || staticCell->objects.size() != 1 || staticCell->objects.front().dynamic
+        || staticCell->objects.front().model != "grass/test.nif"
+        || staticCell->objects.front().transform.position.z != 5.f)
+        throw std::runtime_error("renderer-neutral world scene failed to record a cell-owned static instance");
+    world.removeCell(&staticCellHandle);
+
     Render::ObjectTransform objectTransform;
     objectTransform.position.x = 4.f;
     world.recordObject(&objectHandle, &firstCellHandle, true, 1, 2, "first", "meshes/first.nif", objectTransform, false);

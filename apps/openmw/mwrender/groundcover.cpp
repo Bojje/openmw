@@ -1,7 +1,6 @@
 #include "groundcover.hpp"
 
 #include <span>
-#include <unordered_map>
 
 #include <osg/AlphaFunc>
 #include <osg/BlendFunc>
@@ -11,9 +10,7 @@
 #include <osg/VertexAttribDivisor>
 #include <osgUtil/CullVisitor>
 
-#include <components/esm3/esmreader.hpp>
 #include <components/esm3/loadland.hpp>
-#include <components/esm3/readerscache.hpp>
 #include <components/misc/convert.hpp>
 #include <components/sceneutil/lightmanager.hpp>
 #include <components/sceneutil/nodecallback.hpp>
@@ -260,34 +257,6 @@ namespace MWRender
             osg::Vec3f mChunkPosition;
         };
 
-        class DensityCalculator
-        {
-        public:
-            DensityCalculator(float density)
-                : mDensity(density)
-            {
-            }
-
-            bool isInstanceEnabled()
-            {
-                if (mDensity >= 1.f)
-                    return true;
-
-                mCurrentGroundcover += mDensity;
-                if (mCurrentGroundcover < 1.f)
-                    return false;
-
-                mCurrentGroundcover -= 1.f;
-
-                return true;
-            }
-            void reset() { mCurrentGroundcover = 0.f; }
-
-        private:
-            float mCurrentGroundcover = 0.f;
-            float mDensity = 0.f;
-        };
-
         class ViewDistanceCallback : public SceneUtil::NodeCallback<ViewDistanceCallback>
         {
         public:
@@ -307,13 +276,14 @@ namespace MWRender
             osg::BoundingBox mBox;
         };
 
-        inline bool isInChunkBorders(ESM::CellRef& ref, osg::Vec2f& minBound, osg::Vec2f& maxBound)
+        inline bool isInChunkBorders(const ESM::Position& position, const osg::Vec2f& minBound,
+            const osg::Vec2f& maxBound)
         {
             osg::Vec2f size = maxBound - minBound;
             if (size.x() >= 1 && size.y() >= 1)
                 return true;
 
-            osg::Vec3f pos = ref.mPos.asVec3();
+            osg::Vec3f pos = position.asVec3();
             osg::Vec3f cellPos = pos / ESM::Land::REAL_SIZE;
             if ((minBound.x() > std::floor(minBound.x()) && cellPos.x() < minBound.x())
                 || (minBound.y() > std::floor(minBound.y()) && cellPos.y() < minBound.y())
@@ -378,53 +348,20 @@ namespace MWRender
 
         osg::Vec2f minBound = (center - osg::Vec2f(size / 2.f, size / 2.f));
         osg::Vec2f maxBound = (center + osg::Vec2f(size / 2.f, size / 2.f));
-        DensityCalculator calculator(mDensity);
-        ESM::ReadersCache readers;
         osg::Vec2i startCell = osg::Vec2i(static_cast<int>(std::floor(center.x() - size / 2.f)),
             static_cast<int>(std::floor(center.y() - size / 2.f)));
         for (int cellX = startCell.x(); cellX < startCell.x() + size; ++cellX)
         {
             for (int cellY = startCell.y(); cellY < startCell.y() + size; ++cellY)
             {
-                ESM::Cell cell;
-                mGroundcoverStore.initCell(cell, cellX, cellY);
-                if (cell.mContextList.empty())
-                    continue;
-
-                calculator.reset();
-                std::unordered_map<ESM::RefNum, ESM::CellRef> refs;
-                for (size_t i = 0; i < cell.mContextList.size(); ++i)
+                for (const MWWorld::GroundcoverRecord& record : mGroundcoverStore.getCellRecords(cellX, cellY, mDensity))
                 {
-                    const std::size_t index = static_cast<std::size_t>(cell.mContextList[i].index);
-                    const ESM::ReadersCache::BusyItem reader = readers.get(index);
-                    cell.restore(*reader, i);
-                    ESM::CellRef ref;
-                    bool deleted = false;
-                    while (cell.getNextRef(*reader, ref, deleted))
-                    {
-                        if (!deleted && refs.find(ref.mRefNum) == refs.end() && !calculator.isInstanceEnabled())
-                            deleted = true;
-                        if (!deleted && !isInChunkBorders(ref, minBound, maxBound))
-                            deleted = true;
-
-                        if (deleted)
-                        {
-                            refs.erase(ref.mRefNum);
-                            continue;
-                        }
-                        refs[ref.mRefNum] = std::move(ref);
-                    }
-                }
-
-                for (auto& [refNum, cellRef] : refs)
-                {
-                    const VFS::Path::NormalizedView model = mGroundcoverStore.getGroundcoverModel(cellRef.mRefID);
-                    if (model.empty())
+                    if (!isInChunkBorders(record.position, minBound, maxBound))
                         continue;
-                    auto it = instances.find(model);
+                    auto it = instances.find(record.model);
                     if (it == instances.end())
-                        it = instances.emplace_hint(it, VFS::Path::Normalized(model), std::vector<GroundcoverEntry>());
-                    it->second.emplace_back(std::move(cellRef));
+                        it = instances.emplace_hint(it, record.model, std::vector<GroundcoverEntry>());
+                    it->second.emplace_back(record.position, record.scale);
                 }
             }
         }

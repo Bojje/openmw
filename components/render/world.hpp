@@ -166,6 +166,26 @@ namespace Render
                 found->second.terrainTiles = std::move(tiles);
         }
 
+        // Add renderer-owned static instances whose lifetime is tied to a cell
+        // but which do not have an engine reference identity, such as groundcover.
+        void recordStaticObject(const void* cellKey, bool exterior, int gridX, int gridY, std::string_view cellName,
+            std::string_view model, const ObjectTransform& transform, bool visible,
+            std::string_view worldspace = {})
+        {
+            if (cellKey == nullptr || model.empty())
+                return;
+
+            WorldObject object;
+            object.id = mNextObjectId++;
+            if (object.id == 0)
+                object.id = mNextObjectId++;
+            object.model = model;
+            object.transform = transform;
+            object.visible = visible;
+            object.dynamic = false;
+            ensureCell(cellKey, exterior, gridX, gridY, cellName, worldspace).objects.push_back(std::move(object));
+        }
+
         void recordObject(const void* objectKey, const void* cellKey, bool exterior, int gridX, int gridY,
             std::string_view cellName, std::string_view model, const ObjectTransform& transform, bool visible,
             std::string_view worldspace = {}, bool dynamic = false)

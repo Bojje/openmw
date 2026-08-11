@@ -190,6 +190,7 @@ namespace MWWorld
     public:
         WorldModel& getWorldModel() { return mWorldModel; }
         Scene& getWorldScene() { return *mWorldScene; }
+        const GroundcoverStore& getGroundcoverStore() const { return mGroundcoverStore; }
 
         // FIXME
         void addContainerScripts(const Ptr& reference, CellStore* cell) override;
