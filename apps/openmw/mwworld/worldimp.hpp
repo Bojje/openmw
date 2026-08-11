@@ -114,6 +114,7 @@ namespace MWWorld
         std::unique_ptr<DetourNavigator::Navigator> mNavigator;
         std::unique_ptr<MWRender::TerrainStorage> mTerrainStorage;
         Terrain::World* mTerrain = nullptr;
+        MWRender::SkyManager* mSkyManager = nullptr;
         std::unique_ptr<MWRender::RenderingManager> mRendering;
         Render::FrameLifecycle* mFrameLifecycle = nullptr;
         std::unique_ptr<MWWorld::Scene> mWorldScene;

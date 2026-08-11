@@ -29,6 +29,7 @@ namespace ESM
 namespace MWRender
 {
     class RenderingManager;
+    class SkyManager;
 }
 
 namespace Loading
@@ -311,7 +312,7 @@ namespace MWWorld
     {
     public:
         // Have to pass fallback and Store, can't use singleton since World isn't fully constructed yet at the time
-        WeatherManager(MWRender::RenderingManager& rendering, MWWorld::ESMStore& store);
+        WeatherManager(MWRender::RenderingManager& rendering, MWRender::SkyManager& sky, MWWorld::ESMStore& store);
         ~WeatherManager();
 
         /**
@@ -382,6 +383,7 @@ namespace MWWorld
     private:
         MWWorld::ESMStore& mStore;
         MWRender::RenderingManager& mRendering;
+        MWRender::SkyManager& mSky;
         float mSunriseTime;
         float mSunsetTime;
         float mSunriseDuration;

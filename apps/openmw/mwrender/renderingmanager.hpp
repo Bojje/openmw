@@ -125,7 +125,7 @@ namespace MWRender
             DetourNavigator::Navigator& navigator, const MWWorld::GroundcoverStore& groundcoverStore,
             SceneUtil::UnrefQueue& unrefQueue, TerrainStorage& terrainStorage, Terrain::World*& terrainOutput,
             osgUtil::IncrementalCompileOperation*& incrementalCompileOperationOutput,
-            SceneUtil::LightManager*& lightRootOutput,
+            SceneUtil::LightManager*& lightRootOutput, SkyManager*& skyOutput,
             Render::FrameLifecycle& frameLifecycle);
         ~RenderingManager();
 
@@ -200,8 +200,6 @@ namespace MWRender
         void setSkyEnabled(bool enabled);
 
         bool toggleRenderMode(RenderMode mode);
-
-        SkyManager* getSkyManager();
 
         void spawnEffect(VFS::Path::NormalizedView model, std::string_view texture, const osg::Vec3f& worldPosition,
             float scale = 1.f, bool isMagicVFX = true, bool useAmbientLight = true, std::string_view effectId = {},

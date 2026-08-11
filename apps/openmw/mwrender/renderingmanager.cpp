@@ -177,7 +177,7 @@ namespace MWRender
         DetourNavigator::Navigator& navigator, const MWWorld::GroundcoverStore& groundcoverStore,
         SceneUtil::UnrefQueue& unrefQueue, TerrainStorage& terrainStorage, Terrain::World*& terrainOutput,
         osgUtil::IncrementalCompileOperation*& incrementalCompileOperationOutput,
-        SceneUtil::LightManager*& lightRootOutput,
+        SceneUtil::LightManager*& lightRootOutput, SkyManager*& skyOutput,
         Render::FrameLifecycle& frameLifecycle)
         : mSkyBlending(Settings::fog().mSkyBlending)
         , mViewer(viewer)
@@ -322,7 +322,17 @@ namespace MWRender
                 Shader::ShaderManager::Slot::OpaqueDepthTexture));
         rootNode->addCullCallback(mPerViewUniformStateUpdater);
 
-        mPostProcessor = new PostProcessor(*this, *mSceneRoot, resourceSystem, viewer, mRootNode,
+        mSky = std::make_unique<SkyManager>(sceneRoot, mRootNode, mViewer->getCamera(),
+            resourceSystem->getSceneManager(), mSkyBlending);
+        skyOutput = mSky.get();
+        if (mSkyBlending)
+        {
+            int skyTextureUnit = mResourceSystem->getSceneManager()->getShaderManager().reserveGlobalTextureUnits(
+                Shader::ShaderManager::Slot::SkyTexture);
+            mPerViewUniformStateUpdater->enableSkyRTT(skyTextureUnit, mSky->getSkyRTT());
+        }
+
+        mPostProcessor = new PostProcessor(*this, *mSceneRoot, *mSky, resourceSystem, viewer, mRootNode,
             resourceSystem->getVFS());
         resourceSystem->getSceneManager()->setOpaqueDepthTex(
             mPostProcessor->getTexture(PostProcessor::Tex_OpaqueDepth, 0),
@@ -368,15 +378,6 @@ namespace MWRender
         resourceSystem->getSceneManager()->setUpNormalsRTForStateSet(sceneRoot->getOrCreateStateSet(), true);
 
         mFog = std::make_unique<FogManager>();
-
-        mSky = std::make_unique<SkyManager>(
-            sceneRoot, mRootNode, mViewer->getCamera(), resourceSystem->getSceneManager(), mSkyBlending);
-        if (mSkyBlending)
-        {
-            int skyTextureUnit = mResourceSystem->getSceneManager()->getShaderManager().reserveGlobalTextureUnits(
-                Shader::ShaderManager::Slot::SkyTexture);
-            mPerViewUniformStateUpdater->enableSkyRTT(skyTextureUnit, mSky->getSkyRTT());
-        }
 
         osg::Camera::CullingMode cullingMode = osg::Camera::DEFAULT_CULLING | osg::Camera::FAR_PLANE_CULLING;
 
@@ -706,11 +707,6 @@ namespace MWRender
         float fogDepth, float underwaterFog, float dlFactor, float dlOffset, const osg::Vec4f& color)
     {
         mFog->configure(mViewDistance, fogDepth, underwaterFog, dlFactor, dlOffset, color);
-    }
-
-    SkyManager* RenderingManager::getSkyManager()
-    {
-        return mSky.get();
     }
 
     void RenderingManager::update(float dt, bool paused)

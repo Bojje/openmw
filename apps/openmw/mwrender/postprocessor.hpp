@@ -58,6 +58,7 @@ namespace SceneUtil
 namespace MWRender
 {
     class RenderingManager;
+    class SkyManager;
     class PingPongCull;
     class PingPongCanvas;
     class TransparentDepthBinCallback;
@@ -108,7 +109,7 @@ namespace MWRender
             Status_Unchanged
         };
 
-        PostProcessor(RenderingManager& rendering, SceneUtil::LightManager& lightRoot,
+        PostProcessor(RenderingManager& rendering, SceneUtil::LightManager& lightRoot, SkyManager& sky,
             Resource::ResourceSystem* resourceSystem, osgViewer::Viewer* viewer, osg::Group* rootNode,
             const VFS::Manager* vfs);
 
@@ -248,6 +249,7 @@ namespace MWRender
 
         RenderingManager& mRendering;
         SceneUtil::LightManager& mLightRoot;
+        SkyManager& mSky;
         Resource::ResourceSystem* mResourceSystem;
         osgViewer::Viewer* mViewer;
         const VFS::Manager* mVFS;

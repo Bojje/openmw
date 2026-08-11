@@ -114,7 +114,7 @@ namespace
 
 namespace MWRender
 {
-    PostProcessor::PostProcessor(RenderingManager& rendering, SceneUtil::LightManager& lightRoot,
+    PostProcessor::PostProcessor(RenderingManager& rendering, SceneUtil::LightManager& lightRoot, SkyManager& sky,
         Resource::ResourceSystem* resourceSystem, osgViewer::Viewer* viewer, osg::Group* rootNode,
         const VFS::Manager* vfs)
         : osg::Group()
@@ -122,6 +122,7 @@ namespace MWRender
         , mHUDCamera(new osg::Camera)
         , mRendering(rendering)
         , mLightRoot(lightRoot)
+        , mSky(sky)
         , mResourceSystem(resourceSystem)
         , mViewer(viewer)
         , mVFS(vfs)
@@ -273,7 +274,7 @@ namespace MWRender
     void PostProcessor::disable()
     {
         mUsePostProcessing = false;
-        mRendering.getSkyManager()->setSunglare(true);
+        mSky.setSunglare(true);
     }
 
     void PostProcessor::traverse(osg::NodeVisitor& nv)
@@ -717,7 +718,7 @@ namespace MWRender
             hud->updateTechniques();
 
         if (mUsePostProcessing)
-            mRendering.getSkyManager()->setSunglare(sunglare);
+            mSky.setSunglare(sunglare);
 
         if (dirtyAttachments)
             mCanvases[frameId]->setDirtyAttachments(attachmentsToDirty);

@@ -610,9 +610,11 @@ namespace MWWorld
         return { makeMoon("Masser", mMasser, time), makeMoon("Secunda", mSecunda, time) };
     }
 
-    WeatherManager::WeatherManager(MWRender::RenderingManager& rendering, MWWorld::ESMStore& store)
+    WeatherManager::WeatherManager(
+        MWRender::RenderingManager& rendering, MWRender::SkyManager& sky, MWWorld::ESMStore& store)
         : mStore(store)
         , mRendering(rendering)
+        , mSky(sky)
         , mSunriseTime(Fallback::Map::getFloat("Weather_Sunrise_Time"))
         , mSunsetTime(Fallback::Map::getFloat("Weather_Sunset_Time"))
         , mSunriseDuration(Fallback::Map::getFloat("Weather_Sunrise_Duration"))
@@ -861,13 +863,13 @@ namespace MWWorld
             && mResult.mParticleEffect != Settings::models().mWeatherashcloud.get();
 
         mStormDirection = calculateStormDirection(mResult.mParticleEffect);
-        mRendering.getSkyManager()->setStormParticleDirection(mStormDirection);
+        mSky.setStormParticleDirection(mStormDirection);
 
         // disable sun during night
         if (time.getHour() >= mTimeSettings.mNightStart || time.getHour() <= mSunriseTime)
-            mRendering.getSkyManager()->sunDisable();
+            mSky.sunDisable();
         else
-            mRendering.getSkyManager()->sunEnable();
+            mSky.sunEnable();
 
         // Update the sun direction.  Run it east to west at a fixed angle from overhead.
         // The sun's speed at day and night may differ, since mSunriseTime and mNightStart
@@ -914,17 +916,17 @@ namespace MWWorld
         else
             glareFade = 1.f - (time.getHour() - peakHour) / (mTimeSettings.mNightStart - peakHour);
 
-        mRendering.getSkyManager()->setGlareTimeOfDayFade(glareFade);
+        mSky.setGlareTimeOfDayFade(glareFade);
 
-        mRendering.getSkyManager()->setMasserState(mMasser.calculateState(time));
-        mRendering.getSkyManager()->setSecundaState(mSecunda.calculateState(time));
+        mSky.setMasserState(mMasser.calculateState(time));
+        mSky.setSecundaState(mSecunda.calculateState(time));
 
         mRendering.configureFog(
             mResult.mFogDepth, underwaterFog, mResult.mDLFogFactor, mResult.mDLFogOffset / 100.0f, mResult.mFogColor);
         mRendering.setAmbientColour(mResult.mAmbientColor);
         mRendering.setSunColour(mResult.mSunColor, mResult.mSunColor, mResult.mGlareView * glareFade);
 
-        mRendering.getSkyManager()->setWeather(mResult);
+        mSky.setWeather(mResult);
 
         // Play sounds
         if (mPlayingAmbientSoundID != mResult.mAmbientLoopSoundID)
