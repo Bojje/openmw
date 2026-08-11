@@ -17,6 +17,7 @@
 
 #include <components/esm/exteriorcelllocation.hpp>
 #include <components/misc/constants.hpp>
+#include <components/render/frame.hpp>
 #include <components/render/submission.hpp>
 #include <components/render/world.hpp>
 
@@ -118,6 +119,7 @@ namespace MWWorld
         bool mCellChanged;
         bool mCellLoaded = false;
         MWWorld::World& mWorld;
+        Render::FrameLifecycle& mFrameLifecycle;
         Resource::ResourceSystem* mResourceSystem;
         MWPhysics::PhysicsSystem* mPhysics;
         MWRender::RenderingManager& mRendering;
@@ -181,7 +183,8 @@ namespace MWWorld
         void updateNeutralTerrainRegions();
 
     public:
-        Scene(MWWorld::World& world, MWRender::RenderingManager& rendering, MWRender::LandManager& landManager,
+        Scene(MWWorld::World& world, Render::FrameLifecycle& frameLifecycle, MWRender::RenderingManager& rendering,
+            MWRender::LandManager& landManager,
             Terrain::World*& terrain, osgUtil::IncrementalCompileOperation* incrementalCompileOperation,
             Terrain::RenderStorage& terrainStorage, SceneUtil::WorkQueue* workQueue,
             Resource::ResourceSystem* resourceSystem,

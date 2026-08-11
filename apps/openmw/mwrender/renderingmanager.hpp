@@ -137,8 +137,6 @@ namespace MWRender
 
         void preloadCommonAssets();
 
-        double getReferenceTime() const;
-
         void setNightEyeFactor(float factor);
 
         void setAmbientColour(const osg::Vec4f& colour);

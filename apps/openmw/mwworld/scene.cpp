@@ -410,7 +410,7 @@ namespace MWWorld
             mChangeCellGridRequest.reset();
         }
 
-        mPreloader->updateCache(mRendering.getReferenceTime());
+        mPreloader->updateCache(mFrameLifecycle.referenceTime());
         preloadCells(duration);
     }
 
@@ -733,7 +733,7 @@ namespace MWWorld
         mPreloader->setTerrain(mTerrain);
         if (mRendering.pagingUnlockCache())
             mPreloader->abortTerrainPreloadExcept(nullptr);
-        if (!mPreloader->isTerrainLoaded(PositionCellGrid{ pos, newGrid }, mRendering.getReferenceTime()))
+        if (!mPreloader->isTerrainLoaded(PositionCellGrid{ pos, newGrid }, mFrameLifecycle.referenceTime()))
             preloadTerrain(pos, playerCellIndex.mWorldspace, true);
         mPagedRefs.clear();
         mRendering.getPagedRefnums(newGrid, mPagedRefs);
@@ -858,7 +858,7 @@ namespace MWWorld
                 ++iter;
             }
 
-            mResourceSystem->updateCache(mRendering.getReferenceTime());
+            mResourceSystem->updateCache(mFrameLifecycle.referenceTime());
 
             loadingListener->increaseProgress(1);
             i++;
@@ -915,7 +915,7 @@ namespace MWWorld
                 ++iter;
             }
 
-            mResourceSystem->updateCache(mRendering.getReferenceTime());
+            mResourceSystem->updateCache(mFrameLifecycle.referenceTime());
 
             loadingListener->increaseProgress(1);
             i++;
@@ -963,7 +963,8 @@ namespace MWWorld
         mLastPlayerPos = player.getRefData().getPosition().asVec3();
     }
 
-    Scene::Scene(MWWorld::World& world, MWRender::RenderingManager& rendering, MWRender::LandManager& landManager,
+    Scene::Scene(MWWorld::World& world, Render::FrameLifecycle& frameLifecycle, MWRender::RenderingManager& rendering,
+        MWRender::LandManager& landManager,
         Terrain::World*& terrain, osgUtil::IncrementalCompileOperation* incrementalCompileOperation,
         Terrain::RenderStorage& terrainStorage, SceneUtil::WorkQueue* workQueue, Resource::ResourceSystem* resourceSystem,
         MWPhysics::PhysicsSystem* physics,
@@ -971,6 +972,7 @@ namespace MWWorld
         : mCurrentCell(nullptr)
         , mCellChanged(false)
         , mWorld(world)
+        , mFrameLifecycle(frameLifecycle)
         , mResourceSystem(resourceSystem)
         , mPhysics(physics)
         , mRendering(rendering)
@@ -1382,7 +1384,7 @@ namespace MWWorld
                 VFS::Path::toNormalized(mesh), mResourceSystem->getVFS())
             : VFS::Path::toNormalized(mesh);
 
-        if (mResourceSystem->getSceneManager()->checkLoaded(meshPath, mRendering.getReferenceTime()))
+        if (mResourceSystem->getSceneManager()->checkLoaded(meshPath, mFrameLifecycle.referenceTime()))
             return;
 
         osg::ref_ptr<PreloadMeshItem> item(
@@ -1502,7 +1504,7 @@ namespace MWWorld
     {
         if (!cell.isExterior())
         {
-            mPreloader->preload(cell, mRendering.getReferenceTime());
+            mPreloader->preload(cell, mFrameLifecycle.referenceTime());
             return;
         }
 
@@ -1532,12 +1534,12 @@ namespace MWWorld
         const ESM::RefId worldspace = cell.getCell()->getWorldSpace();
         for (const auto& [x, y] : cells)
             mPreloader->preload(mWorld.getWorldModel().getExterior(ESM::ExteriorCellLocation(x, y, worldspace)),
-                mRendering.getReferenceTime());
+                mFrameLifecycle.referenceTime());
     }
 
     void Scene::preloadCell(CellStore& cell)
     {
-        mPreloader->preload(cell, mRendering.getReferenceTime());
+        mPreloader->preload(cell, mFrameLifecycle.referenceTime());
     }
 
     void Scene::preloadTerrain(const osg::Vec3f& pos, ESM::RefId worldspace, bool sync)

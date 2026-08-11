@@ -273,7 +273,7 @@ namespace MWWorld
         mWeatherManager = std::make_unique<MWWorld::WeatherManager>(*mRendering, *mSkyManager, mStore);
 
         mWorldScene = std::make_unique<Scene>(
-            *this, *mRendering, *mTerrainStorage->getLandManager(), mTerrain, incrementalCompileOperation,
+            *this, frameLifecycle, *mRendering, *mTerrainStorage->getLandManager(), mTerrain, incrementalCompileOperation,
             *mTerrainStorage, workQueue, mResourceSystem, mPhysics.get(), *mNavigator);
     }
 

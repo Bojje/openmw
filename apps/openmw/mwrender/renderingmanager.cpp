@@ -459,11 +459,6 @@ namespace MWRender
         mWorkQueue->addWorkItem(std::move(workItem));
     }
 
-    double RenderingManager::getReferenceTime() const
-    {
-        return mViewer->getFrameStamp()->getReferenceTime();
-    }
-
     void RenderingManager::synchronizeNeutralScene(Render::SceneData& sceneData) const
     {
         const MWRender::Camera* camera = getCamera();
