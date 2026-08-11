@@ -176,11 +176,6 @@ namespace
             camera->getStats()->report(stream, frameNumber);
     }
 
-    void validateNeutralSubmission(const Render::SceneSubmission& submission)
-    {
-        if (const std::string error = submission.validationError(); !error.empty())
-            throw std::runtime_error("full-game neutral scene submission: " + error);
-    }
 }
 
 void OMW::Engine::executeLocalScripts()
@@ -325,7 +320,11 @@ bool OMW::Engine::frame(unsigned frameNumber, float frametime)
 
     if (mValidateNeutralScene && mStateManager->getState() != MWBase::StateManager::State_NoGame
         && (frameNumber % 30 == 0 || mWorld->getWorldScene().hasCellChanged()))
-        validateNeutralSubmission(mWorld->getWorldScene().getNeutralScene());
+    {
+        const Render::SceneSubmission submission = mWorld->getWorldScene().getNeutralScene();
+        if (const std::string error = submission.validationError(); !error.empty())
+            throw std::runtime_error("full-game neutral scene submission: " + error);
+    }
 
     const bool reportResource = stats->collectStats("resource");
 
