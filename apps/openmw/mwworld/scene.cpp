@@ -965,6 +965,8 @@ namespace MWWorld
 
         for (const osg::ref_ptr<SceneUtil::WorkItem>& v : mWorkItems)
             v->waitTillDone();
+
+        mRendering.clearNeutralSceneData();
     }
 
     bool Scene::hasCellChanged() const

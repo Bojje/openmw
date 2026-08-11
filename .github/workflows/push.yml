@@ -107,6 +107,10 @@ jobs:
           echo "RenderingManager must not own or expose the renderer-neutral world scene"
           exit 1
         fi
+        if rg -n 'Render::SceneData[[:space:]]+mNeutralSceneData' apps/openmw/mwrender/renderingmanager.hpp; then
+          echo "RenderingManager must not own the renderer-neutral frame state"
+          exit 1
+        fi
         if readelf -d build-vulkan/openmw | grep -Eiq 'libvulkan|libOpenSceneGraph|libosg'; then
           echo "openmw must not carry Vulkan or OSG runtime dependencies in the isolated build"
           exit 1

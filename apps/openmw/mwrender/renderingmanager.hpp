@@ -170,6 +170,7 @@ namespace MWRender
         /// Attach the world-owned neutral frame state. The manager updates this
         /// snapshot alongside the OSG reference state but does not own it.
         void setNeutralSceneData(Render::SceneData& sceneData) { mNeutralSceneData = &sceneData; }
+        void clearNeutralSceneData() { mNeutralSceneData = nullptr; }
 
         void enableTerrain(bool enable, ESM::RefId worldspace);
 
