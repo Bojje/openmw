@@ -143,6 +143,7 @@ namespace Render
 
                 const Mat4 skinMatrix = multiply(boneMatrices[skin.boneIndices[influence]],
                     source.skinning->inverseBindMatrices[skin.boneIndices[influence]]);
+                const Mat4 normalMatrix = computeNormalMatrix(skinMatrix);
                 const auto addTransformed = [weight, &skinMatrix](std::array<float, 3>& target,
                                                 const float* value, float homogeneous) {
                     target[0] += weight
@@ -155,10 +156,30 @@ namespace Render
                         * (skinMatrix.data[2] * value[0] + skinMatrix.data[6] * value[1]
                             + skinMatrix.data[10] * value[2] + skinMatrix.data[14] * homogeneous);
                 };
+                const auto addNormalTransformed = [weight, &normalMatrix](std::array<float, 3>& target,
+                                                       const float* value) {
+                    target[0] += weight
+                        * (normalMatrix.data[0] * value[0] + normalMatrix.data[4] * value[1]
+                            + normalMatrix.data[8] * value[2]);
+                    target[1] += weight
+                        * (normalMatrix.data[1] * value[0] + normalMatrix.data[5] * value[1]
+                            + normalMatrix.data[9] * value[2]);
+                    target[2] += weight
+                        * (normalMatrix.data[2] * value[0] + normalMatrix.data[6] * value[1]
+                            + normalMatrix.data[10] * value[2]);
+                };
                 addTransformed(position, sourceVertex.position, 1.f);
-                addTransformed(normal, sourceVertex.normal, 0.f);
-                addTransformed(tangent, sourceVertex.tangent, 0.f);
+                addNormalTransformed(normal, sourceVertex.normal);
+                addNormalTransformed(tangent, sourceVertex.tangent);
             }
+            const auto normalize = [](std::array<float, 3>& value) {
+                const float length = std::sqrt(value[0] * value[0] + value[1] * value[1] + value[2] * value[2]);
+                if (length > 1e-6f)
+                    for (float& component : value)
+                        component /= length;
+            };
+            normalize(normal);
+            normalize(tangent);
             for (std::size_t axis = 0; axis < 3; ++axis)
             {
                 vertex.position[axis] = position[axis];

@@ -54,7 +54,7 @@ int main()
     bone.data[12] = 2.f;
     const Render::MeshData posedMesh = Render::skinMesh(skinnedMesh, std::span(&bone, 1));
     if (posedMesh.skinning || posedMesh.vertices.front().position[0] != 3.f
-        || posedMesh.vertices.front().position[1] != 0.f)
+        || posedMesh.vertices.front().position[1] != 0.f || posedMesh.vertices.front().normal[2] != 1.f)
         throw std::runtime_error("neutral CPU skinning did not apply the bone transform");
 
     Nif::NiTriShapeData source;
