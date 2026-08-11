@@ -5,8 +5,8 @@
 #include "renderinginterface.hpp"
 #include "rendermode.hpp"
 
+#include <components/render/scene.hpp>
 #include <components/render/terrainpaging.hpp>
-#include <components/render/world.hpp>
 
 #include <components/settings/settings.hpp>
 #include <components/vfs/pathutil.hpp>
