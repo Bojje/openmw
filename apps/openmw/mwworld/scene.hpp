@@ -87,6 +87,8 @@ namespace MWWorld
         using CellStoreCollection = std::set<CellStore*, std::less<>>;
 
     private:
+        friend class World;
+
         struct ChangeCellGridRequest
         {
             osg::Vec3f mPosition;
@@ -199,9 +201,11 @@ namespace MWWorld
         /// Export the current loaded-world state for a renderer backend.
         Render::SceneSubmission getNeutralScene() const;
 
+    private:
         /// Access the world-owned neutral frame state for renderer synchronization.
         Render::SceneData& getNeutralWorldSceneData();
 
+    public:
         void markCellAsUnchanged();
 
         void update(float duration);
