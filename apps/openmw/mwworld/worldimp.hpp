@@ -673,6 +673,8 @@ namespace MWWorld
 
         Misc::Rng::Generator& getPrng() override;
 
+        bool renderFrame() override;
+
         MWRender::RenderingManager* getRenderingManager() override { return mRendering.get(); }
 
         MWRender::PostProcessor* getPostProcessor() override;

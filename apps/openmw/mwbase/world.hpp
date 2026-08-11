@@ -600,6 +600,11 @@ namespace MWBase
 
         virtual Misc::Rng::Generator& getPrng() = 0;
 
+        /// Process and submit one frame through the selected renderer owner.
+        /// Returns false while the world is being constructed and no renderer
+        /// has been initialized yet.
+        virtual bool renderFrame() = 0;
+
         virtual MWRender::RenderingManager* getRenderingManager() = 0;
 
         virtual MWRender::PostProcessor* getPostProcessor() = 0;

@@ -3815,6 +3815,14 @@ namespace MWWorld
         return mPrng;
     }
 
+    bool World::renderFrame()
+    {
+        if (!mRendering)
+            return false;
+        mRendering->renderFrame();
+        return true;
+    }
+
     MWRender::PostProcessor* World::getPostProcessor()
     {
         return mRendering->getPostProcessor();

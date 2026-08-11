@@ -360,7 +360,7 @@ bool OMW::Engine::frame(unsigned frameNumber, float frametime)
     // if there is a separate Lua thread, it starts the update now
     mLuaWorker->allowUpdate(frameStart, frameNumber, *stats);
 
-    mWorld->getRenderingManager()->renderFrame();
+    mWorld->renderFrame();
 
     mLuaWorker->finishUpdate(frameStart, frameNumber, *stats);
 
@@ -834,9 +834,7 @@ void OMW::Engine::prepareEngine()
     mWindowManager = std::make_unique<MWGui::WindowManager>(mWindow, mViewer, guiRoot, mResourceSystem.get(),
         mWorkQueue.get(), mCfgMgr.getLogPath(), mScriptConsoleMode, mTranslationDataStorage, mEncoding, mExportFonts,
         Version::getOpenmwVersionDescription(), mCfgMgr, [this] {
-            if (mWorld && mWorld->getRenderingManager())
-                mWorld->getRenderingManager()->renderFrame();
-            else
+            if (!mWorld || !mWorld->renderFrame())
             {
                 mViewer->eventTraversal();
                 mViewer->updateTraversal();
