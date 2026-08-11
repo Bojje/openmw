@@ -201,7 +201,7 @@ The non-owning manager update handle is private to the `Scene` owner, detached d
 teardown, and CI guards the manager header against regaining a value-owned neutral frame state.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-81 files, deleting 742 lines and adding 6,355 lines (net `+5,613`). The larger Vulkan-only
+81 files, deleting 742 lines and adding 6,359 lines (net `+5,617`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
@@ -214,7 +214,9 @@ they reach Vulkan. This protects the backend from corrupted engine state without
 on GPU validation diagnostics. Visible models that resolve only to empty mesh batches are also
 reported as unresolved, so a converter cannot silently turn a world reference into no draw.
 Embedded alpha textures are validated at the same boundary, preventing invalid transparency data
-from being replaced by a backend fallback.
+from being replaced by a backend fallback. `World` now synchronizes and assembles the submission,
+while the consuming frame owner performs the single resolver validation before backend upload;
+the previous world-side duplicate validation has been removed.
 Neutral scene data now starts with identity camera and inverse matrices plus explicit safe
 lighting/fog defaults, so a world reset or pre-camera frame cannot silently submit an all-zero
 camera state. The world-scene CPU test covers both initial construction and reset.
@@ -394,7 +396,7 @@ operations remain only in that implementation, while bootstrap callbacks use a s
 adapter that can be replaced with the Vulkan presentation owner. This
 establishes the replacement point for a future Vulkan frame owner while current OSG behavior
 remains unchanged. The interface now has an explicit submission-consuming path: a Vulkan owner
-will receive a synchronized, validated `SceneSubmission` from `World`, while the OSG owner
+will receive a synchronized `SceneSubmission` from `World` and validate it before upload, while the OSG owner
 explicitly reports that it does not consume submissions and continues its legacy traversal.
 The engine-side periodic bridge validator skips its duplicate export when that path is active,
 leaving submission validation at the single world/frame-owner boundary.

@@ -7,7 +7,9 @@ namespace Render
     struct SceneSubmission;
 
     /// Owns the engine's frame traversal and presentation boundary.
-    /// Implementations must initialize and drive exactly one renderer.
+    /// Implementations must initialize and drive exactly one renderer. A
+    /// submission-consuming implementation must validate a SceneSubmission
+    /// before handing it to backend resources.
     class FrameLifecycle
     {
     public:

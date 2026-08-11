@@ -3827,8 +3827,6 @@ namespace MWWorld
 
             mFrameLifecycle->synchronizeScene(mWorldScene->getNeutralWorldSceneData());
             Render::SceneSubmission submission = mWorldScene->getNeutralScene();
-            if (const std::string error = submission.validationError(); !error.empty())
-                throw std::runtime_error("full-game neutral scene submission: " + error);
             return mFrameLifecycle->renderFrame(submission);
         }
 
