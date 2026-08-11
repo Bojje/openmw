@@ -121,6 +121,17 @@ int main()
         throw std::runtime_error("renderer-neutral world scene did not reset active worldspace");
     world.recordObject(&objectHandle, &firstCellHandle, true, 1, 2, "first", "meshes/first.nif", objectTransform, true);
 
+    Render::TerrainTile neutralTerrain;
+    neutralTerrain.size = 1.f;
+    neutralTerrain.center = { 1.5f, 2.5f };
+    neutralTerrain.cellWorldSize = 1.f;
+    neutralTerrain.verticesPerSide = 2;
+    neutralTerrain.vertices.resize(4);
+    neutralTerrain.indices = { 0, 1, 2, 2, 1, 3 };
+    neutralTerrain.layers.push_back({ .diffuseTexture = "textures/terrain.dds", .normalTexture = {}, .parallax = false,
+        .specular = false, .blendmap = {} });
+    world.setTerrainTiles(&firstCellHandle, { neutralTerrain });
+
     Render::SceneData aggregateScene = {};
     Render::MeshInstance aggregateMesh = {};
     aggregateMesh.mesh.vertices.resize(3);
@@ -130,8 +141,9 @@ int main()
             if (model != "meshes/first.nif")
                 throw std::runtime_error("scene submission collector resolved an unexpected model");
             return { aggregateMesh };
-        }, false);
-    if (aggregate.meshes.size() != 1 || aggregate.dynamicObjects.size() != 0 || !aggregate.valid())
+        }, true);
+    if (aggregate.meshes.size() != 1 || aggregate.dynamicObjects.size() != 0 || aggregate.terrainTiles.size() != 1
+        || !aggregate.valid())
         throw std::runtime_error("renderer-neutral scene submission collector lost world state");
 
     const Render::SceneSubmission unresolved = Render::collectSceneSubmission(world, aggregateScene, "",
