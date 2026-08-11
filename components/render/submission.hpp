@@ -140,6 +140,11 @@ namespace Render
         {
             DynamicMeshSubmission dynamic;
             dynamic.object = object;
+            if (!object.visible)
+            {
+                result.dynamicMeshes.push_back(std::move(dynamic));
+                continue;
+            }
             const std::vector<MeshInstance> resolvedMeshes = resolveMeshes(object.model);
             if (resolvedMeshes.empty())
                 result.unresolvedModels.push_back(object.model);

@@ -176,6 +176,20 @@ int main()
         || dynamicSubmission.dynamicMeshes.front().meshes.size() != 1 || !dynamicSubmission.valid())
         throw std::runtime_error("renderer-neutral dynamic mesh payload was not collected");
 
+    int hiddenDynamicHandle = 0;
+    world.recordObject(&hiddenDynamicHandle, &firstCellHandle, true, 1, 2, "first", "meshes/missing.nif",
+        objectTransform, false, {}, true);
+    const Render::SceneSubmission hiddenDynamicSubmission = Render::collectSceneSubmission(world, aggregateScene, "",
+        [&](std::string_view model) -> std::vector<Render::MeshInstance> {
+            if (model != "meshes/first.nif")
+                throw std::runtime_error("hidden dynamic scene submission resolved an invisible model");
+            return { aggregateMesh };
+        }, false);
+    if (hiddenDynamicSubmission.dynamicObjects.size() != 2 || hiddenDynamicSubmission.dynamicMeshes.size() != 2
+        || hiddenDynamicSubmission.dynamicMeshes.back().object.model != "meshes/missing.nif"
+        || !hiddenDynamicSubmission.dynamicMeshes.back().meshes.empty() || !hiddenDynamicSubmission.valid())
+        throw std::runtime_error("renderer-neutral dynamic visibility policy was not preserved");
+
     Render::SceneSubmission submission;
     submission.scene.ambientColor = { 0.2f, 0.3f, 0.4f, 1.f };
     bool resolverCalled = false;
