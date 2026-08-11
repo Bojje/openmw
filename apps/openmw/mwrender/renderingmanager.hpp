@@ -135,8 +135,6 @@ namespace MWRender
 
         MWRender::Objects& getObjects() override;
 
-        Resource::ResourceSystem* getResourceSystem();
-
         SceneUtil::WorkQueue* getWorkQueue();
         Terrain::World* getTerrain();
 

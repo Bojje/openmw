@@ -73,11 +73,7 @@ namespace MWLua
             context.mLuaManager->addAction([] {
                 auto world = MWBase::Environment::get().getWorld();
 
-                world->getRenderingManager()
-                    ->getResourceSystem()
-                    ->getSceneManager()
-                    ->getShaderManager()
-                    .triggerShaderReload();
+                MWBase::Environment::get().getResourceSystem()->getSceneManager()->getShaderManager().triggerShaderReload();
                 world->getPostProcessor()->triggerShaderReload();
             });
         };
@@ -85,11 +81,8 @@ namespace MWLua
         api["setShaderHotReloadEnabled"] = [context](bool value) {
             context.mLuaManager->addAction([value] {
                 auto world = MWBase::Environment::get().getWorld();
-                world->getRenderingManager()
-                    ->getResourceSystem()
-                    ->getSceneManager()
-                    ->getShaderManager()
-                    .setHotReloadEnabled(value);
+                MWBase::Environment::get().getResourceSystem()->getSceneManager()->getShaderManager().setHotReloadEnabled(
+                    value);
                 world->getPostProcessor()->mEnableLiveReload = value;
             });
         };

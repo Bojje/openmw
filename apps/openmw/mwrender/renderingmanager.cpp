@@ -315,7 +315,7 @@ namespace MWRender
                 Shader::ShaderManager::Slot::OpaqueDepthTexture));
         rootNode->addCullCallback(mPerViewUniformStateUpdater);
 
-        mPostProcessor = new PostProcessor(*this, viewer, mRootNode, resourceSystem->getVFS());
+        mPostProcessor = new PostProcessor(*this, resourceSystem, viewer, mRootNode, resourceSystem->getVFS());
         resourceSystem->getSceneManager()->setOpaqueDepthTex(
             mPostProcessor->getTexture(PostProcessor::Tex_OpaqueDepth, 0),
             mPostProcessor->getTexture(PostProcessor::Tex_OpaqueDepth, 1));
@@ -431,11 +431,6 @@ namespace MWRender
     MWRender::Objects& RenderingManager::getObjects()
     {
         return *mObjects.get();
-    }
-
-    Resource::ResourceSystem* RenderingManager::getResourceSystem()
-    {
-        return mResourceSystem;
     }
 
     SceneUtil::WorkQueue* RenderingManager::getWorkQueue()

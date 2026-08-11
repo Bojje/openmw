@@ -15,6 +15,7 @@
 #include <components/misc/pathhelpers.hpp>
 #include <components/misc/strings/algorithm.hpp>
 #include <components/misc/strings/lower.hpp>
+#include <components/resource/resourcesystem.hpp>
 #include <components/resource/scenemanager.hpp>
 #include <components/sceneutil/color.hpp>
 #include <components/sceneutil/depth.hpp>
@@ -113,12 +114,13 @@ namespace
 
 namespace MWRender
 {
-    PostProcessor::PostProcessor(
-        RenderingManager& rendering, osgViewer::Viewer* viewer, osg::Group* rootNode, const VFS::Manager* vfs)
+    PostProcessor::PostProcessor(RenderingManager& rendering, Resource::ResourceSystem* resourceSystem,
+        osgViewer::Viewer* viewer, osg::Group* rootNode, const VFS::Manager* vfs)
         : osg::Group()
         , mRootNode(rootNode)
         , mHUDCamera(new osg::Camera)
         , mRendering(rendering)
+        , mResourceSystem(resourceSystem)
         , mViewer(viewer)
         , mVFS(vfs)
         , mUsePostProcessing(Settings::postProcessing().mEnabled)
@@ -126,7 +128,7 @@ namespace MWRender
         , mPingPongCull(new PingPongCull(this))
         , mDistortionCallback(new DistortionCallback)
     {
-        auto& shaderManager = mRendering.getResourceSystem()->getSceneManager()->getShaderManager();
+        auto& shaderManager = mResourceSystem->getSceneManager()->getShaderManager();
 
         std::shared_ptr<LuminanceCalculator> luminanceCalculator = std::make_shared<LuminanceCalculator>(shaderManager);
 
@@ -149,7 +151,7 @@ namespace MWRender
 
         // resolves the multisampled depth buffer and optionally draws an additional depth postpass
         mTransparentDepthPostPass
-            = new TransparentDepthBinCallback(mRendering.getResourceSystem()->getSceneManager()->getShaderManager(),
+            = new TransparentDepthBinCallback(mResourceSystem->getSceneManager()->getShaderManager(),
                 Settings::postProcessing().mTransparentPostpass);
         osgUtil::RenderBin::getRenderBinPrototype("DepthSortedBin")->setDrawCallback(mTransparentDepthPostPass);
 
@@ -781,7 +783,7 @@ namespace MWRender
         else
             name = path.stem();
 
-        auto technique = std::make_shared<Fx::Technique>(*mVFS, *mRendering.getResourceSystem()->getImageManager(),
+        auto technique = std::make_shared<Fx::Technique>(*mVFS, *mResourceSystem->getImageManager(),
             path, std::move(name), renderWidth(), renderHeight(), mUBO, mNormalsSupported);
 
         technique->compile();

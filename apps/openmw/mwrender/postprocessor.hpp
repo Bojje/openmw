@@ -40,6 +40,11 @@ namespace VFS
     class Manager;
 }
 
+namespace Resource
+{
+    class ResourceSystem;
+}
+
 namespace Shader
 {
     class ShaderManager;
@@ -98,8 +103,8 @@ namespace MWRender
             Status_Unchanged
         };
 
-        PostProcessor(
-            RenderingManager& rendering, osgViewer::Viewer* viewer, osg::Group* rootNode, const VFS::Manager* vfs);
+        PostProcessor(RenderingManager& rendering, Resource::ResourceSystem* resourceSystem, osgViewer::Viewer* viewer,
+            osg::Group* rootNode, const VFS::Manager* vfs);
 
         ~PostProcessor();
 
@@ -236,6 +241,7 @@ namespace MWRender
         std::unordered_set<VFS::Path::Normalized, VFS::Path::Hash, std::equal_to<>> mTechniqueFiles;
 
         RenderingManager& mRendering;
+        Resource::ResourceSystem* mResourceSystem;
         osgViewer::Viewer* mViewer;
         const VFS::Manager* mVFS;
 
