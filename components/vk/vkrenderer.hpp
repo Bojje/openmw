@@ -78,7 +78,6 @@ namespace Vk
             return render();
         }
         bool consumesSceneSubmission() const override { return true; }
-        void synchronizeScene(Render::SceneData& /*sceneData*/) override {}
         void advanceFrame(double /*simulationTime*/) override {}
         std::optional<Render::TextureData> captureFrame();
         void resize(uint32_t width, uint32_t height);

@@ -3,7 +3,6 @@
 
 namespace Render
 {
-    struct SceneData;
     struct SceneSubmission;
 
     /// Owns the engine's frame traversal and presentation boundary.
@@ -18,7 +17,6 @@ namespace Render
         virtual bool renderFrame() = 0;
         virtual bool renderFrame(const SceneSubmission& submission) = 0;
         virtual bool consumesSceneSubmission() const = 0;
-        virtual void synchronizeScene(SceneData& sceneData) = 0;
         virtual void advanceFrame(double simulationTime) = 0;
     };
 }

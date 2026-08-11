@@ -20,7 +20,6 @@ namespace MWRender
         bool renderFrame() override;
         bool renderFrame(const Render::SceneSubmission& submission) override;
         bool consumesSceneSubmission() const override { return false; }
-        void synchronizeScene(Render::SceneData& /*sceneData*/) override {}
         void advanceFrame(double simulationTime) override;
 
     private:

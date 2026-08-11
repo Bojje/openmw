@@ -3835,7 +3835,6 @@ namespace MWWorld
             if (!mWorldScene)
                 return false;
 
-            mFrameLifecycle->synchronizeScene(mWorldScene->getFrameSceneData());
             Render::SceneSubmission submission = mWorldScene->getNeutralScene();
             return mFrameLifecycle->renderFrame(submission);
         }
@@ -3845,7 +3844,6 @@ namespace MWWorld
         if (mWorldScene)
         {
             Render::SceneData& sceneData = mWorldScene->getFrameSceneData();
-            mFrameLifecycle->synchronizeScene(sceneData);
             mRendering->synchronizeNeutralScene(sceneData);
         }
         return true;
