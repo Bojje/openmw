@@ -57,6 +57,8 @@ namespace Vk
     class Renderer : public Render::FrameLifecycle
     {
     public:
+        using Render::FrameLifecycle::resize;
+
         enum class SurfaceMode
         {
             Window,

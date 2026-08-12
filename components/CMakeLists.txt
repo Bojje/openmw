@@ -527,10 +527,6 @@ add_component_dir(render
 
 if (OPENMW_USE_VULKAN)
     set(_component_files_before_vulkan ${COMPONENT_FILES})
-    add_component_dir(render
-        jpeg
-        png
-    )
     add_component_dir (vk
         vkcommon
         vkinstance
@@ -613,6 +609,14 @@ target_include_directories(openmw_render_neutral
     ${CMAKE_SOURCE_DIR}
 )
 
+if (OPENMW_USE_VULKAN)
+    target_sources(openmw_render_neutral PRIVATE
+        render/jpeg.cpp
+        render/png.cpp
+    )
+    target_link_libraries(openmw_render_neutral PUBLIC JPEG::JPEG PNG::PNG)
+endif()
+
 if (OPENMW_USE_SYSTEM_SQLITE3)
     find_package(SQLite3 REQUIRED)
     if(NOT TARGET SQLite3::SQLite3) # CMake < 4.3
@@ -635,7 +639,7 @@ if (APPLE)
     target_compile_definitions(components PUBLIC GL_SILENCE_DEPRECATION=1)
 endif()
 
-target_link_libraries(components
+target_link_libraries(components PUBLIC
     openmw_render_neutral
 
     # CMake's built-in OSG finder does not use pkgconfig, so we have to
@@ -679,9 +683,9 @@ else()
     set(_components_yaml_target yaml-cpp)
 endif()
 
-target_link_libraries(components ${_components_yaml_target})
+target_link_libraries(components PUBLIC ${_components_yaml_target})
 
-target_link_libraries(components ${BULLET_LIBRARIES})
+target_link_libraries(components PUBLIC ${BULLET_LIBRARIES})
 
 if (OPENMW_USE_VULKAN)
     add_library(openmw_vulkan STATIC ${VULKAN_COMPONENT_FILES})
@@ -704,25 +708,25 @@ endif()
 
 if (OSG_STATIC AND CMAKE_SYSTEM_NAME MATCHES "Linux")
     find_package(X11 REQUIRED COMPONENTS Xinerama Xrandr)
-    target_link_libraries(components ${CMAKE_DL_LIBS} X11::X11 X11::Xinerama X11::Xrandr)
+    target_link_libraries(components PUBLIC ${CMAKE_DL_LIBS} X11::X11 X11::Xinerama X11::Xrandr)
     find_package(Fontconfig MODULE)
     if(Fontconfig_FOUND)
-        target_link_libraries(components Fontconfig::Fontconfig)
+        target_link_libraries(components PUBLIC Fontconfig::Fontconfig)
     endif()
 endif()
 
 if (WIN32)
-    target_link_libraries(components shlwapi)
+    target_link_libraries(components PUBLIC shlwapi)
 endif()
 
 # Fix for not visible pthreads functions for linker with glibc 2.15
 if (UNIX AND NOT APPLE)
-    target_link_libraries(components ${CMAKE_THREAD_LIBS_INIT})
+    target_link_libraries(components PUBLIC ${CMAKE_THREAD_LIBS_INIT})
 endif()
 
 if (BUILD_WITH_CODE_COVERAGE)
     target_compile_options(components PRIVATE --coverage)
-    target_link_libraries(components gcov)
+    target_link_libraries(components PUBLIC gcov)
 endif()
 
 
@@ -758,7 +762,7 @@ if(OSG_STATIC)
         find_package(Freetype REQUIRED)
         find_package(JPEG REQUIRED)
         find_package(PNG REQUIRED)
-        target_link_libraries(components Freetype::Freetype JPEG::JPEG PNG::PNG)
+        target_link_libraries(components PUBLIC Freetype::Freetype JPEG::JPEG PNG::PNG)
     endif()
 endif(OSG_STATIC)
 

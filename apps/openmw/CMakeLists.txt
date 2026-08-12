@@ -195,7 +195,7 @@ target_link_libraries(openmw-lib
 )
 
 if (OPENMW_USE_VULKAN)
-    target_link_libraries(openmw-lib PRIVATE openmw_vulkan)
+    target_link_libraries(openmw-lib openmw_vulkan)
     target_compile_definitions(openmw-lib PRIVATE
         OPENMW_USE_VULKAN
         OPENMW_VULKAN_SHADER_DIR="${VK_SHADER_OUTPUT_DIR}"

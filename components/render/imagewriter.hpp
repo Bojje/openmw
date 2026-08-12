@@ -20,7 +20,7 @@ namespace Render
 
         const std::uint16_t width = static_cast<std::uint16_t>(image.width);
         const std::uint16_t height = static_cast<std::uint16_t>(image.height);
-        const std::array<std::uint8_t, 18> header{ 0, 0, 2, 0, 0, 0, 0, 0, 0, 0,
+        const std::array<std::uint8_t, 18> header{ 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             static_cast<std::uint8_t>(width), static_cast<std::uint8_t>(width >> 8),
             static_cast<std::uint8_t>(height), static_cast<std::uint8_t>(height >> 8), 32, 0x28 };
 

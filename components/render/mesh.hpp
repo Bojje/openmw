@@ -204,7 +204,7 @@ namespace Render
     struct MeshInstance
     {
         MeshData mesh;
-        Mat4 transform;
+        Mat4 transform = identityMat4();
     };
 
     using MeshResolver = std::function<std::shared_ptr<const std::vector<MeshInstance>>(std::string_view)>;
