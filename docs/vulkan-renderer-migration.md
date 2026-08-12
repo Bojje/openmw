@@ -416,11 +416,13 @@ OSG window/context creation, icon decoding, OpenGL capability discovery, and ste
 in `ViewerFrameLifecycle`; `Engine` receives only the created SDL window and capability result. This
 removes the engine's direct OpenGL window-construction path and gives the future Vulkan lifecycle a
 real exclusive startup boundary.
+The OSG lifecycle also creates and owns the initial world scene root; `Engine` only receives a
+reference while assembling OSG-specific GUI/world services.
 World bootstrap now rejects any non-OSG lifecycle before entering `initOsgRenderer`, making the
 remaining missing Vulkan game-owner path explicit instead of allowing an accidental mixed setup.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-173 files, deleting 1,959 lines and adding 9,106 lines (net `+7,147`). The larger Vulkan-only
+173 files, deleting 1,962 lines and adding 9,128 lines (net `+7,166`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.

@@ -11,6 +11,11 @@ namespace osgViewer
     class Viewer;
 }
 
+namespace osg
+{
+    class Group;
+}
+
 struct SDL_Window;
 
 namespace MWRender
@@ -31,6 +36,7 @@ namespace MWRender
         // Create and realize the OSG window owned by this lifecycle. The
         // engine receives only the resulting SDL handle and GL capability.
         int initializeWindow(SDL_Window*& window, const std::filesystem::path& resourceDirectory);
+        osg::Group* sceneRoot();
 
         Render::FrameLifecycle::Backend backend() const override { return Render::FrameLifecycle::Backend::Osg; }
         bool renderFrame() override;
@@ -43,6 +49,7 @@ namespace MWRender
 
     private:
         osg::ref_ptr<osgViewer::Viewer> mViewer;
+        osg::ref_ptr<osg::Group> mSceneRoot;
     };
 }
 

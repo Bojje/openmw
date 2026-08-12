@@ -495,12 +495,10 @@ void OMW::Engine::prepareEngine()
             mViewer, stereoEnabled, Settings::camera().mNearClip, Settings::camera().mViewingDistance);
     }
 
-    osg::ref_ptr<osg::Group> rootNode(new osg::Group);
-    mViewer->setSceneData(rootNode);
-
     auto* const viewerLifecycle = dynamic_cast<MWRender::ViewerFrameLifecycle*>(mFrameLifecycle.get());
     if (!viewerLifecycle)
         throw std::logic_error("OSG engine setup requires the OSG frame lifecycle");
+    osg::ref_ptr<osg::Group> rootNode = viewerLifecycle->sceneRoot();
     mGlMaxTextureImageUnits = viewerLifecycle->initializeWindow(mWindow, mResDir);
 
     mVFS = std::make_unique<VFS::Manager>();

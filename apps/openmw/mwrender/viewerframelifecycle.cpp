@@ -9,6 +9,7 @@
 #include <osgDB/Registry>
 #include <osgGA/GUIEventAdapter>
 #include <osg/Stats>
+#include <osg/Group>
 #include <osgViewer/ViewerEventHandlers>
 #include <osgViewer/Viewer>
 
@@ -72,6 +73,17 @@ namespace MWRender
     }
 
     ViewerFrameLifecycle::~ViewerFrameLifecycle() = default;
+
+    osg::Group* ViewerFrameLifecycle::sceneRoot()
+    {
+        if (!mSceneRoot)
+        {
+            mSceneRoot = new osg::Group;
+            mSceneRoot->setName("World Root");
+            mViewer->setSceneData(mSceneRoot);
+        }
+        return mSceneRoot.get();
+    }
 
     int ViewerFrameLifecycle::initializeWindow(SDL_Window*& window, const std::filesystem::path& resourceDirectory)
     {
