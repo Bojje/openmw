@@ -357,9 +357,10 @@ bool OMW::Engine::frame(unsigned frameNumber, float frametime)
     const auto finishLuaUpdate = [this, &frameStart, frameNumber, stats] {
         mLuaWorker->finishUpdate(frameStart, frameNumber, *stats);
     };
+    bool rendered = false;
     try
     {
-        mWorld->renderFrame();
+        rendered = mWorld->renderFrame();
     }
     catch (...)
     {
@@ -368,6 +369,9 @@ bool OMW::Engine::frame(unsigned frameNumber, float frametime)
     }
 
     finishLuaUpdate();
+
+    if (!rendered)
+        return false;
 
     if (mValidateNeutralScene && !mPreWorldFrameLifecycle->consumesSceneSubmission()
         && mStateManager->getState() != MWBase::StateManager::State_NoGame
