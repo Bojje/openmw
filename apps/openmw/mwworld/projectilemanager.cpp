@@ -175,6 +175,22 @@ namespace
         orient.set(mat);
         return orient;
     }
+
+    std::string makeNeutralProjectileEffectId(int projectileId)
+    {
+        return "projectile-" + std::to_string(projectileId);
+    }
+
+    Render::Quat toRenderQuat(const osg::Quat& quat)
+    {
+        return { static_cast<float>(quat.x()), static_cast<float>(quat.y()), static_cast<float>(quat.z()),
+            static_cast<float>(quat.w()) };
+    }
+
+    Render::Vec3 toRenderVec3(const osg::Vec3f& vec)
+    {
+        return { vec.x(), vec.y(), vec.z() };
+    }
 }
 
 namespace MWWorld
@@ -347,6 +363,7 @@ namespace MWWorld
         osg::Vec4 lightDiffuseColor = getMagicBoltLightDiffuseColor(state.mEffects);
 
         VFS::Path::Normalized model = ptr.getClass().getCorrectedModel(ptr);
+        const VFS::Path::Normalized visualModel = model;
         createModel(state, model, pos, orient, true, true, lightDiffuseColor, texture);
 
         MWBase::SoundManager* sndMgr = MWBase::Environment::get().getSoundManager();
@@ -367,6 +384,14 @@ namespace MWWorld
         }
         state.mProjectileId = mPhysics->addProjectile(caster, pos, model, true);
         state.mToDelete = false;
+        if (!mParent)
+        {
+            state.mNeutralEffectId = makeNeutralProjectileEffectId(state.mProjectileId);
+            MWBase::Environment::get().getWorld()->spawnEffect(
+                visualModel, std::string(texture.value()), pos, 1.f, true, false, state.mNeutralEffectId, true);
+            MWBase::Environment::get().getWorld()->updateEffect(
+                state.mNeutralEffectId, toRenderVec3(state.mPosition), toRenderQuat(state.mOrientation));
+        }
         mMagicBolts.push_back(std::move(state));
     }
 
@@ -392,6 +417,14 @@ namespace MWWorld
 
         state.mProjectileId = mPhysics->addProjectile(actor, pos, model, false);
         state.mToDelete = false;
+        if (!mParent)
+        {
+            state.mNeutralEffectId = makeNeutralProjectileEffectId(state.mProjectileId);
+            MWBase::Environment::get().getWorld()->spawnEffect(
+                model, "", pos, 1.f, false, false, state.mNeutralEffectId, true);
+            MWBase::Environment::get().getWorld()->updateEffect(
+                state.mNeutralEffectId, toRenderVec3(state.mPosition), toRenderQuat(state.mOrientation));
+        }
         mProjectiles.push_back(std::move(state));
     }
 
@@ -527,6 +560,9 @@ namespace MWWorld
             projectileState.mOrientation = lookAt(projectileState.mVelocity);
             if (projectileState.mNode)
                 projectileState.mNode->setAttitude(projectileState.mOrientation);
+            if (!projectileState.mNeutralEffectId.empty())
+                MWBase::Environment::get().getWorld()->updateEffect(projectileState.mNeutralEffectId,
+                    toRenderVec3(projectileState.mPosition), toRenderQuat(projectileState.mOrientation));
 
             update(projectileState, duration);
 
@@ -554,6 +590,9 @@ namespace MWWorld
             projectileState.mPosition = pos;
             if (projectileState.mNode)
                 projectileState.mNode->setPosition(pos);
+            if (!projectileState.mNeutralEffectId.empty())
+                MWBase::Environment::get().getWorld()->updateEffect(projectileState.mNeutralEffectId,
+                    toRenderVec3(pos), toRenderQuat(projectileState.mOrientation));
 
             if (projectile->isActive())
                 continue;
@@ -598,6 +637,9 @@ namespace MWWorld
             magicBoltState.mPosition = pos;
             if (magicBoltState.mNode)
                 magicBoltState.mNode->setPosition(pos);
+            if (!magicBoltState.mNeutralEffectId.empty())
+                MWBase::Environment::get().getWorld()->updateEffect(magicBoltState.mNeutralEffectId,
+                    toRenderVec3(pos), toRenderQuat(magicBoltState.mOrientation));
             for (const auto& sound : magicBoltState.mSounds)
                 sound->setPosition(pos);
 
@@ -655,6 +697,8 @@ namespace MWWorld
     {
         if (mParent && state.mNode)
             mParent->removeChild(state.mNode);
+        if (!state.mNeutralEffectId.empty())
+            MWBase::Environment::get().getWorld()->removeEffect(state.mNeutralEffectId);
         mPhysics->removeProjectile(state.mProjectileId);
         state.mToDelete = true;
     }
@@ -663,6 +707,8 @@ namespace MWWorld
     {
         if (mParent && state.mNode)
             mParent->removeChild(state.mNode);
+        if (!state.mNeutralEffectId.empty())
+            MWBase::Environment::get().getWorld()->removeEffect(state.mNeutralEffectId);
         mPhysics->removeProjectile(state.mProjectileId);
         state.mToDelete = true;
         for (size_t soundIter = 0; soundIter != state.mSounds.size(); soundIter++)
@@ -759,6 +805,15 @@ namespace MWWorld
             createModel(state, model, osg::Vec3f(esm.mPosition), osg::Quat(esm.mOrientation), false, false,
                 osg::Vec4(0, 0, 0, 0));
 
+            if (!mParent)
+            {
+                state.mNeutralEffectId = makeNeutralProjectileEffectId(state.mProjectileId);
+                MWBase::Environment::get().getWorld()->spawnEffect(
+                    model, "", osg::Vec3f(esm.mPosition), 1.f, false, false, state.mNeutralEffectId, true);
+                MWBase::Environment::get().getWorld()->updateEffect(
+                    state.mNeutralEffectId, toRenderVec3(state.mPosition), toRenderQuat(state.mOrientation));
+            }
+
             mProjectiles.push_back(std::move(state));
             return true;
         }
@@ -810,6 +865,16 @@ namespace MWWorld
             createModel(state, model, osg::Vec3f(esm.mPosition), osg::Quat(esm.mOrientation), true, true,
                 lightDiffuseColor, texture);
             state.mProjectileId = mPhysics->addProjectile(state.getCaster(), osg::Vec3f(esm.mPosition), model, true);
+
+            if (!mParent)
+            {
+                state.mNeutralEffectId = makeNeutralProjectileEffectId(state.mProjectileId);
+                MWBase::Environment::get().getWorld()->spawnEffect(
+                    model, std::string(texture.value()), osg::Vec3f(esm.mPosition), 1.f, true, false,
+                    state.mNeutralEffectId, true);
+                MWBase::Environment::get().getWorld()->updateEffect(
+                    state.mNeutralEffectId, toRenderVec3(state.mPosition), toRenderQuat(state.mOrientation));
+            }
 
             MWBase::SoundManager* sndMgr = MWBase::Environment::get().getSoundManager();
             for (const auto& soundid : state.mSoundIds)

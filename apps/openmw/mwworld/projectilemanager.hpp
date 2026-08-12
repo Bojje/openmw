@@ -82,6 +82,7 @@ namespace MWWorld
             std::shared_ptr<MWRender::EffectAnimationTime> mEffectAnimationTime;
             osg::Vec3f mPosition;
             osg::Quat mOrientation;
+            std::string mNeutralEffectId;
 
             ESM::RefNum mCaster;
             MWWorld::Ptr mCasterHandle;

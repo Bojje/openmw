@@ -3963,6 +3963,12 @@ namespace MWWorld
             mWorldScene->removeNeutralEffect(effectId);
     }
 
+    void World::updateEffect(std::string_view effectId, const Render::Vec3& position, const Render::Quat& rotation)
+    {
+        if (!mRendering && mWorldScene)
+            mWorldScene->updateNeutralEffect(effectId, position, rotation);
+    }
+
     struct ResetActorsVisitor
     {
         World& mWorld;

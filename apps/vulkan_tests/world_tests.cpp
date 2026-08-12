@@ -314,6 +314,13 @@ int main()
     if (!world.recordEffect("loop", "meshes/effect.nif", { 1.f, 2.f, 3.f }, 1.f, {}, true, 2.f)
         || world.effectsInOrder().size() != 1 || !world.effectsInOrder().front()->looping)
         throw std::runtime_error("renderer-neutral world scene failed to retain an identified effect");
+    if (!world.updateEffect("loop", { 9.f, 8.f, 7.f }, { 0.f, 0.f, 0.5f, 0.5f })
+        || world.effectsInOrder().front()->transform.position.x != 9.f
+        || world.effectsInOrder().front()->transform.position.y != 8.f
+        || world.effectsInOrder().front()->transform.position.z != 7.f
+        || world.effectsInOrder().front()->transform.rotation.z != 0.5f
+        || world.updateEffect("missing", { 0.f, 0.f, 0.f }, Render::Quat{ 0.f, 0.f, 0.f, 1.f }))
+        throw std::runtime_error("renderer-neutral world scene failed to update an identified effect");
     world.updateEffects(1.5f);
     if (world.effectsInOrder().front()->animationTime != 1.5f)
         throw std::runtime_error("renderer-neutral world scene failed to advance an effect");

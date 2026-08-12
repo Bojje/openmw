@@ -34,6 +34,7 @@ namespace osg
 namespace Render
 {
     struct Vec3;
+    struct Quat;
     struct AnimationTextKey;
 }
 
@@ -560,6 +561,11 @@ namespace MWBase
             = 0;
 
         virtual void removeEffect(std::string_view effectId) = 0;
+
+        /// Update a renderer-neutral effect's transform. OSG-owned effects do not
+        /// use this path; neutral owners consume the transform in their scene snapshot.
+        virtual void updateEffect(std::string_view effectId, const Render::Vec3& position,
+            const Render::Quat& rotation) = 0;
 
         /// @see MWWorld::WeatherManager::isInStorm
         virtual bool isInStorm() const = 0;

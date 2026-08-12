@@ -662,6 +662,8 @@ namespace MWWorld
             std::string_view effectId = {}, bool loop = false) override;
 
         void removeEffect(std::string_view effectId) override;
+        void updateEffect(std::string_view effectId, const Render::Vec3& position,
+            const Render::Quat& rotation) override;
 
         /// @see MWWorld::WeatherManager::isInStorm
         bool isInStorm() const override;

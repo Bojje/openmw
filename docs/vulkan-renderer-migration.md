@@ -423,8 +423,9 @@ World update no longer performs GUI-dependent spell preloading or jail-window ch
 legacy renderer/UI owner.
 Projectile simulation now uses the same manager in both backends: neutral startup constructs it
 without an OSG parent, so collision, hit processing, spell effects, sounds, cleanup, and save/load
-state continue without an OSG projectile presenter. Neutral projectile model/glow presentation and
-presentation-specific effects remain a later dynamic-content milestone.
+state continue without an OSG projectile presenter. Neutral arrows and magic bolts now register
+movable neutral mesh effects from the same world-effect submission path; enchantment glow, bolt
+lights, multi-effect composition, and other presentation-specific effects remain a later gate.
 Cell-transition loading screens, window-manager cell notifications, actor watching, fades, and
 postprocessor flags now follow the same legacy-service guard, so the neutral bootstrap does not
 silently re-enter the OSG/UI path during cell changes.
@@ -520,7 +521,7 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the frozen `openmw-vulkan-osg-reference` tag, the current checkpoint changes
-207 code files excluding this ledger, deleting 2,264 lines and adding 14,046 lines (net `+11,782`). The larger Vulkan-only
+207 code files excluding this ledger, deleting 2,279 lines and adding 14,081 lines (net `+11,802`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; the current branch continues the reduction
 work with renderer-neutral ownership and compatibility-wrapper deletion. The live no-GUI
 consumer is the first deletion checkpoint; further reduction can now target OSG
@@ -627,7 +628,7 @@ the game unplayable rather than reduce duplication safely.
 | Vulkan validation renderer | Vulkan standalone smoke target | Retained as the migration test harness |
 | Vulkan frame-owner forwarding wrapper | Removed; `Vk::Renderer` is the engine's Vulkan `FrameLifecycle` owner | Complete |
 | Legacy `Scene` constructor forwarding wrapper | Removed; OSG now uses the canonical scene-construction contract | Complete |
-| Projectile simulation and water-impact event | Shared projectile physics/combat manager with neutral position/orientation state; world-level neutral water-ripple fan-out; projectile service no longer stores `RenderingManager` | Complete for simulation/event ownership; neutral projectile model/glow presentation remains outstanding |
+| Projectile simulation and water-impact event | Shared projectile physics/combat manager with neutral position/orientation state; movable neutral arrow/bolt mesh effects; world-level neutral water-ripple fan-out; projectile service no longer stores `RenderingManager` | Complete for simulation/event ownership and basic mesh presentation; enchantment glow, bolt lights, and multi-effect composition remain outstanding |
 | Water-level event | World-level fan-out to physics, OSG water, and neutral water snapshots | Complete for owner fan-out; legacy water shading remains outstanding |
 | Vulkan mesh submission queue | Removed | Complete |
 | Inactive raster ray-tracing scaffold | Removed | Reintroduce only with a complete RT pipeline |
@@ -707,9 +708,10 @@ and starts neutral weapon and spell-cast queues with attack/cast timing keys, in
 random attack group selection. Neutral queue ownership now also reports the active front group when
 the OSG animation owner is absent, so repeated group requests and death completion do not
 prematurely clear or finish the active queue. Projectile collision, hit, spell, sound, save/load, and cleanup
-behavior now also run through neutral state without an OSG scene parent. The remaining animation
-gate is actor `.kf` priority/queue arbitration, OSG-specific presentation events, blending, and
-  controller-stack ownership; neutral projectile visuals/glows and full particle presentation remain.
+ behavior now also run through neutral state without an OSG scene parent. Neutral arrows and magic
+bolts also submit movable mesh effects through the same `WorldScene` effect collection. The remaining animation
+ gate is actor `.kf` priority/queue arbitration, OSG-specific presentation events, blending, and
+ controller-stack ownership; projectile glows/lights/multi-effect composition and full particle presentation remain.
   Neutral Lua/sound/melee/spell text-key dispatch is now covered for the migrated event classes.
 - Resting actors, owned-item lookup, line-of-sight, moving doors, and transformation-script movement/rotation now use active-cell state and world-model transforms instead of treating an absent OSG node as inactive.
 - Neutral focus selection and gameplay raycasts now use the renderer-neutral camera state and physics collision masks, so activation and targeting no longer require an OSG renderer.

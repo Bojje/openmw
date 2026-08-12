@@ -472,6 +472,12 @@ namespace MWWorld
             mNeutralWorldScene->removeEffect(effectId);
     }
 
+    void Scene::updateNeutralEffect(std::string_view effectId, const Render::Vec3& position, const Render::Quat& rotation)
+    {
+        if (mNeutralWorldScene)
+            mNeutralWorldScene->updateEffect(effectId, position, rotation);
+    }
+
     void Scene::updateNeutralWeatherEffects(const WeatherManager& weatherManager)
     {
         if (mNeutralWorldScene)

@@ -294,6 +294,16 @@ namespace Render
 
         bool removeEffect(std::string_view effectId) { return mEffects.erase(std::string(effectId)) != 0; }
 
+        bool updateEffect(std::string_view effectId, const Vec3& position, const Quat& rotation)
+        {
+            const auto found = mEffects.find(std::string(effectId));
+            if (found == mEffects.end() || !valid(position) || !valid(rotation))
+                return false;
+            found->second.transform.position = position;
+            found->second.transform.rotation = rotation;
+            return true;
+        }
+
         void updateEffects(float duration)
         {
             if (!valid(duration) || duration <= 0.f)
