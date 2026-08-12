@@ -1,6 +1,7 @@
 #include "worldimp.hpp"
 
 #include <charconv>
+#include <array>
 #include <stdexcept>
 #include <vector>
 
@@ -36,6 +37,8 @@
 #include <components/misc/pathhelpers.hpp>
 #include <components/misc/resourcehelpers.hpp>
 #include <components/misc/rng.hpp>
+
+#include <components/render/textureconversion.hpp>
 
 #include <components/files/collections.hpp>
 
@@ -306,10 +309,25 @@ namespace MWWorld
                 return resourceSystem->getNifMeshManager()->get(path);
             return std::make_shared<const std::vector<Render::MeshInstance>>();
         };
-        const Render::TextureResolver textureResolver = [resourceSystem = mResourceSystem](std::string_view path) {
+        Resource::ImageManager* const imageManager = mResourceSystem->getImageManager();
+        const Render::TextureResolver textureResolver = [imageManager](std::string_view path) {
             if (path.empty())
                 return std::shared_ptr<const Render::TextureData>();
-            return resourceSystem->getImageManager()->getRenderTexture(VFS::Path::Normalized(path));
+            const osg::ref_ptr<osg::Image> image = imageManager->getImage(VFS::Path::Normalized(path));
+            // The legacy renderer uses a warning image as a fallback for missing
+            // or unsupported resources. A neutral backend must not mistake that
+            // fallback for the requested asset.
+            if (!image || image.get() == imageManager->getWarningImage() || image->s() <= 0 || image->t() <= 0)
+                return std::shared_ptr<const Render::TextureData>();
+
+            Render::TextureData texture = Render::makeRgba8Texture(static_cast<std::uint32_t>(image->s()),
+                static_cast<std::uint32_t>(image->t()), [image](std::uint32_t x, std::uint32_t y) {
+                    const osg::Vec4 color = image->getColor(static_cast<int>(x), static_cast<int>(y), 0);
+                    return std::array<float, 4>{ color.r(), color.g(), color.b(), color.a() };
+                });
+            if (!texture.valid())
+                return std::shared_ptr<const Render::TextureData>();
+            return std::make_shared<const Render::TextureData>(std::move(texture));
         };
         const Render::SceneSynchronizer sceneSynchronizer = [rendering = mRendering.get()](Render::SceneData& sceneData) {
             sceneData = rendering->getNeutralFrameData();

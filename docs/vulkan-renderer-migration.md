@@ -353,7 +353,7 @@ The engine public header no longer imports complete OSG viewer/event-handler hea
 are now included only by the implementation files that use them.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-157 files, deleting 1,367 lines and adding 8,419 lines (net `+7,052`). The larger Vulkan-only
+156 files, deleting 1,367 lines and adding 8,412 lines (net `+7,045`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
@@ -398,7 +398,10 @@ blendmaps, so clamping, finite-value rejection, and byte quantization cannot dri
 resource paths. The conversion helper has direct CPU coverage.
 Neutral image resolution also rejects the legacy warning-image fallback, so the opt-in
 full-game bridge validator cannot report missing or unsupported textures as successful
-RGBA8 resources.
+RGBA8 resources. The RGBA8 conversion is now an OSG initialization adapter rather than an
+`ImageManager` API; neutral resource construction therefore has no image-manager dependency,
+and the future Vulkan resource provider can replace that adapter without preserving a mixed
+OSG/neutral manager contract.
 The scene collector also carries visible models that resolve to no converted geometry as
 explicit unresolved entries; submission validation rejects those entries instead of silently
 dropping world references.
