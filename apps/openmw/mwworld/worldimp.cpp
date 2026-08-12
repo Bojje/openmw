@@ -369,7 +369,8 @@ namespace MWWorld
         setupPlayer();
 
         renderPlayer();
-        mRendering->getCamera()->reset();
+        if (mRendering)
+            mRendering->getCamera()->reset();
 
         // we don't want old weather to persist on a new game
         // Note that if reset later, the initial ChangeWeather that the chargen script calls will be lost.
@@ -425,7 +426,7 @@ namespace MWWorld
         if (!bypass)
         {
             std::string_view video = Fallback::Map::getString("Movies_New_Game");
-            if (!video.empty())
+            if (!video.empty() && mRendering)
             {
                 // Make sure that we do not continue to play a Title music after a new game video.
                 MWBase::Environment::get().getSoundManager()->stopMusic();
@@ -437,7 +438,8 @@ namespace MWWorld
         if (!mPhysics->toggleCollisionMode())
             mPhysics->toggleCollisionMode();
 
-        MWBase::Environment::get().getWindowManager()->updatePlayer();
+        if (mRendering)
+            MWBase::Environment::get().getWindowManager()->updatePlayer();
         mTimeManager->setup(mGlobalVariables);
 
         // Initial seed.
@@ -622,7 +624,8 @@ namespace MWWorld
 
     void World::useDeathCamera()
     {
-        mRendering->getCamera()->setMode(MWRender::Camera::Mode::ThirdPerson);
+        if (mRendering)
+            mRendering->getCamera()->setMode(MWRender::Camera::Mode::ThirdPerson);
     }
 
     MWWorld::Player& World::getPlayer()
@@ -1018,6 +1021,9 @@ namespace MWWorld
 
     MWWorld::Ptr World::getFocusObject()
     {
+        if (!mRendering)
+            return {};
+
         if (MWBase::Environment::get().getStateManager()->getState() == MWBase::StateManager::State_NoGame)
             return {};
 
@@ -1199,7 +1205,8 @@ namespace MWWorld
                             destinationCell->getCell()->getGridY(), destinationCell->getCell()->getNameId(),
                             destinationCell->getCell()->getWorldSpace().serializeText());
                     }
-                    MWBase::Environment::get().getSoundManager()->updatePtr(ptr, newPtr);
+                    if (mRendering)
+                        MWBase::Environment::get().getSoundManager()->updatePtr(ptr, newPtr);
                     mPhysics->updatePtr(ptr, newPtr);
 
                     MWBase::MechanicsManager* mechMgr = MWBase::Environment::get().getMechanicsManager();
@@ -1508,7 +1515,7 @@ namespace MWWorld
     void World::queueMovement(const Ptr& ptr, const osg::Vec3f& velocity)
     {
         mPhysics->queueObjectMovement(ptr, velocity);
-        if (ptr == MWMechanics::getPlayer())
+        if (mRendering && ptr == MWMechanics::getPlayer())
             MWBase::Environment::get().getSoundManager()->setListenerVel(velocity);
     }
 
@@ -1617,14 +1624,14 @@ namespace MWWorld
             if (state == MWWorld::DoorState::Opening)
             {
                 const ESM::RefId& openSound = ref->mOpenSound;
-                if (!openSound.empty()
+                if (mRendering && !openSound.empty()
                     && MWBase::Environment::get().getSoundManager()->getSoundPlaying(door, openSound))
                     MWBase::Environment::get().getSoundManager()->stopSound3D(door, openSound);
             }
             else if (state == MWWorld::DoorState::Closing)
             {
                 const ESM::RefId& closeSound = ref->mCloseSound;
-                if (!closeSound.empty()
+                if (mRendering && !closeSound.empty()
                     && MWBase::Environment::get().getSoundManager()->getSoundPlaying(door, closeSound))
                     MWBase::Environment::get().getSoundManager()->stopSound3D(door, closeSound);
             }
@@ -1698,7 +1705,7 @@ namespace MWWorld
             case MWRender::Render_CollisionDebug:
                 return mPhysics->toggleDebugRendering();
             default:
-                return mRendering->toggleRenderMode(mode);
+                return mRendering && mRendering->toggleRenderMode(mode);
         }
     }
 
@@ -1831,6 +1838,9 @@ namespace MWWorld
 
     void World::updateFocusObject()
     {
+        if (!mRendering)
+            return;
+
         try
         {
             // inform the GUI about focused object
@@ -1861,6 +1871,9 @@ namespace MWWorld
 
     MWWorld::Ptr World::getFocusObject(float maxDistance, bool ignorePlayer)
     {
+        if (!mRendering)
+            return {};
+
         const float camDist = mRendering->getCamera()->getCameraDistance();
         maxDistance += camDist;
         MWWorld::Ptr focusObject;
@@ -1891,6 +1904,12 @@ namespace MWWorld
     bool World::castRenderingRay(MWPhysics::RayCastingResult& res, const osg::Vec3f& from, const osg::Vec3f& to,
         bool ignorePlayer, bool ignoreActors, bool ignoreTerrain, std::span<const MWWorld::Ptr> ignoreList)
     {
+        if (!mRendering)
+        {
+            res = mPhysics->castRay(from, to);
+            return res.mHit;
+        }
+
         MWRender::RenderingManager::RayResult rayRes
             = mRendering->castRay(from, to, ignorePlayer, ignoreActors, ignoreTerrain, ignoreList);
         res.mHit = rayRes.mHit;
@@ -2223,7 +2242,8 @@ namespace MWWorld
 
     void World::processChangedSettings(const Settings::CategorySettingVector& settings)
     {
-        mRendering->processChangedSettings(settings);
+        if (mRendering)
+            mRendering->processChangedSettings(settings);
     }
 
     bool World::isFlying(const MWWorld::Ptr& ptr) const
@@ -2335,7 +2355,8 @@ namespace MWWorld
 
     void World::togglePOV(bool force)
     {
-        mRendering->getCamera()->toggleViewMode(force);
+        if (mRendering)
+            mRendering->getCamera()->toggleViewMode(force);
     }
 
     bool World::isFirstPerson() const
@@ -2345,31 +2366,36 @@ namespace MWWorld
 
     bool World::isPreviewModeEnabled() const
     {
-        return mRendering->getCamera()->getMode() == MWRender::Camera::Mode::Preview;
+        return mRendering && mRendering->getCamera()->getMode() == MWRender::Camera::Mode::Preview;
     }
 
     bool World::toggleVanityMode(bool enable)
     {
-        return mRendering->getCamera()->toggleVanityMode(enable);
+        return mRendering && mRendering->getCamera()->toggleVanityMode(enable);
     }
 
     void World::disableDeferredPreviewRotation()
     {
-        mRendering->getCamera()->disableDeferredPreviewRotation();
+        if (mRendering)
+            mRendering->getCamera()->disableDeferredPreviewRotation();
     }
 
     void World::applyDeferredPreviewRotationToPlayer(float dt)
     {
-        mRendering->getCamera()->applyDeferredPreviewRotationToPlayer(dt);
+        if (mRendering)
+            mRendering->getCamera()->applyDeferredPreviewRotationToPlayer(dt);
     }
 
     MWRender::Camera* World::getCamera()
     {
-        return mRendering->getCamera();
+        return mRendering ? mRendering->getCamera() : nullptr;
     }
 
     bool World::vanityRotateCamera(const float* rot)
     {
+        if (!mRendering)
+            return false;
+
         auto* camera = mRendering->getCamera();
         if (!camera->isVanityOrPreviewModeEnabled())
             return false;
@@ -2500,7 +2526,8 @@ namespace MWWorld
 
     void World::screenshot(osg::Image* image, int w, int h)
     {
-        mRendering->screenshot(image, w, h);
+        if (mRendering)
+            mRendering->screenshot(image, w, h);
     }
 
     void World::activateDoor(const MWWorld::Ptr& door)
@@ -2567,7 +2594,7 @@ namespace MWWorld
 
     void World::hurtStandingActors(const ConstPtr& object, float healthPerSecond)
     {
-        if (MWBase::Environment::get().getWindowManager()->isGuiMode())
+        if (mRendering && MWBase::Environment::get().getWindowManager()->isGuiMode())
             return;
 
         std::vector<MWWorld::Ptr> actors;
@@ -2589,11 +2616,11 @@ namespace MWWorld
 
             if (healthPerSecond > 0.0f)
             {
-                if (actor == getPlayerPtr())
+                if (mRendering && actor == getPlayerPtr())
                     MWBase::Environment::get().getWindowManager()->activateHitOverlay(false);
 
                 auto healthDamage = ESM::RefId::stringRefId("Health Damage");
-                if (!MWBase::Environment::get().getSoundManager()->getSoundPlaying(actor, healthDamage))
+                if (mRendering && !MWBase::Environment::get().getSoundManager()->getSoundPlaying(actor, healthDamage))
                     MWBase::Environment::get().getSoundManager()->playSound3D(actor, healthDamage, 1.0f, 1.0f);
             }
         }
@@ -2601,7 +2628,7 @@ namespace MWWorld
 
     void World::hurtCollidingActors(const ConstPtr& object, float healthPerSecond)
     {
-        if (MWBase::Environment::get().getWindowManager()->isGuiMode())
+        if (mRendering && MWBase::Environment::get().getWindowManager()->isGuiMode())
             return;
 
         std::vector<Ptr> actors;
@@ -2623,11 +2650,11 @@ namespace MWWorld
 
             if (healthPerSecond > 0.0f)
             {
-                if (actor == getPlayerPtr())
+                if (mRendering && actor == getPlayerPtr())
                     MWBase::Environment::get().getWindowManager()->activateHitOverlay(false);
 
                 auto healthDamage = ESM::RefId::stringRefId("Health Damage");
-                if (!MWBase::Environment::get().getSoundManager()->getSoundPlaying(actor, healthDamage))
+                if (mRendering && !MWBase::Environment::get().getSoundManager()->getSoundPlaying(actor, healthDamage))
                     MWBase::Environment::get().getSoundManager()->playSound3D(actor, healthDamage, 1.0f, 1.0f);
             }
         }
@@ -2928,7 +2955,8 @@ namespace MWWorld
 
     void World::reattachPlayerCamera()
     {
-        mRendering->rebuildPtr(getPlayerPtr());
+        if (mRendering)
+            mRendering->rebuildPtr(getPlayerPtr());
     }
 
     bool World::getGodModeState() const
@@ -3052,7 +3080,7 @@ namespace MWWorld
             }
         }
 
-        if (isPlayer && result != MWWorld::SpellCastState::Success)
+        if (mRendering && isPlayer && result != MWWorld::SpellCastState::Success)
             MWBase::Environment::get().getWindowManager()->messageBox(message);
 
         return result;
@@ -3263,7 +3291,8 @@ namespace MWWorld
 
     const osg::Vec4f& World::getSunLightPosition() const
     {
-        return mRendering->getSunLightPosition();
+        static const osg::Vec4f neutralSunLightPosition(0.f, 0.f, 1.f, 0.f);
+        return mRendering ? mRendering->getSunLightPosition() : neutralSunLightPosition;
     }
 
     float World::getSunVisibility() const
@@ -3724,9 +3753,11 @@ namespace MWWorld
             mPlayer->setDrawState(MWMechanics::DrawState::Nothing);
             mGoToJail = false;
 
-            MWBase::Environment::get().getWindowManager()->removeGuiMode(MWGui::GM_Dialogue);
-
-            MWBase::Environment::get().getWindowManager()->goToJail(mDaysInPrison);
+            if (mRendering)
+            {
+                MWBase::Environment::get().getWindowManager()->removeGuiMode(MWGui::GM_Dialogue);
+                MWBase::Environment::get().getWindowManager()->goToJail(mDaysInPrison);
+            }
         }
     }
 

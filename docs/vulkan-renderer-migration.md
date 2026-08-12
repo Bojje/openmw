@@ -287,6 +287,10 @@ queries no longer require `RenderingManager` geometry traversal.
 The world update boundary now skips OSG rendering, weather, sound-listener, and loading-screen
 work when those optional services are absent; simulation, navigation, physics, and neutral scene
 updates can therefore advance under a submission-consuming frame owner.
+The remaining world-facing interaction helpers now follow that same rule: neutral startup does
+not touch camera/UI/audio services, focus polling becomes a no-op until a presentation owner
+exists, and rendering-ray queries fall back to the physics ray caster. Preview, screenshot,
+settings, spell-feedback, damage-feedback, and jail presentation calls are likewise optional.
 Player setup/rendering now follows the same split: OSG animation and node work is optional, while
 physics actor creation, mechanics registration, inventory listener clearing, effects, navigation,
 and neutral transform updates remain shared. This removes another first-frame null dereference in
@@ -342,7 +346,7 @@ The engine public header no longer imports complete OSG viewer/event-handler hea
 are now included only by the implementation files that use them.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-156 files, deleting 1,322 lines and adding 8,287 lines (net `+6,965`). The larger Vulkan-only
+156 files, deleting 1,351 lines and adding 8,351 lines (net `+7,000`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
