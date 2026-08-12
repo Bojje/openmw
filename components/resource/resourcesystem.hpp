@@ -25,6 +25,7 @@ namespace Resource
 
     class SceneManager;
     class ImageManager;
+    class NeutralTextureManager;
     class BgsmFileManager;
     class NifFileManager;
     class NifMeshManager;
@@ -56,6 +57,7 @@ namespace Resource
         /// Returns nullptr for the neutral backend; neutral scene services receive texture data through injected
         /// renderer-neutral resolvers instead of constructing the OSG image/material managers.
         ImageManager* getImageManager();
+        NeutralTextureManager* getNeutralTextureManager();
         BgsmFileManager* getBgsmFileManager();
         NifFileManager* getNifFileManager();
         NifMeshManager* getNifMeshManager();
@@ -92,6 +94,7 @@ namespace Resource
     private:
         std::unique_ptr<SceneManager> mSceneManager;
         std::unique_ptr<ImageManager> mImageManager;
+        std::unique_ptr<NeutralTextureManager> mNeutralTextureManager;
         std::unique_ptr<BgsmFileManager> mBgsmFileManager;
         std::unique_ptr<NifFileManager> mNifFileManager;
         std::unique_ptr<NifMeshManager> mNifMeshManager;

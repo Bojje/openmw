@@ -91,13 +91,16 @@ through a Bethesda shader property rather than a classic NIF property. Classic N
 slots and Bethesda shader glow textures now cross the same boundary and contribute to the
 neutral emissive channel. Resource images can now cross into neutral RGBA8 data,
 and authored BSLighting double-sided flags now select the matching Vulkan no-cull pipeline.
+The neutral resource backend now owns a VFS-backed RGBA8 texture cache with TGA, BMP, and
+common DDS/DXT decoding; the live Vulkan bootstrap uses it for real static-world texture
+paths and keeps the white texture only as an explicit unsupported-resource fallback.
 Classic and BS shader texture wrap flags now select per-resource repeat/clamp sampler variants.
 The standalone Vulkan renderer uploads/caches indexed albedo textures and samples them
 in the G-buffer (currently bounded to a 64-entry table). Vulkan now consumes neutral
 alpha-test state and thresholds in the G-buffer
 cutout path, and the standalone harness has a basic source-alpha pipeline for blended draws;
 ordinary alpha draws are now sorted back-to-front with stable ties, while ordered terrain
-layers retain their submission order; full material shading and full-game resource hookup
+layers retain their submission order; full material shading and complete image-format coverage
 remain outstanding.
 The Vulkan G-buffer now carries neutral roughness,
 ambient-occlusion,
@@ -449,7 +452,7 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-184 files, deleting 1,975 lines and adding 10,661 lines (net `+8,686`). The larger Vulkan-only
+186 files, deleting 1,974 lines and adding 11,111 lines (net `+9,137`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. The live no-GUI consumer is the first deletion
 checkpoint; further reduction can now target OSG scene/resource/presentation ownership rather

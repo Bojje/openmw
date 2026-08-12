@@ -10,6 +10,7 @@
 #include "keyframemanager.hpp"
 #include "niffilemanager.hpp"
 #include "nifmeshmanager.hpp"
+#include "neutraltexturemanager.hpp"
 #include "scenemanager.hpp"
 
 namespace Resource
@@ -22,6 +23,9 @@ namespace Resource
     {
         mNifFileManager = std::make_unique<NifFileManager>(vfs, encoder);
         mNifMeshManager = std::make_unique<NifMeshManager>(mNifFileManager.get());
+
+        if (backend == Backend::Neutral)
+            mNeutralTextureManager = std::make_unique<NeutralTextureManager>(vfs);
 
         if (backend == Backend::Osg)
         {
@@ -68,6 +72,11 @@ namespace Resource
     ImageManager* ResourceSystem::getImageManager()
     {
         return mImageManager.get();
+    }
+
+    NeutralTextureManager* ResourceSystem::getNeutralTextureManager()
+    {
+        return mNeutralTextureManager.get();
     }
 
     BgsmFileManager* ResourceSystem::getBgsmFileManager()
@@ -119,6 +128,8 @@ namespace Resource
 
     void ResourceSystem::clearCache()
     {
+        if (mNeutralTextureManager)
+            mNeutralTextureManager->clearCache();
         for (CacheManager* const cacheManager : mCacheManagers)
             cacheManager->clearCache();
         for (std::vector<BaseResourceManager*>::iterator it = mResourceManagers.begin(); it != mResourceManagers.end();

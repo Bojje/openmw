@@ -26,6 +26,7 @@
 
 #include <components/resource/resourcesystem.hpp>
 #include <components/resource/nifmeshmanager.hpp>
+#include <components/resource/neutraltexturemanager.hpp>
 #include <components/resource/scenemanager.hpp>
 #include <components/resource/stats.hpp>
 #include <components/compiler/extensions0.hpp>
@@ -611,7 +612,15 @@ void OMW::Engine::prepareVulkanEngine()
     fallbackTexture->width = 1;
     fallbackTexture->height = 1;
     fallbackTexture->pixels = { 255, 255, 255, 255 };
-    const Render::TextureResolver textureResolver = [fallbackTexture](std::string_view) {
+    Resource::NeutralTextureManager* const textureManager = mResourceSystem->getNeutralTextureManager();
+    const Render::TextureResolver textureResolver = [textureManager, fallbackTexture](std::string_view name) {
+        if (!name.empty())
+        {
+            const std::shared_ptr<const Render::TextureData> texture
+                = textureManager->get(VFS::Path::Normalized(name));
+            if (texture)
+                return texture;
+        }
         return std::shared_ptr<const Render::TextureData>(fallbackTexture);
     };
     mWorld->initNeutralRenderer(*mFrameLifecycle, [](Render::SceneData&) {},

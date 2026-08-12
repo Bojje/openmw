@@ -1,8 +1,66 @@
+#include <array>
+#include <cstdint>
+#include <filesystem>
+#include <fstream>
 #include <stdexcept>
 
+#include <components/files/collections.hpp>
+#include <components/resource/neutraltexturemanager.hpp>
 #include <components/resource/resourcesystem.hpp>
 #include <components/toutf8/toutf8.hpp>
 #include <components/vfs/manager.hpp>
+#include <components/vfs/registerarchives.hpp>
+
+namespace
+{
+    void write32(std::array<std::uint8_t, 58>& data, std::size_t offset, std::uint32_t value)
+    {
+        data[offset + 0] = static_cast<std::uint8_t>(value);
+        data[offset + 1] = static_cast<std::uint8_t>(value >> 8);
+        data[offset + 2] = static_cast<std::uint8_t>(value >> 16);
+        data[offset + 3] = static_cast<std::uint8_t>(value >> 24);
+    }
+
+    void testNeutralBmpTexture()
+    {
+        const std::filesystem::path root = std::filesystem::temp_directory_path() / "openmw-neutral-texture-test";
+        std::error_code error;
+        std::filesystem::remove_all(root, error);
+        std::filesystem::create_directories(root / "textures");
+        std::array<std::uint8_t, 58> bmp = {};
+        bmp[0] = 'B';
+        bmp[1] = 'M';
+        write32(bmp, 2, bmp.size());
+        write32(bmp, 10, 54);
+        write32(bmp, 14, 40);
+        write32(bmp, 18, 1);
+        write32(bmp, 22, 1);
+        bmp[26] = 1;
+        bmp[28] = 24;
+        write32(bmp, 34, 4);
+        // One bottom-up BGR pixel: red, followed by row padding.
+        bmp[54] = 0;
+        bmp[55] = 0;
+        bmp[56] = 255;
+        bmp[57] = 0;
+        {
+            std::ofstream output(root / "textures/test.bmp", std::ios::binary);
+            output.write(reinterpret_cast<const char*>(bmp.data()), static_cast<std::streamsize>(bmp.size()));
+        }
+
+        const ToUTF8::Utf8Encoder encoder(ToUTF8::WINDOWS_1252);
+        VFS::Manager vfs;
+        Files::Collections collections(Files::PathContainer{ root });
+        VFS::registerArchives(&vfs, collections, {}, true, &encoder.getStatelessEncoder());
+        Resource::ResourceSystem resources(
+            &vfs, 1.0, &encoder.getStatelessEncoder(), Resource::ResourceSystem::Backend::Neutral);
+        const auto texture = resources.getNeutralTextureManager()->get(VFS::Path::Normalized("textures/test.bmp"));
+        if (!texture || texture->width != 1 || texture->height != 1
+            || texture->pixels != std::vector<std::uint8_t>({ 255, 0, 0, 255 }))
+            throw std::runtime_error("neutral BMP texture decoding changed pixel data");
+        std::filesystem::remove_all(root, error);
+    }
+}
 
 int main()
 {
@@ -20,4 +78,8 @@ int main()
         throw std::runtime_error("neutral resource backend constructed OSG scene services");
     if (resourceSystem.getNifFileManager() == nullptr || resourceSystem.getNifMeshManager() == nullptr)
         throw std::runtime_error("neutral resource backend omitted shared resource services");
+    if (resourceSystem.getNeutralTextureManager() == nullptr)
+        throw std::runtime_error("neutral resource backend omitted the texture decoder");
+
+    testNeutralBmpTexture();
 }
