@@ -75,10 +75,10 @@ static batch, and composes object transforms with NIF node transforms before bat
 animated objects are explicitly retained as dynamic snapshots, but are excluded from the static
 mesh batch until a skinning/animation consumer owns them; the ordered `dynamicMeshes` payload provides
 that future backend with the retained visibility, transform, model, and cell ordering together with
-any resolved mesh data. The neutral Vulkan bootstrap currently leaves bone-pose production empty,
-so skinned records are deliberately excluded rather than silently rendered in a bind pose. The
-renderer-neutral CPU skinning helper and converted skinning metadata remain ready for the later
-animation owner.
+any resolved mesh data. The neutral Vulkan bootstrap still has no per-frame animation producer, but
+skinned records now receive an inverse-bind-derived bind pose so they remain visible while the
+animation owner is ported. The renderer-neutral CPU skinning helper and converted skinning metadata
+remain ready for that later animation owner.
 NIF classic texture, diffuse/emissive, glossiness, and alpha properties now cross the
 renderer-neutral mesh boundary and survive batching; the neutral batch applies diffuse
 and alpha to vertex color output. NIF bump/normal texture slots now cross the same boundary
@@ -119,7 +119,7 @@ for a future Vulkan frame consumer. Neutral loaded-cell snapshots retain inserti
 collected, making backend draw lists stable for image comparison and predictable alpha ordering.
 Fog color and start/end distances now cross the same neutral scene handoff, and the Vulkan
 composite applies the active linear fog range after reconstructing world position.
-The CPU ABI guard tracks the expanded 336-byte scene UBO so future neutral-state additions
+The CPU ABI guard tracks the expanded 352-byte scene UBO so future neutral-state additions
 cannot silently desynchronize the Vulkan shader layout.
 The neutral world snapshot now has an explicit reset path owned by `Scene::clear()` after cell
 teardown, so a game/world unload cannot retain stale object identities, terrain tiles, or cell
