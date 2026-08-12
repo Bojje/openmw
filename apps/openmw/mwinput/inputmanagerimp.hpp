@@ -1,10 +1,8 @@
 #ifndef MWINPUT_MWINPUTMANAGERIMP_H
 #define MWINPUT_MWINPUTMANAGERIMP_H
 
+#include <functional>
 #include <memory>
-
-#include <osg/ref_ptr>
-#include <osgViewer/ViewerEventHandlers>
 
 #include <components/sdlutil/events.hpp>
 #include <components/sdlutil/sdlinputwrapper.hpp>
@@ -45,8 +43,7 @@ namespace MWInput
     {
     public:
         InputManager(SDL_Window* window, SDLUtil::InputCallbacks inputCallbacks,
-            osg::ref_ptr<osgViewer::Viewer> viewer,
-            osg::ref_ptr<osgViewer::ScreenCaptureHandler> screenCaptureHandler, const std::filesystem::path& userFile,
+            std::function<void()> screenshot, const std::filesystem::path& userFile,
             bool userFileExists, const std::filesystem::path& userControllerBindingsFile,
             const std::filesystem::path& controllerBindingsFile, bool grab);
 

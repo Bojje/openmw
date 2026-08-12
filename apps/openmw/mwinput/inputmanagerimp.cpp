@@ -1,7 +1,5 @@
 #include "inputmanagerimp.hpp"
 
-#include <osgViewer/ViewerEventHandlers>
-
 #include <components/esm3/esmreader.hpp>
 #include <components/esm3/esmwriter.hpp>
 #include <components/sdlutil/sdlinputwrapper.hpp>
@@ -25,15 +23,14 @@
 namespace MWInput
 {
     InputManager::InputManager(SDL_Window* window, SDLUtil::InputCallbacks inputCallbacks,
-        osg::ref_ptr<osgViewer::Viewer> viewer,
-        osg::ref_ptr<osgViewer::ScreenCaptureHandler> screenCaptureHandler, const std::filesystem::path& userFile,
+        std::function<void()> screenshot, const std::filesystem::path& userFile,
         bool userFileExists, const std::filesystem::path& userControllerBindingsFile,
         const std::filesystem::path& controllerBindingsFile, bool grab)
         : mControlsDisabled(false)
         , mInputWrapper(std::make_unique<SDLUtil::InputWrapper>(window, std::move(inputCallbacks), grab))
         , mBindingsManager(std::make_unique<BindingsManager>(userFile, userFileExists))
         , mControlSwitch(std::make_unique<ControlSwitch>())
-        , mActionManager(std::make_unique<ActionManager>(mBindingsManager.get(), viewer, screenCaptureHandler))
+        , mActionManager(std::make_unique<ActionManager>(mBindingsManager.get(), std::move(screenshot)))
         , mKeyboardManager(std::make_unique<KeyboardManager>(mBindingsManager.get()))
         , mMouseManager(std::make_unique<MouseManager>(mBindingsManager.get(), mInputWrapper.get(), window))
         , mControllerManager(std::make_unique<ControllerManager>(

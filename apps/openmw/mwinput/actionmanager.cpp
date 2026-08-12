@@ -27,11 +27,9 @@
 namespace MWInput
 {
 
-    ActionManager::ActionManager(BindingsManager* bindingsManager, osg::ref_ptr<osgViewer::Viewer> viewer,
-        osg::ref_ptr<osgViewer::ScreenCaptureHandler> screenCaptureHandler)
+    ActionManager::ActionManager(BindingsManager* bindingsManager, std::function<void()> screenshot)
         : mBindingsManager(bindingsManager)
-        , mViewer(std::move(viewer))
-        , mScreenCaptureHandler(std::move(screenCaptureHandler))
+        , mScreenshot(std::move(screenshot))
         , mTimeIdle(0.f)
     {
     }
@@ -168,10 +166,8 @@ namespace MWInput
 
     void ActionManager::screenshot()
     {
-        if (!mScreenCaptureHandler || !mViewer)
-            return;
-        mScreenCaptureHandler->setFramesToCapture(1);
-        mScreenCaptureHandler->captureNextFrame(*mViewer);
+        if (mScreenshot)
+            mScreenshot();
     }
 
     void ActionManager::toggleMainMenu()

@@ -902,8 +902,12 @@ void OMW::Engine::prepareEngine()
             viewer->getEventQueue()->windowResize(x, y, width, height);
         };
     }
-    mInputManager = std::make_unique<MWInput::InputManager>(mWindow, std::move(inputCallbacks), mViewer,
-        mScreenCaptureHandler, keybinderUser,
+    mInputManager = std::make_unique<MWInput::InputManager>(mWindow, std::move(inputCallbacks), [this] {
+        if (!mScreenCaptureHandler || !mViewer)
+            return;
+        mScreenCaptureHandler->setFramesToCapture(1);
+        mScreenCaptureHandler->captureNextFrame(*mViewer);
+    }, keybinderUser,
         keybinderUserExists, userGameControllerdb, gameControllerdb, mGrab);
     mEnvironment.setInputManager(*mInputManager);
 

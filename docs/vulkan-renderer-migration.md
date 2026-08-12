@@ -397,9 +397,12 @@ SDL input transport is now renderer-neutral as well: `InputWrapper` owns only SD
 backend callbacks for frame events, function keys, and drawable resize. The OSG engine injects its
 viewer event-queue callbacks, leaving a future Vulkan/input owner free to provide those operations
 without linking OSG into the shared SDL input component.
+Screenshot scheduling now follows the same callback boundary: `ActionManager` no longer owns an
+OSG viewer or `ScreenCaptureHandler`; the reference engine supplies its capture action, while a
+Vulkan presentation owner can supply a native capture implementation later.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-164 files, deleting 1,551 lines and adding 8,728 lines (net `+7,177`). The larger Vulkan-only
+165 files, deleting 1,577 lines and adding 8,742 lines (net `+7,165`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
