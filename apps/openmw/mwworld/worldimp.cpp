@@ -433,8 +433,10 @@ namespace MWWorld
 
     void World::clear()
     {
-        mWeatherManager->clear();
-        mRendering->clear();
+        if (mWeatherManager)
+            mWeatherManager->clear();
+        if (mRendering)
+            mRendering->clear();
         mProjectileManager->clear();
         mLocalScripts.clear();
 
@@ -811,7 +813,7 @@ namespace MWWorld
             if (reference.getCellRef().getRefNum().hasContentFile())
             {
                 int type = mStore.find(reference.getCellRef().getRefId());
-                if (mRendering->pagingEnableObject(type, reference, true))
+                if (mRendering && mRendering->pagingEnableObject(type, reference, true))
                     mWorldScene->reloadTerrain();
             }
         }
@@ -852,7 +854,7 @@ namespace MWWorld
         if (reference.getCellRef().getRefNum().hasContentFile())
         {
             int type = mStore.find(reference.getCellRef().getRefId());
-            if (mRendering->pagingEnableObject(type, reference, false))
+            if (mRendering && mRendering->pagingEnableObject(type, reference, false))
                 mWorldScene->reloadTerrain();
         }
 
@@ -878,12 +880,14 @@ namespace MWWorld
             rechargeItems(duration, false);
         }
 
-        mWeatherManager->advanceTime(hours, incremental);
+        if (mWeatherManager)
+            mWeatherManager->advanceTime(hours, incremental);
         mTimeManager->advanceTime(hours, mGlobalVariables);
 
         if (!incremental)
         {
-            mRendering->notifyWorldSpaceChanged();
+            if (mRendering)
+                mRendering->notifyWorldSpaceChanged();
             mProjectileManager->clear();
             mDiscardMovements = true;
         }
@@ -897,28 +901,30 @@ namespace MWWorld
     bool World::toggleSky()
     {
         mSky = !mSky;
-        mRendering->setSkyEnabled(mSky);
+        if (mRendering)
+            mRendering->setSkyEnabled(mSky);
         return mSky;
     }
 
     int World::getMasserPhase() const
     {
-        return mRendering->skyGetMasserPhase();
+        return mRendering ? mRendering->skyGetMasserPhase() : 0;
     }
 
     int World::getSecundaPhase() const
     {
-        return mRendering->skyGetSecundaPhase();
+        return mRendering ? mRendering->skyGetSecundaPhase() : 0;
     }
 
     std::vector<MWWorld::Moon> World::getCurrentMoons() const
     {
-        return mWeatherManager->getCurrentMoons(getTimeStamp());
+        return mWeatherManager ? mWeatherManager->getCurrentMoons(getTimeStamp()) : std::vector<MWWorld::Moon>();
     }
 
     void World::setMoonColour(bool red)
     {
-        mRendering->skySetMoonColour(red);
+        if (mRendering)
+            mRendering->skySetMoonColour(red);
     }
 
     void World::changeToInteriorCell(
@@ -931,7 +937,8 @@ namespace MWWorld
         {
             // changed worldspace
             mProjectileManager->clear();
-            mRendering->notifyWorldSpaceChanged();
+            if (mRendering)
+                mRendering->notifyWorldSpaceChanged();
 
             mCurrentWorldSpace = cellName;
         }
@@ -954,7 +961,8 @@ namespace MWWorld
         {
             // changed worldspace
             mProjectileManager->clear();
-            mRendering->notifyWorldSpaceChanged();
+            if (mRendering)
+                mRendering->notifyWorldSpaceChanged();
             mCurrentWorldSpace = destinationCell->getNameId();
         }
         removeContainerScripts(getPlayerPtr());
