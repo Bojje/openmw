@@ -220,6 +220,8 @@ The full-game bridge validator runs after that same render boundary, so it valid
 camera payload that was just submitted rather than the previous frame's cached matrices.
 The non-owning manager update handle is private to the `Scene` owner, detached during `Scene`
 teardown, and CI guards the manager header against regaining a value-owned neutral frame state.
+Engine GUI fallback frame advancement now also reads simulation time from the active
+`FrameLifecycle`, keeping renderer orchestration from reaching directly into an OSG frame stamp.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
 91 files, deleting 916 lines and adding 7,214 lines (net `+6,298`). The larger Vulkan-only

@@ -851,7 +851,7 @@ void OMW::Engine::prepareEngine()
             if (!mWorld || !mWorld->renderFrame())
                 mPreWorldFrameLifecycle->renderFrame();
         }, [this] {
-            const double simulationTime = mViewer->getFrameStamp()->getSimulationTime();
+            const double simulationTime = mPreWorldFrameLifecycle->referenceTime();
             if (!mWorld || !mWorld->advanceFrame(simulationTime))
                 mPreWorldFrameLifecycle->advanceFrame(simulationTime);
         });
