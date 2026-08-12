@@ -218,6 +218,8 @@ remain confined to the legacy quadtree and reference-renderer methods.
 Camera and environment state are synchronized into that same world-owned state at the renderer
 frame boundary; neutral submission export uses the same explicit synchronization operation for
 a submission-consuming backend.
+Neutral object and groundcover snapshots now compose Euler and axis-angle rotations through
+renderer-neutral math; OSG quaternion construction remains only for legacy scene-node updates.
 The full-game bridge validator runs after that same render boundary, so it validates the
 camera payload that was just submitted rather than the previous frame's cached matrices.
 The non-owning manager update handle is private to the `Scene` owner, detached during `Scene`
@@ -226,7 +228,7 @@ Engine GUI fallback frame advancement now also reads simulation time from the ac
 `FrameLifecycle`, keeping renderer orchestration from reaching directly into an OSG frame stamp.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-91 files, deleting 916 lines and adding 7,253 lines (net `+6,337`). The larger Vulkan-only
+91 files, deleting 912 lines and adding 7,290 lines (net `+6,378`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.

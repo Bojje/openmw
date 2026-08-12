@@ -8,6 +8,30 @@
 
 namespace Render
 {
+    inline Quat multiply(const Quat& lhs, const Quat& rhs)
+    {
+        return { lhs.w * rhs.x + lhs.x * rhs.w + lhs.y * rhs.z - lhs.z * rhs.y,
+            lhs.w * rhs.y - lhs.x * rhs.z + lhs.y * rhs.w + lhs.z * rhs.x,
+            lhs.w * rhs.z + lhs.x * rhs.y - lhs.y * rhs.x + lhs.z * rhs.w,
+            lhs.w * rhs.w - lhs.x * rhs.x - lhs.y * rhs.y - lhs.z * rhs.z };
+    }
+
+    inline Quat makeAxisAngleRotation(const Vec3& axis, float angle)
+    {
+        const float halfAngle = angle * 0.5f;
+        const float sine = std::sin(halfAngle);
+        return { axis.x * sine, axis.y * sine, axis.z * sine, std::cos(halfAngle) };
+    }
+
+    // Matches the game's direct object rotation order without exposing OSG's
+    // quaternion or vector types to renderer-neutral scene consumers.
+    inline Quat makeEulerRotation(const Vec3& rotation)
+    {
+        return multiply(multiply(makeAxisAngleRotation({ 0.f, 0.f, -1.f }, rotation.z),
+                              makeAxisAngleRotation({ 0.f, -1.f, 0.f }, rotation.y)),
+            makeAxisAngleRotation({ -1.f, 0.f, 0.f }, rotation.x));
+    }
+
     inline Mat4 multiply(const Mat4& lhs, const Mat4& rhs)
     {
         Mat4 result = {};

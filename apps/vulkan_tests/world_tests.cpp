@@ -1,4 +1,5 @@
 #include <limits>
+#include <cmath>
 #include <stdexcept>
 #include <string>
 
@@ -7,6 +8,11 @@
 
 int main()
 {
+    const Render::Quat identityRotation = Render::makeEulerRotation({ 0.f, 0.f, 0.f });
+    if (std::abs(identityRotation.x) > 1e-6f || std::abs(identityRotation.y) > 1e-6f
+        || std::abs(identityRotation.z) > 1e-6f || std::abs(identityRotation.w - 1.f) > 1e-6f)
+        throw std::runtime_error("renderer-neutral Euler rotation did not produce identity");
+
     Render::CellScene scene;
     scene.exterior = true;
     scene.gridX = 2;

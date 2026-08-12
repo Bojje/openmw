@@ -103,6 +103,14 @@ namespace
             static_cast<float>(rotation.w()) };
     }
 
+    Render::Quat makeDirectRenderRotation(const MWWorld::Ptr& ptr)
+    {
+        const auto& position = ptr.getRefData().getPosition();
+        if (ptr.getClass().isActor())
+            return Render::makeAxisAngleRotation({ 0.f, 0.f, -1.f }, position.rot[2]);
+        return Render::makeEulerRotation({ position.rot[0], position.rot[1], position.rot[2] });
+    }
+
     void recordNeutralObject(const MWWorld::Ptr& ptr, std::string_view model, bool visible,
         Render::WorldScene& neutralWorld)
     {
@@ -120,7 +128,7 @@ namespace
 
         Render::ObjectTransform transform;
         transform.position = { position.pos[0], position.pos[1], position.pos[2] };
-        transform.rotation = toRenderQuat(makeDirectNodeRotation(ptr));
+        transform.rotation = makeDirectRenderRotation(ptr);
         transform.scale = { scale.x(), scale.y(), scale.z() };
         neutralWorld.recordObject(static_cast<const void*>(ptr.mRef), static_cast<const void*>(cell),
             cell->getCell()->isExterior(), cell->getCell()->getGridX(), cell->getCell()->getGridY(),
@@ -504,7 +512,8 @@ namespace MWWorld
             {
                 Render::ObjectTransform transform;
                 transform.position = { record.position.pos[0], record.position.pos[1], record.position.pos[2] };
-                transform.rotation = toRenderQuat(Misc::Convert::makeOsgQuat(record.position));
+                transform.rotation = Render::makeEulerRotation(
+                    { record.position.rot[0], record.position.rot[1], record.position.rot[2] });
                 transform.scale = { record.scale, record.scale, record.scale };
                 mNeutralWorldScene.recordStaticObject(static_cast<const void*>(&cell), true, cellX, cellY,
                     cellVariant.getNameId(), record.model.value(), transform, true, worldspace.serializeText());
