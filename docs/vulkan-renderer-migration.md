@@ -261,7 +261,7 @@ The engine public header no longer imports complete OSG viewer/event-handler hea
 are now included only by the implementation files that use them.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-143 files, deleting 1,070 lines and adding 7,500 lines (net `+6,430`). The larger Vulkan-only
+147 files, deleting 1,081 lines and adding 7,562 lines (net `+6,481`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
