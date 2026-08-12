@@ -64,6 +64,7 @@ namespace MWRender
 
         struct CellCache;
 
+        ESM::RefId resolveLandWorldspace(ESM::RefId worldspace) const;
         std::unique_ptr<ESM::LandData> loadCell(int gridX, int gridY, ESM::RefId worldspace) const;
         Terrain::LayerInfo getLayerInfo(VFS::Path::NormalizedView texture) const;
         Terrain::LayerInfo getEsm4DefaultLayerInfo(int gridX, int gridY, ESM::RefId worldspace) const;

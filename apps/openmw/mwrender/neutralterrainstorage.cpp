@@ -14,6 +14,7 @@
 #include <components/esm4/loadland.hpp>
 #include <components/esm4/loadltex.hpp>
 #include <components/esm4/loadtxst.hpp>
+#include <components/esm4/loadwrld.hpp>
 #include <components/terrain/gridsampling.hpp>
 #include <components/misc/resourcehelpers.hpp>
 #include <components/misc/strings/algorithm.hpp>
@@ -109,10 +110,22 @@ namespace MWRender
 
     NeutralTerrainStorage::~NeutralTerrainStorage() = default;
 
+    ESM::RefId NeutralTerrainStorage::resolveLandWorldspace(ESM::RefId worldspace) const
+    {
+        if (!ESM::isEsm4Ext(worldspace))
+            return worldspace;
+
+        const ESM4::World* world = mStore.get<ESM4::World>().search(worldspace);
+        if (world && !world->mParent.isZeroOrUnset() && world->mParentUseFlags & ESM4::World::UseFlag_Land)
+            return world->mParent;
+        return worldspace;
+    }
+
     std::unique_ptr<ESM::LandData> NeutralTerrainStorage::loadCell(
         int gridX, int gridY, ESM::RefId worldspace) const
     {
         std::lock_guard lock(mDataMutex);
+        worldspace = resolveLandWorldspace(worldspace);
         constexpr int dataFlags = ESM::Land::DATA_VNML | ESM::Land::DATA_VHGT | ESM::Land::DATA_VCLR
             | ESM::Land::DATA_VTEX;
 
@@ -129,6 +142,7 @@ namespace MWRender
     void NeutralTerrainStorage::getBounds(
         float& minX, float& maxX, float& minY, float& maxY, ESM::RefId worldspace)
     {
+        worldspace = resolveLandWorldspace(worldspace);
         minX = 0.f;
         maxX = 0.f;
         minY = 0.f;
@@ -270,6 +284,7 @@ namespace MWRender
     Terrain::LayerInfo NeutralTerrainStorage::getEsm4DefaultLayerInfo(int gridX, int gridY, ESM::RefId worldspace) const
     {
         constexpr VFS::Path::NormalizedView defaultTexture("_land_default.dds");
+        worldspace = resolveLandWorldspace(worldspace);
         const ESM4::Land* land = mStore.get<ESM4::Land>().search({ gridX, gridY, worldspace });
         if (!land || land->mDefaultDiffuseMap.empty())
             return getLayerInfo(defaultTexture);
