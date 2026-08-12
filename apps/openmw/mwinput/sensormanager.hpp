@@ -5,9 +5,6 @@
 
 #include <SDL_sensor.h>
 
-#include <osg/Matrixf>
-#include <osg/Vec3f>
-
 #include <components/sdlutil/events.hpp>
 #include <components/settings/settings.hpp>
 
@@ -45,8 +42,8 @@ namespace MWInput
         void updateSensors();
         void correctGyroscopeAxes();
 
-        osg::Matrixf mRotation;
-        osg::Vec3f mGyroValues;
+        float mRotationAngle;
+        std::array<float, 3> mGyroValues;
         float mGyroUpdateTimer;
 
         SDL_Sensor* mGyroscope;

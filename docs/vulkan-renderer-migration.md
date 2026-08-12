@@ -400,9 +400,12 @@ without linking OSG into the shared SDL input component.
 Screenshot scheduling now follows the same callback boundary: `ActionManager` no longer owns an
 OSG viewer or `ScreenCaptureHandler`; the reference engine supplies its capture action, while a
 Vulkan presentation owner can supply a native capture implementation later.
+Gyroscope orientation correction now uses a scalar Z rotation and neutral float storage rather than
+OSG matrix/vector types, so SDL sensor input can be reused by a non-OSG backend without importing
+presentation math.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-165 files, deleting 1,577 lines and adding 8,742 lines (net `+7,165`). The larger Vulkan-only
+167 files, deleting 1,593 lines and adding 8,766 lines (net `+7,173`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.

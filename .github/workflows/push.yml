@@ -102,7 +102,8 @@ jobs:
         if rg -n '#include[[:space:]]*[<"]osg|osg::|osgViewer' \
             components/sdlutil/sdlinputwrapper.hpp components/sdlutil/sdlinputwrapper.cpp \
             apps/openmw/mwinput/actionmanager.hpp apps/openmw/mwinput/actionmanager.cpp \
-            apps/openmw/mwinput/inputmanagerimp.hpp apps/openmw/mwinput/inputmanagerimp.cpp; then
+            apps/openmw/mwinput/inputmanagerimp.hpp apps/openmw/mwinput/inputmanagerimp.cpp \
+            apps/openmw/mwinput/sensormanager.hpp apps/openmw/mwinput/sensormanager.cpp; then
           echo "Shared SDL input and action layers must not depend on OSG presentation types"
           exit 1
         fi
