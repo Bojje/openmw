@@ -7,6 +7,7 @@
 #include <cstring>
 #include <iterator>
 #include <limits>
+#include <new>
 #include <stdexcept>
 #include <vector>
 
@@ -192,8 +193,12 @@ namespace
             return {};
         }
 
+        png_bytep rows = nullptr;
+        png_bytep* rowPointers = nullptr;
         if (setjmp(png_jmpbuf(png)) != 0)
         {
+            delete[] rowPointers;
+            delete[] rows;
             png_destroy_read_struct(&png, &info, nullptr);
             return {};
         }
@@ -235,21 +240,27 @@ namespace
             png_error(png, "PNG dimensions overflow");
 
         const std::size_t pixelBytes = static_cast<std::size_t>(width) * height * 4;
-        std::vector<std::uint8_t> rows(static_cast<std::size_t>(rowBytes) * height);
-        std::vector<png_bytep> rowPointers(height);
+        const std::size_t rowStorageSize = static_cast<std::size_t>(rowBytes) * height;
+        rows = new (std::nothrow) png_byte[rowStorageSize];
+        rowPointers = new (std::nothrow) png_bytep[height];
+        if (!rows || !rowPointers)
+            png_error(png, "PNG allocation failed");
         for (png_uint_32 y = 0; y < height; ++y)
-            rowPointers[y] = rows.data() + static_cast<std::size_t>(y) * rowBytes;
-        png_read_image(png, rowPointers.data());
+            rowPointers[y] = rows + static_cast<std::size_t>(y) * rowBytes;
+        png_read_image(png, rowPointers);
 
+        std::vector<std::uint8_t> pixels(pixelBytes);
+        for (png_uint_32 y = 0; y < height; ++y)
+            std::memcpy(pixels.data() + static_cast<std::size_t>(y) * width * 4,
+                rows + static_cast<std::size_t>(y) * rowBytes, static_cast<std::size_t>(width) * 4);
+
+        delete[] rowPointers;
+        delete[] rows;
+        png_destroy_read_struct(&png, &info, nullptr);
         auto result = std::make_shared<Render::TextureData>();
         result->width = static_cast<std::uint32_t>(width);
         result->height = static_cast<std::uint32_t>(height);
-        result->pixels.resize(pixelBytes);
-        for (png_uint_32 y = 0; y < height; ++y)
-            std::memcpy(result->pixels.data() + static_cast<std::size_t>(y) * width * 4,
-                rows.data() + static_cast<std::size_t>(y) * rowBytes, static_cast<std::size_t>(width) * 4);
-
-        png_destroy_read_struct(&png, &info, nullptr);
+        result->pixels = std::move(pixels);
         return result;
     }
 #endif
