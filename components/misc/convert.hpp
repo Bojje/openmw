@@ -58,6 +58,14 @@ namespace Misc::Convert
         return makeOsgQuat(position.rot);
     }
 
+    // Actors use only their horizontal orientation for their scene-node
+    // transform. Keep this conversion shared by the legacy scene graph and
+    // renderer-neutral physics so both paths agree when no OSG node exists.
+    inline osg::Quat makeActorOsgQuat(const ESM::Position& position)
+    {
+        return osg::Quat(position.rot[2], osg::Vec3f(0, 0, -1));
+    }
+
     inline btQuaternion makeBulletQuaternion(const float (&rotation)[3])
     {
         return btQuaternion(btVector3(0, 0, -1), rotation[2]) * btQuaternion(btVector3(0, -1, 0), rotation[1])

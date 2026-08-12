@@ -106,6 +106,11 @@ namespace MWPhysics
 
         if (!mRotationallyInvariant)
         {
+            // The OSG node carries the same actor yaw in the legacy path. In
+            // neutral mode it does not exist, so initialize physics from the
+            // ESM transform instead of leaving the collision shape at the
+            // identity rotation.
+            mRotation = Misc::Convert::makeActorOsgQuat(mPtr.getRefData().getPosition());
             const SceneUtil::PositionAttitudeTransform* baseNode = mPtr.getRefData().getBaseNode();
             if (baseNode)
                 mRotation = baseNode->getAttitude();
