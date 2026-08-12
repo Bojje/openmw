@@ -33,6 +33,7 @@
 #include <components/resource/resourcesystem.hpp>
 #include <components/resource/scenemanager.hpp>
 
+#include <components/sdlutil/sdlgraphicswindow.hpp>
 #include <components/sceneutil/workqueue.hpp>
 
 #include <components/translation/translation.hpp>
@@ -304,7 +305,19 @@ namespace MWGui
         MyGUI::ClipboardManager::getInstance().eventClipboardRequested
             += MyGUI::newDelegate(this, &WindowManager::onClipboardRequested);
 
-        mVideoWrapper = std::make_unique<SDLUtil::VideoWrapper>(window, viewer);
+        mVideoWrapper = std::make_unique<SDLUtil::VideoWrapper>(window, [viewer](SDLUtil::VSyncMode mode) {
+            osgViewer::Viewer::Windows windows;
+            viewer->getWindows(windows);
+            viewer->stopThreading();
+            for (osgViewer::GraphicsWindow* win : windows)
+            {
+                if (auto* sdl2win = dynamic_cast<SDLUtil::GraphicsWindowSDL2*>(win))
+                    sdl2win->setSyncToVBlank(mode);
+                else
+                    win->setSyncToVBlank(mode != SDLUtil::VSyncMode::Disabled);
+            }
+            viewer->startThreading();
+        });
         mVideoWrapper->setGammaContrast(Settings::video().mGamma, Settings::video().mContrast);
 
         mGuiPlatform->getRenderManagerPtr()->enableShaders(mResourceSystem->getSceneManager()->getShaderManager());

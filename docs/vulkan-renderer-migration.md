@@ -403,9 +403,12 @@ Vulkan presentation owner can supply a native capture implementation later.
 Gyroscope orientation correction now uses a scalar Z rotation and neutral float storage rather than
 OSG matrix/vector types, so SDL sensor input can be reused by a non-OSG backend without importing
 presentation math.
+SDL video policy and gamma/window-mode handling now live behind a renderer-neutral `VideoWrapper`
+callback; only the OSG GUI boundary traverses OSG windows to apply VSync. This keeps shared SDL
+window policy reusable by a Vulkan presentation owner.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-167 files, deleting 1,593 lines and adding 8,766 lines (net `+7,173`). The larger Vulkan-only
+169 files, deleting 1,619 lines and adding 8,791 lines (net `+7,172`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
