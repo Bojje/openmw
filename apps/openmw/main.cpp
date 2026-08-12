@@ -24,6 +24,8 @@ extern "C" __declspec(dllexport) DWORD AmdPowerXpressRequestHighPerformance = 0x
 
 #include <filesystem>
 
+#include <osg/Notify>
+
 #if (defined(__APPLE__) || defined(__linux) || defined(__unix) || defined(__posix))
 #include <unistd.h>
 #endif

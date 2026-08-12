@@ -10,6 +10,7 @@
 
 #include <osgDB/ReaderWriter>
 #include <osgDB/Registry>
+#include <osgViewer/Viewer>
 #include <osgViewer/ViewerEventHandlers>
 
 #include <SDL.h>

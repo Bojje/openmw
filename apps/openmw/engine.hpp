@@ -3,6 +3,8 @@
 
 #include <filesystem>
 
+#include <osg/ref_ptr>
+
 #include <components/compiler/extensions.hpp>
 #include <components/debug/debuglog.hpp>
 #include <components/esm/refid.hpp>
@@ -10,9 +12,6 @@
 #include <components/render/frame.hpp>
 #include <components/settings/settings.hpp>
 #include <components/translation/translation.hpp>
-
-#include <osgViewer/Viewer>
-#include <osgViewer/ViewerEventHandlers>
 
 #include "mwbase/environment.hpp"
 
@@ -56,6 +55,7 @@ namespace Files
 
 namespace osgViewer
 {
+    class Viewer;
     class ScreenCaptureHandler;
 }
 
