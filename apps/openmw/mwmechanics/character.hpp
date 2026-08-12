@@ -261,7 +261,7 @@ namespace MWMechanics
             uint32_t loops, bool loopfallback = false) const;
 
     public:
-        CharacterController(const MWWorld::Ptr& ptr, MWRender::Animation& anim);
+        CharacterController(const MWWorld::Ptr& ptr, MWRender::Animation* anim);
         virtual ~CharacterController();
 
         CharacterController(const CharacterController&) = delete;

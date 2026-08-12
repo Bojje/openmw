@@ -1219,9 +1219,7 @@ namespace MWMechanics
         removeActor(ptr, true);
 
         MWRender::Animation* anim = MWBase::Environment::get().getWorld()->getAnimation(ptr);
-        if (!anim)
-            return;
-        const auto it = mActors.emplace(mActors.end(), ptr, *anim);
+        const auto it = mActors.emplace(mActors.end(), ptr, anim);
         mIndex.emplace(ptr.mRef, it);
 
         if (updateImmediately)
@@ -1245,13 +1243,18 @@ namespace MWMechanics
         const float dist
             = (player.getRefData().getPosition().asVec3() - ptr.getRefData().getPosition().asVec3()).length();
         const int actorsProcessingRange = Settings::game().mActorsProcessingRange;
+        osg::Node* baseNode = ptr.getRefData().getBaseNode();
         if (dist > actorsProcessingRange)
         {
-            ptr.getRefData().getBaseNode()->setNodeMask(0);
+            if (baseNode)
+                baseNode->setNodeMask(0);
             return;
         }
         else
-            ptr.getRefData().getBaseNode()->setNodeMask(MWRender::Mask_Actor);
+        {
+            if (baseNode)
+                baseNode->setNodeMask(MWRender::Mask_Actor);
+        }
 
         // Fade away actors on large distance (>90% of actor's processing distance)
         float visibilityRatio = 1.0;
@@ -1728,7 +1731,8 @@ namespace MWMechanics
 
                 if (!inRange)
                 {
-                    actor.getPtr().getRefData().getBaseNode()->setNodeMask(0);
+                    if (osg::Node* baseNode = actor.getPtr().getRefData().getBaseNode())
+                        baseNode->setNodeMask(0);
                     world->setActorActive(actor.getPtr(), false);
                     continue;
                 }
@@ -1747,7 +1751,8 @@ namespace MWMechanics
                     continue;
                 }
 
-                actor.getPtr().getRefData().getBaseNode()->setNodeMask(MWRender::Mask_Actor);
+                if (osg::Node* baseNode = actor.getPtr().getRefData().getBaseNode())
+                    baseNode->setNodeMask(MWRender::Mask_Actor);
                 world->setActorCollisionMode(actor.getPtr(), true,
                     !actor.getPtr().getClass().getCreatureStats(actor.getPtr()).isDeathAnimationFinished());
 

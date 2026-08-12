@@ -17,10 +17,7 @@ namespace MWMechanics
         removeObject(ptr);
 
         MWRender::Animation* anim = MWBase::Environment::get().getWorld()->getAnimation(ptr);
-        if (anim == nullptr)
-            return;
-
-        const auto it = mObjects.emplace(mObjects.end(), ptr, *anim);
+        const auto it = mObjects.emplace(mObjects.end(), ptr, anim);
         mIndex.emplace(ptr.mRef, it);
     }
 

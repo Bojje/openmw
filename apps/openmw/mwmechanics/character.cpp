@@ -914,13 +914,39 @@ namespace MWMechanics
         return result;
     }
 
-    CharacterController::CharacterController(const MWWorld::Ptr& ptr, MWRender::Animation& anim)
+    CharacterController::CharacterController(const MWWorld::Ptr& ptr, MWRender::Animation* anim)
         : mPtr(ptr)
-        , mAnimation(&anim)
+        , mAnimation(anim)
     {
+        const MWWorld::Class& cls = mPtr.getClass();
+        if (!mAnimation)
+        {
+            // Mechanics must not depend on an OSG animation owner. Vulkan and other
+            // renderer backends can register actors before they have a pose owner.
+            if (cls.isActor())
+            {
+                if (!cls.getCreatureStats(mPtr).isDead())
+                {
+                    mIdleState = CharState_Idle;
+                    if (cls.getCreatureStats(mPtr).getFallHeight() > 0)
+                        mJumpState = JumpState_InAir;
+                }
+                else if (cls.getCreatureStats(mPtr).isDeathAnimationFinished())
+                {
+                    const signed char deathanim = cls.getCreatureStats(mPtr).getDeathAnimation();
+                    if (deathanim == -1)
+                        mDeathState = chooseRandomDeathState();
+                    else
+                        mDeathState = static_cast<CharacterState>(CharState_Death1 + deathanim);
+                }
+            }
+            else
+                mIdleState = CharState_Idle;
+            return;
+        }
+
         mAnimation->setTextKeyListener(this);
 
-        const MWWorld::Class& cls = mPtr.getClass();
         if (cls.isActor())
         {
             /* Accumulate along X/Y only for now, until we can figure out how we should
@@ -2833,6 +2859,9 @@ namespace MWMechanics
 
     void CharacterController::updateContinuousVfx() const
     {
+        if (!mAnimation)
+            return;
+
         // Keeping track of when to stop a continuous VFX seems to be very difficult to do inside the spells code,
         // as it's extremely spread out (ActiveSpells, Spells, InventoryStore effects, etc...) so we do it here.
 
@@ -2857,7 +2886,7 @@ namespace MWMechanics
 
     void CharacterController::updateMagicEffects() const
     {
-        if (!mPtr.getClass().isActor())
+        if (!mAnimation || !mPtr.getClass().isActor())
             return;
 
         float light = mPtr.getClass()
@@ -3178,7 +3207,13 @@ namespace MWMechanics
     MWWorld::MovementDirectionFlags CharacterController::getSupportedMovementDirections() const
     {
         if (!mAnimation)
-            return 0;
+        {
+            // A renderer-neutral controller has no animation metadata to restrict
+            // movement. AI should retain all four navigation directions until the
+            // active renderer supplies equivalent capability data.
+            return MWWorld::MovementDirectionFlag_Forward | MWWorld::MovementDirectionFlag_Back
+                | MWWorld::MovementDirectionFlag_Left | MWWorld::MovementDirectionFlag_Right;
+        }
         using namespace std::string_view_literals;
         // There are fallbacks in the CharacterController::refreshMovementAnims for certain animations. Arrays below
         // represent them.

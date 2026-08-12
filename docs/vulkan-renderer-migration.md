@@ -146,6 +146,12 @@ legacy `Camera` continues to retain its OSG getters for the reference backend.
 The no-GUI Vulkan bootstrap now supplies a renderer-neutral first-person look-at and perspective
 snapshot from the player transform, including full pitch/roll orientation and resize-aware
 projection updates; camera-controller parity remains outstanding.
+Mechanics actor and animated-object registries no longer discard references when the active
+backend has no OSG animation owner. Their controllers now explicitly accept an optional pose
+owner, so Vulkan can run actor/object AI, collision activation, and state transitions while
+neutral bind-pose rendering remains independent of the legacy animation implementation.
+OSG scene-node visibility writes are guarded at the mechanics boundary; this removes a hidden
+requirement that every simulated actor already have an OSG node.
 Player update logic now treats the absent OSG presentation owner as an explicit Vulkan mode, and
 player-only OSG/MyGUI Lua packages, including menu/UI packages, are withheld from that runtime
 instead of exposing null renderer dereferences. Lua lifecycle cleanup and input filtering also

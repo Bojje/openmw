@@ -28,7 +28,7 @@ namespace MWMechanics
     class Actor
     {
     public:
-        Actor(const MWWorld::Ptr& ptr, MWRender::Animation& animation)
+        Actor(const MWWorld::Ptr& ptr, MWRender::Animation* animation)
             : mCharacterController(ptr, animation)
             , mPositionAdjusted(ptr.getClass().getCreatureStats(ptr).getFallHeight() > 0)
         {
