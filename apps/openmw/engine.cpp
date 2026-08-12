@@ -17,6 +17,7 @@
 #include <osgViewer/ViewerEventHandlers>
 
 #include <SDL.h>
+#include <SDL_vulkan.h>
 
 #include <components/debug/debuglog.hpp>
 #include <components/misc/rng.hpp>
@@ -710,8 +711,12 @@ void OMW::Engine::prepareVulkanEngine()
         return std::shared_ptr<const Render::TextureData>(fallbackTexture);
     };
     const Render::SceneSynchronizer sceneSynchronizer = [this](Render::SceneData& sceneData) {
-        const float aspect = static_cast<float>(std::max(1, Settings::video().mResolutionX.get()))
-            / static_cast<float>(std::max(1, Settings::video().mResolutionY.get()));
+        int drawableWidth = Settings::video().mResolutionX.get();
+        int drawableHeight = Settings::video().mResolutionY.get();
+        if (mWindow)
+            SDL_Vulkan_GetDrawableSize(mWindow, &drawableWidth, &drawableHeight);
+        const float aspect = static_cast<float>(std::max(1, drawableWidth))
+            / static_cast<float>(std::max(1, drawableHeight));
         sceneData.projection = neutralPerspective(aspect);
         const MWWorld::Ptr player = mWorld->getPlayerPtr();
         if (player.isEmpty())
