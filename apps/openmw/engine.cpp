@@ -1070,7 +1070,7 @@ void OMW::Engine::go()
 
         mWorld->advanceFrame(timeManager.getRenderingSimulationTime());
 
-        const unsigned frameNumber = mViewer->getFrameStamp()->getFrameNumber();
+        const unsigned frameNumber = mPreWorldFrameLifecycle->frameNumber();
 
         if (!frame(frameNumber, static_cast<float>(dt)))
         {
@@ -1093,7 +1093,7 @@ void OMW::Engine::go()
             {
                 // Viewer frame number can be different from frameNumber because of loading screens which render new
                 // frames inside a simulation frame.
-                const unsigned currentFrameNumber = mViewer->getFrameStamp()->getFrameNumber();
+                const unsigned currentFrameNumber = mPreWorldFrameLifecycle->frameNumber();
                 for (unsigned i = frameNumber; i <= currentFrameNumber; ++i)
                     reportStats(i - statsReportDelay, *mViewer, stats);
             }

@@ -20,6 +20,7 @@ namespace MWRender
         bool renderFrame() override;
         bool consumesSceneSubmission() const override { return false; }
         double referenceTime() const override;
+        unsigned frameNumber() const override;
         void advanceFrame(double simulationTime) override;
 
     private:

@@ -78,7 +78,12 @@ namespace Vk
         }
         bool consumesSceneSubmission() const override { return true; }
         double referenceTime() const override { return mReferenceTime; }
-        void advanceFrame(double simulationTime) override { mReferenceTime = simulationTime; }
+        unsigned frameNumber() const override { return mFrameNumber; }
+        void advanceFrame(double simulationTime) override
+        {
+            mReferenceTime = simulationTime;
+            ++mFrameNumber;
+        }
         std::optional<Render::TextureData> captureFrame();
         void resize(uint32_t width, uint32_t height);
         bool loadShadersAndCreatePipelines(const std::string& shaderDir);
@@ -215,6 +220,7 @@ namespace Vk
         uint64_t mMeshRevision = 1;
         std::array<uint64_t, maxFramesInFlight> mUploadedMeshRevisions = {};
         double mReferenceTime = 0.0;
+        unsigned mFrameNumber = 0;
 
         std::vector<Render::MeshDraw> mMeshDraws;
         std::size_t mDynamicMeshCount = 0;
