@@ -2625,7 +2625,28 @@ namespace MWMechanics
             {
                 const bool atSegmentStart = from <= 0.f && key.time >= 0.f;
                 if ((atSegmentStart ? key.time >= from : key.time > from) && key.time <= to)
+                {
+                    const std::string prefix = current.mGroup + ": ";
+                    if (key.event == prefix + "start" && isRandomAttackAnimation(current.mGroup))
+                    {
+                        const bool hasHitKey = std::any_of(textKeys.begin(), textKeys.end(), [&](const auto& candidate) {
+                            return candidate.time >= key.time && candidate.event == prefix + "hit";
+                        });
+                        if (!hasHitKey)
+                        {
+                            prepareHit();
+                            const int attackType = current.mGroup == "attack1" || current.mGroup == "swimattack1"
+                                ? ESM::Weapon::AT_Chop
+                                : current.mGroup == "attack2" || current.mGroup == "swimattack2"
+                                ? ESM::Weapon::AT_Slash
+                                : ESM::Weapon::AT_Thrust;
+                            mPtr.getClass().hit(mPtr, mAttackStrength, mAttackWindUp, attackType, mAttackVictim,
+                                mAttackHitPos, mAttackSuccess);
+                            mReadyToHit = false;
+                        }
+                    }
                     handleNeutralTextKey(current.mGroup, key.event);
+                }
             }
         };
 
@@ -2683,6 +2704,7 @@ namespace MWMechanics
         if (event.starts_with("soundgen: "))
         {
             std::string_view soundgen = event.substr(10);
+            MWBase::SoundManager* soundManager = MWBase::Environment::get().getSoundManager();
             float volume = 1.0f;
             float pitch = 1.0f;
             if (soundgen.find(' ') != std::string_view::npos)
@@ -2697,7 +2719,16 @@ namespace MWMechanics
             }
             const ESM::RefId sound = mPtr.getClass().getSoundIdFromSndGen(mPtr, soundgen);
             if (!sound.empty())
-                MWBase::Environment::get().getSoundManager()->playSound3D(mPtr, sound, volume, pitch);
+            {
+                if (soundgen == "left" || soundgen == "right")
+                {
+                    if (!soundManager->getSoundPlaying(mPtr, wolfRun))
+                        soundManager->playSound3D(
+                            mPtr, sound, volume, pitch, MWSound::Type::Foot, MWSound::PlayMode::NoPlayerLocal);
+                }
+                else
+                    soundManager->playSound3D(mPtr, sound, volume, pitch);
+            }
             return;
         }
 
