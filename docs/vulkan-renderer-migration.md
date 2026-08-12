@@ -615,6 +615,7 @@ the game unplayable rather than reduce duplication safely.
 | --- | --- | --- |
 | Full-game scene graph and world rendering | OSG reference path; Vulkan owns the experimental neutral submission path | Vulkan static and dynamic scene consumers reach parity, then delete the OSG owner |
 | Vulkan validation renderer | Vulkan standalone smoke target | Retained as the migration test harness |
+| Vulkan frame-owner forwarding wrapper | Removed; `Vk::Renderer` is the engine's Vulkan `FrameLifecycle` owner | Complete |
 | Vulkan mesh submission queue | Removed | Complete |
 | Inactive raster ray-tracing scaffold | Removed | Reintroduce only with a complete RT pipeline |
 | Vulkan utility/queue helper paths | Removed | Complete |
