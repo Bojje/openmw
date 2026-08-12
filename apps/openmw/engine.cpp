@@ -486,23 +486,23 @@ void OMW::Engine::setSkipMenu(bool skipMenu, bool newGame)
 
 void OMW::Engine::prepareEngine()
 {
-    osgViewer::Viewer* const viewer = getOsgViewer();
-    mFrameStats = viewer ? viewer->getViewerStats() : new osg::Stats("OpenMW Engine");
-
-    mStateManager = std::make_unique<MWState::StateManager>(mCfgMgr.getUserDataPath() / "saves", mContentFiles);
-    mEnvironment.setStateManager(*mStateManager);
-
-    if (viewer)
-    {
-        const bool stereoEnabled
-            = Settings::stereo().mStereoEnabled || osg::DisplaySettings::instance().get()->getStereo();
-        mStereoManager = std::make_unique<Stereo::Manager>(
-            viewer, stereoEnabled, Settings::camera().mNearClip, Settings::camera().mViewingDistance);
-    }
+    if (mFrameLifecycle->backend() != Render::FrameLifecycle::Backend::Osg)
+        throw std::logic_error("The full game currently requires the OSG frame lifecycle");
 
     auto* const viewerLifecycle = dynamic_cast<MWRender::ViewerFrameLifecycle*>(mFrameLifecycle.get());
     if (!viewerLifecycle)
         throw std::logic_error("OSG engine setup requires the OSG frame lifecycle");
+    osgViewer::Viewer* const viewer = viewerLifecycle->viewer();
+    mFrameStats = viewer->getViewerStats();
+
+    mStateManager = std::make_unique<MWState::StateManager>(mCfgMgr.getUserDataPath() / "saves", mContentFiles);
+    mEnvironment.setStateManager(*mStateManager);
+
+    const bool stereoEnabled
+        = Settings::stereo().mStereoEnabled || osg::DisplaySettings::instance().get()->getStereo();
+    mStereoManager = std::make_unique<Stereo::Manager>(
+        viewer, stereoEnabled, Settings::camera().mNearClip, Settings::camera().mViewingDistance);
+
     osg::ref_ptr<osg::Group> rootNode = viewerLifecycle->sceneRoot();
     viewerLifecycle->initializeWindow(mWindow, mResDir);
 
@@ -512,9 +512,7 @@ void OMW::Engine::prepareEngine()
 
     mResourceSystem = std::make_unique<Resource::ResourceSystem>(
         mVFS.get(), Settings::cells().mCacheExpiryDelay, &mEncoder.get()->getStatelessEncoder(),
-        mFrameLifecycle->backend() == Render::FrameLifecycle::Backend::Osg
-            ? Resource::ResourceSystem::Backend::Osg
-            : Resource::ResourceSystem::Backend::Neutral);
+        Resource::ResourceSystem::Backend::Osg);
     if (Resource::SceneManager* const sceneManager = mResourceSystem->getSceneManager())
     {
         sceneManager->getShaderManager().setMaxTextureUnits(viewerLifecycle->maxTextureImageUnits());
@@ -525,20 +523,16 @@ void OMW::Engine::prepareEngine()
     mEnvironment.setResourceSystem(*mResourceSystem);
 
     mWorkQueue = new SceneUtil::WorkQueue(Settings::cells().mPreloadNumThreads);
-    if (mFrameLifecycle->backend() == Render::FrameLifecycle::Backend::Osg)
-        mUnrefQueue = std::make_unique<SceneUtil::UnrefQueue>();
+    mUnrefQueue = std::make_unique<SceneUtil::UnrefQueue>();
 
-    if (mFrameLifecycle->backend() == Render::FrameLifecycle::Backend::Osg)
-    {
-        mScreenCaptureOperation = new SceneUtil::AsyncScreenCaptureOperation(mWorkQueue,
-            new SceneUtil::WriteScreenshotToFileOperation(mCfgMgr.getScreenshotPath(),
-                Settings::general().mScreenshotFormat,
-                Settings::general().mNotifyOnSavedScreenshot ? std::function<void(std::string)>(ScreenCaptureMessageBox{})
-                                                             : std::function<void(std::string)>(IgnoreString{})));
+    mScreenCaptureOperation = new SceneUtil::AsyncScreenCaptureOperation(mWorkQueue,
+        new SceneUtil::WriteScreenshotToFileOperation(mCfgMgr.getScreenshotPath(),
+            Settings::general().mScreenshotFormat,
+            Settings::general().mNotifyOnSavedScreenshot ? std::function<void(std::string)>(ScreenCaptureMessageBox{})
+                                                         : std::function<void(std::string)>(IgnoreString{})));
 
-        mScreenCaptureHandler = new osgViewer::ScreenCaptureHandler(mScreenCaptureOperation);
-        viewer->addEventHandler(mScreenCaptureHandler);
-    }
+    mScreenCaptureHandler = new osgViewer::ScreenCaptureHandler(mScreenCaptureOperation);
+    viewer->addEventHandler(mScreenCaptureHandler);
 
     mL10nManager = std::make_unique<L10n::Manager>(mVFS.get());
     mL10nManager->setPreferredLocales(Settings::general().mPreferredLocales, Settings::general().mGmstOverridesL10n);
@@ -614,22 +608,19 @@ void OMW::Engine::prepareEngine()
     mEnvironment.setWindowManager(*mWindowManager);
 
     SDLUtil::InputCallbacks inputCallbacks;
-    if (viewer)
-    {
-        inputCallbacks.frame = [viewer] { viewer->getEventQueue()->frame(0.f); };
-        inputCallbacks.functionKey = [viewer](int key, bool pressed) {
-            const int osgKey = osgGA::GUIEventAdapter::KEY_F1 + (key - SDLK_F1);
-            if (pressed)
-                viewer->getEventQueue()->keyPress(osgKey);
-            else
-                viewer->getEventQueue()->keyRelease(osgKey);
-        };
-        inputCallbacks.resize = [viewer](int x, int y, int width, int height) {
-            if (osg::GraphicsContext* const context = viewer->getCamera()->getGraphicsContext())
-                context->resized(x, y, width, height);
-            viewer->getEventQueue()->windowResize(x, y, width, height);
-        };
-    }
+    inputCallbacks.frame = [viewer] { viewer->getEventQueue()->frame(0.f); };
+    inputCallbacks.functionKey = [viewer](int key, bool pressed) {
+        const int osgKey = osgGA::GUIEventAdapter::KEY_F1 + (key - SDLK_F1);
+        if (pressed)
+            viewer->getEventQueue()->keyPress(osgKey);
+        else
+            viewer->getEventQueue()->keyRelease(osgKey);
+    };
+    inputCallbacks.resize = [viewer](int x, int y, int width, int height) {
+        if (osg::GraphicsContext* const context = viewer->getCamera()->getGraphicsContext())
+            context->resized(x, y, width, height);
+        viewer->getEventQueue()->windowResize(x, y, width, height);
+    };
     mInputManager = std::make_unique<MWInput::InputManager>(mWindow, std::move(inputCallbacks), [this] {
         osgViewer::Viewer* const captureViewer = getOsgViewer();
         if (!mScreenCaptureHandler || !captureViewer)
@@ -714,8 +705,6 @@ void OMW::Engine::prepareEngine()
     listener->loadingOff();
 
     mWorld->initSimulation(mMaxRecastLogLevel, mFrameLifecycle->backend());
-    if (mFrameLifecycle->backend() != Render::FrameLifecycle::Backend::Osg)
-        throw std::logic_error("No game renderer is installed for the active non-OSG frame lifecycle");
     mWorld->initOsgRenderer(viewer, *mFrameLifecycle, std::move(rootNode), mWorkQueue.get(), *mUnrefQueue);
     mEnvironment.setWorldScene(mWorld->getWorldScene());
     mWorld->setupPlayer();
