@@ -175,6 +175,15 @@ jobs:
           echo "Scene must not retain the full ResourceSystem as a renderer-service gateway"
           exit 1
         fi
+        if rg -n 'mWorkQueue|mWorkItems|SceneUtil::WorkQueue|SceneUtil::WorkItem' \
+            apps/openmw/mwworld/scene.hpp apps/openmw/mwworld/scene.cpp; then
+          echo "Scene must not own OSG preload queue or asynchronous work items"
+          exit 1
+        fi
+        if rg -n 'preload\([^;]*Resource::SceneManager' apps/openmw/mwworld/scene.hpp; then
+          echo "Scene preload API must not expose the OSG SceneManager"
+          exit 1
+        fi
         if rg -n 'getAnimation\(|getNeutralBoneMatrices\(' apps/openmw/mwworld/scene.cpp; then
           echo "Scene neutral state and bone poses must use injected renderer providers"
           exit 1
