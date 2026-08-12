@@ -90,12 +90,15 @@ int main()
     weather.maxHeight = 30.f;
     weather.speed = 4.f;
     weather.maxParticles = 2;
+    weather.fallDirection = { 1.f, 0.f, -1.f };
     world.setWeatherEffects(weather);
     const std::vector<Render::MeshInstance> weatherMeshes = Render::collectWeatherMeshes(world, world.sceneData());
     if (weatherMeshes.size() != 2 || !weatherMeshes.front().mesh.material.alphaBlend
         || weatherMeshes.front().mesh.material.diffuse.w != 0.5f
         || weatherMeshes.front().mesh.vertices.size() != 4)
         throw std::runtime_error("renderer-neutral world scene failed to emit precipitation geometry");
+    if (weatherMeshes.front().mesh.vertices[2].position[0] <= weatherMeshes.front().mesh.vertices[0].position[0])
+        throw std::runtime_error("renderer-neutral precipitation ignored storm fall direction");
     world.sceneData().viewInverse.data[0] = 0.f;
     world.sceneData().viewInverse.data[1] = 1.f;
     world.sceneData().viewInverse.data[4] = -1.f;

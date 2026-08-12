@@ -26,6 +26,10 @@ namespace Render
         float maxHeight = 0.f;
         float speed = 0.f;
         int maxParticles = 0;
+        // Horizontal storm direction plus downward fall. This keeps
+        // precipitation motion renderer-neutral instead of baking a vertical
+        // particle assumption into the Vulkan consumer.
+        Vec3 fallDirection{ 0.f, 0.f, -1.f };
 
         bool valid() const
         {
@@ -33,7 +37,9 @@ namespace Render
                 return true;
             return std::isfinite(alpha) && alpha >= 0.f && alpha <= 1.f && std::isfinite(diameter)
                 && diameter > 0.f && std::isfinite(minHeight) && std::isfinite(maxHeight)
-                && maxHeight > minHeight && std::isfinite(speed) && speed >= 0.f && maxParticles >= 0;
+                && maxHeight > minHeight && std::isfinite(speed) && speed >= 0.f && maxParticles >= 0
+                && Render::valid(fallDirection) && (std::abs(fallDirection.x) + std::abs(fallDirection.y)
+                    + std::abs(fallDirection.z) > 0.0001f);
         }
     };
 

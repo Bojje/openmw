@@ -156,6 +156,11 @@ namespace Render
             const float x = cameraX + horizontalX * weather.diameter;
             const float y = cameraY + horizontalY * weather.diameter;
             const float z = cameraZ + weather.minHeight + fallingDistance;
+            const Vec3 fallDirection = weather.fallDirection;
+            const float fallLength = std::sqrt(
+                fallDirection.x * fallDirection.x + fallDirection.y * fallDirection.y + fallDirection.z * fallDirection.z);
+            const Vec3 fallOffset{ fallDirection.x * lineLength / fallLength,
+                fallDirection.y * lineLength / fallLength, fallDirection.z * lineLength / fallLength };
 
             MeshInstance instance;
             instance.mesh.material.diffuse = { 1.f, 1.f, 1.f, weather.alpha };
@@ -164,8 +169,10 @@ namespace Render
             instance.mesh.vertices.resize(4);
             const std::array<Vec3, 4> positions = { Vec3{ x - widthX * halfWidth, y - widthY * halfWidth, z },
                 Vec3{ x + widthX * halfWidth, y + widthY * halfWidth, z },
-                Vec3{ x + widthX * halfWidth, y + widthY * halfWidth, z - lineLength },
-                Vec3{ x - widthX * halfWidth, y - widthY * halfWidth, z - lineLength } };
+                Vec3{ x + widthX * halfWidth + fallOffset.x, y + widthY * halfWidth + fallOffset.y,
+                    z + fallOffset.z },
+                Vec3{ x - widthX * halfWidth + fallOffset.x, y - widthY * halfWidth + fallOffset.y,
+                    z + fallOffset.z } };
             for (std::size_t vertexIndex = 0; vertexIndex < positions.size(); ++vertexIndex)
             {
                 MeshVertex& vertex = instance.mesh.vertices[vertexIndex];

@@ -1108,6 +1108,10 @@ namespace MWWorld
         effects.maxHeight = std::max(mResult.mRainMaxHeight, effects.minHeight + 1.f);
         effects.speed = std::max(0.f, mResult.mRainSpeed);
         effects.maxParticles = std::max(0, mResult.mRainMaxRaindrops);
+        const osg::Vec3f direction = mStormDirection;
+        const float horizontalLength = std::sqrt(direction.x() * direction.x() + direction.y() * direction.y());
+        effects.fallDirection = { horizontalLength > 0.001f ? direction.x() / horizontalLength : 0.f,
+            horizontalLength > 0.001f ? direction.y() / horizontalLength : 0.f, -1.f };
         worldScene.setWeatherEffects(effects);
     }
 
