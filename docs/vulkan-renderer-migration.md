@@ -294,6 +294,8 @@ construct or query an OSG scene service; the legacy cell-test commands resolve t
 inside their OSG-only operations.
 The `SceneManager` is now passed only to the OSG preload operation itself; neutral `Scene`
 construction no longer stores or accepts that optional service.
+`CellPreloader` construction is likewise owned by the OSG world-renderer bootstrap and passed as
+an already-created legacy service; `Scene` no longer accepts a `ResourceSystem` pointer at all.
 The neutral scene also no longer caches OSG-only preloader settings; those values are read only by
 the active legacy preloader operations, leaving the scene state smaller on the neutral path.
 The fixed legacy cell-loading threshold is local to the OSG preload calculation as well, removing
@@ -378,7 +380,7 @@ The engine public header no longer imports complete OSG viewer/event-handler hea
 are now included only by the implementation files that use them.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-157 files, deleting 1,430 lines and adding 8,561 lines (net `+7,131`). The larger Vulkan-only
+157 files, deleting 1,431 lines and adding 8,567 lines (net `+7,136`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.

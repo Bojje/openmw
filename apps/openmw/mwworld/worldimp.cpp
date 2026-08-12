@@ -101,6 +101,7 @@
 #include "../mwsound/constants.hpp"
 
 #include "actionteleport.hpp"
+#include "cellpreloader.hpp"
 #include "cellstore.hpp"
 #include "containerstore.hpp"
 #include "datetimemanager.hpp"
@@ -311,6 +312,14 @@ namespace MWWorld
 
         mWeatherManager = std::make_unique<MWWorld::WeatherManager>(mRendering.get(), mSkyManager, mStore);
 
+        auto preloader = std::make_unique<CellPreloader>(
+            mResourceSystem, mPhysics->getShapeManager(), mTerrain, osgTerrainStoragePtr->getLandManager());
+        preloader->setWorkQueue(workQueue);
+        preloader->setExpiryDelay(Settings::cells().mPreloadCellExpiryDelay);
+        preloader->setMinCacheSize(Settings::cells().mPreloadCellCacheMin);
+        preloader->setMaxCacheSize(Settings::cells().mPreloadCellCacheMax);
+        preloader->setPreloadInstances(Settings::cells().mPreloadInstances);
+
         const Render::MeshResolver meshResolver = [resourceSystem = mResourceSystem](std::string_view model) {
             const VFS::Path::Normalized path(model);
             if (path.extension().value() == "nif")
@@ -350,7 +359,7 @@ namespace MWWorld
         mWorldScene = std::make_unique<Scene>(
             *this, frameLifecycle, sceneSynchronizer, bonePoseResolver, meshResolver, textureResolver,
             mResourceSystem->getVFS(), mRendering.get(), osgTerrainStoragePtr->getLandManager(), mTerrain, mObjectPaging,
-            *osgTerrainStoragePtr, workQueue, mResourceSystem, mPhysics.get(), *mNavigator);
+            *osgTerrainStoragePtr, workQueue, std::move(preloader), mPhysics.get(), *mNavigator);
     }
 
     void World::initNeutralRenderer(Render::FrameLifecycle& frameLifecycle,

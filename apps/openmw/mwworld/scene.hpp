@@ -70,7 +70,6 @@ namespace SceneUtil
 namespace Resource
 {
     class SceneManager;
-    class ResourceSystem;
 }
 
 namespace VFS
@@ -190,7 +189,7 @@ namespace MWWorld
             MWRender::RenderingManager* rendering, MWRender::LandManager* landManager,
             Terrain::World* terrain, MWRender::ObjectPaging* objectPaging,
             Terrain::RenderStorage& terrainStorage, SceneUtil::WorkQueue* workQueue,
-            Resource::ResourceSystem* resourceSystem,
+            std::unique_ptr<CellPreloader> preloader,
             MWPhysics::PhysicsSystem* physics,
             DetourNavigator::Navigator& navigator);
 

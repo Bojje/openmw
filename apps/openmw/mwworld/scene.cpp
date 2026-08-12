@@ -1048,7 +1048,8 @@ namespace MWWorld
         Render::MeshResolver meshResolver, Render::TextureResolver textureResolver, const VFS::Manager* vfs,
         MWRender::RenderingManager* rendering, MWRender::LandManager* landManager,
         Terrain::World* terrain, MWRender::ObjectPaging* objectPaging,
-        Terrain::RenderStorage& terrainStorage, SceneUtil::WorkQueue* workQueue, Resource::ResourceSystem* resourceSystem,
+        Terrain::RenderStorage& terrainStorage, SceneUtil::WorkQueue* workQueue,
+        std::unique_ptr<CellPreloader> preloader,
         MWPhysics::PhysicsSystem* physics,
         DetourNavigator::Navigator& navigator)
         : mCurrentCell(nullptr)
@@ -1067,18 +1068,9 @@ namespace MWWorld
         , mTerrainStorage(terrainStorage)
         , mWorkQueue(workQueue)
         , mNavigator(navigator)
+        , mPreloader(std::move(preloader))
         , mLowestPoint(std::numeric_limits<float>::max())
     {
-        if (mRendering && landManager && mTerrain && mWorkQueue)
-        {
-            mPreloader = std::make_unique<CellPreloader>(
-                resourceSystem, physics->getShapeManager(), mTerrain, landManager);
-            mPreloader->setWorkQueue(mWorkQueue);
-            mPreloader->setExpiryDelay(Settings::cells().mPreloadCellExpiryDelay);
-            mPreloader->setMinCacheSize(Settings::cells().mPreloadCellCacheMin);
-            mPreloader->setMaxCacheSize(Settings::cells().mPreloadCellCacheMax);
-            mPreloader->setPreloadInstances(Settings::cells().mPreloadInstances);
-        }
     }
 
     Scene::Scene(MWWorld::World& world, Render::FrameLifecycle& frameLifecycle,
@@ -1087,8 +1079,8 @@ namespace MWWorld
         Terrain::RenderStorage& terrainStorage,
         MWPhysics::PhysicsSystem* physics, DetourNavigator::Navigator& navigator)
         : Scene(world, frameLifecycle, std::move(sceneSynchronizer), std::move(bonePoseResolver), std::move(meshResolver),
-            std::move(textureResolver), vfs, nullptr, nullptr, nullptr, nullptr, terrainStorage, nullptr, nullptr, physics,
-            navigator)
+            std::move(textureResolver), vfs, nullptr, nullptr, nullptr, nullptr, terrainStorage, nullptr, nullptr,
+            physics, navigator)
     {
     }
 
