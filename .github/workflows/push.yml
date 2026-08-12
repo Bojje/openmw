@@ -198,6 +198,12 @@ jobs:
           echo "RenderingManager must not assemble renderer-neutral scene submissions"
           exit 1
         fi
+        if rg -n 'getNeutralFrameData|getNeutral(View|Projection)Matrix' \
+            apps/openmw/mwrender/renderingmanager.hpp apps/openmw/mwrender/renderingmanager.cpp \
+            apps/openmw/mwrender/camera.hpp apps/openmw/mwrender/camera.cpp; then
+          echo "OSG manager and camera must not retain the removed neutral-frame adapter"
+          exit 1
+        fi
         if rg -n 'getRenderTile\(|Render::TerrainTile' apps/openmw/mwrender/renderingmanager.cpp; then
           echo "RenderingManager must not assemble renderer-neutral terrain snapshots"
           exit 1

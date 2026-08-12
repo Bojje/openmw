@@ -4,9 +4,6 @@
 #include "objects.hpp"
 #include "rendermode.hpp"
 
-#include <components/render/scene.hpp>
-#include <components/render/terrainpaging.hpp>
-
 #include <components/settings/settings.hpp>
 #include <components/vfs/pathutil.hpp>
 
@@ -128,10 +125,6 @@ namespace MWRender
             SceneUtil::LightManager*& lightRootOutput, SkyManager*& skyOutput, PostProcessor*& postProcessorOutput,
             std::function<void()> frameRenderer, std::function<void()> frameAdvancer);
         ~RenderingManager();
-
-        /// Return the current reference-renderer camera and environment state
-        /// as a value for the world-owned neutral frame snapshot.
-        Render::SceneData getNeutralFrameData() const;
 
         MWRender::Objects& getObjects();
 

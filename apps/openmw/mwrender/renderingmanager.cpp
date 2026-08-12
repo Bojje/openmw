@@ -460,36 +460,6 @@ namespace MWRender
         mWorkQueue->addWorkItem(std::move(workItem));
     }
 
-    Render::SceneData RenderingManager::getNeutralFrameData() const
-    {
-        Render::SceneData sceneData;
-        const MWRender::Camera* camera = getCamera();
-        if (camera == nullptr)
-            return sceneData;
-
-        sceneData.view = camera->getNeutralViewMatrix();
-        sceneData.projection = camera->getNeutralProjectionMatrix();
-        sceneData.viewInverse = Render::invertMat4(sceneData.view);
-        sceneData.projInverse = Render::invertMat4(sceneData.projection);
-
-        const osg::Vec4f& ambient = mSunLight->getAmbient();
-        sceneData.ambientColor = { ambient.r(), ambient.g(), ambient.b(), ambient.a() };
-
-        const osg::Vec4f& sunPosition = mSunLight->getPosition();
-        sceneData.sunDirection = { -sunPosition.x(), -sunPosition.y(), -sunPosition.z(), 0.f };
-
-        const osg::Vec4f& sunColor = mSunLight->getDiffuse();
-        sceneData.sunColor = { sunColor.r(), sunColor.g(), sunColor.b(), sunColor.a() };
-
-        const bool underwater = mWater->isUnderwater(camera->getPosition());
-        const float fogStart = mFog->getFogStart(underwater);
-        const float fogEnd = mFog->getFogEnd(underwater);
-        const osg::Vec4f fogColor = mFog->getFogColor(underwater);
-        sceneData.fogColor = { fogColor.r(), fogColor.g(), fogColor.b(), fogColor.a() };
-        sceneData.fogParameters = { fogStart, fogEnd, 0.f, 0.f };
-        return sceneData;
-    }
-
     void RenderingManager::setNightEyeFactor(float factor)
     {
         if (factor != mNightEyeFactor)
