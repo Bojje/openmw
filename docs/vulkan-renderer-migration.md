@@ -422,7 +422,7 @@ World bootstrap now rejects any non-OSG lifecycle before entering `initOsgRender
 remaining missing Vulkan game-owner path explicit instead of allowing an accidental mixed setup.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-173 files, deleting 1,962 lines and adding 9,128 lines (net `+7,166`). The larger Vulkan-only
+173 files, deleting 1,965 lines and adding 9,136 lines (net `+7,171`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.

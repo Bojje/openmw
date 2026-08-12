@@ -154,6 +154,12 @@ void OMW::Engine::executeLocalScripts()
     }
 }
 
+osgViewer::Viewer* OMW::Engine::getOsgViewer() const
+{
+    const auto* const lifecycle = dynamic_cast<const MWRender::ViewerFrameLifecycle*>(mFrameLifecycle.get());
+    return lifecycle ? lifecycle->viewer() : nullptr;
+}
+
 bool OMW::Engine::frame(unsigned frameNumber, float frametime)
 {
     const osg::Timer_t frameStart = osg::Timer::instance()->tick();
@@ -416,7 +422,6 @@ OMW::Engine::~Engine()
     mWorkQueue = nullptr;
 
     mFrameLifecycle = nullptr;
-    mViewer = nullptr;
     mFrameStats = nullptr;
 
     mResourceSystem.reset();
@@ -482,17 +487,18 @@ void OMW::Engine::setSkipMenu(bool skipMenu, bool newGame)
 
 void OMW::Engine::prepareEngine()
 {
-    mFrameStats = mViewer ? mViewer->getViewerStats() : new osg::Stats("OpenMW Engine");
+    osgViewer::Viewer* const viewer = getOsgViewer();
+    mFrameStats = viewer ? viewer->getViewerStats() : new osg::Stats("OpenMW Engine");
 
     mStateManager = std::make_unique<MWState::StateManager>(mCfgMgr.getUserDataPath() / "saves", mContentFiles);
     mEnvironment.setStateManager(*mStateManager);
 
-    if (mViewer)
+    if (viewer)
     {
         const bool stereoEnabled
             = Settings::stereo().mStereoEnabled || osg::DisplaySettings::instance().get()->getStereo();
         mStereoManager = std::make_unique<Stereo::Manager>(
-            mViewer, stereoEnabled, Settings::camera().mNearClip, Settings::camera().mViewingDistance);
+            viewer, stereoEnabled, Settings::camera().mNearClip, Settings::camera().mViewingDistance);
     }
 
     auto* const viewerLifecycle = dynamic_cast<MWRender::ViewerFrameLifecycle*>(mFrameLifecycle.get());
@@ -532,7 +538,7 @@ void OMW::Engine::prepareEngine()
                                                              : std::function<void(std::string)>(IgnoreString{})));
 
         mScreenCaptureHandler = new osgViewer::ScreenCaptureHandler(mScreenCaptureOperation);
-        mViewer->addEventHandler(mScreenCaptureHandler);
+        viewer->addEventHandler(mScreenCaptureHandler);
     }
 
     mL10nManager = std::make_unique<L10n::Manager>(mVFS.get());
@@ -596,7 +602,7 @@ void OMW::Engine::prepareEngine()
         mStereoManager->disableStereoForNode(guiRoot);
     rootNode->addChild(guiRoot);
 
-    mWindowManager = std::make_unique<MWGui::WindowManager>(mWindow, mViewer, guiRoot, mResourceSystem.get(),
+    mWindowManager = std::make_unique<MWGui::WindowManager>(mWindow, viewer, guiRoot, mResourceSystem.get(),
         mWorkQueue.get(), mCfgMgr.getLogPath(), mScriptConsoleMode, mTranslationDataStorage, mEncoding, mExportFonts,
         Version::getOpenmwVersionDescription(), mCfgMgr, [this] {
             if (!mWorld || !mWorld->renderFrame())
@@ -609,9 +615,8 @@ void OMW::Engine::prepareEngine()
     mEnvironment.setWindowManager(*mWindowManager);
 
     SDLUtil::InputCallbacks inputCallbacks;
-    if (mViewer)
+    if (viewer)
     {
-        osgViewer::Viewer* const viewer = mViewer;
         inputCallbacks.frame = [viewer] { viewer->getEventQueue()->frame(0.f); };
         inputCallbacks.functionKey = [viewer](int key, bool pressed) {
             const int osgKey = osgGA::GUIEventAdapter::KEY_F1 + (key - SDLK_F1);
@@ -627,10 +632,11 @@ void OMW::Engine::prepareEngine()
         };
     }
     mInputManager = std::make_unique<MWInput::InputManager>(mWindow, std::move(inputCallbacks), [this] {
-        if (!mScreenCaptureHandler || !mViewer)
+        osgViewer::Viewer* const captureViewer = getOsgViewer();
+        if (!mScreenCaptureHandler || !captureViewer)
             return;
         mScreenCaptureHandler->setFramesToCapture(1);
-        mScreenCaptureHandler->captureNextFrame(*mViewer);
+        mScreenCaptureHandler->captureNextFrame(*captureViewer);
     }, keybinderUser,
         keybinderUserExists, userGameControllerdb, gameControllerdb, mGrab);
     mEnvironment.setInputManager(*mInputManager);
@@ -711,7 +717,7 @@ void OMW::Engine::prepareEngine()
     mWorld->initSimulation(mMaxRecastLogLevel, mFrameLifecycle->backend());
     if (mFrameLifecycle->backend() != Render::FrameLifecycle::Backend::Osg)
         throw std::logic_error("No game renderer is installed for the active non-OSG frame lifecycle");
-    mWorld->initOsgRenderer(mViewer, *mFrameLifecycle, std::move(rootNode), mWorkQueue.get(), *mUnrefQueue);
+    mWorld->initOsgRenderer(viewer, *mFrameLifecycle, std::move(rootNode), mWorkQueue.get(), *mUnrefQueue);
     mEnvironment.setWorldScene(mWorld->getWorldScene());
     mWorld->setupPlayer();
     mWorld->setRandomSeed(mRandomSeed);
@@ -761,7 +767,6 @@ void OMW::Engine::go()
     // The OSG lifecycle owns its viewer. A future Vulkan lifecycle can replace
     // this owner without constructing an OSG viewer in the engine.
     auto viewerLifecycle = std::make_unique<MWRender::ViewerFrameLifecycle>();
-    mViewer = viewerLifecycle->viewer();
     mFrameLifecycle = std::move(viewerLifecycle);
 
     mEnvironment.setFrameRateLimit(Settings::video().mFramerateLimit);
@@ -789,18 +794,18 @@ void OMW::Engine::go()
                                 << "\": " << std::generic_category().message(errno);
     }
 
-    if (mViewer)
+    if (osgViewer::Viewer* const viewer = getOsgViewer())
     {
         // Setup OSG profiler and resource event handlers only for the reference renderer.
         osg::ref_ptr<Resource::Profiler> statsHandler = new Resource::Profiler(stats.is_open(), *mVFS);
         initStatsHandler(*statsHandler);
-        mViewer->addEventHandler(statsHandler);
+        viewer->addEventHandler(statsHandler);
 
         osg::ref_ptr<Resource::StatsHandler> resourcesHandler = new Resource::StatsHandler(stats.is_open(), *mVFS);
-        mViewer->addEventHandler(resourcesHandler);
+        viewer->addEventHandler(resourcesHandler);
 
         if (stats.is_open())
-            Resource::collectStatistics(*mViewer);
+            Resource::collectStatistics(*viewer);
     }
 
     // Start the game
@@ -859,7 +864,7 @@ void OMW::Engine::go()
             timeManager.setRenderingSimulationTime(timeManager.getRenderingSimulationTime() + dt);
         }
 
-        if (stats && mViewer)
+        if (stats && getOsgViewer())
         {
             // The delay is required because rendering happens in parallel to the main thread and stats from there is
             // available with delay.
@@ -870,7 +875,7 @@ void OMW::Engine::go()
                 // frames inside a simulation frame.
                 const unsigned currentFrameNumber = mFrameLifecycle->frameNumber();
                 for (unsigned i = frameNumber; i <= currentFrameNumber; ++i)
-                    reportStats(i - statsReportDelay, *mViewer, stats);
+                    reportStats(i - statsReportDelay, *getOsgViewer(), stats);
             }
         }
 

@@ -145,7 +145,6 @@ namespace OMW
         Files::PathContainer mDataDirs;
         std::vector<std::string> mArchives;
         std::filesystem::path mResDir;
-        osgViewer::Viewer* mViewer = nullptr; // owned by the active OSG frame lifecycle
         osg::ref_ptr<osg::Stats> mFrameStats;
         osg::ref_ptr<osgViewer::ScreenCaptureHandler> mScreenCaptureHandler;
         osg::ref_ptr<SceneUtil::AsyncScreenCaptureOperation> mScreenCaptureOperation;
@@ -188,6 +187,7 @@ namespace OMW
         Engine& operator=(const Engine&);
 
         void executeLocalScripts();
+        osgViewer::Viewer* getOsgViewer() const;
 
         bool frame(unsigned frameNumber, float dt);
 
