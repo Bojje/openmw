@@ -1949,7 +1949,8 @@ namespace MWMechanics
             if (!sleep || actor.getPtr() == player)
                 restoreDynamicStats(actor.getPtr(), hours, sleep);
 
-            if ((!actor.getPtr().getRefData().getBaseNode())
+            if (!actor.getPtr().isInCell()
+                || !MWBase::Environment::get().getWorldScene()->isCellActive(*actor.getPtr().getCell())
                 || (playerPos - actor.getPtr().getRefData().getPosition().asVec3()).length2()
                     > actorsProcessingRange * actorsProcessingRange)
                 continue;

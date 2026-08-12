@@ -1,5 +1,6 @@
 #include <components/debug/debuglog.hpp>
 
+#include <components/misc/convert.hpp>
 #include <components/sceneutil/positionattitudetransform.hpp>
 
 #include <components/esm3/loadcell.hpp>
@@ -39,6 +40,17 @@ namespace MWScript
             MWBase::Environment::get().getWorld()->getActorsStandingOn(ptr, actors);
             for (auto& actor : actors)
                 MWBase::Environment::get().getWorld()->moveObjectBy(actor, diff, false);
+        }
+
+        osg::Quat getWorldObjectAttitude(const MWWorld::Ptr& ptr)
+        {
+            if (const auto* baseNode = ptr.getRefData().getBaseNode())
+                return baseNode->getAttitude();
+
+            const auto& position = ptr.getRefData().getPosition();
+            if (ptr.getClass().isActor())
+                return osg::Quat(position.rot[2], osg::Vec3f(0, 0, -1));
+            return Misc::Convert::makeOsgQuat(position);
         }
 
         template <class R>
@@ -668,7 +680,7 @@ namespace MWScript
                     = osg::DegreesToRadians(runtime[0].mFloat * MWBase::Environment::get().getFrameDuration());
                 runtime.pop();
 
-                if (!ptr.getRefData().getBaseNode())
+                if (!ptr.getRefData().isEnabled())
                     return;
 
                 // We can rotate actors only around Z axis
@@ -685,7 +697,7 @@ namespace MWScript
                 else
                     return;
 
-                osg::Quat attitude = ptr.getRefData().getBaseNode()->getAttitude();
+                osg::Quat attitude = getWorldObjectAttitude(ptr);
                 MWBase::Environment::get().getWorld()->rotateWorldObject(ptr, attitude * rot);
             }
         };
@@ -743,11 +755,10 @@ namespace MWScript
                 else
                     return;
 
-                // is it correct that disabled objects can't be Move-d?
-                if (!ptr.getRefData().getBaseNode())
+                if (!ptr.getRefData().isEnabled())
                     return;
 
-                osg::Vec3f diff = ptr.getRefData().getBaseNode()->getAttitude() * posChange;
+                osg::Vec3f diff = getWorldObjectAttitude(ptr) * posChange;
 
                 // We should move actors, standing on moving object, too.
                 // This approach can be used to create elevators.

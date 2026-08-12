@@ -1662,7 +1662,8 @@ namespace MWWorld
         auto it = mDoorStates.begin();
         while (it != mDoorStates.end())
         {
-            if (!mWorldScene->isCellActive(*it->first.getCell()) || !it->first.getRefData().getBaseNode())
+            if (!it->first.isInCell() || !mWorldScene->isCellActive(*it->first.getCell())
+                || !it->first.getRefData().isEnabled())
             {
                 // The door is no longer in an active cell, or it was disabled.
                 // Erase from mDoorStates, since we no longer need to move it.
@@ -2779,7 +2780,7 @@ namespace MWWorld
         for (CellStore* cellstore : mWorldScene->getActiveCells())
         {
             cellstore->forEach([&](const auto& ptr) {
-                if (ptr.getRefData().getBaseNode() && ptr.getCellRef().getOwner() == npc.getCellRef().getRefId())
+                if (ptr.getCellRef().getOwner() == npc.getCellRef().getRefId())
                     out.push_back(ptr);
                 return true;
             });
@@ -2790,7 +2791,8 @@ namespace MWWorld
     {
         if (!targetActor.getRefData().isEnabled() || !actor.getRefData().isEnabled())
             return false; // cannot get LOS unless both NPC's are enabled
-        if (!targetActor.getRefData().getBaseNode() || !actor.getRefData().getBaseNode())
+        if (!targetActor.isInCell() || !actor.isInCell() || !mWorldScene->isCellActive(*targetActor.getCell())
+            || !mWorldScene->isCellActive(*actor.getCell()))
             return false; // not in active cell
 
         return mPhysics->getLineOfSight(actor, targetActor);
