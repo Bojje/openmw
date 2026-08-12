@@ -265,6 +265,8 @@ The non-owning manager update handle is private to the `Scene` owner, detached d
 teardown, and CI guards the manager header against regaining a value-owned neutral frame state.
 `Scene` no longer retains pass-through ownership of the legacy land manager, and its temporary
 cell-test suppression restores the scene manager's current incremental-compile operation locally.
+The scene no longer stores that incremental-compile pointer or a second land-manager reference;
+both are now scoped to the legacy operations that need them.
 Engine GUI fallback frame advancement now also reads simulation time from the active
 `FrameLifecycle`, keeping renderer orchestration from reaching directly into an OSG frame stamp.
 The same interface now owns the engine-visible frame number: the OSG adapter reads its frame stamp,
@@ -277,7 +279,7 @@ The engine public header no longer imports complete OSG viewer/event-handler hea
 are now included only by the implementation files that use them.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-154 files, deleting 1,187 lines and adding 7,791 lines (net `+6,604`). The larger Vulkan-only
+154 files, deleting 1,187 lines and adding 7,790 lines (net `+6,603`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
