@@ -128,7 +128,11 @@ namespace Render
             {
                 MeshInstance instance = transformMeshInstance(*effect, mesh);
                 if (!effect->textureOverride.empty())
+                {
                     instance.mesh.material.albedoTexture = effect->textureOverride;
+                    instance.mesh.material.albedoWrapU = false;
+                    instance.mesh.material.albedoWrapV = false;
+                }
                 result.push_back(std::move(instance));
             }
         }

@@ -217,6 +217,8 @@ int main()
         }, false);
     if (effectSubmission.meshes.size() != 2 || effectSubmission.meshes.back().transform.data[0] != 2.f
         || effectSubmission.meshes.back().mesh.material.albedoTexture != "textures/effect.dds"
+        || effectSubmission.meshes.back().mesh.material.albedoWrapU
+        || effectSubmission.meshes.back().mesh.material.albedoWrapV
         || !effectSubmission.valid())
         throw std::runtime_error("renderer-neutral scene submission lost an identified effect");
     if (!world.removeEffect("spark") || world.removeEffect("spark"))
