@@ -3954,17 +3954,20 @@ namespace MWWorld
     void World::updateActorPath(const MWWorld::ConstPtr& actor, const std::deque<osg::Vec3f>& path,
         const DetourNavigator::AgentBounds& agentBounds, const osg::Vec3f& start, const osg::Vec3f& end) const
     {
-        mRendering->updateActorPath(actor, path, agentBounds, start, end);
+        if (mRendering)
+            mRendering->updateActorPath(actor, path, agentBounds, start, end);
     }
 
     void World::removeActorPath(const MWWorld::ConstPtr& actor) const
     {
-        mRendering->removeActorPath(actor);
+        if (mRendering)
+            mRendering->removeActorPath(actor);
     }
 
     void World::setNavMeshNumberToRender(const std::size_t value)
     {
-        mRendering->setNavMeshNumber(value);
+        if (mRendering)
+            mRendering->setNavMeshNumber(value);
     }
 
     DetourNavigator::AgentBounds World::getPathfindingAgentBounds(const MWWorld::ConstPtr& actor) const
