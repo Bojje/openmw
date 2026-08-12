@@ -80,6 +80,8 @@ namespace MWWorld
         {
             osg::ref_ptr<osg::PositionAttitudeTransform> mNode;
             std::shared_ptr<MWRender::EffectAnimationTime> mEffectAnimationTime;
+            osg::Vec3f mPosition;
+            osg::Quat mOrientation;
 
             ESM::RefNum mCaster;
             MWWorld::Ptr mCasterHandle;

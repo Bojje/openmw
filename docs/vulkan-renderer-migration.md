@@ -421,11 +421,10 @@ while non-NIF scene-derived collision shapes are rejected explicitly until a neu
 that OSG-only path.
 World update no longer performs GUI-dependent spell preloading or jail-window checks without the
 legacy renderer/UI owner.
-Projectile bookkeeping is likewise optional at the neutral simulation boundary; physics can advance
-and the world can clear and shut down without constructing the OSG projectile presenter. Unsupported
-weather/projectile save records are explicitly skipped in neutral mode and are not claimed as
-save-compatibility parity; projectile visuals and presentation-specific effects remain a later
-dynamic-content milestone.
+Projectile simulation now uses the same manager in both backends: neutral startup constructs it
+without an OSG parent, so collision, hit processing, spell effects, sounds, cleanup, and save/load
+state continue without an OSG projectile presenter. Neutral projectile model/glow presentation and
+presentation-specific effects remain a later dynamic-content milestone.
 Cell-transition loading screens, window-manager cell notifications, actor watching, fades, and
 postprocessor flags now follow the same legacy-service guard, so the neutral bootstrap does not
 silently re-enter the OSG/UI path during cell changes.
@@ -628,7 +627,7 @@ the game unplayable rather than reduce duplication safely.
 | Vulkan validation renderer | Vulkan standalone smoke target | Retained as the migration test harness |
 | Vulkan frame-owner forwarding wrapper | Removed; `Vk::Renderer` is the engine's Vulkan `FrameLifecycle` owner | Complete |
 | Legacy `Scene` constructor forwarding wrapper | Removed; OSG now uses the canonical scene-construction contract | Complete |
-| Projectile water-impact event | World-level neutral water-ripple fan-out; projectile service no longer stores `RenderingManager` | Complete for event ownership; projectile presentation remains OSG-only |
+| Projectile simulation and water-impact event | Shared projectile physics/combat manager with neutral position/orientation state; world-level neutral water-ripple fan-out; projectile service no longer stores `RenderingManager` | Complete for simulation/event ownership; neutral projectile model/glow presentation remains outstanding |
 | Water-level event | World-level fan-out to physics, OSG water, and neutral water snapshots | Complete for owner fan-out; legacy water shading remains outstanding |
 | Vulkan mesh submission queue | Removed | Complete |
 | Inactive raster ray-tracing scaffold | Removed | Reintroduce only with a complete RT pipeline |
@@ -701,14 +700,15 @@ provide a usable surface, while validation errors remain hard failures.
 
 ### 7. Port dynamic content and presentation
 
-- Add actors, skinning, animation, particles, weather, water, spell effects, and post-processing.
+- Add actors, skinning, animation, particles, weather, water, spell effects, projectiles, and post-processing.
   The neutral path now samples model-local NIF and classic external `.kf` keyframe controllers,
   honors selected group start/stop segments, carries explicit per-object animation groups and clocks,
   and starts neutral weapon and spell-cast queues with attack/cast timing keys, including non-biped
-  random attack group selection; the remaining animation gate is actor `.kf` priority/queue arbitration,
-  OSG-specific presentation events, blending, and
-  controller-stack ownership. Neutral Lua/sound/melee/spell text-key dispatch is now covered for the
-  migrated event classes.
+  random attack group selection. Projectile collision, hit, spell, sound, save/load, and cleanup
+  behavior now also run through neutral state without an OSG scene parent. The remaining animation
+  gate is actor `.kf` priority/queue arbitration, OSG-specific presentation events, blending, and
+  controller-stack ownership; neutral projectile visuals/glows and full particle presentation remain.
+  Neutral Lua/sound/melee/spell text-key dispatch is now covered for the migrated event classes.
 - Resting actors, owned-item lookup, line-of-sight, moving doors, and transformation-script movement/rotation now use active-cell state and world-model transforms instead of treating an absent OSG node as inactive.
 - Neutral focus selection and gameplay raycasts now use the renderer-neutral camera state and physics collision masks, so activation and targeting no longer require an OSG renderer.
 - The active sound listener now follows the same neutral first-person, third-person, and vanity camera state instead of being disabled with OSG.

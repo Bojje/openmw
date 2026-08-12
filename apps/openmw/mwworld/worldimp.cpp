@@ -356,6 +356,7 @@ namespace MWWorld
         mWorldScene = std::make_unique<Scene>(*this, frameLifecycle, std::move(sceneSynchronizer),
             std::move(meshResolver), std::move(textureResolver), std::move(poseResolver), mResourceSystem->getVFS(),
             *mTerrainRenderStorage, mPhysics.get(), *mNavigator);
+        mProjectileManager = std::make_unique<ProjectileManager>(nullptr, mResourceSystem, mPhysics.get());
     }
 
     void World::fillGlobalVariables()
