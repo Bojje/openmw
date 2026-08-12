@@ -207,6 +207,7 @@ namespace MWWorld
     public:
         WorldModel& getWorldModel() { return mWorldModel; }
         Scene& getWorldScene() { return *mWorldScene; }
+        void updateNeutralSceneData(Render::SceneData& sceneData) const;
         const GroundcoverStore& getGroundcoverStore() const { return mGroundcoverStore; }
 
         // FIXME

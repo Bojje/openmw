@@ -707,6 +707,7 @@ void OMW::Engine::prepareVulkanEngine()
         return textureManager->get(VFS::Path::Normalized(name));
     };
     const Render::SceneSynchronizer sceneSynchronizer = [this](Render::SceneData& sceneData) {
+        mWorld->updateNeutralSceneData(sceneData);
         int drawableWidth = Settings::video().mResolutionX.get();
         int drawableHeight = Settings::video().mResolutionY.get();
         if (mWindow)

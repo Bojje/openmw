@@ -13,6 +13,7 @@
 
 #include <components/esm/refid.hpp>
 #include <components/fallback/fallback.hpp>
+#include <components/render/scene.hpp>
 
 #include "../mwbase/soundmanager.hpp"
 
@@ -372,6 +373,9 @@ namespace MWWorld
 
         float getSunVisibility() const;
 
+        /// Copy weather lighting and fog into the renderer-neutral frame state.
+        void updateNeutralSceneData(Render::SceneData& sceneData) const;
+
         std::vector<Moon> getCurrentMoons(const TimeStamp& time) const;
 
         void write(ESM::ESMWriter& writer, Loading::Listener& progress);
@@ -411,6 +415,7 @@ namespace MWWorld
         bool mIsStorm;
         bool mPrecipitation;
         osg::Vec3f mStormDirection;
+        osg::Vec3f mSunDirection{ 0.f, 0.f, -1.f };
 
         ESM::RefId mCurrentRegion;
         float mTimePassed;

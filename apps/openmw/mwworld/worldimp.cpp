@@ -4059,6 +4059,31 @@ namespace MWWorld
         return mPostProcessor;
     }
 
+    void World::updateNeutralSceneData(Render::SceneData& sceneData) const
+    {
+        if (mWeatherManager)
+            mWeatherManager->updateNeutralSceneData(sceneData);
+
+        const CellStore* const currentCell = mWorldScene ? mWorldScene->getCurrentCell() : nullptr;
+        if (currentCell == nullptr || currentCell->isExterior() || currentCell->isQuasiExterior())
+            return;
+
+        const auto color = [](unsigned int value) {
+            return Render::Vec4{ static_cast<float>((value >> 0) & 0xff) / 255.f,
+                static_cast<float>((value >> 8) & 0xff) / 255.f,
+                static_cast<float>((value >> 16) & 0xff) / 255.f, 1.f };
+        };
+        const auto& mood = currentCell->getCell()->getMood();
+        sceneData.ambientColor = color(mood.mAmbiantColor);
+        sceneData.sunColor = color(mood.mDirectionalColor);
+        sceneData.fogColor = color(mood.mFogColor);
+        const float viewDistance = Settings::camera().mViewingDistance;
+        const float fogDepth = std::clamp(mood.mFogDensity, 0.f, 1.f);
+        sceneData.fogParameters = fogDepth > 0.f
+            ? Render::Vec4{ viewDistance * (1.f - fogDepth), viewDistance, 0.f, 0.f }
+            : Render::Vec4{ 0.f, 0.f, 0.f, 0.f };
+    }
+
     void World::setActorActive(const MWWorld::Ptr& ptr, bool value)
     {
         if (MWPhysics::Actor* const actor = mPhysics->getActor(ptr))

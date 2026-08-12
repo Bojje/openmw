@@ -161,7 +161,7 @@ The submission
 boundary now validates mesh indices and terrain snapshots before Vulkan consumes them. The
 full-game Vulkan call site now exists for the no-GUI bootstrap: window/input ownership,
 camera synchronization, neutral image loading, and static scene submission are live, while
-dynamic-content, weather, and GUI/presentation services remain incomplete. NIF skinning metadata now survives conversion, and resolved dynamic
+dynamic-content, weather sky/particle/water presentation, and GUI/presentation services remain incomplete. Weather ambient, directional-light, and fog values now cross the neutral frame state. NIF skinning metadata now survives conversion, and resolved dynamic
 mesh payloads cross the neutral boundary into the Vulkan consumer. A deterministic CPU skinning
 helper now applies frame bone matrices for future animation integration. Unskinned dynamic meshes and skinned records with a
 supplied pose now enter the raster draw batch with their neutral transforms; skinned records without a pose remain outside it
@@ -454,7 +454,7 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-189 files, deleting 1,992 lines and adding 11,267 lines (net `+9,275`). The larger Vulkan-only
+189 files, deleting 1,992 lines and adding 11,331 lines (net `+9,339`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. The live no-GUI consumer is the first deletion
 checkpoint; further reduction can now target OSG scene/resource/presentation ownership rather

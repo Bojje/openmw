@@ -1,5 +1,8 @@
 #include "weather.hpp"
 
+#include <algorithm>
+#include <limits>
+
 #include <components/esm/stringrefid.hpp>
 #include <components/settings/values.hpp>
 
@@ -909,6 +912,7 @@ namespace MWWorld
 
             // Hardcoded constant from Morrowind
             const osg::Vec3f sunDir(-400.f * orbit, 75.f, -100.f);
+            mSunDirection = sunDir;
             if (mRendering)
             {
                 mRendering->setSunDirection(sunDir);
@@ -1062,6 +1066,34 @@ namespace MWWorld
                 + t * mWeatherSettings[mNextWeather].mGlareView;
         }
         return mWeatherSettings[mCurrentWeather].mGlareView;
+    }
+
+    void WeatherManager::updateNeutralSceneData(Render::SceneData& sceneData) const
+    {
+        const auto toRenderColor = [](const osg::Vec4f& color) {
+            return Render::Vec4{ color.r(), color.g(), color.b(), color.a() };
+        };
+
+        sceneData.ambientColor = toRenderColor(mResult.mAmbientColor);
+        sceneData.sunColor = toRenderColor(mResult.mSunColor);
+        sceneData.sunDirection = { mSunDirection.x(), mSunDirection.y(), mSunDirection.z(), 0.f };
+        sceneData.fogColor = toRenderColor(mResult.mFogColor);
+
+        if (Settings::fog().mUseDistantFog)
+        {
+            const float offset = mResult.mDLFogOffset / 100.f;
+            sceneData.fogParameters = {
+                mResult.mDLFogFactor * (Settings::fog().mDistantLandFogStart - offset * Settings::fog().mDistantLandFogEnd),
+                mResult.mDLFogFactor * (1.f - offset) * Settings::fog().mDistantLandFogEnd, 0.f, 0.f };
+        }
+        else if (mResult.mFogDepth > 0.f)
+        {
+            const float viewDistance = Settings::camera().mViewingDistance;
+            sceneData.fogParameters = { viewDistance * (1.f - std::clamp(mResult.mFogDepth, 0.f, 1.f)),
+                viewDistance, 0.f, 0.f };
+        }
+        else
+            sceneData.fogParameters = { 0.f, 0.f, 0.f, 0.f };
     }
 
     void WeatherManager::write(ESM::ESMWriter& writer, Loading::Listener& progress)
