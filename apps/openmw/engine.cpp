@@ -711,6 +711,8 @@ void OMW::Engine::prepareEngine()
     listener->loadingOff();
 
     mWorld->initSimulation(mMaxRecastLogLevel, mFrameLifecycle->backend());
+    if (mFrameLifecycle->backend() != Render::FrameLifecycle::Backend::Osg)
+        throw std::logic_error("No game renderer is installed for the active non-OSG frame lifecycle");
     mWorld->initOsgRenderer(mViewer, *mFrameLifecycle, std::move(rootNode), mWorkQueue.get(), *mUnrefQueue);
     mEnvironment.setWorldScene(mWorld->getWorldScene());
     mWorld->setupPlayer();
