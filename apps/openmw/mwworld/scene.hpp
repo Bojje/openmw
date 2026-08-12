@@ -127,7 +127,6 @@ namespace MWWorld
         Render::MeshResolver mMeshResolver;
         Render::TextureResolver mTextureResolver;
         const VFS::Manager* mVfs;
-        Resource::SceneManager* mSceneManager;
         MWPhysics::PhysicsSystem* mPhysics;
         MWRender::RenderingManager* mRendering;
         Terrain::World* mTerrain;
@@ -192,7 +191,6 @@ namespace MWWorld
             Terrain::World* terrain, MWRender::ObjectPaging* objectPaging,
             Terrain::RenderStorage& terrainStorage, SceneUtil::WorkQueue* workQueue,
             Resource::ResourceSystem* resourceSystem,
-            Resource::SceneManager* sceneManager,
             MWPhysics::PhysicsSystem* physics,
             DetourNavigator::Navigator& navigator);
 
@@ -265,7 +263,7 @@ namespace MWWorld
 
         bool isCellActive(const CellStore& cell);
 
-        void preload(const std::string& mesh, bool useAnim = false);
+        void preload(const std::string& mesh, Resource::SceneManager* sceneManager, bool useAnim = false);
 
         void testExteriorCells();
         void testInteriorCells();

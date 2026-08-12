@@ -867,8 +867,10 @@ namespace MWWorld
             return;
 
         Resource::ResourceSystem& resourceSystem = *MWBase::Environment::get().getResourceSystem();
+        Resource::SceneManager* const sceneManager = resourceSystem.getSceneManager();
+        if (!sceneManager)
+            return;
         // Note: temporary disable ICO to decrease memory usage
-        Resource::SceneManager* const sceneManager = mSceneManager;
         osgUtil::IncrementalCompileOperation* const incrementalCompileOperation
             = sceneManager->getIncrementalCompileOperation();
         sceneManager->setIncrementalCompileOperation(nullptr);
@@ -939,8 +941,10 @@ namespace MWWorld
             return;
 
         Resource::ResourceSystem& resourceSystem = *MWBase::Environment::get().getResourceSystem();
+        Resource::SceneManager* const sceneManager = resourceSystem.getSceneManager();
+        if (!sceneManager)
+            return;
         // Note: temporary disable ICO to decrease memory usage
-        Resource::SceneManager* const sceneManager = mSceneManager;
         osgUtil::IncrementalCompileOperation* const incrementalCompileOperation
             = sceneManager->getIncrementalCompileOperation();
         sceneManager->setIncrementalCompileOperation(nullptr);
@@ -1045,7 +1049,6 @@ namespace MWWorld
         MWRender::RenderingManager* rendering, MWRender::LandManager* landManager,
         Terrain::World* terrain, MWRender::ObjectPaging* objectPaging,
         Terrain::RenderStorage& terrainStorage, SceneUtil::WorkQueue* workQueue, Resource::ResourceSystem* resourceSystem,
-        Resource::SceneManager* sceneManager,
         MWPhysics::PhysicsSystem* physics,
         DetourNavigator::Navigator& navigator)
         : mCurrentCell(nullptr)
@@ -1057,7 +1060,6 @@ namespace MWWorld
         , mMeshResolver(std::move(meshResolver))
         , mTextureResolver(std::move(textureResolver))
         , mVfs(vfs)
-        , mSceneManager(sceneManager)
         , mPhysics(physics)
         , mRendering(rendering)
         , mTerrain(terrain)
@@ -1085,8 +1087,8 @@ namespace MWWorld
         Terrain::RenderStorage& terrainStorage,
         MWPhysics::PhysicsSystem* physics, DetourNavigator::Navigator& navigator)
         : Scene(world, frameLifecycle, std::move(sceneSynchronizer), std::move(bonePoseResolver), std::move(meshResolver),
-            std::move(textureResolver), vfs, nullptr, nullptr, nullptr, nullptr, terrainStorage, nullptr, nullptr, nullptr,
-            physics, navigator)
+            std::move(textureResolver), vfs, nullptr, nullptr, nullptr, nullptr, terrainStorage, nullptr, nullptr, physics,
+            navigator)
     {
     }
 
@@ -1470,9 +1472,9 @@ namespace MWWorld
         std::atomic_bool mAborted{ false };
     };
 
-    void Scene::preload(const std::string& mesh, bool useAnim)
+    void Scene::preload(const std::string& mesh, Resource::SceneManager* sceneManager, bool useAnim)
     {
-        if (!mSceneManager)
+        if (!sceneManager)
             return;
 
         const VFS::Path::Normalized meshPath = useAnim
@@ -1480,10 +1482,10 @@ namespace MWWorld
                 VFS::Path::toNormalized(mesh), mVfs)
             : VFS::Path::toNormalized(mesh);
 
-        if (mSceneManager->checkLoaded(meshPath, mFrameLifecycle.referenceTime()))
+        if (sceneManager->checkLoaded(meshPath, mFrameLifecycle.referenceTime()))
             return;
 
-        osg::ref_ptr<PreloadMeshItem> item(new PreloadMeshItem(meshPath, mSceneManager));
+        osg::ref_ptr<PreloadMeshItem> item(new PreloadMeshItem(meshPath, sceneManager));
         mWorkQueue->addWorkItem(item);
         const auto isDone = [](const osg::ref_ptr<SceneUtil::WorkItem>& v) { return v->isDone(); };
         mWorkItems.erase(std::remove_if(mWorkItems.begin(), mWorkItems.end(), isDone), mWorkItems.end());

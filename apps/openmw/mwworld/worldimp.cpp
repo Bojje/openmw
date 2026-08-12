@@ -350,7 +350,7 @@ namespace MWWorld
         mWorldScene = std::make_unique<Scene>(
             *this, frameLifecycle, sceneSynchronizer, bonePoseResolver, meshResolver, textureResolver,
             mResourceSystem->getVFS(), mRendering.get(), osgTerrainStoragePtr->getLandManager(), mTerrain, mObjectPaging,
-            *osgTerrainStoragePtr, workQueue, mResourceSystem, mResourceSystem->getSceneManager(), mPhysics.get(), *mNavigator);
+            *osgTerrainStoragePtr, workQueue, mResourceSystem, mPhysics.get(), *mNavigator);
     }
 
     void World::initNeutralRenderer(Render::FrameLifecycle& frameLifecycle,
@@ -3934,7 +3934,8 @@ namespace MWWorld
 
     namespace
     {
-        void preload(MWWorld::Scene* scene, const ESMStore& store, const ESM::RefId& obj)
+        void preload(MWWorld::Scene* scene, Resource::SceneManager* sceneManager, const ESMStore& store,
+            const ESM::RefId& obj)
         {
             if (obj.empty())
                 return;
@@ -3943,7 +3944,7 @@ namespace MWWorld
                 MWWorld::ManualRef ref(store, obj);
                 std::string model = ref.getPtr().getClass().getCorrectedModel(ref.getPtr());
                 if (!model.empty())
-                    scene->preload(model, ref.getPtr().getClass().useAnim());
+                    scene->preload(model, sceneManager, ref.getPtr().getClass().useAnim());
             }
             catch (const std::exception& e)
             {
@@ -3954,23 +3955,28 @@ namespace MWWorld
 
     void World::preloadEffects(const ESM::EffectList* effectList)
     {
+        Resource::SceneManager* const sceneManager = mResourceSystem->getSceneManager();
+        if (!sceneManager)
+            return;
+
         for (const ESM::IndexedENAMstruct& effectInfo : effectList->mList)
         {
             const ESM::MagicEffect* effect = mStore.get<ESM::MagicEffect>().find(effectInfo.mData.mEffectID);
 
             if (MWMechanics::isSummoningEffect(effectInfo.mData.mEffectID))
             {
-                preload(mWorldScene.get(), mStore, ESM::RefId::stringRefId("VFX_Summon_Start"));
-                preload(mWorldScene.get(), mStore, MWMechanics::getSummonedCreature(effectInfo.mData.mEffectID));
+                preload(mWorldScene.get(), sceneManager, mStore, ESM::RefId::stringRefId("VFX_Summon_Start"));
+                preload(mWorldScene.get(), sceneManager, mStore,
+                    MWMechanics::getSummonedCreature(effectInfo.mData.mEffectID));
             }
 
-            preload(mWorldScene.get(), mStore, effect->mCasting);
-            preload(mWorldScene.get(), mStore, effect->mHit);
+            preload(mWorldScene.get(), sceneManager, mStore, effect->mCasting);
+            preload(mWorldScene.get(), sceneManager, mStore, effect->mHit);
 
             if (effectInfo.mData.mArea > 0)
-                preload(mWorldScene.get(), mStore, effect->mArea);
+                preload(mWorldScene.get(), sceneManager, mStore, effect->mArea);
             if (effectInfo.mData.mRange == ESM::RT_Target)
-                preload(mWorldScene.get(), mStore, effect->mBolt);
+                preload(mWorldScene.get(), sceneManager, mStore, effect->mBolt);
         }
     }
 
