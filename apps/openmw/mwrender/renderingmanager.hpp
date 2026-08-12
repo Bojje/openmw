@@ -124,6 +124,7 @@ namespace MWRender
             Resource::ResourceSystem* resourceSystem, SceneUtil::WorkQueue* workQueue,
             DetourNavigator::Navigator& navigator, const MWWorld::GroundcoverStore& groundcoverStore,
             SceneUtil::UnrefQueue& unrefQueue, TerrainStorage& terrainStorage, Terrain::World*& terrainOutput,
+            ObjectPaging*& objectPagingOutput,
             osgUtil::IncrementalCompileOperation*& incrementalCompileOperationOutput,
             SceneUtil::LightManager*& lightRootOutput, SkyManager*& skyOutput, PostProcessor*& postProcessorOutput,
             Render::FrameLifecycle& frameLifecycle);
@@ -268,8 +269,6 @@ namespace MWRender
 
         bool pagingEnableObject(int type, const MWWorld::ConstPtr& ptr, bool enabled);
         void pagingBlacklistObject(int type, const MWWorld::ConstPtr& ptr);
-        bool pagingUnlockCache();
-        void getPagedRefnums(const osg::Vec4i& activeGrid, std::vector<ESM::RefNum>& out);
 
         void updateProjectionMatrix();
 
@@ -334,6 +333,7 @@ namespace MWRender
         TerrainStorage& mTerrainStorage;
         Terrain::World** mTerrainOutput;
         ObjectPaging* mObjectPaging;
+        ObjectPaging** mObjectPagingOutput;
         Groundcover* mGroundcover;
         std::unique_ptr<SkyManager> mSky;
         std::unique_ptr<FogManager> mFog;

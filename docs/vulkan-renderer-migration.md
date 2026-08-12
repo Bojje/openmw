@@ -216,7 +216,7 @@ The non-owning manager update handle is private to the `Scene` owner, detached d
 teardown, and CI guards the manager header against regaining a value-owned neutral frame state.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-88 files, deleting 896 lines and adding 7,049 lines (net `+6,153`). The larger Vulkan-only
+88 files, deleting 916 lines and adding 7,076 lines (net `+6,160`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
@@ -247,9 +247,9 @@ at the shared storage boundary, preventing ESM4 default layers from acquiring un
 parallax or specular state.
 Neutral scene export receives the world-owned `ResourceSystem` directly for mesh and texture
 resolution, so `RenderingManager` is not used as that renderer-neutral resource gateway.
-The manager's OSG-owned terrain, incremental compile operation, light root, sky, and postprocessor
-are now passed explicitly during world construction; these are no longer public manager service
-gateways.
+The manager's OSG-owned terrain, object paging, incremental compile operation, light root, sky,
+and postprocessor are now passed explicitly during world construction; these are no longer public
+manager service gateways.
 Scene/resource cache timing now comes from the renderer-neutral `FrameLifecycle` clock, with OSG
 and Vulkan owners supplying their own reference time.
 Neutral mesh and texture resolution, including optional specular-file discovery, now crosses the

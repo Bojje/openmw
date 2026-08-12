@@ -47,6 +47,7 @@ namespace SceneUtil
 
 namespace MWRender
 {
+    class ObjectPaging;
     class TerrainStorage;
 }
 
@@ -114,6 +115,7 @@ namespace MWWorld
         std::unique_ptr<DetourNavigator::Navigator> mNavigator;
         std::unique_ptr<MWRender::TerrainStorage> mTerrainStorage;
         Terrain::World* mTerrain = nullptr;
+        MWRender::ObjectPaging* mObjectPaging = nullptr;
         MWRender::SkyManager* mSkyManager = nullptr;
         MWRender::PostProcessor* mPostProcessor = nullptr;
         std::unique_ptr<MWRender::RenderingManager> mRendering;

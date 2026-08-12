@@ -133,6 +133,11 @@ jobs:
           echo "RenderingManager must not expose general game-service gateways"
           exit 1
         fi
+        if rg -n 'pagingUnlockCache|getPagedRefnums' \
+            apps/openmw/mwrender/renderingmanager.hpp apps/openmw/mwrender/renderingmanager.cpp; then
+          echo "RenderingManager must not expose object-paging service gateways"
+          exit 1
+        fi
         if rg -n 'getNeutralScene\(' apps/openmw/mwrender/renderingmanager.hpp apps/openmw/mwrender/renderingmanager.cpp; then
           echo "RenderingManager must not assemble renderer-neutral scene submissions"
           exit 1

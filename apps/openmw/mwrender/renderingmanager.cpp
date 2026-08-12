@@ -176,6 +176,7 @@ namespace MWRender
         Resource::ResourceSystem* resourceSystem, SceneUtil::WorkQueue* workQueue,
         DetourNavigator::Navigator& navigator, const MWWorld::GroundcoverStore& groundcoverStore,
         SceneUtil::UnrefQueue& unrefQueue, TerrainStorage& terrainStorage, Terrain::World*& terrainOutput,
+        ObjectPaging*& objectPagingOutput,
         osgUtil::IncrementalCompileOperation*& incrementalCompileOperationOutput,
         SceneUtil::LightManager*& lightRootOutput, SkyManager*& skyOutput, PostProcessor*& postProcessorOutput,
         Render::FrameLifecycle& frameLifecycle)
@@ -188,6 +189,7 @@ namespace MWRender
         , mNavigator(navigator)
         , mTerrainStorage(terrainStorage)
         , mTerrainOutput(&terrainOutput)
+        , mObjectPagingOutput(&objectPagingOutput)
         , mNightEyeFactor(0.f)
         // TODO: Near clip should not need to be bounded like this, but too small values break OSG shadow calculations
         // CPU-side. See issue: #6072
@@ -307,9 +309,10 @@ namespace MWRender
         WorldspaceChunkMgr& chunkMgr = getWorldspaceChunkMgr(ESM::Cell::sDefaultWorldspaceId);
         mTerrain = chunkMgr.mTerrain.get();
         terrainOutput = mTerrain;
+        mObjectPaging = chunkMgr.mObjectPaging.get();
+        objectPagingOutput = mObjectPaging;
         incrementalCompileOperationOutput = mViewer->getIncrementalCompileOperation();
         mGroundcover = chunkMgr.mGroundcover.get();
-        mObjectPaging = chunkMgr.mObjectPaging.get();
 
         mStateUpdater = new SceneUtil::StateUpdater();
         sceneRoot->addUpdateCallback(mStateUpdater);
@@ -630,6 +633,7 @@ namespace MWRender
                 *mTerrainOutput = mTerrain;
                 mGroundcover = newChunks.mGroundcover.get();
                 mObjectPaging = newChunks.mObjectPaging.get();
+                *mObjectPagingOutput = mObjectPaging;
             }
         }
         mTerrain->enable(enable);
@@ -1639,21 +1643,6 @@ namespace MWRender
                 osg::Vec2i(ptr.getCell()->getCell()->getGridX(), ptr.getCell()->getCell()->getGridY())))
             mTerrain->rebuildViews();
     }
-    bool RenderingManager::pagingUnlockCache()
-    {
-        if (mObjectPaging && mObjectPaging->unlockCache())
-        {
-            mTerrain->rebuildViews();
-            return true;
-        }
-        return false;
-    }
-    void RenderingManager::getPagedRefnums(const osg::Vec4i& activeGrid, std::vector<ESM::RefNum>& out)
-    {
-        if (mObjectPaging)
-            mObjectPaging->getPagedRefnums(activeGrid, out);
-    }
-
     void RenderingManager::setNavMeshMode(Settings::NavMeshRenderMode value)
     {
         mNavMesh->setMode(value);

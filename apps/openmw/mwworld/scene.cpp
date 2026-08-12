@@ -38,6 +38,7 @@
 
 #include "../mwrender/landmanager.hpp"
 #include "../mwrender/camera.hpp"
+#include "../mwrender/objectpaging.hpp"
 #include "../mwrender/postprocessor.hpp"
 #include "../mwrender/renderingmanager.hpp"
 #include "../mwrender/terrainstorage.hpp"
@@ -729,12 +730,16 @@ namespace MWWorld
         mRendering.setActiveGrid(newGrid);
 
         mPreloader->setTerrain(mTerrain);
-        if (mRendering.pagingUnlockCache())
+        if (mObjectPaging && mObjectPaging->unlockCache())
+        {
+            mTerrain->rebuildViews();
             mPreloader->abortTerrainPreloadExcept(nullptr);
+        }
         if (!mPreloader->isTerrainLoaded(PositionCellGrid{ pos, newGrid }, mFrameLifecycle.referenceTime()))
             preloadTerrain(pos, playerCellIndex.mWorldspace, true);
         mPagedRefs.clear();
-        mRendering.getPagedRefnums(newGrid, mPagedRefs);
+        if (mObjectPaging)
+            mObjectPaging->getPagedRefnums(newGrid, mPagedRefs);
 
         addPostponedPhysicsObjects();
 
@@ -965,7 +970,8 @@ namespace MWWorld
         Render::SceneSynchronizer sceneSynchronizer, Render::BonePoseResolver bonePoseResolver,
         Render::MeshResolver meshResolver, Render::TextureResolver textureResolver, const VFS::Manager* vfs,
         MWRender::RenderingManager& rendering, MWRender::LandManager& landManager,
-        Terrain::World*& terrain, osgUtil::IncrementalCompileOperation* incrementalCompileOperation,
+        Terrain::World*& terrain, MWRender::ObjectPaging*& objectPaging,
+        osgUtil::IncrementalCompileOperation* incrementalCompileOperation,
         Terrain::RenderStorage& terrainStorage, SceneUtil::WorkQueue* workQueue, Resource::ResourceSystem* resourceSystem,
         MWPhysics::PhysicsSystem* physics,
         DetourNavigator::Navigator& navigator)
@@ -983,6 +989,7 @@ namespace MWWorld
         , mRendering(rendering)
         , mLandManager(landManager)
         , mTerrain(terrain)
+        , mObjectPaging(objectPaging)
         , mIncrementalCompileOperation(incrementalCompileOperation)
         , mTerrainStorage(terrainStorage)
         , mWorkQueue(workQueue)

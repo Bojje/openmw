@@ -56,6 +56,7 @@ namespace DetourNavigator
 namespace MWRender
 {
     class LandManager;
+    class ObjectPaging;
     class SkyManager;
     class RenderingManager;
 }
@@ -135,6 +136,7 @@ namespace MWWorld
         MWRender::RenderingManager& mRendering;
         MWRender::LandManager& mLandManager;
         Terrain::World*& mTerrain;
+        MWRender::ObjectPaging*& mObjectPaging;
         osgUtil::IncrementalCompileOperation* mIncrementalCompileOperation;
         Terrain::RenderStorage& mTerrainStorage;
         SceneUtil::WorkQueue* mWorkQueue;
@@ -198,7 +200,8 @@ namespace MWWorld
             Render::SceneSynchronizer sceneSynchronizer, Render::BonePoseResolver bonePoseResolver,
             Render::MeshResolver meshResolver, Render::TextureResolver textureResolver, const VFS::Manager* vfs,
             MWRender::RenderingManager& rendering, MWRender::LandManager& landManager,
-            Terrain::World*& terrain, osgUtil::IncrementalCompileOperation* incrementalCompileOperation,
+            Terrain::World*& terrain, MWRender::ObjectPaging*& objectPaging,
+            osgUtil::IncrementalCompileOperation* incrementalCompileOperation,
             Terrain::RenderStorage& terrainStorage, SceneUtil::WorkQueue* workQueue,
             Resource::ResourceSystem* resourceSystem,
             MWPhysics::PhysicsSystem* physics,

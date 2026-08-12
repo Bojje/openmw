@@ -266,7 +266,8 @@ namespace MWWorld
         SceneUtil::LightManager* lightRoot = nullptr;
         mRendering = std::make_unique<MWRender::RenderingManager>(
             viewer, rootNode, mResourceSystem, workQueue, *mNavigator, mGroundcoverStore, unrefQueue, *mTerrainStorage,
-            mTerrain, incrementalCompileOperation, lightRoot, mSkyManager, mPostProcessor, frameLifecycle);
+            mTerrain, mObjectPaging, incrementalCompileOperation, lightRoot, mSkyManager, mPostProcessor,
+            frameLifecycle);
         mFrameLifecycle = &frameLifecycle;
         mProjectileManager = std::make_unique<ProjectileManager>(
             lightRoot->asGroup(), mResourceSystem, mRendering.get(), mPhysics.get());
@@ -297,7 +298,7 @@ namespace MWWorld
         };
         mWorldScene = std::make_unique<Scene>(
             *this, frameLifecycle, sceneSynchronizer, bonePoseResolver, meshResolver, textureResolver,
-            mResourceSystem->getVFS(), *mRendering, *mTerrainStorage->getLandManager(), mTerrain,
+            mResourceSystem->getVFS(), *mRendering, *mTerrainStorage->getLandManager(), mTerrain, mObjectPaging,
             incrementalCompileOperation, *mTerrainStorage, workQueue, mResourceSystem, mPhysics.get(), *mNavigator);
     }
 
