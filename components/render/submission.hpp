@@ -114,9 +114,15 @@ namespace Render
         return result;
     }
 
+    struct EffectMeshSubmission
+    {
+        WorldObject object;
+        std::vector<MeshInstance> meshes;
+    };
+
     template <class ResolveMeshes>
-    void collectEffectMeshes(const WorldScene& world, ResolveMeshes&& resolveMeshes, std::vector<MeshInstance>& result,
-        std::vector<std::string>& unresolvedModels)
+    void collectEffectMeshes(const WorldScene& world, ResolveMeshes&& resolveMeshes,
+        std::vector<EffectMeshSubmission>& result, std::vector<std::string>& unresolvedModels)
     {
         for (const WorldObject* effect : world.effectsInOrder())
         {
@@ -124,6 +130,8 @@ namespace Render
             const bool hasGeometry = std::any_of(resolvedMeshes.begin(), resolvedMeshes.end(), hasRenderableGeometry);
             if (!hasGeometry)
                 unresolvedModels.push_back(effect->model);
+            EffectMeshSubmission submission;
+            submission.object = *effect;
             for (const MeshInstance& mesh : resolvedMeshes)
             {
                 MeshInstance instance = transformMeshInstance(*effect, mesh);
@@ -133,8 +141,9 @@ namespace Render
                     instance.mesh.material.albedoWrapU = false;
                     instance.mesh.material.albedoWrapV = false;
                 }
-                result.push_back(std::move(instance));
+                submission.meshes.push_back(std::move(instance));
             }
+            result.push_back(std::move(submission));
         }
     }
 
@@ -155,6 +164,9 @@ namespace Render
     {
         SceneData scene;
         std::vector<MeshInstance> meshes;
+        // Effects remain separate from ordinary world meshes so loop/lifetime
+        // metadata crosses the backend boundary without duplicating draws.
+        std::vector<EffectMeshSubmission> effects;
         std::vector<TerrainTile> terrainTiles;
         std::vector<std::string> unresolvedModels;
         std::size_t invalidWaterSurfaces = 0;
@@ -194,6 +206,15 @@ namespace Render
                 }
             }
 
+            for (const EffectMeshSubmission& effect : effects)
+            {
+                if (effect.object.dynamic || effect.object.model.empty() || !effect.object.transform.valid())
+                    return false;
+                for (const MeshInstance& instance : effect.meshes)
+                    if (!validMeshInstance(instance, false))
+                        return false;
+            }
+
             return std::all_of(terrainTiles.begin(), terrainTiles.end(), [](const TerrainTile& tile) {
                 return tile.valid();
             });
@@ -217,6 +238,9 @@ namespace Render
                 addMesh(instance);
             for (const DynamicMeshSubmission& dynamic : dynamicMeshes)
                 for (const MeshInstance& instance : dynamic.meshes)
+                    addMesh(instance);
+            for (const EffectMeshSubmission& effect : effects)
+                for (const MeshInstance& instance : effect.meshes)
                     addMesh(instance);
             for (const TerrainTile& tile : terrainTiles)
                 for (const TerrainLayer& layer : tile.layers)
@@ -288,7 +312,7 @@ namespace Render
         std::vector<MeshInstance> waterMeshes = collectWaterMeshes(world, worldspace);
         result.meshes.insert(result.meshes.end(), std::make_move_iterator(waterMeshes.begin()),
             std::make_move_iterator(waterMeshes.end()));
-        collectEffectMeshes(world, resolveMeshes, result.meshes, result.unresolvedModels);
+        collectEffectMeshes(world, resolveMeshes, result.effects, result.unresolvedModels);
         for (const CellScene* cell : world.cellsInOrder(worldspace))
             for (const WorldObject& object : cell->objects)
             {

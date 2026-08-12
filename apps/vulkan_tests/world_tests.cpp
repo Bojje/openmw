@@ -211,7 +211,7 @@ int main()
     Render::MeshInstance aggregateMesh = {};
     aggregateMesh.mesh.vertices.resize(3);
     aggregateMesh.mesh.indices = { 0, 1, 2 };
-    if (!world.recordEffect("spark", "meshes/effect.nif", { 10.f, 11.f, 12.f }, 2.f, "textures/effect.dds")
+    if (!world.recordEffect("spark", "meshes/effect.nif", { 10.f, 11.f, 12.f }, 2.f, "textures/effect.dds", true)
         || world.recordEffect("", "meshes/effect.nif", { 10.f, 11.f, 12.f }, 1.f))
         throw std::runtime_error("renderer-neutral world scene accepted an invalid or anonymous effect");
     const Render::SceneSubmission effectSubmission = Render::collectSceneSubmission(world, aggregateScene, "",
@@ -220,10 +220,13 @@ int main()
                 throw std::runtime_error("effect scene submission resolved an unexpected model");
             return { aggregateMesh };
         }, false);
-    if (effectSubmission.meshes.size() != 2 || effectSubmission.meshes.back().transform.data[0] != 2.f
-        || effectSubmission.meshes.back().mesh.material.albedoTexture != "textures/effect.dds"
-        || effectSubmission.meshes.back().mesh.material.albedoWrapU
-        || effectSubmission.meshes.back().mesh.material.albedoWrapV
+    if (effectSubmission.meshes.size() != 1 || effectSubmission.effects.size() != 1
+        || effectSubmission.effects.back().meshes.size() != 1
+        || effectSubmission.effects.back().meshes.back().transform.data[0] != 2.f
+        || effectSubmission.effects.back().meshes.back().mesh.material.albedoTexture != "textures/effect.dds"
+        || effectSubmission.effects.back().meshes.back().mesh.material.albedoWrapU
+        || effectSubmission.effects.back().meshes.back().mesh.material.albedoWrapV
+        || !effectSubmission.effects.back().object.looping
         || !effectSubmission.valid())
         throw std::runtime_error("renderer-neutral scene submission lost an identified effect");
     if (!world.removeEffect("spark") || world.removeEffect("spark"))
@@ -240,7 +243,8 @@ int main()
                 throw std::runtime_error("scene submission collector resolved an unexpected model");
             return { aggregateMesh };
         }, true);
-    if (aggregate.meshes.size() != 1 || aggregate.dynamicMeshes.size() != 0 || aggregate.terrainTiles.size() != 1
+    if (aggregate.meshes.size() != 1 || !aggregate.effects.empty() || aggregate.dynamicMeshes.size() != 0
+        || aggregate.terrainTiles.size() != 1
         || !aggregate.valid())
         throw std::runtime_error("renderer-neutral scene submission collector lost world state");
 

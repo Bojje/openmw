@@ -1603,6 +1603,8 @@ namespace Vk
         mHasSceneData = true;
         mDynamicMeshCount = submission.dynamicMeshes.size();
         std::vector<Render::MeshInstance> meshes = submission.meshes;
+        for (const Render::EffectMeshSubmission& effect : submission.effects)
+            meshes.insert(meshes.end(), effect.meshes.begin(), effect.meshes.end());
         for (const Render::TerrainTile& tile : submission.terrainTiles)
         {
             std::vector<Render::MeshInstance> terrain = Render::makeTerrainMeshes(tile);
