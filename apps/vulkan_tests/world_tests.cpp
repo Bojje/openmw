@@ -82,6 +82,31 @@ int main()
     world.removeCell(&waterCellHandle);
     world.removeCell(&emptyCellHandle);
 
+    Render::WeatherEffects weather;
+    weather.enabled = true;
+    weather.alpha = 0.5f;
+    weather.diameter = 100.f;
+    weather.minHeight = 10.f;
+    weather.maxHeight = 30.f;
+    weather.speed = 4.f;
+    weather.maxParticles = 2;
+    world.setWeatherEffects(weather);
+    const std::vector<Render::MeshInstance> weatherMeshes = Render::collectWeatherMeshes(world, world.sceneData());
+    if (weatherMeshes.size() != 2 || !weatherMeshes.front().mesh.material.alphaBlend
+        || weatherMeshes.front().mesh.material.diffuse.w != 0.5f
+        || weatherMeshes.front().mesh.vertices.size() != 4)
+        throw std::runtime_error("renderer-neutral world scene failed to emit precipitation geometry");
+    const Render::SceneSubmission weatherSubmission = Render::collectSceneSubmission(world, world.sceneData(), "",
+        [](std::string_view) { return std::vector<Render::MeshInstance>(); }, false);
+    if (weatherSubmission.meshes.size() != 2 || !weatherSubmission.valid())
+        throw std::runtime_error("renderer-neutral scene submission lost precipitation geometry");
+    world.updateEffects(1.f);
+    if (world.weatherTime() != 1.f)
+        throw std::runtime_error("renderer-neutral world scene failed to advance precipitation time");
+    world.clearWeatherEffects();
+    if (!Render::collectWeatherMeshes(world, world.sceneData()).empty())
+        throw std::runtime_error("renderer-neutral world scene failed to clear precipitation geometry");
+
     int staticCellHandle = 0;
     Render::ObjectTransform staticTransform;
     staticTransform.position = { 3.f, 4.f, 5.f };

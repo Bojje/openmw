@@ -179,7 +179,7 @@ The submission
 boundary now validates mesh indices and terrain snapshots before Vulkan consumes them. The
 full-game Vulkan call site now exists for the no-GUI bootstrap: window/input ownership,
 camera synchronization, neutral image loading, and static scene submission are live, while
-dynamic-content, weather particle/water presentation, and GUI/presentation services remain incomplete. Weather ambient, directional-light, fog, and sky-horizon values now cross the neutral frame state, and the Vulkan composite derives its background gradient from that state. NIF skinning metadata now survives conversion, and resolved dynamic
+dynamic-content, legacy weather particle fidelity, and GUI/presentation services remain incomplete. Weather ambient, directional-light, fog, and sky-horizon values now cross the neutral frame state, and the Vulkan composite derives its background gradient from that state. Renderer-neutral precipitation state now belongs to `WorldScene` and produces deterministic alpha-blended rain geometry in the Vulkan submission; full weather particle meshes, storm orientation, and water-shader parity remain. NIF skinning metadata now survives conversion, and resolved dynamic
 mesh payloads cross the neutral boundary into the Vulkan consumer. A deterministic CPU skinning
 helper now applies frame bone matrices for future animation integration. Unskinned dynamic meshes and skinned records with a
 supplied pose now enter the raster draw batch with their neutral transforms; skinned records without a resolved pose now
@@ -490,7 +490,7 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-206 files, deleting 2,245 lines and adding 12,848 lines (net `+10,603`). The larger Vulkan-only
+206 files, deleting 2,245 lines and adding 12,948 lines (net `+10,703`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. The live no-GUI consumer is the first deletion
 checkpoint; further reduction can now target OSG scene/resource/presentation ownership rather

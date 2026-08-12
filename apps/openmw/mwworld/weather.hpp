@@ -33,6 +33,11 @@ namespace MWRender
     class SkyManager;
 }
 
+namespace Render
+{
+    class WorldScene;
+}
+
 namespace Loading
 {
     class Listener;
@@ -375,6 +380,8 @@ namespace MWWorld
 
         /// Copy weather lighting and fog into the renderer-neutral frame state.
         void updateNeutralSceneData(Render::SceneData& sceneData) const;
+        /// Copy precipitation parameters into the renderer-neutral world owner.
+        void updateNeutralWeatherEffects(Render::WorldScene& worldScene) const;
 
         std::vector<Moon> getCurrentMoons(const TimeStamp& time) const;
 

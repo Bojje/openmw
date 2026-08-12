@@ -17,6 +17,26 @@
 
 namespace Render
 {
+    struct WeatherEffects
+    {
+        bool enabled = false;
+        float alpha = 0.f;
+        float diameter = 0.f;
+        float minHeight = 0.f;
+        float maxHeight = 0.f;
+        float speed = 0.f;
+        int maxParticles = 0;
+
+        bool valid() const
+        {
+            if (!enabled)
+                return true;
+            return std::isfinite(alpha) && alpha >= 0.f && alpha <= 1.f && std::isfinite(diameter)
+                && diameter > 0.f && std::isfinite(minHeight) && std::isfinite(maxHeight)
+                && maxHeight > minHeight && std::isfinite(speed) && speed >= 0.f && maxParticles >= 0;
+        }
+    };
+
     struct WaterSurface
     {
         float minX = 0.f;
@@ -123,6 +143,8 @@ namespace Render
         std::vector<TerrainRegion> mTerrainRegions;
         std::string mActiveWorldspace;
         SceneData mSceneData{};
+        WeatherEffects mWeatherEffects;
+        float mWeatherTime = 0.f;
         bool mWaterEnabled = true;
         uint64_t mNextObjectId = 1;
 
@@ -172,6 +194,19 @@ namespace Render
 
         SceneData& sceneData() { return mSceneData; }
 
+        void setWeatherEffects(const WeatherEffects& effects)
+        {
+            mWeatherEffects = effects.valid() ? effects : WeatherEffects{};
+            if (!mWeatherEffects.enabled)
+                mWeatherTime = 0.f;
+        }
+
+        void clearWeatherEffects() { setWeatherEffects({}); }
+
+        const WeatherEffects& weatherEffects() const { return mWeatherEffects; }
+
+        float weatherTime() const { return mWeatherTime; }
+
         void recordCell(const void* cellKey, bool exterior, int gridX, int gridY, std::string_view name,
             std::string_view worldspace = {}, std::optional<WaterSurface> water = {})
         {
@@ -218,6 +253,8 @@ namespace Render
         {
             if (!valid(duration) || duration <= 0.f)
                 return;
+            if (mWeatherEffects.enabled && mWeatherEffects.speed > 0.f)
+                mWeatherTime = std::fmod(mWeatherTime + duration, 3600.f);
             for (auto iter = mEffects.begin(); iter != mEffects.end();)
             {
                 WorldObject& effect = iter->second;
@@ -468,6 +505,8 @@ namespace Render
             mTerrainRegions.clear();
             mActiveWorldspace.clear();
             mSceneData = {};
+            mWeatherEffects = {};
+            mWeatherTime = 0.f;
             mWaterEnabled = true;
             mNextObjectId = 1;
         }

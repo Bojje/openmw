@@ -5,6 +5,7 @@
 
 #include <components/esm/stringrefid.hpp>
 #include <components/settings/values.hpp>
+#include <components/render/world.hpp>
 
 #include <components/misc/rng.hpp>
 
@@ -1095,6 +1096,19 @@ namespace MWWorld
         }
         else
             sceneData.fogParameters = { 0.f, 0.f, 0.f, 0.f };
+    }
+
+    void WeatherManager::updateNeutralWeatherEffects(Render::WorldScene& worldScene) const
+    {
+        Render::WeatherEffects effects;
+        effects.enabled = mPrecipitation && (!mResult.mRainEffect.empty() || !mResult.mParticleEffect.empty());
+        effects.alpha = std::clamp(mResult.mPrecipitationAlpha, 0.f, 1.f);
+        effects.diameter = std::max(1.f, mResult.mRainDiameter);
+        effects.minHeight = mResult.mRainMinHeight;
+        effects.maxHeight = std::max(mResult.mRainMaxHeight, effects.minHeight + 1.f);
+        effects.speed = std::max(0.f, mResult.mRainSpeed);
+        effects.maxParticles = std::max(0, mResult.mRainMaxRaindrops);
+        worldScene.setWeatherEffects(effects);
     }
 
     void WeatherManager::write(ESM::ESMWriter& writer, Loading::Listener& progress)

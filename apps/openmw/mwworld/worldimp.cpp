@@ -4184,11 +4184,17 @@ namespace MWWorld
     void World::updateNeutralSceneData(Render::SceneData& sceneData) const
     {
         if (mWeatherManager)
+        {
             mWeatherManager->updateNeutralSceneData(sceneData);
+            if (mWorldScene && mWorldScene->mNeutralWorldScene)
+                mWeatherManager->updateNeutralWeatherEffects(*mWorldScene->mNeutralWorldScene);
+        }
 
         const CellStore* const currentCell = mWorldScene ? mWorldScene->getCurrentCell() : nullptr;
         if (currentCell == nullptr || currentCell->isExterior() || currentCell->isQuasiExterior())
             return;
+        if (mWorldScene && mWorldScene->mNeutralWorldScene)
+            mWorldScene->mNeutralWorldScene->clearWeatherEffects();
 
         const auto color = [](unsigned int value) {
             return Render::Vec4{ static_cast<float>((value >> 0) & 0xff) / 255.f,

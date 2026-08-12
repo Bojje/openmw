@@ -114,6 +114,60 @@ namespace Render
         return result;
     }
 
+    inline std::vector<MeshInstance> collectWeatherMeshes(const WorldScene& world, const SceneData& scene)
+    {
+        const WeatherEffects& weather = world.weatherEffects();
+        if (!weather.enabled || !weather.valid() || weather.maxParticles <= 0 || !scene.valid())
+            return {};
+
+        const int particleCount = std::min(weather.maxParticles, 256);
+        const float height = weather.maxHeight - weather.minHeight;
+        const float lineLength = std::clamp(height * 0.08f, 2.f, 32.f);
+        const float halfWidth = std::clamp(weather.diameter / 400.f, 0.02f, 0.2f);
+        const float cameraX = scene.viewInverse.data[12];
+        const float cameraY = scene.viewInverse.data[13];
+        const float cameraZ = scene.viewInverse.data[14];
+        std::vector<MeshInstance> result;
+        result.reserve(static_cast<std::size_t>(particleCount));
+
+        for (int index = 0; index < particleCount; ++index)
+        {
+            const uint32_t seed = static_cast<uint32_t>(index) * 1664525u + 1013904223u;
+            const float horizontalX = static_cast<float>((seed >> 8) & 0xffffu) / 65535.f - 0.5f;
+            const float horizontalY = static_cast<float>((seed >> 24) & 0xffu) / 255.f - 0.5f;
+            const float heightFraction = static_cast<float>((seed >> 16) & 0xffffu) / 65535.f;
+            const float fallingDistance = std::fmod(
+                heightFraction * height + world.weatherTime() * weather.speed, height);
+            const float x = cameraX + horizontalX * weather.diameter;
+            const float y = cameraY + horizontalY * weather.diameter;
+            const float z = cameraZ + weather.minHeight + fallingDistance;
+
+            MeshInstance instance;
+            instance.mesh.material.diffuse = { 1.f, 1.f, 1.f, weather.alpha };
+            instance.mesh.material.alphaBlend = true;
+            instance.mesh.material.doubleSided = true;
+            instance.mesh.vertices.resize(4);
+            const std::array<Vec3, 4> positions = { Vec3{ x - halfWidth, y, z },
+                Vec3{ x + halfWidth, y, z }, Vec3{ x + halfWidth, y, z - lineLength },
+                Vec3{ x - halfWidth, y, z - lineLength } };
+            for (std::size_t vertexIndex = 0; vertexIndex < positions.size(); ++vertexIndex)
+            {
+                MeshVertex& vertex = instance.mesh.vertices[vertexIndex];
+                vertex.position[0] = positions[vertexIndex].x;
+                vertex.position[1] = positions[vertexIndex].y;
+                vertex.position[2] = positions[vertexIndex].z;
+                vertex.normal[1] = 1.f;
+                vertex.texcoord[0] = vertexIndex == 1 || vertexIndex == 2 ? 1.f : 0.f;
+                vertex.texcoord[1] = vertexIndex >= 2 ? 1.f : 0.f;
+                vertex.color[0] = vertex.color[1] = vertex.color[2] = vertex.color[3] = 1.f;
+                vertex.tangent[3] = 1.f;
+            }
+            instance.mesh.indices = { 0, 1, 2, 0, 2, 3 };
+            result.push_back(std::move(instance));
+        }
+        return result;
+    }
+
     struct EffectMeshSubmission
     {
         WorldObject object;
@@ -310,6 +364,9 @@ namespace Render
         SceneSubmission result;
         result.scene = scene;
         result.meshes = collectWorldMeshes(world, resolveMeshes, worldspace, &result.unresolvedModels);
+        std::vector<MeshInstance> weatherMeshes = collectWeatherMeshes(world, scene);
+        result.meshes.insert(result.meshes.end(), std::make_move_iterator(weatherMeshes.begin()),
+            std::make_move_iterator(weatherMeshes.end()));
         for (const CellScene* cell : world.cellsInOrder(worldspace))
             if (cell->water && !cell->water->valid())
                 ++result.invalidWaterSurfaces;
