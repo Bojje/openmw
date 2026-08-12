@@ -100,7 +100,7 @@ namespace MWClass
     }
 
     void CreatureLevList::insertObjectRendering(
-        const MWWorld::Ptr& ptr, const std::string& model, MWRender::RenderingInterface& renderingInterface) const
+        const MWWorld::Ptr& ptr, const std::string& model, MWRender::Objects& objects) const
     {
         ensureCustomData(ptr);
 

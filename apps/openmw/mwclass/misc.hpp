@@ -16,7 +16,7 @@ namespace MWClass
         MWWorld::Ptr moveToCell(const MWWorld::Ptr& ptr, MWWorld::CellStore& cell) const override;
 
         void insertObjectRendering(const MWWorld::Ptr& ptr, const std::string& model,
-            MWRender::RenderingInterface& renderingInterface) const override;
+            MWRender::Objects& objects) const override;
         ///< Add reference into a cell for rendering
 
         std::string_view getName(const MWWorld::ConstPtr& ptr) const override;

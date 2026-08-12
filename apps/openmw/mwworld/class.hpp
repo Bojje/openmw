@@ -29,7 +29,7 @@ namespace ESM
 
 namespace MWRender
 {
-    class RenderingInterface;
+    class Objects;
 }
 
 namespace MWPhysics
@@ -87,7 +87,7 @@ namespace MWWorld
         unsigned int getType() const { return mType; }
 
         virtual void insertObjectRendering(
-            const Ptr& ptr, const std::string& mesh, MWRender::RenderingInterface& renderingInterface) const;
+            const Ptr& ptr, const std::string& mesh, MWRender::Objects& objects) const;
         virtual void insertObject(const Ptr& ptr, const std::string& mesh, const osg::Quat& rotation,
             MWPhysics::PhysicsSystem& physics) const;
         ///< Add reference into a cell for rendering (default implementation: don't render anything).

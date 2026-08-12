@@ -3,7 +3,6 @@
 #include <components/esm3/loadbody.hpp>
 
 #include "../mwrender/objects.hpp"
-#include "../mwrender/renderinginterface.hpp"
 
 #include "../mwworld/cellstore.hpp"
 
@@ -24,11 +23,11 @@ namespace MWClass
     }
 
     void BodyPart::insertObjectRendering(
-        const MWWorld::Ptr& ptr, const std::string& model, MWRender::RenderingInterface& renderingInterface) const
+        const MWWorld::Ptr& ptr, const std::string& model, MWRender::Objects& objects) const
     {
         if (!model.empty())
         {
-            renderingInterface.getObjects().insertModel(ptr, model);
+            objects.insertModel(ptr, model);
         }
     }
 

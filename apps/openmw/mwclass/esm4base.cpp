@@ -8,7 +8,6 @@
 #include "../mwgui/tooltips.hpp"
 
 #include "../mwrender/objects.hpp"
-#include "../mwrender/renderinginterface.hpp"
 #include "../mwrender/vismask.hpp"
 
 #include "../mwphysics/physicssystem.hpp"
@@ -17,11 +16,11 @@
 namespace MWClass
 {
     void ESM4Impl::insertObjectRendering(
-        const MWWorld::Ptr& ptr, const std::string& model, MWRender::RenderingInterface& renderingInterface)
+        const MWWorld::Ptr& ptr, const std::string& model, MWRender::Objects& objects)
     {
         if (!model.empty())
         {
-            renderingInterface.getObjects().insertModel(ptr, model);
+            objects.insertModel(ptr, model);
             ptr.getRefData().getBaseNode()->setNodeMask(MWRender::Mask_Static);
         }
     }

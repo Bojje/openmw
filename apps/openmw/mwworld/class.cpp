@@ -34,7 +34,7 @@ namespace MWWorld
     }
 
     void Class::insertObjectRendering(
-        const Ptr& ptr, const std::string& mesh, MWRender::RenderingInterface& renderingInterface) const
+        const Ptr& ptr, const std::string& mesh, MWRender::Objects& objects) const
     {
     }
 

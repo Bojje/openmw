@@ -23,7 +23,7 @@ namespace MWClass
     namespace ESM4Impl
     {
         void insertObjectRendering(
-            const MWWorld::Ptr& ptr, const std::string& model, MWRender::RenderingInterface& renderingInterface);
+            const MWWorld::Ptr& ptr, const std::string& model, MWRender::Objects& objects);
         void insertObjectPhysics(const MWWorld::Ptr& ptr, const std::string& model, const osg::Quat& rotation,
             MWPhysics::PhysicsSystem& physics);
         MWGui::ToolTipInfo getToolTipInfo(std::string_view name, int count);
@@ -85,9 +85,9 @@ namespace MWClass
 
     public:
         void insertObjectRendering(const MWWorld::Ptr& ptr, const std::string& model,
-            MWRender::RenderingInterface& renderingInterface) const override
+            MWRender::Objects& objects) const override
         {
-            ESM4Impl::insertObjectRendering(ptr, model, renderingInterface);
+            ESM4Impl::insertObjectRendering(ptr, model, objects);
         }
 
         void insertObject(const MWWorld::Ptr& ptr, const std::string& model, const osg::Quat& rotation,

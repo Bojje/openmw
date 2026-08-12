@@ -18,7 +18,6 @@
 #include "../mwgui/tooltips.hpp"
 
 #include "../mwrender/objects.hpp"
-#include "../mwrender/renderinginterface.hpp"
 
 #include "classmodel.hpp"
 #include "nameorid.hpp"
@@ -31,11 +30,11 @@ namespace MWClass
     }
 
     void Lockpick::insertObjectRendering(
-        const MWWorld::Ptr& ptr, const std::string& model, MWRender::RenderingInterface& renderingInterface) const
+        const MWWorld::Ptr& ptr, const std::string& model, MWRender::Objects& objects) const
     {
         if (!model.empty())
         {
-            renderingInterface.getObjects().insertModel(ptr, model);
+            objects.insertModel(ptr, model);
         }
     }
 

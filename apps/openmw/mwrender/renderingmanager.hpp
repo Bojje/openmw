@@ -2,7 +2,6 @@
 #define OPENMW_MWRENDER_RENDERINGMANAGER_H
 
 #include "objects.hpp"
-#include "renderinginterface.hpp"
 #include "rendermode.hpp"
 
 #include <components/render/frame.hpp>
@@ -117,7 +116,7 @@ namespace MWRender
     class Groundcover;
     class PostProcessor;
 
-    class RenderingManager : public MWRender::RenderingInterface
+    class RenderingManager
     {
     public:
         RenderingManager(osgViewer::Viewer* viewer, osg::ref_ptr<osg::Group> rootNode,
@@ -134,7 +133,7 @@ namespace MWRender
         /// the world-owned neutral frame snapshot at a frame boundary.
         void synchronizeNeutralScene(Render::SceneData& sceneData) const;
 
-        MWRender::Objects& getObjects() override;
+        MWRender::Objects& getObjects();
 
         void preloadCommonAssets();
 

@@ -21,7 +21,7 @@ namespace MWClass
         ///< @return true if this object has a tooltip when focused (default implementation: true)
 
         void insertObjectRendering(const MWWorld::Ptr& ptr, const std::string& model,
-            MWRender::RenderingInterface& renderingInterface) const override;
+            MWRender::Objects& objects) const override;
         ///< Add reference into a cell for rendering
 
         void readAdditionalState(const MWWorld::Ptr& ptr, const ESM::ObjectState& state) const override;

@@ -7,7 +7,6 @@
 #include "../mwgui/tooltips.hpp"
 
 #include "../mwrender/objects.hpp"
-#include "../mwrender/renderinginterface.hpp"
 #include "../mwworld/cellstore.hpp"
 #include "../mwworld/class.hpp"
 #include "../mwworld/registeredclass.hpp"
@@ -31,9 +30,9 @@ namespace MWClass
         }
 
         void insertObjectRendering(const MWWorld::Ptr& ptr, const std::string& model,
-            MWRender::RenderingInterface& renderingInterface) const override
+            MWRender::Objects& objects) const override
         {
-            renderingInterface.getObjects().insertNPC(ptr);
+            objects.insertNPC(ptr);
         }
 
         void insertObject(const MWWorld::Ptr& ptr, const std::string& model, const osg::Quat& rotation,

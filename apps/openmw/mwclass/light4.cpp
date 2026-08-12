@@ -1,7 +1,6 @@
 #include "light4.hpp"
 
 #include "../mwrender/objects.hpp"
-#include "../mwrender/renderinginterface.hpp"
 #include "../mwworld/ptr.hpp"
 
 #include <components/esm4/loadligh.hpp>
@@ -14,11 +13,11 @@ namespace MWClass
     }
 
     void ESM4Light ::insertObjectRendering(
-        const MWWorld::Ptr& ptr, const std::string& model, MWRender::RenderingInterface& renderingInterface) const
+        const MWWorld::Ptr& ptr, const std::string& model, MWRender::Objects& objects) const
     {
         MWWorld::LiveCellRef<ESM4::Light>* ref = ptr.get<ESM4::Light>();
 
         // Insert even if model is empty, so that the light is added
-        renderingInterface.getObjects().insertModel(ptr, model, !(ref->mBase->mData.flags & ESM4::Light::OffDefault));
+        objects.insertModel(ptr, model, !(ref->mBase->mData.flags & ESM4::Light::OffDefault));
     }
 }

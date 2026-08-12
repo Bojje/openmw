@@ -24,7 +24,6 @@
 #include "../mwgui/tooltips.hpp"
 
 #include "../mwrender/objects.hpp"
-#include "../mwrender/renderinginterface.hpp"
 
 #include "classmodel.hpp"
 #include "nameorid.hpp"
@@ -37,12 +36,12 @@ namespace MWClass
     }
 
     void Light::insertObjectRendering(
-        const MWWorld::Ptr& ptr, const std::string& model, MWRender::RenderingInterface& renderingInterface) const
+        const MWWorld::Ptr& ptr, const std::string& model, MWRender::Objects& objects) const
     {
         MWWorld::LiveCellRef<ESM::Light>* ref = ptr.get<ESM::Light>();
 
         // Insert even if model is empty, so that the light is added
-        renderingInterface.getObjects().insertModel(ptr, model, !(ref->mBase->mData.mFlags & ESM::Light::OffDefault));
+        objects.insertModel(ptr, model, !(ref->mBase->mData.mFlags & ESM::Light::OffDefault));
     }
 
     void Light::insertObject(const MWWorld::Ptr& ptr, const std::string& model, const osg::Quat& rotation,

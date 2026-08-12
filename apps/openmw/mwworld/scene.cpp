@@ -173,7 +173,7 @@ namespace
         ESM::RefNum refnum = ptr.getCellRef().getRefNum();
         const bool isPaged = refnum.hasContentFile() && std::binary_search(pagedRefs.begin(), pagedRefs.end(), refnum);
         if (!isPaged)
-            ptr.getClass().insertObjectRendering(ptr, model, rendering);
+            ptr.getClass().insertObjectRendering(ptr, model, rendering.getObjects());
         else
             ptr.getRefData().setBaseNode(pagedNode);
         setNodeRotation(ptr, rendering, rotation);
@@ -382,7 +382,7 @@ namespace MWWorld
             if (!ptr.getRefData().getBaseNode())
                 return;
             const VFS::Path::Normalized model = getModel(ptr);
-            ptr.getClass().insertObjectRendering(ptr, model, mRendering);
+            ptr.getClass().insertObjectRendering(ptr, model, mRendering.getObjects());
             setNodeRotation(ptr, mRendering, makeNodeRotation(ptr, RotationOrder::direct));
             recordNeutralObject(ptr, model.view(), true, mNeutralWorldScene);
             reloadTerrain();

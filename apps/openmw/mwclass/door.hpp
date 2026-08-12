@@ -19,7 +19,7 @@ namespace MWClass
 
     public:
         void insertObjectRendering(const MWWorld::Ptr& ptr, const std::string& model,
-            MWRender::RenderingInterface& renderingInterface) const override;
+            MWRender::Objects& objects) const override;
         ///< Add reference into a cell for rendering
 
         void insertObject(const MWWorld::Ptr& ptr, const std::string& model, const osg::Quat& rotation,
