@@ -19,6 +19,11 @@
 #include <png.h>
 #endif
 
+#ifdef OPENMW_NEUTRAL_JPEG
+#include <csetjmp>
+#include <jpeglib.h>
+#endif
+
 // Decoding stays in the neutral resource layer so Vulkan never needs an OSG image adapter.
 namespace
 {
@@ -263,6 +268,115 @@ namespace
     }
 #endif
 
+#ifdef OPENMW_NEUTRAL_JPEG
+    struct JpegErrorContext
+    {
+        jpeg_error_mgr manager;
+        jmp_buf jump;
+    };
+
+    void jpegErrorExit(j_common_ptr cinfo)
+    {
+        auto* const error = reinterpret_cast<JpegErrorContext*>(cinfo->err);
+        longjmp(error->jump, 1);
+    }
+
+    std::shared_ptr<const Render::TextureData> decodeJpeg(const Bytes& data)
+    {
+        if (data.size() < 2 || data[0] != 0xff || data[1] != 0xd8
+            || data.size() > std::numeric_limits<unsigned long>::max())
+            return {};
+
+        jpeg_decompress_struct jpeg{};
+        JpegErrorContext error{};
+        jpeg.err = jpeg_std_error(&error.manager);
+        error.manager.error_exit = jpegErrorExit;
+        jpeg_create_decompress(&jpeg);
+
+        JSAMPLE* rawPixels = nullptr;
+        if (setjmp(error.jump) != 0)
+        {
+            delete[] rawPixels;
+            jpeg_destroy_decompress(&jpeg);
+            return {};
+        }
+
+        jpeg_mem_src(&jpeg, const_cast<unsigned char*>(data.data()), static_cast<unsigned long>(data.size()));
+        if (jpeg_read_header(&jpeg, TRUE) != JPEG_HEADER_OK)
+        {
+            jpeg_destroy_decompress(&jpeg);
+            return {};
+        }
+
+        jpeg.out_color_space = JCS_RGB;
+        if (!jpeg_start_decompress(&jpeg))
+        {
+            jpeg_destroy_decompress(&jpeg);
+            return {};
+        }
+
+        const std::size_t width = jpeg.output_width;
+        const std::size_t height = jpeg.output_height;
+        const int channels = jpeg.output_components;
+        if (width == 0 || height == 0 || (channels != 1 && channels != 3)
+            || width > std::numeric_limits<std::uint32_t>::max()
+            || height > std::numeric_limits<std::uint32_t>::max()
+            || width > std::numeric_limits<std::size_t>::max() / static_cast<std::size_t>(channels)
+            || width * static_cast<std::size_t>(channels) > std::numeric_limits<std::size_t>::max() / height)
+        {
+            delete[] rawPixels;
+            jpeg_destroy_decompress(&jpeg);
+            return {};
+        }
+
+        const std::size_t rowBytes = width * static_cast<std::size_t>(channels);
+        const std::size_t rawBytes = rowBytes * height;
+        rawPixels = new (std::nothrow) JSAMPLE[rawBytes];
+        if (!rawPixels)
+        {
+            jpeg_destroy_decompress(&jpeg);
+            return {};
+        }
+
+        while (jpeg.output_scanline < jpeg.output_height)
+        {
+            JSAMPROW row = rawPixels + static_cast<std::size_t>(jpeg.output_scanline) * rowBytes;
+            if (jpeg_read_scanlines(&jpeg, &row, 1) != 1)
+            {
+                delete[] rawPixels;
+                jpeg_destroy_decompress(&jpeg);
+                return {};
+            }
+        }
+        jpeg_finish_decompress(&jpeg);
+        jpeg_destroy_decompress(&jpeg);
+
+        if (width > std::numeric_limits<std::size_t>::max() / height
+            || width * height > std::numeric_limits<std::size_t>::max() / 4)
+        {
+            delete[] rawPixels;
+            return {};
+        }
+        const std::size_t pixelBytes = width * height * 4;
+        std::unique_ptr<JSAMPLE[]> decodedPixels(rawPixels);
+        auto result = std::make_shared<Render::TextureData>();
+        result->width = static_cast<std::uint32_t>(width);
+        result->height = static_cast<std::uint32_t>(height);
+        result->pixels.resize(pixelBytes);
+        for (std::size_t y = 0; y < height; ++y)
+            for (std::size_t x = 0; x < width; ++x)
+            {
+                const std::size_t source = y * rowBytes + x * static_cast<std::size_t>(channels);
+                const std::uint8_t red = decodedPixels[source];
+                const std::uint8_t green = channels == 1 ? red : decodedPixels[source + 1];
+                const std::uint8_t blue = channels == 1 ? red : decodedPixels[source + 2];
+                setPixel(*result, static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y), red, green, blue,
+                    255);
+            }
+        return result;
+    }
+#endif
+
     std::shared_ptr<const Render::TextureData> decodeDds(const Bytes& data)
     {
         if (data.size() < 128 || data[0] != 'D' || data[1] != 'D' || data[2] != 'S' || data[3] != ' ')
@@ -391,6 +505,10 @@ namespace
 #ifdef OPENMW_NEUTRAL_PNG
         if (extension == "png")
             return decodePng(data);
+#endif
+#ifdef OPENMW_NEUTRAL_JPEG
+        if (extension == "jpg" || extension == "jpeg")
+            return decodeJpeg(data);
 #endif
         return {};
     }

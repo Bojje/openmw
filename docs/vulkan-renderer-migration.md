@@ -89,7 +89,7 @@ through a Bethesda shader property rather than a classic NIF property. Classic N
 slots and Bethesda shader glow textures now cross the same boundary and contribute to the
 neutral emissive channel. Resource images can now cross into neutral RGBA8 data,
 and authored BSLighting double-sided flags now select the matching Vulkan no-cull pipeline.
-The neutral resource backend now owns a VFS-backed RGBA8 texture cache with TGA, BMP, PNG, and
+The neutral resource backend now owns a VFS-backed RGBA8 texture cache with TGA, BMP, PNG, JPEG, and
 common DDS/DXT decoding; the live Vulkan bootstrap uses it for real static-world texture
 paths; unsupported formats now fail the submission with their exact resource path instead of
 silently becoming white.

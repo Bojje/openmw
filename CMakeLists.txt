@@ -277,6 +277,7 @@ endif()
 if (OPENMW_USE_VULKAN)
     find_package(Vulkan REQUIRED COMPONENTS glslangValidator)
     find_package(PNG REQUIRED)
+    find_package(JPEG REQUIRED)
     message(STATUS "Vulkan found: ${Vulkan_LIBRARIES}")
 
     if (NOT Vulkan_GLSLANG_VALIDATOR_EXECUTABLE)
