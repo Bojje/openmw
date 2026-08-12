@@ -172,6 +172,15 @@ namespace Render
 
         bool waterEnabled() const { return mWaterEnabled; }
 
+        bool updateWaterLevel(const void* cellKey, float level)
+        {
+            const auto found = mCells.find(cellKey);
+            if (found == mCells.end() || !found->second.water)
+                return false;
+            found->second.water->level = level;
+            return true;
+        }
+
         void setTerrainTiles(const void* cellKey, std::vector<TerrainTile> tiles)
         {
             if (cellKey == nullptr)

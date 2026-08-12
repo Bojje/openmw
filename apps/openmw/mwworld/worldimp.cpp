@@ -2071,6 +2071,12 @@ namespace MWWorld
         mPhysics->setWaterHeight(height);
         if (mRendering)
             mRendering->setWaterHeight(height);
+        else if (mWorldScene)
+        {
+            const CellStore* const currentCell = mWorldScene->getCurrentCell();
+            if (currentCell != nullptr && mWorldScene->mNeutralWorldScene)
+                mWorldScene->mNeutralWorldScene->updateWaterLevel(static_cast<const void*>(currentCell), height);
+        }
     }
 
     bool World::toggleWater()

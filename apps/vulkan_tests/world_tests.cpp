@@ -63,6 +63,9 @@ int main()
         || waterMeshes.front().mesh.indices.size() != 6 || waterMeshes.front().mesh.vertices.front().position[2] != 4.f
         || !waterMeshes.front().mesh.material.alphaBlend)
         throw std::runtime_error("renderer-neutral world scene failed to emit a water surface");
+    if (!world.updateWaterLevel(&waterCellHandle, 7.f)
+        || Render::collectWaterMeshes(world, "Tamriel").front().mesh.vertices.front().position[2] != 7.f)
+        throw std::runtime_error("renderer-neutral world scene failed to update a water surface level");
     world.setWaterEnabled(false);
     if (!Render::collectWaterMeshes(world, "Tamriel").empty())
         throw std::runtime_error("renderer-neutral world scene ignored water visibility state");
