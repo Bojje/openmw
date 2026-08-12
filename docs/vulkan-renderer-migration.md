@@ -145,6 +145,9 @@ viewer directly, and neutral lighting/fog values are updated at their game-state
 than re-read from OSG objects during export. `Camera` now exposes neutral `Render::Mat4` snapshots
 for this path while retaining legacy OSG getters for the reference backend. This removes another
 backend-specific type from the future Vulkan handoff.
+The no-GUI Vulkan bootstrap now supplies a renderer-neutral first-person look-at and perspective
+snapshot from the player transform, so its first live frame no longer uses identity camera
+matrices; camera-controller parity and resize-aware projection updates remain outstanding.
 Those inputs can now be collected as one `Render::SceneSubmission`; the standalone smoke
 consumer now exercises the same `WorldScene` to `Vk::Renderer` handoff, while the renderer-neutral
 `collectSceneSubmission` helper owns mesh, dynamic-record, worldspace, and terrain selection.
