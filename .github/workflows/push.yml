@@ -123,6 +123,11 @@ jobs:
           echo "neutral terrain provider must not depend on legacy OSG terrain storage"
           exit 1
         fi
+        if rg -n '#include[[:space:]]*[<"]osg|namespace[[:space:]]+osg|osg::|MyGUI' \
+            components/resource/neutraltexturemanager.hpp components/resource/neutraltexturemanager.cpp; then
+          echo "neutral texture decoding must not depend on OSG or MyGUI"
+          exit 1
+        fi
         if rg -n '#include[[:space:]]*[<"]osg|osg::|BaseResourceManager|resourcemanager\.hpp' \
             components/resource/cachemanager.hpp components/resource/niffilemanager.hpp components/resource/niffilemanager.cpp \
             components/resource/nifmeshmanager.hpp components/resource/nifmeshmanager.cpp; then
@@ -261,6 +266,11 @@ jobs:
         if sed -n '/void World::initNeutralRenderer/,/^    }$/p' apps/openmw/mwworld/worldimp.cpp \
             | rg -n '\b(initOsgRenderer|mRendering|mTerrainStorage|mObjectPaging|mPreloader|RenderingManager|LandManager|ObjectPaging)\b'; then
           echo "neutral world bootstrap must not construct or reach back into OSG renderer services"
+          exit 1
+        fi
+        if sed -n '/void OMW::Engine::prepareVulkanEngine/,/^}/p' apps/openmw/engine.cpp \
+            | rg -n 'std::make_unique<MWGui::WindowManager>|initUI|setStore|initOsgRenderer|SceneManager|ViewerFrameLifecycle|mWorkQueue|mUnrefQueue'; then
+          echo "Vulkan engine bootstrap must not construct OSG scene or GUI services"
           exit 1
         fi
         if ! sed -n '/void World::adjustSky/,/^    }$/p' apps/openmw/mwworld/worldimp.cpp \
