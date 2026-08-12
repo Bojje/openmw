@@ -1753,8 +1753,7 @@ namespace MWWorld
         if (mRendering)
             mRendering->update(duration, paused);
 
-        if (mRendering)
-            updateSoundListener();
+        updateSoundListener();
 
         mSpellPreloadTimer -= duration;
         if (mRendering && mSpellPreloadTimer <= 0.f)
@@ -1826,28 +1825,52 @@ namespace MWWorld
 
     void World::updateSoundListener()
     {
-        const MWRender::Camera* camera = mRendering->getCamera();
         const auto& player = getPlayerPtr();
         const ESM::Position& refpos = player.getRefData().getPosition();
         osg::Vec3f listenerPos, up, forward;
         osg::Quat listenerOrient;
 
-        if (isFirstPerson() || Settings::sound().mCameraListener)
-            listenerPos = camera->getPosition();
+        if (mRendering)
+        {
+            const MWRender::Camera* camera = mRendering->getCamera();
+            if (isFirstPerson() || Settings::sound().mCameraListener)
+                listenerPos = camera->getPosition();
+            else
+                listenerPos = refpos.asVec3() + osg::Vec3f(0, 0, 1.85f * mPhysics->getHalfExtents(player).z());
+
+            if (isFirstPerson() || Settings::sound().mCameraListener)
+                listenerOrient = camera->getOrient();
+            else
+                listenerOrient = osg::Quat(refpos.rot[1], osg::Vec3f(0, -1, 0))
+                    * osg::Quat(refpos.rot[0], osg::Vec3f(-1, 0, 0))
+                    * osg::Quat(refpos.rot[2], osg::Vec3f(0, 0, -1));
+
+            forward = listenerOrient * osg::Vec3f(0, 1, 0);
+            up = listenerOrient * osg::Vec3f(0, 0, 1);
+            const bool underwater = isUnderwater(player.getCell(), camera->getPosition());
+            MWBase::Environment::get().getSoundManager()->setListenerPosDir(listenerPos, forward, up, underwater);
+            return;
+        }
+
+        const Render::Quat orientation = Render::makeEulerRotation({ refpos.rot[0], refpos.rot[1], refpos.rot[2] });
+        const Render::Quat cameraOrientation = mNeutralVanityMode
+            ? Render::multiply(orientation,
+                  Render::makeEulerRotation({ mNeutralVanityPitch, 0.f, mNeutralVanityYaw }))
+            : orientation;
+        const Render::Vec3 cameraForward = Render::rotateVector(cameraOrientation, { 0.f, 1.f, 0.f });
+        const Render::Vec3 playerPosition{ refpos.pos[0], refpos.pos[1], refpos.pos[2] };
+        if (mNeutralFirstPerson)
+            listenerPos = osg::Vec3f(playerPosition.x, playerPosition.y, playerPosition.z + 124.f);
+        else if (Settings::sound().mCameraListener)
+            listenerPos = osg::Vec3f(playerPosition.x - cameraForward.x * 180.f,
+                playerPosition.y - cameraForward.y * 180.f,
+                playerPosition.z + (mNeutralVanityMode ? 90.f : 105.f));
         else
             listenerPos = refpos.asVec3() + osg::Vec3f(0, 0, 1.85f * mPhysics->getHalfExtents(player).z());
-
-        if (isFirstPerson() || Settings::sound().mCameraListener)
-            listenerOrient = camera->getOrient();
-        else
-            listenerOrient = osg::Quat(refpos.rot[1], osg::Vec3f(0, -1, 0))
-                * osg::Quat(refpos.rot[0], osg::Vec3f(-1, 0, 0)) * osg::Quat(refpos.rot[2], osg::Vec3f(0, 0, -1));
-
-        forward = listenerOrient * osg::Vec3f(0, 1, 0);
-        up = listenerOrient * osg::Vec3f(0, 0, 1);
-
-        bool underwater = isUnderwater(player.getCell(), camera->getPosition());
-
+        forward = osg::Vec3f(cameraForward.x, cameraForward.y, cameraForward.z);
+        const Render::Vec3 cameraUp = Render::rotateVector(cameraOrientation, { 0.f, 0.f, 1.f });
+        up = osg::Vec3f(cameraUp.x, cameraUp.y, cameraUp.z);
+        const bool underwater = isUnderwater(player.getCell(), listenerPos);
         MWBase::Environment::get().getSoundManager()->setListenerPosDir(listenerPos, forward, up, underwater);
     }
 

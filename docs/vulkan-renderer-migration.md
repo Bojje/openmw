@@ -479,7 +479,7 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-205 files, deleting 2,222 lines and adding 12,724 lines (net `+10,502`). The larger Vulkan-only
+205 files, deleting 2,236 lines and adding 12,762 lines (net `+10,526`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. The live no-GUI consumer is the first deletion
 checkpoint; further reduction can now target OSG scene/resource/presentation ownership rather
@@ -645,6 +645,7 @@ real replacement consumes its responsibility and the fast tests cover the bounda
 - Add actors, skinning, animation, particles, weather, water, spell effects, and post-processing.
 - Resting actors, owned-item lookup, line-of-sight, moving doors, and transformation-script movement/rotation now use active-cell state and world-model transforms instead of treating an absent OSG node as inactive.
 - Neutral focus selection and gameplay raycasts now use the renderer-neutral camera state and physics collision masks, so activation and targeting no longer require an OSG renderer.
+- The active sound listener now follows the same neutral first-person, third-person, and vanity camera state instead of being disabled with OSG.
 - Port GUI, fonts, loading screens, cursor handling, and video presentation. Vulkan now has a
   deliberately small PPM/JPEG/PNG screenshot path for visual checkpoints and neutral JPEG savegame
   thumbnails; interactive GUI/video presentation remains outstanding.
