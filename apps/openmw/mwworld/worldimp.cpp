@@ -37,6 +37,8 @@
 #include <components/misc/resourcehelpers.hpp>
 #include <components/misc/rng.hpp>
 
+#include <components/render/math.hpp>
+
 #include <components/files/collections.hpp>
 
 #include <components/resource/bulletshape.hpp>
@@ -1033,14 +1035,11 @@ namespace MWWorld
 
     MWWorld::Ptr World::getFocusObject()
     {
-        if (!mRendering)
-            return {};
-
         if (MWBase::Environment::get().getStateManager()->getState() == MWBase::StateManager::State_NoGame)
             return {};
 
         float maxDistance;
-        const bool inGui = MWBase::Environment::get().getWindowManager()->isGuiMode();
+        const bool inGui = mRendering && MWBase::Environment::get().getWindowManager()->isGuiMode();
         if (inGui)
         {
             if (MWBase::Environment::get().getWindowManager()->isConsoleMode())
@@ -1887,33 +1886,63 @@ namespace MWWorld
 
     MWWorld::Ptr World::getFocusObject(float maxDistance, bool ignorePlayer)
     {
-        if (!mRendering)
-            return {};
-
-        const float camDist = mRendering->getCamera()->getCameraDistance();
+        const float camDist = mRendering ? mRendering->getCamera()->getCameraDistance() : 0.f;
         maxDistance += camDist;
         MWWorld::Ptr focusObject;
-        MWRender::RenderingManager::RayResult rayToObject;
 
         const bool ignoreTerrain = !Settings::game().mTerrainObstructsFocus;
 
-        if (MWBase::Environment::get().getWindowManager()->isGuiMode())
+        if (mRendering)
         {
-            float x, y;
-            MWBase::Environment::get().getWindowManager()->getMousePosition(x, y);
-            rayToObject = mRendering->castCameraToViewportRay(x, y, maxDistance, ignorePlayer, false, ignoreTerrain);
-        }
-        else
-            rayToObject
-                = mRendering->castCameraToViewportRay(0.5f, 0.5f, maxDistance, ignorePlayer, false, ignoreTerrain);
+            MWRender::RenderingManager::RayResult rayToObject;
+            if (MWBase::Environment::get().getWindowManager()->isGuiMode())
+            {
+                float x, y;
+                MWBase::Environment::get().getWindowManager()->getMousePosition(x, y);
+                rayToObject
+                    = mRendering->castCameraToViewportRay(x, y, maxDistance, ignorePlayer, false, ignoreTerrain);
+            }
+            else
+                rayToObject = mRendering->castCameraToViewportRay(
+                    0.5f, 0.5f, maxDistance, ignorePlayer, false, ignoreTerrain);
 
-        focusObject = rayToObject.mHitObject;
-        if (focusObject.isEmpty() && rayToObject.mHitRefnum.isSet())
-            focusObject = MWBase::Environment::get().getWorldModel()->getPtr(rayToObject.mHitRefnum);
-        if (rayToObject.mHit)
-            mDistanceToFocusObject = (rayToObject.mRatio * maxDistance) - camDist;
-        else
-            mDistanceToFocusObject = -1;
+            focusObject = rayToObject.mHitObject;
+            if (focusObject.isEmpty() && rayToObject.mHitRefnum.isSet())
+                focusObject = MWBase::Environment::get().getWorldModel()->getPtr(rayToObject.mHitRefnum);
+            if (rayToObject.mHit)
+                mDistanceToFocusObject = (rayToObject.mRatio * maxDistance) - camDist;
+            else
+                mDistanceToFocusObject = -1;
+            return focusObject;
+        }
+
+        const MWWorld::Ptr player = mPlayer->getPlayer();
+        if (player.isEmpty())
+            return {};
+        const auto& position = player.getRefData().getPosition();
+        const Render::Quat orientation = Render::makeEulerRotation(
+            { position.rot[0], position.rot[1], position.rot[2] });
+        const Render::Quat cameraOrientation = mNeutralVanityMode
+            ? Render::multiply(orientation,
+                  Render::makeEulerRotation({ mNeutralVanityPitch, 0.f, mNeutralVanityYaw }))
+            : orientation;
+        const Render::Vec3 forward = Render::rotateVector(cameraOrientation, { 0.f, 1.f, 0.f });
+        const Render::Vec3 playerPosition{ position.pos[0], position.pos[1], position.pos[2] };
+        const Render::Vec3 eye = mNeutralFirstPerson
+            ? Render::Vec3{ playerPosition.x, playerPosition.y, playerPosition.z + 124.f }
+            : Render::Vec3{ playerPosition.x - forward.x * 180.f, playerPosition.y - forward.y * 180.f,
+                  playerPosition.z + (mNeutralVanityMode ? 90.f : 105.f) };
+        const osg::Vec3f from(eye.x, eye.y, eye.z);
+        const osg::Vec3f to(eye.x + forward.x * maxDistance, eye.y + forward.y * maxDistance,
+            eye.z + forward.z * maxDistance);
+        std::vector<MWWorld::ConstPtr> ignored;
+        if (ignorePlayer)
+            ignored.emplace_back(player);
+        const int mask = MWPhysics::CollisionType_World | MWPhysics::CollisionType_Door
+            | (ignoreTerrain ? 0 : MWPhysics::CollisionType_HeightMap) | MWPhysics::CollisionType_Actor;
+        const MWPhysics::RayCastingResult ray = mPhysics->castRay(from, to, ignored, {}, mask);
+        mDistanceToFocusObject = ray.mHit ? (ray.mHitPos - from).length() : -1.f;
+        focusObject = ray.mHitObject;
         return focusObject;
     }
 
@@ -1922,7 +1951,17 @@ namespace MWWorld
     {
         if (!mRendering)
         {
-            res = mPhysics->castRay(from, to);
+            int mask = MWPhysics::CollisionType_World | MWPhysics::CollisionType_Door
+                | MWPhysics::CollisionType_HeightMap;
+            if (!ignoreActors)
+                mask |= MWPhysics::CollisionType_Actor;
+            if (ignoreTerrain)
+                mask &= ~MWPhysics::CollisionType_HeightMap;
+
+            std::vector<MWWorld::ConstPtr> ignored(ignoreList.begin(), ignoreList.end());
+            if (ignorePlayer)
+                ignored.emplace_back(mPlayer->getPlayer());
+            res = mPhysics->castRay(from, to, ignored, {}, mask);
             return res.mHit;
         }
 

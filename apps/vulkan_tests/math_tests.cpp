@@ -113,6 +113,16 @@ namespace
         expectNear(projection.data[14], -10.f / 9.f, "perspective depth offset");
         expectNear(projection.data[11], -1.f, "perspective homogeneous depth");
     }
+
+    void testQuaternionVectorRotation()
+    {
+        const Render::Quat quarterTurn = Render::makeAxisAngleRotation(
+            { 0.f, 0.f, -1.f }, 3.14159265358979323846f / 2.f);
+        const Render::Vec3 result = Render::rotateVector(quarterTurn, { 0.f, 1.f, 0.f });
+        expectNear(result.x, 1.f, "quaternion vector rotation x");
+        expectNear(result.y, 0.f, "quaternion vector rotation y");
+        expectNear(result.z, 0.f, "quaternion vector rotation z");
+    }
 }
 
 int main()
@@ -125,6 +135,7 @@ int main()
         testSingularMatrices();
         testSceneDataValidation();
         testPerspective();
+        testQuaternionVectorRotation();
         std::cout << "Vulkan math tests passed\n";
         return EXIT_SUCCESS;
     }

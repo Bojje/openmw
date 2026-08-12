@@ -137,20 +137,6 @@ namespace
         return result;
     }
 
-    Render::Vec3 rotateNeutralVector(const Render::Quat& rotation, const Render::Vec3& vector)
-    {
-        const Render::Vec3 qVector{ rotation.x, rotation.y, rotation.z };
-        const Render::Vec3 crossFirst{ qVector.y * vector.z - qVector.z * vector.y,
-            qVector.z * vector.x - qVector.x * vector.z, qVector.x * vector.y - qVector.y * vector.x };
-        const Render::Vec3 twiceCross{ 2.f * crossFirst.x, 2.f * crossFirst.y, 2.f * crossFirst.z };
-        const Render::Vec3 crossSecond{ qVector.y * twiceCross.z - qVector.z * twiceCross.y,
-            qVector.z * twiceCross.x - qVector.x * twiceCross.z,
-            qVector.x * twiceCross.y - qVector.y * twiceCross.x };
-        return { vector.x + rotation.w * twiceCross.x + crossSecond.x,
-            vector.y + rotation.w * twiceCross.y + crossSecond.y,
-            vector.z + rotation.w * twiceCross.z + crossSecond.z };
-    }
-
     bool writeVulkanScreenshot(const Render::TextureData& image, const std::filesystem::path& path)
     {
         if (!image.valid())
@@ -750,8 +736,8 @@ void OMW::Engine::prepareVulkanEngine()
                   Render::makeEulerRotation(
                       { mWorld->getNeutralVanityPitch(), 0.f, mWorld->getNeutralVanityYaw() }))
             : orientation;
-        const Render::Vec3 forward = rotateNeutralVector(cameraOrientation, { 0.f, 1.f, 0.f });
-        const Render::Vec3 up = rotateNeutralVector(cameraOrientation, { 0.f, 0.f, 1.f });
+        const Render::Vec3 forward = Render::rotateVector(cameraOrientation, { 0.f, 1.f, 0.f });
+        const Render::Vec3 up = Render::rotateVector(cameraOrientation, { 0.f, 0.f, 1.f });
         const Render::Vec3 playerPosition{ position.pos[0], position.pos[1], position.pos[2] };
         const Render::Vec3 eye = firstPerson
             ? Render::Vec3{ playerPosition.x, playerPosition.y, playerPosition.z + 124.f }

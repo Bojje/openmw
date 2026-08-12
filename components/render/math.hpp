@@ -53,6 +53,20 @@ namespace Render
             makeAxisAngleRotation({ -1.f, 0.f, 0.f }, rotation.x));
     }
 
+    inline Vec3 rotateVector(const Quat& rotation, const Vec3& vector)
+    {
+        const Vec3 qVector{ rotation.x, rotation.y, rotation.z };
+        const Vec3 crossFirst{ qVector.y * vector.z - qVector.z * vector.y,
+            qVector.z * vector.x - qVector.x * vector.z, qVector.x * vector.y - qVector.y * vector.x };
+        const Vec3 twiceCross{ 2.f * crossFirst.x, 2.f * crossFirst.y, 2.f * crossFirst.z };
+        const Vec3 crossSecond{ qVector.y * twiceCross.z - qVector.z * twiceCross.y,
+            qVector.z * twiceCross.x - qVector.x * twiceCross.z,
+            qVector.x * twiceCross.y - qVector.y * twiceCross.x };
+        return { vector.x + rotation.w * twiceCross.x + crossSecond.x,
+            vector.y + rotation.w * twiceCross.y + crossSecond.y,
+            vector.z + rotation.w * twiceCross.z + crossSecond.z };
+    }
+
     inline Mat4 multiply(const Mat4& lhs, const Mat4& rhs)
     {
         Mat4 result = {};
