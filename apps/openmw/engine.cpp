@@ -10,6 +10,8 @@
 
 #include <osgDB/ReaderWriter>
 #include <osgDB/Registry>
+#include <osg/Stats>
+#include <osg/Timer>
 #include <osgViewer/Viewer>
 #include <osgViewer/ViewerEventHandlers>
 
@@ -195,9 +197,11 @@ void OMW::Engine::executeLocalScripts()
 
 bool OMW::Engine::frame(unsigned frameNumber, float frametime)
 {
-    const osg::Timer_t frameStart = mViewer->getStartTick();
+    const osg::Timer_t frameStart = osg::Timer::instance()->tick();
     const osg::Timer* const timer = osg::Timer::instance();
-    osg::Stats* const stats = mViewer->getViewerStats();
+    osg::Stats* const stats = mFrameStats.get();
+    if (!stats)
+        throw std::logic_error("Engine frame statistics were not initialized");
 
     mEnvironment.setFrameDuration(frametime);
 
@@ -454,6 +458,7 @@ OMW::Engine::~Engine()
 
     mFrameLifecycle = nullptr;
     mViewer = nullptr;
+    mFrameStats = nullptr;
 
     mResourceSystem.reset();
 
@@ -752,6 +757,8 @@ void OMW::Engine::setWindowIcon()
 
 void OMW::Engine::prepareEngine()
 {
+    mFrameStats = mViewer ? mViewer->getViewerStats() : new osg::Stats("OpenMW Engine");
+
     mStateManager = std::make_unique<MWState::StateManager>(mCfgMgr.getUserDataPath() / "saves", mContentFiles);
     mEnvironment.setStateManager(*mStateManager);
 

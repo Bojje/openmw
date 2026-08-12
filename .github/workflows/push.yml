@@ -193,6 +193,10 @@ jobs:
           echo "OpenMW frame advancement must go through an explicit renderer owner boundary"
           exit 1
         fi
+        if sed -n '/bool OMW::Engine::frame/,/^}/p' apps/openmw/engine.cpp | rg -n 'mViewer->'; then
+          echo "Engine simulation/update loop must not query the OSG viewer directly"
+          exit 1
+        fi
         if rg -n 'new[[:space:]]+osgViewer::Viewer' apps/openmw --glob '*.cpp' --glob '*.hpp' \
             | rg -v 'apps/openmw/mwrender/viewerframelifecycle.cpp'; then
           echo "The OSG viewer must be created only by its renderer-specific lifecycle owner"
