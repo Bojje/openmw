@@ -2608,19 +2608,25 @@ namespace MWMechanics
 
         world->queueMovement(mPtr, movement);
 
-        std::string animationGroup = "idle";
-        if (inputLength > 0.f)
+        std::string animationGroup;
+        if (!mAnimQueue.empty())
+            animationGroup = mAnimQueue.front().mGroup;
+        else
         {
-            const bool sneak = stats.getStance(MWMechanics::CreatureStats::Stance_Sneak) && !flying && !inWater;
-            const bool running = stats.getStance(MWMechanics::CreatureStats::Stance_Run) && !flying;
-            const std::string_view prefix = inWater ? (running ? "swimrun" : "swimwalk")
-                                                     : (sneak ? "sneak" : (running ? "run" : "walk"));
-            const std::string_view direction = input.y() >= 0.f
-                ? "forward"
-                : "back";
-            animationGroup = std::string(prefix) + std::string(direction);
-            if (std::abs(input.y()) <= 0.001f)
-                animationGroup = std::string(prefix) + (input.x() >= 0.f ? "right" : "left");
+            animationGroup = "idle";
+            if (inputLength > 0.f)
+            {
+                const bool sneak = stats.getStance(MWMechanics::CreatureStats::Stance_Sneak) && !flying && !inWater;
+                const bool running = stats.getStance(MWMechanics::CreatureStats::Stance_Run) && !flying;
+                const std::string_view prefix = inWater ? (running ? "swimrun" : "swimwalk")
+                                                         : (sneak ? "sneak" : (running ? "run" : "walk"));
+                const std::string_view direction = input.y() >= 0.f
+                    ? "forward"
+                    : "back";
+                animationGroup = std::string(prefix) + std::string(direction);
+                if (std::abs(input.y()) <= 0.001f)
+                    animationGroup = std::string(prefix) + (input.x() >= 0.f ? "right" : "left");
+            }
         }
         world->updateNeutralAnimation(mPtr, animationGroup);
         settings.mPosition[0] = settings.mPosition[1] = 0.f;
@@ -2675,24 +2681,32 @@ namespace MWMechanics
                 entry.mGroup = animation.mGroup;
                 entry.mLoopCount = static_cast<uint32_t>(
                     std::min<uint64_t>(animation.mLoopCount, std::numeric_limits<uint32_t>::max()));
-                entry.mLooping = mAnimation->isLoopingAnimation(entry.mGroup);
+                // Vulkan has no OSG Animation owner. Preserve the queue entry
+                // so the neutral owner can publish the active group;
+                // controller-specific looping remains a later neutral queue
+                // responsibility.
+                entry.mLooping = mAnimation != nullptr && mAnimation->isLoopingAnimation(entry.mGroup);
                 entry.mScripted = true;
                 entry.mStartKey = "start";
                 entry.mStopKey = "stop";
                 entry.mSpeed = 1.f;
                 entry.mTime = animation.mTime;
-                if (animation.mAbsolute)
+                if (animation.mAbsolute && mAnimation != nullptr)
                 {
                     float start = mAnimation->getTextKeyTime(animation.mGroup + ": start");
                     float stop = mAnimation->getTextKeyTime(animation.mGroup + ": stop");
                     float time = std::clamp(animation.mTime, start, stop);
-                    entry.mTime = (time - start) / (stop - start);
+                    if (stop > start)
+                        entry.mTime = (time - start) / (stop - start);
                 }
 
                 mAnimQueue.push_back(std::move(entry));
             }
 
-            playAnimQueue();
+            if (mAnimation != nullptr)
+                playAnimQueue();
+            else if (!mAnimQueue.empty())
+                MWBase::Environment::get().getWorld()->updateNeutralAnimation(mPtr, mAnimQueue.front().mGroup);
         }
     }
 
@@ -2710,7 +2724,34 @@ namespace MWMechanics
 
     bool CharacterController::playGroup(std::string_view groupname, int mode, uint32_t count, bool scripted)
     {
-        if (!mAnimation || !mAnimation->hasAnimation(groupname))
+        if (groupname.empty())
+            return false;
+
+        if (!mAnimation)
+        {
+            // Keep one neutral animation request alive when the legacy
+            // scene-graph owner is absent. The neutral resource boundary
+            // falls back to bind pose if the group is unavailable.
+            if (mode != 0 || mAnimQueue.empty() || !isAnimPlaying(mAnimQueue.front().mGroup))
+                clearAnimQueue(scripted);
+            else
+                mAnimQueue.resize(1);
+
+            AnimationQueueEntry entry;
+            entry.mGroup = groupname;
+            entry.mLoopCount = count;
+            entry.mTime = 0.f;
+            entry.mLooping = mode == 2;
+            entry.mScripted = scripted && groupname != "idle";
+            entry.mStartKey = mode == 2 ? "loop start" : "start";
+            entry.mStopKey = "stop";
+            entry.mSpeed = 1.f;
+            mAnimQueue.push_back(std::move(entry));
+            MWBase::Environment::get().getWorld()->updateNeutralAnimation(mPtr, groupname);
+            return true;
+        }
+
+        if (!mAnimation->hasAnimation(groupname))
             return false;
 
         // We should not interrupt scripted animations with non-scripted ones
@@ -2784,7 +2825,27 @@ namespace MWMechanics
         // Note: In mwscript, "idle" is a special case used to clear the anim queue.
         // In lua we offer an explicit clear method instead so this method does not treat "idle" special.
 
-        if (!mAnimation || !mAnimation->hasAnimation(groupname))
+        if (groupname.empty())
+            return false;
+
+        if (!mAnimation)
+        {
+            AnimationQueueEntry entry;
+            entry.mGroup = groupname;
+            entry.mLoopCount = loops;
+            entry.mStartKey = startKey;
+            entry.mStopKey = stopKey;
+            entry.mLooping = forceLoop;
+            entry.mScripted = true;
+            entry.mSpeed = speed;
+            entry.mTime = 0.f;
+            mAnimQueue.clear();
+            mAnimQueue.push_back(std::move(entry));
+            MWBase::Environment::get().getWorld()->updateNeutralAnimation(mPtr, groupname);
+            return true;
+        }
+
+        if (!mAnimation->hasAnimation(groupname))
             return false;
 
         AnimationQueueEntry entry;
