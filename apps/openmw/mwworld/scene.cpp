@@ -111,6 +111,12 @@ namespace
         return Render::makeEulerRotation({ position.rot[0], position.rot[1], position.rot[2] });
     }
 
+    MWWorld::PositionCellGrid makeTerrainPreloadPosition(const osg::Vec3f& position, const osg::Vec4i& bounds)
+    {
+        return { { position.x(), position.y(), position.z() },
+            { bounds.x(), bounds.y(), bounds.z(), bounds.w() } };
+    }
+
     void recordNeutralObject(const MWWorld::Ptr& ptr, std::string_view model, bool visible,
         Render::WorldScene& neutralWorld)
     {
@@ -744,7 +750,7 @@ namespace MWWorld
             mTerrain->rebuildViews();
             mPreloader->abortTerrainPreloadExcept(nullptr);
         }
-        if (!mPreloader->isTerrainLoaded(PositionCellGrid{ pos, newGrid }, mFrameLifecycle.referenceTime()))
+        if (!mPreloader->isTerrainLoaded(makeTerrainPreloadPosition(pos, newGrid), mFrameLifecycle.referenceTime()))
             preloadTerrain(pos, playerCellIndex.mWorldspace, true);
         mPagedRefs.clear();
         if (mObjectPaging)
@@ -1423,8 +1429,8 @@ namespace MWWorld
         osg::Vec3f predictedPos = playerPos + moved / dt * mPredictionTime;
 
         if (mCurrentCell->isExterior())
-            exteriorPositions.push_back(PositionCellGrid{
-                predictedPos, gridCenterToBounds(getNewGridCenter(predictedPos, &mCurrentGridCenter)) });
+            exteriorPositions.push_back(
+                makeTerrainPreloadPosition(predictedPos, gridCenterToBounds(getNewGridCenter(predictedPos, &mCurrentGridCenter))));
 
         mLastPlayerPos = playerPos;
 
@@ -1564,7 +1570,7 @@ namespace MWWorld
             throw std::runtime_error("preloadTerrain can only work with the current exterior worldspace");
 
         ESM::ExteriorCellLocation cellPos = ESM::positionToExteriorCellLocation(pos.x(), pos.y(), worldspace);
-        const PositionCellGrid position{ pos, gridCenterToBounds({ cellPos.mX, cellPos.mY }) };
+        const PositionCellGrid position = makeTerrainPreloadPosition(pos, gridCenterToBounds({ cellPos.mX, cellPos.mY }));
         mPreloader->abortTerrainPreloadExcept(&position);
         mPreloader->setTerrainPreloadPositions(std::span(&position, 1));
         if (!sync)
@@ -1635,7 +1641,7 @@ namespace MWWorld
                 const ESM::ExteriorCellLocation cellIndex
                     = ESM::positionToExteriorCellLocation(pos.x(), pos.y(), extWorldspace);
                 preloadCellWithSurroundings(mWorld.getWorldModel().getExterior(cellIndex));
-                exteriorPositions.push_back(PositionCellGrid{ pos, gridCenterToBounds(getNewGridCenter(pos)) });
+                exteriorPositions.push_back(makeTerrainPreloadPosition(pos, gridCenterToBounds(getNewGridCenter(pos))));
             }
         }
     }

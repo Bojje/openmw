@@ -6,6 +6,8 @@
 #include <span>
 
 #include <osg/Stats>
+#include <osg/Vec3f>
+#include <osg/Vec4i>
 
 #include <components/debug/debuglog.hpp>
 #include <components/esm3/loadcell.hpp>
@@ -36,7 +38,10 @@ namespace MWWorld
         {
             const float squaredTolerance = tolerance * tolerance;
             const auto predicate = [&](const PositionCellGrid& v) {
-                return (contained.mPosition - v.mPosition).length2() < squaredTolerance
+                const float dx = contained.mPosition.x - v.mPosition.x;
+                const float dy = contained.mPosition.y - v.mPosition.y;
+                const float dz = contained.mPosition.z - v.mPosition.z;
+                return dx * dx + dy * dy + dz * dz < squaredTolerance
                     && contained.mCellBounds == v.mCellBounds;
             };
             return std::ranges::any_of(positions, predicate);
@@ -183,7 +188,11 @@ namespace MWWorld
             for (unsigned int i = 0; i < mTerrainViews.size() && i < mPreloadPositions.size() && !mAbort; ++i)
             {
                 mTerrainViews[i]->reset();
-                mWorld->preload(mTerrainViews[i], mPreloadPositions[i].mPosition, mPreloadPositions[i].mCellBounds,
+                const PositionCellGrid& position = mPreloadPositions[i];
+                mWorld->preload(mTerrainViews[i],
+                    osg::Vec3f(position.mPosition.x, position.mPosition.y, position.mPosition.z),
+                    osg::Vec4i(position.mCellBounds[0], position.mCellBounds[1], position.mCellBounds[2],
+                        position.mCellBounds[3]),
                     mAbort, mLoadingReporter);
             }
             mLoadingReporter.complete();
