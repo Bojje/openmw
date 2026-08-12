@@ -364,13 +364,15 @@ for the reference renderer, while a future Vulkan owner can run the same update 
 OSG viewer query in `Engine::frame()`.
 OSG screen-capture operation and event-handler construction is likewise limited to the OSG frame
 backend; the input action remains safe when a backend has not installed that legacy capture service.
+OSG profiler/resource event handlers and delayed viewer-stat reporting are also guarded by the
+presence of the OSG viewer, so the engine main loop has no unconditional viewer-stat path.
 The engine now honors a failed frame submission from `World`, retrying without advancing simulation,
 focus, or frame statistics; this makes minimized and swapchain-recovery behavior part of the lifecycle contract.
 The engine public header no longer imports complete OSG viewer/event-handler headers; OSG declarations
 are now included only by the implementation files that use them.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-157 files, deleting 1,399 lines and adding 8,506 lines (net `+7,107`). The larger Vulkan-only
+157 files, deleting 1,410 lines and adding 8,525 lines (net `+7,115`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.

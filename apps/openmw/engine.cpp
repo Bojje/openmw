@@ -1032,18 +1032,19 @@ void OMW::Engine::go()
                                 << "\": " << std::generic_category().message(errno);
     }
 
-    // Setup profiler
-    osg::ref_ptr<Resource::Profiler> statsHandler = new Resource::Profiler(stats.is_open(), *mVFS);
+    if (mViewer)
+    {
+        // Setup OSG profiler and resource event handlers only for the reference renderer.
+        osg::ref_ptr<Resource::Profiler> statsHandler = new Resource::Profiler(stats.is_open(), *mVFS);
+        initStatsHandler(*statsHandler);
+        mViewer->addEventHandler(statsHandler);
 
-    initStatsHandler(*statsHandler);
+        osg::ref_ptr<Resource::StatsHandler> resourcesHandler = new Resource::StatsHandler(stats.is_open(), *mVFS);
+        mViewer->addEventHandler(resourcesHandler);
 
-    mViewer->addEventHandler(statsHandler);
-
-    osg::ref_ptr<Resource::StatsHandler> resourcesHandler = new Resource::StatsHandler(stats.is_open(), *mVFS);
-    mViewer->addEventHandler(resourcesHandler);
-
-    if (stats.is_open())
-        Resource::collectStatistics(*mViewer);
+        if (stats.is_open())
+            Resource::collectStatistics(*mViewer);
+    }
 
     // Start the game
     if (!mSaveGameFile.empty())
@@ -1101,7 +1102,7 @@ void OMW::Engine::go()
             timeManager.setRenderingSimulationTime(timeManager.getRenderingSimulationTime() + dt);
         }
 
-        if (stats)
+        if (stats && mViewer)
         {
             // The delay is required because rendering happens in parallel to the main thread and stats from there is
             // available with delay.
