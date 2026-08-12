@@ -374,14 +374,17 @@ namespace MWWorld
 {
     void Scene::removeFromPagedRefs(const Ptr& ptr)
     {
+        if (!mRendering)
+            return;
+
         ESM::RefNum refnum = ptr.getCellRef().getRefNum();
         if (refnum.hasContentFile() && removeFromSorted(refnum, mPagedRefs))
         {
             if (!ptr.getRefData().getBaseNode())
                 return;
             const VFS::Path::Normalized model = getModel(ptr);
-            ptr.getClass().insertObjectRendering(ptr, model, mRendering.getObjects());
-            setNodeRotation(ptr, mRendering, makeNodeRotation(ptr, RotationOrder::direct));
+            ptr.getClass().insertObjectRendering(ptr, model, mRendering->getObjects());
+            setNodeRotation(ptr, *mRendering, makeNodeRotation(ptr, RotationOrder::direct));
             recordNeutralObject(ptr, model.view(), true, mNeutralWorldScene);
             reloadTerrain();
         }
@@ -395,7 +398,8 @@ namespace MWWorld
     void Scene::updateObjectRotation(const Ptr& ptr, RotationOrder order)
     {
         const auto rot = makeNodeRotation(ptr, order);
-        setNodeRotation(ptr, mRendering, rot);
+        if (mRendering)
+            setNodeRotation(ptr, *mRendering, rot);
         mNeutralWorldScene.updateObjectRotation(static_cast<const void*>(ptr.mRef), makeDirectRenderRotation(ptr));
         mPhysics->updateRotation(ptr, rot);
     }
@@ -405,7 +409,8 @@ namespace MWWorld
         float scale = ptr.getCellRef().getScale();
         Render::Vec3 scaleVec{ scale, scale, scale };
         ptr.getClass().adjustScale(ptr, scaleVec, true);
-        mRendering.scaleObject(ptr, osg::Vec3f(scaleVec.x, scaleVec.y, scaleVec.z));
+        if (mRendering)
+            mRendering->scaleObject(ptr, osg::Vec3f(scaleVec.x, scaleVec.y, scaleVec.z));
         mNeutralWorldScene.updateObjectScale(static_cast<const void*>(ptr.mRef), scaleVec);
         mPhysics->updateScale(ptr);
     }
@@ -419,7 +424,8 @@ namespace MWWorld
             mChangeCellGridRequest.reset();
         }
 
-        mPreloader->updateCache(mFrameLifecycle.referenceTime());
+        if (mPreloader)
+            mPreloader->updateCache(mFrameLifecycle.referenceTime());
         preloadCells(duration);
     }
 
@@ -443,7 +449,8 @@ namespace MWWorld
             else if (mPhysics->getActor(ptr))
             {
                 mNavigator.removeAgent(mWorld.getPathfindingAgentBounds(ptr));
-                mRendering.removeActorPath(ptr);
+                if (mRendering)
+                    mRendering->removeActorPath(ptr);
                 mPhysics->remove(ptr);
             }
             else
@@ -475,7 +482,8 @@ namespace MWWorld
         MWBase::Environment::get().getMechanicsManager()->drop(cell);
 
         mNeutralWorldScene.removeCell(static_cast<const void*>(cell));
-        mRendering.removeCell(cell);
+        if (mRendering)
+            mRendering->removeCell(cell);
         MWBase::Environment::get().getWindowManager()->removeCell(cell);
 
         mWorld.getLocalScripts().clearCell(cell);
@@ -484,8 +492,8 @@ namespace MWWorld
         mActiveCells.erase(cell);
         mNeutralTerrainRegionsDirty = true;
         // Clean up any effects that may have been spawned while unloading all cells
-        if (mActiveCells.empty())
-            mRendering.notifyWorldSpaceChanged();
+        if (mActiveCells.empty() && mRendering)
+            mRendering->notifyWorldSpaceChanged();
     }
 
     void Scene::recordNeutralCell(CellStore& cell)
@@ -595,17 +603,20 @@ namespace MWWorld
 
         insertCell(cell, loadingListener, navigatorUpdateGuard);
 
-        mRendering.addCell(&cell);
+        if (mRendering)
+            mRendering->addCell(&cell);
         mNeutralTerrainRegionsDirty = true;
 
         MWBase::Environment::get().getWindowManager()->addCell(&cell);
         bool waterEnabled = cellVariant.hasWater() || cell.isExterior();
         float waterLevel = cell.getWaterLevel();
-        mRendering.setWaterEnabled(waterEnabled);
+        if (mRendering)
+            mRendering->setWaterEnabled(waterEnabled);
         if (waterEnabled)
         {
             mPhysics->enableWater(waterLevel);
-            mRendering.setWaterHeight(waterLevel);
+            if (mRendering)
+                mRendering->setWaterHeight(waterLevel);
 
             if (cellVariant.isExterior())
             {
@@ -623,9 +634,11 @@ namespace MWWorld
             mPhysics->disableWater();
 
         if (!cell.isExterior() && !cellVariant.isQuasiExterior())
-            mRendering.configureAmbient(cellVariant);
+            if (mRendering)
+                mRendering->configureAmbient(cellVariant);
 
-        mPreloader->notifyLoaded(&cell);
+        if (mPreloader)
+            mPreloader->notifyLoaded(&cell);
     }
 
     void Scene::clear()
@@ -644,7 +657,8 @@ namespace MWWorld
         mCurrentCell = nullptr;
         mLowestPoint = std::numeric_limits<float>::max();
 
-        mPreloader->clear();
+        if (mPreloader)
+            mPreloader->clear();
     }
 
     std::array<int, 4> Scene::gridCenterToBounds(const std::array<int, 2>& centerCell) const
@@ -750,19 +764,24 @@ namespace MWWorld
         const std::array<int, 4> newGrid = gridCenterToBounds(mCurrentGridCenter);
 
         // NOTE: setActiveGrid must be after enableTerrain, otherwise we set the grid in the old exterior worldspace
-        mRendering.enableTerrain(true, playerCellIndex.mWorldspace);
-        mRendering.setActiveGrid(osg::Vec4i(newGrid[0], newGrid[1], newGrid[2], newGrid[3]));
+        if (mRendering)
+        {
+            mRendering->enableTerrain(true, playerCellIndex.mWorldspace);
+            mRendering->setActiveGrid(osg::Vec4i(newGrid[0], newGrid[1], newGrid[2], newGrid[3]));
+        }
 
-        mPreloader->setTerrain(mTerrain);
-        if (mObjectPaging && mObjectPaging->unlockCache())
+        if (mPreloader)
+            mPreloader->setTerrain(mTerrain);
+        if (mPreloader && mObjectPaging && mObjectPaging->unlockCache())
         {
             mTerrain->rebuildViews();
             mPreloader->abortTerrainPreloadExcept(nullptr);
         }
-        if (!mPreloader->isTerrainLoaded(makeTerrainPreloadPosition(pos, newGrid), mFrameLifecycle.referenceTime()))
+        if (mPreloader && !mPreloader->isTerrainLoaded(
+                makeTerrainPreloadPosition(pos, newGrid), mFrameLifecycle.referenceTime()))
             preloadTerrain(pos, playerCellIndex.mWorldspace, true);
         mPagedRefs.clear();
-        if (mObjectPaging)
+        if (mObjectPaging && mRendering)
             mObjectPaging->getPagedRefnums(osg::Vec4i(newGrid[0], newGrid[1], newGrid[2], newGrid[3]), mPagedRefs);
 
         addPostponedPhysicsObjects();
@@ -965,13 +984,15 @@ namespace MWWorld
 
         mNeutralWorldScene.setActiveWorldspace(cell.getCell()->getWorldSpace().serializeText());
         mNeutralTerrainRegionsDirty = true;
-        mRendering.enableTerrain(cell.isExterior(), cell.getCell()->getWorldSpace());
+        if (mRendering)
+            mRendering->enableTerrain(cell.isExterior(), cell.getCell()->getWorldSpace());
 
         MWWorld::Ptr old = mWorld.getPlayerPtr();
         mWorld.getPlayer().setCell(&cell);
 
         MWWorld::Ptr player = mWorld.getPlayerPtr();
-        mRendering.updatePlayerPtr(player);
+        if (mRendering)
+            mRendering->updatePlayerPtr(player);
 
         // The player is loaded before the scene and by default it is grounded, with the scene fully loaded,
         // we validate and correct this. Only run once, during initial cell load.
@@ -1000,7 +1021,7 @@ namespace MWWorld
     Scene::Scene(MWWorld::World& world, Render::FrameLifecycle& frameLifecycle,
         Render::SceneSynchronizer sceneSynchronizer, Render::BonePoseResolver bonePoseResolver,
         Render::MeshResolver meshResolver, Render::TextureResolver textureResolver, const VFS::Manager* vfs,
-        MWRender::RenderingManager& rendering, MWRender::LandManager& landManager,
+        MWRender::RenderingManager* rendering, MWRender::LandManager* landManager,
         Terrain::World*& terrain, MWRender::ObjectPaging*& objectPaging,
         Terrain::RenderStorage& terrainStorage, SceneUtil::WorkQueue* workQueue, Resource::ResourceSystem* resourceSystem,
         MWPhysics::PhysicsSystem* physics,
@@ -1031,12 +1052,16 @@ namespace MWWorld
         , mPredictionTime(Settings::cells().mPredictionTime)
         , mLowestPoint(std::numeric_limits<float>::max())
     {
-        mPreloader = std::make_unique<CellPreloader>(resourceSystem, physics->getShapeManager(), mTerrain, &landManager);
-        mPreloader->setWorkQueue(mWorkQueue);
-        mPreloader->setExpiryDelay(Settings::cells().mPreloadCellExpiryDelay);
-        mPreloader->setMinCacheSize(Settings::cells().mPreloadCellCacheMin);
-        mPreloader->setMaxCacheSize(Settings::cells().mPreloadCellCacheMax);
-        mPreloader->setPreloadInstances(Settings::cells().mPreloadInstances);
+        if (mRendering && landManager && mTerrain && mWorkQueue)
+        {
+            mPreloader = std::make_unique<CellPreloader>(
+                resourceSystem, physics->getShapeManager(), mTerrain, landManager);
+            mPreloader->setWorkQueue(mWorkQueue);
+            mPreloader->setExpiryDelay(Settings::cells().mPreloadCellExpiryDelay);
+            mPreloader->setMinCacheSize(Settings::cells().mPreloadCellCacheMin);
+            mPreloader->setMaxCacheSize(Settings::cells().mPreloadCellCacheMax);
+            mPreloader->setPreloadInstances(Settings::cells().mPreloadInstances);
+        }
     }
 
     Scene::~Scene()
@@ -1108,7 +1133,8 @@ namespace MWWorld
         changePlayerCell(cell, position, adjustPlayerPos);
 
         // adjust fog
-        mRendering.configureFog(*mCurrentCell->getCell());
+        if (mRendering)
+            mRendering->configureFog(*mCurrentCell->getCell());
 
         // Sky system
         mWorld.adjustSky();
@@ -1321,7 +1347,14 @@ namespace MWWorld
         InsertVisitor insertVisitor(cell, loadingListener);
         cell.forEach(insertVisitor);
         insertVisitor.insert([&](const MWWorld::Ptr& ptr) {
-            addObject(ptr, mWorld, mPagedRefs, *mPhysics, mRendering, mNeutralWorldScene);
+            if (mRendering)
+                addObject(ptr, mWorld, mPagedRefs, *mPhysics, *mRendering, mNeutralWorldScene);
+            else
+            {
+                const VFS::Path::Normalized model = getModel(ptr);
+                if (!model.empty())
+                    recordNeutralObject(ptr, model.view(), true, mNeutralWorldScene);
+            }
         });
         insertVisitor.insert([&](const MWWorld::Ptr& ptr) {
             addObject(ptr, mWorld, *mPhysics, mLowestPoint, isInterior, mNavigator, navigatorUpdateGuard);
@@ -1333,7 +1366,14 @@ namespace MWWorld
         const bool isInterior = mCurrentCell && !mCurrentCell->isExterior();
         try
         {
-            addObject(ptr, mWorld, mPagedRefs, *mPhysics, mRendering, mNeutralWorldScene);
+            if (mRendering)
+                addObject(ptr, mWorld, mPagedRefs, *mPhysics, *mRendering, mNeutralWorldScene);
+            else
+            {
+                const VFS::Path::Normalized model = getModel(ptr);
+                if (!model.empty())
+                    recordNeutralObject(ptr, model.view(), true, mNeutralWorldScene);
+            }
             addObject(ptr, mWorld, *mPhysics, mLowestPoint, isInterior, mNavigator);
             mWorld.scaleObject(ptr, ptr.getCellRef().getScale());
         }
@@ -1364,9 +1404,13 @@ namespace MWWorld
         mPhysics->remove(ptr);
         if (!ptr.isEmpty())
             mNeutralWorldScene.removeObject(static_cast<const void*>(ptr.mRef));
-        mRendering.removeObject(ptr);
+        if (mRendering)
+            mRendering->removeObject(ptr);
         if (ptr.getClass().isActor())
-            mRendering.removeWaterRippleEmitter(ptr);
+        {
+            if (mRendering)
+                mRendering->removeWaterRippleEmitter(ptr);
+        }
         ptr.getRefData().setBaseNode(nullptr);
     }
 
@@ -1427,7 +1471,7 @@ namespace MWWorld
 
     void Scene::preloadCells(float dt)
     {
-        if (dt <= 1e-06)
+        if (!mPreloader || dt <= 1e-06)
             return;
         std::vector<PositionCellGrid> exteriorPositions;
 
@@ -1543,6 +1587,9 @@ namespace MWWorld
 
     void Scene::preloadCellWithSurroundings(CellStore& cell)
     {
+        if (!mPreloader)
+            return;
+
         if (!cell.isExterior())
         {
             mPreloader->preload(cell, mFrameLifecycle.referenceTime());
@@ -1580,11 +1627,15 @@ namespace MWWorld
 
     void Scene::preloadCell(CellStore& cell)
     {
-        mPreloader->preload(cell, mFrameLifecycle.referenceTime());
+        if (mPreloader)
+            mPreloader->preload(cell, mFrameLifecycle.referenceTime());
     }
 
     void Scene::preloadTerrain(const Render::Vec3& pos, ESM::RefId worldspace, bool sync)
     {
+        if (!mPreloader || !mTerrain)
+            return;
+
         if (mTerrain->getWorldspace() != worldspace)
             throw std::runtime_error("preloadTerrain can only work with the current exterior worldspace");
 
@@ -1606,7 +1657,8 @@ namespace MWWorld
     void Scene::reloadTerrain()
     {
         mNeutralTerrainRegionsDirty = true;
-        mPreloader->setTerrainPreloadPositions({});
+        if (mPreloader)
+            mPreloader->setTerrainPreloadPositions({});
     }
 
     struct ListFastTravelDestinationsVisitor
@@ -1673,6 +1725,7 @@ namespace MWWorld
 
     void Scene::reportStats(unsigned int frameNumber, osg::Stats& stats) const
     {
-        mPreloader->reportStats(frameNumber, stats);
+        if (mPreloader)
+            mPreloader->reportStats(frameNumber, stats);
     }
 }

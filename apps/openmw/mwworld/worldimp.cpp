@@ -309,7 +309,7 @@ namespace MWWorld
         };
         mWorldScene = std::make_unique<Scene>(
             *this, frameLifecycle, sceneSynchronizer, bonePoseResolver, meshResolver, textureResolver,
-            mResourceSystem->getVFS(), *mRendering, *mTerrainStorage->getLandManager(), mTerrain, mObjectPaging,
+            mResourceSystem->getVFS(), mRendering.get(), mTerrainStorage->getLandManager(), mTerrain, mObjectPaging,
             *mTerrainStorage, workQueue, mResourceSystem, mPhysics.get(), *mNavigator);
     }
 

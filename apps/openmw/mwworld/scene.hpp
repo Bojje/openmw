@@ -128,7 +128,7 @@ namespace MWWorld
         const VFS::Manager* mVfs;
         Resource::ResourceSystem* mResourceSystem;
         MWPhysics::PhysicsSystem* mPhysics;
-        MWRender::RenderingManager& mRendering;
+        MWRender::RenderingManager* mRendering;
         Terrain::World*& mTerrain;
         MWRender::ObjectPaging*& mObjectPaging;
         Terrain::RenderStorage& mTerrainStorage;
@@ -195,7 +195,7 @@ namespace MWWorld
         Scene(MWWorld::World& world, Render::FrameLifecycle& frameLifecycle,
             Render::SceneSynchronizer sceneSynchronizer, Render::BonePoseResolver bonePoseResolver,
             Render::MeshResolver meshResolver, Render::TextureResolver textureResolver, const VFS::Manager* vfs,
-            MWRender::RenderingManager& rendering, MWRender::LandManager& landManager,
+            MWRender::RenderingManager* rendering, MWRender::LandManager* landManager,
             Terrain::World*& terrain, MWRender::ObjectPaging*& objectPaging,
             Terrain::RenderStorage& terrainStorage, SceneUtil::WorkQueue* workQueue,
             Resource::ResourceSystem* resourceSystem,
