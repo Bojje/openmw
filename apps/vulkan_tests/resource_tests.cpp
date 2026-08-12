@@ -10,6 +10,9 @@
 #ifdef OPENMW_NEUTRAL_JPEG
 #include <components/render/jpeg.hpp>
 #endif
+#ifdef OPENMW_NEUTRAL_PNG
+#include <components/render/png.hpp>
+#endif
 #include <components/toutf8/toutf8.hpp>
 #include <components/vfs/manager.hpp>
 #include <components/vfs/registerarchives.hpp>
@@ -74,16 +77,13 @@ namespace
         if (error)
             throw std::runtime_error("could not create neutral PNG test directory");
 
-        // 1x1 RGBA PNG containing an opaque red pixel.
-        constexpr std::array<unsigned char, 70> png = {
-            0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
-            0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4,
-            0x89, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x44, 0x41, 0x54, 0x08, 0xd7, 0x63, 0xf8, 0xcf, 0xc0, 0xf0,
-            0x1f, 0x00, 0x05, 0x00, 0x01, 0xff, 0x89, 0x99, 0x3d, 0x1d, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45,
-            0x4e, 0x44, 0xae, 0x42, 0x60, 0x82 };
+        Render::TextureData source{ .width = 1, .height = 1, .pixels = { 255, 0, 0, 255 } };
+        std::vector<char> encoded;
+        if (!Render::writePng(source, encoded))
+            throw std::runtime_error("could not encode neutral PNG test file");
         {
             std::ofstream output(root / "textures/test.png", std::ios::binary);
-            output.write(reinterpret_cast<const char*>(png.data()), static_cast<std::streamsize>(png.size()));
+            output.write(encoded.data(), static_cast<std::streamsize>(encoded.size()));
         }
 
         const ToUTF8::Utf8Encoder encoder(ToUTF8::WINDOWS_1252);
@@ -99,7 +99,7 @@ namespace
 
         {
             std::ofstream output(root / "textures/test.png", std::ios::binary | std::ios::trunc);
-            output.write(reinterpret_cast<const char*>(png.data()), 32);
+            output.write(encoded.data(), 32);
         }
         resources.getNeutralTextureManager()->clearCache();
         if (resources.getNeutralTextureManager()->get(VFS::Path::Normalized("textures/test.png")))

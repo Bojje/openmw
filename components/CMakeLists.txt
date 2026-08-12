@@ -529,6 +529,7 @@ if (OPENMW_USE_VULKAN)
     set(_component_files_before_vulkan ${COMPONENT_FILES})
     add_component_dir(render
         jpeg
+        png
     )
     add_component_dir (vk
         vkcommon

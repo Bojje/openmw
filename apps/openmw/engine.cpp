@@ -36,6 +36,9 @@
 #ifdef OPENMW_NEUTRAL_JPEG
 #include <components/render/jpeg.hpp>
 #endif
+#ifdef OPENMW_NEUTRAL_PNG
+#include <components/render/png.hpp>
+#endif
 #include <components/render/math.hpp>
 
 #include <components/stereo/stereomanager.hpp>
@@ -172,6 +175,22 @@ namespace
 #ifdef OPENMW_NEUTRAL_JPEG
             std::vector<char> encoded;
             if (!Render::writeJpeg(image, encoded))
+                return false;
+            std::ofstream output(path, std::ios::binary);
+            if (!output)
+                return false;
+            output.write(encoded.data(), static_cast<std::streamsize>(encoded.size()));
+            return output.good();
+#else
+            return false;
+#endif
+        }
+
+        if (path.extension() == ".png")
+        {
+#ifdef OPENMW_NEUTRAL_PNG
+            std::vector<char> encoded;
+            if (!Render::writePng(image, encoded))
                 return false;
             std::ofstream output(path, std::ios::binary);
             if (!output)
@@ -645,9 +664,11 @@ void OMW::Engine::prepareVulkanEngine()
         std::filesystem::create_directories(mCfgMgr.getScreenshotPath(), error);
         const auto stamp = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::system_clock::now().time_since_epoch()).count();
-        const bool jpeg = Settings::general().mScreenshotFormat.get() == "jpg";
+        const std::string screenshotFormat = Settings::general().mScreenshotFormat.get();
+        const bool jpeg = screenshotFormat == "jpg";
+        const bool png = screenshotFormat == "png";
         const std::filesystem::path path = mCfgMgr.getScreenshotPath()
-            / ("openmw-vulkan-" + std::to_string(stamp) + (jpeg ? ".jpg" : ".ppm"));
+            / ("openmw-vulkan-" + std::to_string(stamp) + (jpeg ? ".jpg" : png ? ".png" : ".ppm"));
         if (!writeVulkanScreenshot(*image, path))
             Log(Debug::Warning) << "Failed to write Vulkan screenshot " << path;
         else

@@ -619,8 +619,8 @@ real replacement consumes its responsibility and the fast tests cover the bounda
 
 - Add actors, skinning, animation, particles, weather, water, spell effects, and post-processing.
 - Port GUI, fonts, loading screens, cursor handling, and video presentation. Vulkan now has a
-  deliberately small PPM/JPEG screenshot path for visual checkpoints and neutral JPEG savegame
-  thumbnails; PNG/TGA output and interactive presentation remain outstanding.
+  deliberately small PPM/JPEG/PNG screenshot path for visual checkpoints and neutral JPEG savegame
+  thumbnails; TGA output and interactive presentation remain outstanding.
 - Reintroduce ray tracing only after TLAS creation and the ray-tracing pipeline are complete; do not carry an inactive RT scaffold in the raster path.
 
 ### 8. Compare and delete
