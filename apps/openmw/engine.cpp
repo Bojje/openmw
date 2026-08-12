@@ -7,6 +7,7 @@
 #include <cstdlib>
 #include <future>
 #include <fstream>
+#include <limits>
 #include <system_error>
 
 #include <osgGA/GUIEventAdapter>
@@ -200,6 +201,28 @@ namespace
 #else
             return false;
 #endif
+        }
+
+        if (path.extension() == ".tga")
+        {
+            if (image.width > std::numeric_limits<std::uint16_t>::max()
+                || image.height > std::numeric_limits<std::uint16_t>::max())
+                return false;
+            std::ofstream output(path, std::ios::binary);
+            if (!output)
+                return false;
+            const std::array<std::uint8_t, 18> header{ 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                static_cast<std::uint8_t>(image.width), static_cast<std::uint8_t>(image.width >> 8),
+                static_cast<std::uint8_t>(image.height), static_cast<std::uint8_t>(image.height >> 8), 32, 0x28 };
+            output.write(reinterpret_cast<const char*>(header.data()), static_cast<std::streamsize>(header.size()));
+            for (std::size_t pixel = 0; pixel < image.pixels.size(); pixel += 4)
+            {
+                output.put(static_cast<char>(image.pixels[pixel + 2]));
+                output.put(static_cast<char>(image.pixels[pixel + 1]));
+                output.put(static_cast<char>(image.pixels[pixel + 0]));
+                output.put(static_cast<char>(image.pixels[pixel + 3]));
+            }
+            return output.good();
         }
 
         std::ofstream output(path, std::ios::binary);
@@ -667,8 +690,10 @@ void OMW::Engine::prepareVulkanEngine()
         const std::string screenshotFormat = Settings::general().mScreenshotFormat.get();
         const bool jpeg = screenshotFormat == "jpg";
         const bool png = screenshotFormat == "png";
+        const bool tga = screenshotFormat == "tga";
         const std::filesystem::path path = mCfgMgr.getScreenshotPath()
-            / ("openmw-vulkan-" + std::to_string(stamp) + (jpeg ? ".jpg" : png ? ".png" : ".ppm"));
+            / ("openmw-vulkan-" + std::to_string(stamp)
+                + (jpeg ? ".jpg" : png ? ".png" : tga ? ".tga" : ".ppm"));
         if (!writeVulkanScreenshot(*image, path))
             Log(Debug::Warning) << "Failed to write Vulkan screenshot " << path;
         else
