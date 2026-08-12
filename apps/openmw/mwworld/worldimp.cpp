@@ -288,7 +288,7 @@ namespace MWWorld
             lightRoot->asGroup(), mResourceSystem, mRendering.get(), mPhysics.get());
         mRendering->preloadCommonAssets();
 
-        mWeatherManager = std::make_unique<MWWorld::WeatherManager>(*mRendering, *mSkyManager, mStore);
+        mWeatherManager = std::make_unique<MWWorld::WeatherManager>(mRendering.get(), mSkyManager, mStore);
 
         const Render::MeshResolver meshResolver = [resourceSystem = mResourceSystem](std::string_view model) {
             const VFS::Path::Normalized path(model);
@@ -331,6 +331,7 @@ namespace MWWorld
 
         mFrameLifecycle = &frameLifecycle;
         mTerrainRenderStorage = &terrainStorage;
+        mWeatherManager = std::make_unique<MWWorld::WeatherManager>(nullptr, nullptr, mStore);
         mWorldScene = std::make_unique<Scene>(*this, frameLifecycle, std::move(sceneSynchronizer),
             std::move(bonePoseResolver), std::move(meshResolver), std::move(textureResolver), mResourceSystem->getVFS(),
             terrainStorage, mResourceSystem, mPhysics.get(), *mNavigator);
@@ -361,7 +362,7 @@ namespace MWWorld
         // we don't want old weather to persist on a new game
         // Note that if reset later, the initial ChangeWeather that the chargen script calls will be lost.
         mWeatherManager.reset();
-        mWeatherManager = std::make_unique<MWWorld::WeatherManager>(*mRendering, *mSkyManager, mStore);
+        mWeatherManager = std::make_unique<MWWorld::WeatherManager>(mRendering.get(), mSkyManager, mStore);
 
         if (!bypass)
         {

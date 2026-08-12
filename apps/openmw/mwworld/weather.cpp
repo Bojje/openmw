@@ -611,7 +611,7 @@ namespace MWWorld
     }
 
     WeatherManager::WeatherManager(
-        MWRender::RenderingManager& rendering, MWRender::SkyManager& sky, MWWorld::ESMStore& store)
+        MWRender::RenderingManager* rendering, MWRender::SkyManager* sky, MWWorld::ESMStore& store)
         : mStore(store)
         , mRendering(rendering)
         , mSky(sky)
@@ -839,7 +839,8 @@ namespace MWWorld
 
         if (!isExterior)
         {
-            mRendering.setSkyEnabled(false);
+            if (mRendering)
+                mRendering->setSkyEnabled(false);
             stopSounds();
             mWindSpeed = 0.f;
             mCurrentWindSpeed = 0.f;
@@ -863,13 +864,20 @@ namespace MWWorld
             && mResult.mParticleEffect != Settings::models().mWeatherashcloud.get();
 
         mStormDirection = calculateStormDirection(mResult.mParticleEffect);
-        mSky.setStormParticleDirection(mStormDirection);
+        if (mSky)
+            mSky->setStormParticleDirection(mStormDirection);
 
         // disable sun during night
         if (time.getHour() >= mTimeSettings.mNightStart || time.getHour() <= mSunriseTime)
-            mSky.sunDisable();
+        {
+            if (mSky)
+                mSky->sunDisable();
+        }
         else
-            mSky.sunEnable();
+        {
+            if (mSky)
+                mSky->sunEnable();
+        }
 
         // Update the sun direction.  Run it east to west at a fixed angle from overhead.
         // The sun's speed at day and night may differ, since mSunriseTime and mNightStart
@@ -901,8 +909,11 @@ namespace MWWorld
 
             // Hardcoded constant from Morrowind
             const osg::Vec3f sunDir(-400.f * orbit, 75.f, -100.f);
-            mRendering.setSunDirection(sunDir);
-            mRendering.setNight(isNight);
+            if (mRendering)
+            {
+                mRendering->setSunDirection(sunDir);
+                mRendering->setNight(isNight);
+            }
         }
 
         float underwaterFog = mUnderwaterFog.getValue(time.getHour(), mTimeSettings, "Fog");
@@ -916,17 +927,26 @@ namespace MWWorld
         else
             glareFade = 1.f - (time.getHour() - peakHour) / (mTimeSettings.mNightStart - peakHour);
 
-        mSky.setGlareTimeOfDayFade(glareFade);
+        if (mSky)
+            mSky->setGlareTimeOfDayFade(glareFade);
 
-        mSky.setMasserState(mMasser.calculateState(time));
-        mSky.setSecundaState(mSecunda.calculateState(time));
+        if (mSky)
+        {
+            mSky->setMasserState(mMasser.calculateState(time));
+            mSky->setSecundaState(mSecunda.calculateState(time));
+        }
 
-        mRendering.configureFog(
-            mResult.mFogDepth, underwaterFog, mResult.mDLFogFactor, mResult.mDLFogOffset / 100.0f, mResult.mFogColor);
-        mRendering.setAmbientColour(mResult.mAmbientColor);
-        mRendering.setSunColour(mResult.mSunColor, mResult.mSunColor, mResult.mGlareView * glareFade);
+        if (mRendering)
+        {
+            mRendering->configureFog(
+                mResult.mFogDepth, underwaterFog, mResult.mDLFogFactor, mResult.mDLFogOffset / 100.0f,
+                mResult.mFogColor);
+            mRendering->setAmbientColour(mResult.mAmbientColor);
+            mRendering->setSunColour(mResult.mSunColor, mResult.mSunColor, mResult.mGlareView * glareFade);
+        }
 
-        mSky.setWeather(mResult);
+        if (mSky)
+            mSky->setWeather(mResult);
 
         // Play sounds
         if (mPlayingAmbientSoundID != mResult.mAmbientLoopSoundID)
