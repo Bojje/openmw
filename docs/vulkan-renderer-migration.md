@@ -284,6 +284,9 @@ Player setup/rendering now follows the same split: OSG animation and node work i
 physics actor creation, mechanics registration, inventory listener clearing, effects, navigation,
 and neutral transform updates remain shared. This removes another first-frame null dereference in
 the neutral bootstrap.
+Object movement and active-cell transfer now publish neutral positions and update physics without
+requiring an OSG base node; the legacy manager is limited to node movement, pointer transfer, and
+paging blacklist updates.
 Cell-transition loading screens, window-manager cell notifications, actor watching, fades, and
 postprocessor flags now follow the same legacy-service guard, so the neutral bootstrap does not
 silently re-enter the OSG/UI path during cell changes.
@@ -310,7 +313,7 @@ The engine public header no longer imports complete OSG viewer/event-handler hea
 are now included only by the implementation files that use them.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-154 files, deleting 1,252 lines and adding 8,063 lines (net `+6,811`). The larger Vulkan-only
+154 files, deleting 1,257 lines and adding 8,075 lines (net `+6,818`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.

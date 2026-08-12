@@ -1144,7 +1144,8 @@ namespace MWWorld
                 {
                     newPtr = currCell->moveTo(ptr, newCell);
 
-                    mRendering->updatePtr(ptr, newPtr);
+                    if (mRendering)
+                        mRendering->updatePtr(ptr, newPtr);
                     if (!ptr.isEmpty() && !newPtr.isEmpty())
                     {
                         const MWWorld::CellStore* destinationCell = newPtr.getCell();
@@ -1171,12 +1172,14 @@ namespace MWWorld
                 }
             }
 
-            MWBase::Environment::get().getWindowManager()->updateConsoleObjectPtr(ptr, newPtr);
+            if (mRendering)
+                MWBase::Environment::get().getWindowManager()->updateConsoleObjectPtr(ptr, newPtr);
             MWBase::Environment::get().getScriptManager()->getGlobalScripts().updatePtrs(ptr, newPtr);
         }
-        if (haveToMove && newPtr.getRefData().getBaseNode())
+        if (haveToMove && (mRendering ? newPtr.getRefData().getBaseNode() != nullptr : true))
         {
-            mRendering->moveObject(newPtr, position);
+            if (mRendering)
+                mRendering->moveObject(newPtr, position);
             mWorldScene->updateNeutralObjectPosition(static_cast<const void*>(newPtr.mRef),
                 { position.x(), position.y(), position.z() });
             if (movePhysics)
@@ -1191,7 +1194,8 @@ namespace MWWorld
             mWorldScene->playerMoved({ position.x(), position.y(), position.z() });
         else
         {
-            mRendering->pagingBlacklistObject(mStore.find(ptr.getCellRef().getRefId()), ptr);
+            if (mRendering)
+                mRendering->pagingBlacklistObject(mStore.find(ptr.getCellRef().getRefId()), ptr);
             mWorldScene->removeFromPagedRefs(newPtr);
         }
 
