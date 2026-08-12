@@ -264,10 +264,12 @@ visualization unchanged.
 physics/navigation services, and `initOsgRenderer()` creates the OSG terrain, scene graph,
 legacy manager, and OSG-backed neutral resource callbacks. The engine calls these phases
 explicitly, leaving a concrete insertion point for a Vulkan renderer-services phase.
-`ResourceSystem` now has an explicit OSG/neutral backend mode: neutral initialization does
-not construct `SceneManager` or `KeyframeManager`, and the world renderer rejects a mismatched
-resource backend before touching presentation services. This keeps the future Vulkan path from
-paying for OSG scene ownership merely because the shared resource facade still exists.
+`ResourceSystem` now has an explicit OSG/neutral backend mode: neutral initialization constructs
+only the shared NIF file/mesh services and omits `SceneManager`, `KeyframeManager`, image, material,
+and animation-rule managers. Neutral scene services receive texture data through injected
+renderer-neutral resolvers, while the world renderer rejects a mismatched resource backend before
+touching presentation services. This keeps the future Vulkan path from paying for OSG scene and
+image ownership merely because the shared resource facade still exists.
 The OSG renderer also validates that its light-root handoff was populated before constructing
 the projectile presenter, turning a previously unchecked startup dereference into a fail-fast
 diagnostic.
@@ -351,7 +353,7 @@ The engine public header no longer imports complete OSG viewer/event-handler hea
 are now included only by the implementation files that use them.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-157 files, deleting 1,361 lines and adding 8,404 lines (net `+7,043`). The larger Vulkan-only
+157 files, deleting 1,367 lines and adding 8,419 lines (net `+7,052`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.

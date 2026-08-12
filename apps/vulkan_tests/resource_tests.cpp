@@ -11,8 +11,10 @@ int main()
     Resource::ResourceSystem resourceSystem(
         &vfsManager, 1.0, &encoder.getStatelessEncoder(), Resource::ResourceSystem::Backend::Neutral);
 
-    if (resourceSystem.getSceneManager() != nullptr || resourceSystem.getKeyframeManager() != nullptr)
+    if (resourceSystem.getSceneManager() != nullptr || resourceSystem.getKeyframeManager() != nullptr
+        || resourceSystem.getImageManager() != nullptr || resourceSystem.getBgsmFileManager() != nullptr
+        || resourceSystem.getAnimBlendRulesManager() != nullptr)
         throw std::runtime_error("neutral resource backend constructed OSG scene services");
-    if (resourceSystem.getImageManager() == nullptr || resourceSystem.getNifMeshManager() == nullptr)
+    if (resourceSystem.getNifFileManager() == nullptr || resourceSystem.getNifMeshManager() == nullptr)
         throw std::runtime_error("neutral resource backend omitted shared resource services");
 }

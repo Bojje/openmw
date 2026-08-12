@@ -19,26 +19,29 @@ namespace Resource
     {
         mNifFileManager = std::make_unique<NifFileManager>(vfs, encoder);
         mNifMeshManager = std::make_unique<NifMeshManager>(mNifFileManager.get());
-        mBgsmFileManager = std::make_unique<BgsmFileManager>(vfs, expiryDelay);
-        mImageManager = std::make_unique<ImageManager>(vfs, expiryDelay);
-        mAnimBlendRulesManager = std::make_unique<AnimBlendRulesManager>(vfs, expiryDelay);
 
         if (backend == Backend::Osg)
         {
+            mBgsmFileManager = std::make_unique<BgsmFileManager>(vfs, expiryDelay);
+            mImageManager = std::make_unique<ImageManager>(vfs, expiryDelay);
+            mAnimBlendRulesManager = std::make_unique<AnimBlendRulesManager>(vfs, expiryDelay);
             mSceneManager = std::make_unique<SceneManager>(
                 vfs, mImageManager.get(), mNifFileManager.get(), mBgsmFileManager.get(), expiryDelay);
             mKeyframeManager = std::make_unique<KeyframeManager>(vfs, mSceneManager.get(), expiryDelay, encoder);
         }
 
         addResourceManager(mNifFileManager.get());
-        addResourceManager(mBgsmFileManager.get());
+        if (mBgsmFileManager)
+            addResourceManager(mBgsmFileManager.get());
         if (mKeyframeManager)
             addResourceManager(mKeyframeManager.get());
         // note, scene references images so add images afterwards for correct implementation of updateCache()
         if (mSceneManager)
             addResourceManager(mSceneManager.get());
-        addResourceManager(mImageManager.get());
-        addResourceManager(mAnimBlendRulesManager.get());
+        if (mImageManager)
+            addResourceManager(mImageManager.get());
+        if (mAnimBlendRulesManager)
+            addResourceManager(mAnimBlendRulesManager.get());
     }
 
     ResourceSystem::~ResourceSystem()

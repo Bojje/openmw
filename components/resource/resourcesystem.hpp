@@ -50,6 +50,8 @@ namespace Resource
         ~ResourceSystem();
 
         SceneManager* getSceneManager();
+        /// Returns nullptr for the neutral backend; neutral scene services receive texture data through injected
+        /// renderer-neutral resolvers instead of constructing the OSG image/material managers.
         ImageManager* getImageManager();
         BgsmFileManager* getBgsmFileManager();
         NifFileManager* getNifFileManager();
