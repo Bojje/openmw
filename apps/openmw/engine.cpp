@@ -31,6 +31,7 @@
 #include <components/resource/stats.hpp>
 #include <components/compiler/extensions0.hpp>
 #include <components/render/texture.hpp>
+#include <components/render/math.hpp>
 
 #include <components/stereo/stereomanager.hpp>
 
@@ -95,6 +96,52 @@
 
 namespace
 {
+    Render::Mat4 neutralLookAt(const Render::Vec3& eye, const Render::Vec3& center)
+    {
+        const Render::Vec3 forward = { center.x - eye.x, center.y - eye.y, center.z - eye.z };
+        const float length = std::sqrt(forward.x * forward.x + forward.y * forward.y + forward.z * forward.z);
+        if (length <= 0.f)
+            return Render::identityMat4();
+        const Render::Vec3 f = { forward.x / length, forward.y / length, forward.z / length };
+        Render::Vec3 side = { f.y, -f.x, 0.f };
+        const float sideLength = std::sqrt(side.x * side.x + side.y * side.y);
+        if (sideLength <= 0.f)
+            side = { 1.f, 0.f, 0.f };
+        else
+            side = { side.x / sideLength, side.y / sideLength, 0.f };
+        const Render::Vec3 up = { side.y * f.z, -side.x * f.z, side.x * f.y - side.y * f.x };
+
+        Render::Mat4 result = Render::identityMat4();
+        result.data[0] = side.x;
+        result.data[1] = up.x;
+        result.data[2] = -f.x;
+        result.data[4] = side.y;
+        result.data[5] = up.y;
+        result.data[6] = -f.y;
+        result.data[8] = side.z;
+        result.data[9] = up.z;
+        result.data[10] = -f.z;
+        result.data[12] = -(side.x * eye.x + side.y * eye.y + side.z * eye.z);
+        result.data[13] = -(up.x * eye.x + up.y * eye.y + up.z * eye.z);
+        result.data[14] = f.x * eye.x + f.y * eye.y + f.z * eye.z;
+        return result;
+    }
+
+    Render::Mat4 neutralPerspective(float aspect)
+    {
+        const float fieldOfView = 75.f * static_cast<float>(M_PI) / 180.f;
+        const float focal = 1.f / std::tan(fieldOfView * 0.5f);
+        const float nearClip = 1.f;
+        const float farClip = 100000.f;
+        Render::Mat4 result = {};
+        result.data[0] = focal / aspect;
+        result.data[5] = focal;
+        result.data[10] = farClip / (nearClip - farClip);
+        result.data[11] = -1.f;
+        result.data[14] = farClip * nearClip / (nearClip - farClip);
+        return result;
+    }
+
     void initStatsHandler(Resource::Profiler& profiler)
     {
         const osg::Vec4f textColor(1.f, 1.f, 1.f, 1.f);
@@ -623,7 +670,21 @@ void OMW::Engine::prepareVulkanEngine()
         }
         return std::shared_ptr<const Render::TextureData>(fallbackTexture);
     };
-    mWorld->initNeutralRenderer(*mFrameLifecycle, [](Render::SceneData&) {},
+    const Render::SceneSynchronizer sceneSynchronizer = [this](Render::SceneData& sceneData) {
+        const float aspect = static_cast<float>(std::max(1, Settings::video().mResolutionX.get()))
+            / static_cast<float>(std::max(1, Settings::video().mResolutionY.get()));
+        sceneData.projection = neutralPerspective(aspect);
+        const MWWorld::Ptr player = mWorld->getPlayerPtr();
+        if (player.isEmpty())
+            return;
+        const ESM::Position& position = player.getRefData().getPosition();
+        const Render::Vec3 eye = { position.pos[0], position.pos[1], position.pos[2] + 124.f };
+        const Render::Vec3 forward = { -std::sin(position.rot[2]), std::cos(position.rot[2]), 0.f };
+        sceneData.view = neutralLookAt(eye, { eye.x + forward.x, eye.y + forward.y, eye.z + forward.z });
+        sceneData.viewInverse = Render::invertMat4(sceneData.view);
+        sceneData.projInverse = Render::invertMat4(sceneData.projection);
+    };
+    mWorld->initNeutralRenderer(*mFrameLifecycle, sceneSynchronizer,
         [](const void*, std::span<const std::string_view>) { return std::vector<Render::Mat4>(); },
         std::move(meshResolver), textureResolver);
     mEnvironment.setWorldScene(mWorld->getWorldScene());
