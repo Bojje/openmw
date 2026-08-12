@@ -54,6 +54,7 @@ namespace MWRender
 namespace Terrain
 {
     class World;
+    class RenderStorage;
 }
 
 namespace ESM
@@ -227,6 +228,12 @@ namespace MWWorld
         // renderer services after initSimulation instead of calling this.
         void initOsgRenderer(osgViewer::Viewer* viewer, Render::FrameLifecycle& frameLifecycle,
             osg::ref_ptr<osg::Group> rootNode, SceneUtil::WorkQueue* workQueue, SceneUtil::UnrefQueue& unrefQueue);
+
+        // Neutral scene bootstrap for a submission-consuming backend. This does not create
+        // OSG rendering, paging, terrain-world, or preloader services.
+        void initNeutralRenderer(Render::FrameLifecycle& frameLifecycle, Render::SceneSynchronizer sceneSynchronizer,
+            Render::BonePoseResolver bonePoseResolver, Render::MeshResolver meshResolver,
+            Render::TextureResolver textureResolver, Terrain::RenderStorage& terrainStorage);
 
         virtual ~World();
 

@@ -313,6 +313,25 @@ namespace MWWorld
             *mTerrainStorage, workQueue, mResourceSystem, mPhysics.get(), *mNavigator);
     }
 
+    void World::initNeutralRenderer(Render::FrameLifecycle& frameLifecycle,
+        Render::SceneSynchronizer sceneSynchronizer, Render::BonePoseResolver bonePoseResolver,
+        Render::MeshResolver meshResolver, Render::TextureResolver textureResolver,
+        Terrain::RenderStorage& terrainStorage)
+    {
+        if (frameLifecycle.backend() != Render::FrameLifecycle::Backend::Vulkan)
+            throw std::invalid_argument("The neutral world renderer requires a Vulkan frame owner");
+        if (!mPhysics || !mNavigator)
+            throw std::logic_error("World simulation must be initialized before its renderer");
+        if (mWorldScene)
+            throw std::logic_error("World renderer services have already been initialized");
+
+        mFrameLifecycle = &frameLifecycle;
+        mWorldScene = std::make_unique<Scene>(*this, frameLifecycle, std::move(sceneSynchronizer),
+            std::move(bonePoseResolver), std::move(meshResolver), std::move(textureResolver), mResourceSystem->getVFS(),
+            nullptr, nullptr, mTerrain, mObjectPaging, terrainStorage, nullptr, mResourceSystem, mPhysics.get(),
+            *mNavigator);
+    }
+
     void World::fillGlobalVariables()
     {
         mGlobalVariables.fill(mStore);
