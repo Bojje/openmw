@@ -25,6 +25,7 @@ namespace MWRender
 
         osgViewer::Viewer* viewer() const { return mViewer.get(); }
 
+        Render::FrameLifecycle::Backend backend() const override { return Render::FrameLifecycle::Backend::Osg; }
         bool renderFrame() override;
         bool consumesSceneSubmission() const override { return false; }
         bool done() const override;

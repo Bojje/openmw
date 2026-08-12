@@ -232,6 +232,8 @@ int main(int argc, char** argv)
             auto renderer = std::make_unique<Vk::Renderer>(window, true, surfaceMode,
                 static_cast<uint32_t>(drawableWidth), static_cast<uint32_t>(drawableHeight));
             Render::FrameLifecycle& frameOwner = *renderer;
+            if (frameOwner.backend() != Render::FrameLifecycle::Backend::Vulkan)
+                throw std::runtime_error("Vulkan smoke renderer reported the wrong backend identity");
             if (!frameOwner.consumesSceneSubmission())
                 throw std::runtime_error("Vulkan smoke renderer did not claim the submission frame path");
             if (!renderer->validationEnabled())

@@ -70,6 +70,7 @@ namespace Vk
         Renderer(const Renderer&) = delete;
         Renderer& operator=(const Renderer&) = delete;
 
+        Render::FrameLifecycle::Backend backend() const override { return Render::FrameLifecycle::Backend::Vulkan; }
         bool renderFrame() override { return render(); }
         bool renderFrame(const Render::SceneSubmission& submission) override
         {

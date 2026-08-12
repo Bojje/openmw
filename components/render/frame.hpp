@@ -12,8 +12,15 @@ namespace Render
     class FrameLifecycle
     {
     public:
+        enum class Backend
+        {
+            Osg,
+            Vulkan,
+        };
+
         virtual ~FrameLifecycle() = default;
 
+        virtual Backend backend() const = 0;
         virtual bool renderFrame() = 0;
         virtual bool renderFrame(const SceneSubmission& /*submission*/) { return false; }
         virtual bool consumesSceneSubmission() const = 0;

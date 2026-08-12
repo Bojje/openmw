@@ -235,6 +235,10 @@ Neutral object and groundcover snapshots now compose Euler and axis-angle rotati
 renderer-neutral math; OSG quaternion construction remains only for legacy scene-node updates.
 The full-game bridge validator runs after that same render boundary, so it validates the
 camera payload that was just submitted rather than the previous frame's cached matrices.
+`FrameLifecycle` now identifies its backend explicitly. The current `World::init` path rejects
+non-OSG owners before allocating OSG physics, terrain, or scene services; this is a deliberate
+fail-fast guard against accidentally constructing Vulkan and OSG in one runtime, while the
+backend-service replacement is still being implemented.
 The non-owning manager update handle is private to the `Scene` owner, detached during `Scene`
 teardown, and CI guards the manager header against regaining a value-owned neutral frame state.
 Engine GUI fallback frame advancement now also reads simulation time from the active

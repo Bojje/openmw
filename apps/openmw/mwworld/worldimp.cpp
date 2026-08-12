@@ -242,6 +242,9 @@ namespace MWWorld
     void World::init(Debug::Level maxRecastLogLevel, osgViewer::Viewer* viewer, Render::FrameLifecycle& frameLifecycle,
         osg::ref_ptr<osg::Group> rootNode, SceneUtil::WorkQueue* workQueue, SceneUtil::UnrefQueue& unrefQueue)
     {
+        if (frameLifecycle.backend() != Render::FrameLifecycle::Backend::Osg)
+            throw std::invalid_argument("The current World initialization path requires the OSG renderer backend");
+
         mPhysics = std::make_unique<MWPhysics::PhysicsSystem>(mResourceSystem, rootNode);
 
         if (Settings::navigator().mEnable)
