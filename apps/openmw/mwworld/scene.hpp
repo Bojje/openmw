@@ -30,11 +30,6 @@ namespace ESM
     struct Position;
 }
 
-namespace Files
-{
-    class Collections;
-}
-
 namespace Loading
 {
     class Listener;
@@ -49,14 +44,12 @@ namespace DetourNavigator
 namespace MWRender
 {
     class ObjectPaging;
-    class SkyManager;
     class RenderingManager;
 }
 
 namespace Terrain
 {
     class RenderStorage;
-    class World;
 }
 
 namespace VFS
@@ -71,7 +64,6 @@ namespace MWPhysics
 
 namespace MWWorld
 {
-    class Player;
     class CellStore;
     class CellPreloader;
     class World;
