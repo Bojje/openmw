@@ -374,6 +374,8 @@ blendmaps without `ESMTerrain::Storage`, `LandObject`, or OSG lifetimes. Its gen
 entry point is exposed through the neutral terrain component. ESM4 terrain currently uses an
 explicit opaque fallback layer while its record-to-layer mapping is completed; it is not treated as
 visual parity.
+The generic grid and blendmap sampling implementation now lives in `components/terrain`; the old
+`components/esmterrain/gridsampling.hpp` path is only a compatibility alias for the legacy adapter.
 CI now rejects a neutral bootstrap that regains those legacy service names or calls the OSG
 initializer, keeping the single-backend boundary enforceable during the migration.
 Engine GUI fallback frame advancement now also reads simulation time from the active
@@ -442,7 +444,7 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-178 files, deleting 1,980 lines and adding 9,789 lines (net `+7,809`). The larger Vulkan-only
+179 files, deleting 2,179 lines and adding 9,990 lines (net `+7,811`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
