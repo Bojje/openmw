@@ -19,10 +19,16 @@
 #include <components/vfs/manager.hpp>
 #include <components/vfs/pathutil.hpp>
 
-#include "gridsampling.hpp"
+#include <components/terrain/gridsampling.hpp>
 
 namespace ESMTerrain
 {
+    using Terrain::CellSample;
+    using Terrain::getBlendmapLocalRange;
+    using Terrain::getBlendmapSize;
+    using Terrain::sampleBlendmaps;
+    using Terrain::sampleCellGrid;
+
     namespace
     {
         Render::TextureData makeAlphaTexture(int size, const std::vector<std::uint8_t>& alpha)

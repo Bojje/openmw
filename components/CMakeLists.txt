@@ -193,7 +193,6 @@ add_component_dir (esm3
     )
 
 add_component_dir (esmterrain
-    gridsampling
     storage
     )
 
