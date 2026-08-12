@@ -460,11 +460,12 @@ namespace MWRender
         mWorkQueue->addWorkItem(std::move(workItem));
     }
 
-    void RenderingManager::synchronizeNeutralScene(Render::SceneData& sceneData) const
+    Render::SceneData RenderingManager::getNeutralFrameData() const
     {
+        Render::SceneData sceneData;
         const MWRender::Camera* camera = getCamera();
         if (camera == nullptr)
-            return;
+            return sceneData;
 
         sceneData.view = camera->getNeutralViewMatrix();
         sceneData.projection = camera->getNeutralProjectionMatrix();
@@ -486,6 +487,7 @@ namespace MWRender
         const osg::Vec4f fogColor = mFog->getFogColor(underwater);
         sceneData.fogColor = { fogColor.r(), fogColor.g(), fogColor.b(), fogColor.a() };
         sceneData.fogParameters = { fogStart, fogEnd, 0.f, 0.f };
+        return sceneData;
     }
 
     void RenderingManager::setNightEyeFactor(float factor)

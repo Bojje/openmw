@@ -288,7 +288,7 @@ namespace MWWorld
             return resourceSystem->getImageManager()->getRenderTexture(VFS::Path::Normalized(path));
         };
         const Render::SceneSynchronizer sceneSynchronizer = [rendering = mRendering.get()](Render::SceneData& sceneData) {
-            rendering->synchronizeNeutralScene(sceneData);
+            sceneData = rendering->getNeutralFrameData();
         };
         const Render::BonePoseResolver bonePoseResolver = [rendering = mRendering.get()](
                                                                const void* objectKey,

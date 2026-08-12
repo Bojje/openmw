@@ -129,9 +129,9 @@ namespace MWRender
             std::function<void()> frameRenderer, std::function<void()> frameAdvancer);
         ~RenderingManager();
 
-        /// Copy the current reference-renderer camera and environment state into
-        /// the world-owned neutral frame snapshot at a frame boundary.
-        void synchronizeNeutralScene(Render::SceneData& sceneData) const;
+        /// Return the current reference-renderer camera and environment state
+        /// as a value for the world-owned neutral frame snapshot.
+        Render::SceneData getNeutralFrameData() const;
 
         MWRender::Objects& getObjects();
 

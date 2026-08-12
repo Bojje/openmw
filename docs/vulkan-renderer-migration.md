@@ -223,14 +223,14 @@ concrete `MWRender::TerrainStorage` lifetime and passes it explicitly to the OSG
 world scene; `RenderingManager` consumes it as a reference for legacy terrain setup instead of
 owning a second terrain-storage lifetime.
 Neutral lighting and fog state now lives in `WorldScene::sceneData()` with the rest of the
-world-owned handoff. `RenderingManager` exposes an explicit frame-boundary synchronization
-operation, so its OSG state changes cannot reintroduce a second neutral scene owner or retain
-a pointer into the world scene.
+world-owned handoff. `RenderingManager` exposes a value-returning frame-state snapshot, so its
+OSG state changes cannot reintroduce a second neutral scene owner or retain a pointer into the
+world scene.
 The neutral terrain tile entry point also uses a plain two-float center; OSG vector types
 remain confined to the legacy quadtree and reference-renderer methods.
-Camera and environment state are synchronized into that same world-owned state at the renderer
-frame boundary; neutral submission export uses the same explicit synchronization operation for
-a submission-consuming backend.
+Camera and environment state are copied into that same world-owned state at the renderer frame
+boundary; neutral submission export uses the same explicit value snapshot for a submission-consuming
+backend.
 Neutral object and groundcover snapshots now compose Euler and axis-angle rotations through
 renderer-neutral math; OSG quaternion construction remains only for legacy scene-node updates.
 The full-game bridge validator runs after that same render boundary, so it validates the
