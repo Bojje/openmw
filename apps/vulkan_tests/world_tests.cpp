@@ -181,6 +181,9 @@ int main()
     world.updateEffects(0.5f);
     if (world.findCell(&firstCellHandle)->objects.front().animationTime != 0.5f)
         throw std::runtime_error("renderer-neutral world scene did not advance selected animation time");
+    if (!world.updateObjectAnimation(&dynamicObjectHandle, "walkforward", 1.25f)
+        || world.findCell(&firstCellHandle)->objects.front().animationTime != 1.25f)
+        throw std::runtime_error("renderer-neutral world scene did not accept an explicit animation clock");
     Render::Mat4 dynamicBone = Render::identityMat4();
     dynamicBone.data[12] = 3.f;
     if (!world.updateObjectPose(&dynamicObjectHandle, { dynamicBone })

@@ -2610,15 +2610,17 @@ namespace MWMechanics
             return;
 
         AnimationQueueEntry& current = mAnimQueue.front();
-        if (current.mLooping)
-            return;
-
         const std::optional<float> animationDuration
             = MWBase::Environment::get().getWorld()->getNeutralAnimationDuration(mPtr);
         if (!animationDuration || *animationDuration <= 0.f)
             return;
 
         current.mTime += duration * std::max(0.f, current.mSpeed);
+        if (current.mLooping)
+        {
+            current.mTime = std::fmod(current.mTime, *animationDuration);
+            return;
+        }
         if (current.mTime < *animationDuration)
             return;
 
@@ -2704,7 +2706,9 @@ namespace MWMechanics
                     animationGroup = std::string(prefix) + (input.x() >= 0.f ? "right" : "left");
             }
         }
-        world->updateNeutralAnimation(mPtr, animationGroup);
+        const std::optional<float> animationTime
+            = mAnimQueue.empty() ? std::nullopt : std::optional<float>(mAnimQueue.front().mTime);
+        world->updateNeutralAnimation(mPtr, animationGroup, animationTime);
         settings.mPosition[0] = settings.mPosition[1] = 0.f;
         if (movement.z() == 0.f)
             settings.mPosition[2] = 0.f;

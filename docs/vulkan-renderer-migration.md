@@ -552,7 +552,9 @@ Neutral scene synchronization and bone-pose production now cross the same bounda
 callbacks; the Vulkan game owner supplies camera synchronization and grouped NIF/KF pose sampling,
 while actor priority and blended animation remain to be ported. Neutral one-shot animation queues
 now advance from resource duration metadata and hand off to the next queued group, including
-finite loop counts; full text-key timing and controller-stack ownership remain outstanding.
+finite loop counts; looping groups now retain a wrapped neutral clock, and mechanics exports
+the queue clock at submission time so the resource pose sampler does not invent a second timeline.
+Full text-key timing and controller-stack ownership remain outstanding.
 RGBA8 conversion is now one renderer-neutral helper shared by image resources and terrain
 blendmaps, so clamping, finite-value rejection, and byte quantization cannot drift between
 resource paths. The conversion helper has direct CPU coverage.

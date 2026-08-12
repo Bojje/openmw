@@ -433,7 +433,8 @@ namespace Render
             return true;
         }
 
-        bool updateObjectAnimation(const void* objectKey, std::string_view group)
+        bool updateObjectAnimation(
+            const void* objectKey, std::string_view group, std::optional<float> animationTime = std::nullopt)
         {
             const auto found = mObjects.find(objectKey);
             if (found == mObjects.end())
@@ -450,6 +451,8 @@ namespace Render
                 object->animationTime = 0.f;
                 object->boneMatrices.clear();
             }
+            if (animationTime && std::isfinite(*animationTime) && *animationTime >= 0.f)
+                object->animationTime = *animationTime;
             return true;
         }
 

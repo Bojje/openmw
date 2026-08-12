@@ -406,10 +406,10 @@ namespace MWWorld
         mPhysics->updateScale(ptr);
     }
 
-    void Scene::updateObjectAnimation(const Ptr& ptr, std::string_view group)
+    void Scene::updateObjectAnimation(const Ptr& ptr, std::string_view group, std::optional<float> animationTime)
     {
         if (mNeutralWorldScene)
-            mNeutralWorldScene->updateObjectAnimation(static_cast<const void*>(ptr.mRef), group);
+            mNeutralWorldScene->updateObjectAnimation(static_cast<const void*>(ptr.mRef), group, animationTime);
     }
 
     void Scene::updateNeutralObjectCell(const Ptr& oldPtr, const Ptr& newPtr)

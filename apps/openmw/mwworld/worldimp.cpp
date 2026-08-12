@@ -4193,10 +4193,11 @@ namespace MWWorld
             : Render::Vec4{ 0.f, 0.f, 0.f, 0.f };
     }
 
-    void World::updateNeutralAnimation(const MWWorld::Ptr& ptr, std::string_view group)
+    void World::updateNeutralAnimation(
+        const MWWorld::Ptr& ptr, std::string_view group, std::optional<float> animationTime)
     {
         if (mWorldScene)
-            mWorldScene->updateObjectAnimation(ptr, group);
+            mWorldScene->updateObjectAnimation(ptr, group, animationTime);
     }
 
     std::optional<float> World::getNeutralAnimationDuration(const MWWorld::Ptr& ptr) const
