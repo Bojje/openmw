@@ -453,7 +453,7 @@ and Vulkan records it in its owner state. This gives future input/window service
 without reintroducing backend-specific viewer access into the engine.
 The engine simulation/update loop now owns its frame start tick and statistics sink instead of
 querying the OSG viewer directly. The OSG lifecycle may still provide its viewer statistics object
-for the reference renderer, while a future Vulkan owner can run the same update loop without an
+for the reference renderer, while the active Vulkan owner runs the same update loop without an
 OSG viewer query in `Engine::frame()`.
 OSG screen-capture operation and event-handler construction is likewise owned by
 `ViewerFrameLifecycle`, the OSG frame backend; `Engine` supplies only the capture configuration
@@ -733,9 +733,9 @@ update traversal, and frame submission through one engine-owned frame lifecycle.
 one OSG `ViewerFrameLifecycle` before world initialization; that lifecycle owns the OSG viewer and
 the engine passes its frame service explicitly to `World`. The legacy manager receives only screenshot
 render/advance callbacks and stores no frame lifecycle.
-Direct OSG frame operations remain only in that adapter, while bootstrap callbacks use the same small
-frame-owner type that can be replaced with the Vulkan presentation owner. This establishes the
-replacement point for a future Vulkan frame owner while current OSG behavior remains unchanged.
+Direct OSG frame operations remain only in that adapter. The Vulkan renderer itself implements the
+same frame-owner contract, so the engine does not need a second Vulkan lifecycle wrapper or a
+backend-specific forwarding layer.
 The interface now has an explicit submission-consuming path: the Vulkan owner
 receives a synchronized `SceneSubmission` from `World` and validates it before upload, while the OSG owner
 explicitly reports that it does not consume submissions and continues its legacy traversal.

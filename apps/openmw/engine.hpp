@@ -178,6 +178,7 @@ namespace OMW
 
         void executeLocalScripts();
         osg::Stats* getOsgStats() const;
+        void captureVulkanScreenshot();
 
         bool frame(unsigned frameNumber, float dt);
 

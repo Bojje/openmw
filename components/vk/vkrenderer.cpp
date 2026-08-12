@@ -1565,6 +1565,13 @@ namespace Vk
         }
     }
 
+    void Renderer::resize()
+    {
+        const auto [width, height] = drawableSize();
+        if (width > 0 && height > 0)
+            resize(width, height);
+    }
+
     void Renderer::resize(uint32_t width, uint32_t height)
     {
         if (width == 0 || height == 0)
