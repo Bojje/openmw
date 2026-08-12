@@ -470,7 +470,7 @@ namespace MWWorld
             + mGlobalVariables.countSavedGameRecords()
             + (mProjectileManager ? mProjectileManager->countSavedGameRecords() : 0)
             + 1 // player record
-            + 1 // weather record
+            + (mWeatherManager ? 1 : 0) // weather record
             + 1 // levitation/teleport enabled state
             + 1 // camera
             + 1; // random state.
@@ -490,7 +490,8 @@ namespace MWWorld
         // Active cells could have a dirty fog of war, sync it to the CellStore first
         for (CellStore* cellstore : mWorldScene->getActiveCells())
         {
-            MWBase::Environment::get().getWindowManager()->writeFog(cellstore);
+            if (mRendering)
+                MWBase::Environment::get().getWindowManager()->writeFog(cellstore);
         }
 
         mStore.write(writer, progress); // dynamic Store must be written (and read) before Cells, so that
@@ -515,6 +516,17 @@ namespace MWWorld
 
     void World::readRecord(ESM::ESMReader& reader, uint32_t type)
     {
+        if (!mWeatherManager && type == ESM::REC_WTHR)
+        {
+            reader.skipRecord();
+            return;
+        }
+        if (!mProjectileManager && (type == ESM::REC_PROJ || type == ESM::REC_MPRJ))
+        {
+            reader.skipRecord();
+            return;
+        }
+
         switch (type)
         {
             case ESM::REC_ACTC:
@@ -2310,7 +2322,7 @@ namespace MWWorld
 
     bool World::isFirstPerson() const
     {
-        return mRendering->getCamera()->getMode() == MWRender::Camera::Mode::FirstPerson;
+        return mRendering && mRendering->getCamera()->getMode() == MWRender::Camera::Mode::FirstPerson;
     }
 
     bool World::isPreviewModeEnabled() const
