@@ -1,6 +1,8 @@
 #ifndef OPENMW_MWRENDER_VIEWER_FRAME_LIFECYCLE_H
 #define OPENMW_MWRENDER_VIEWER_FRAME_LIFECYCLE_H
 
+#include <osg/ref_ptr>
+
 #include <components/render/frame.hpp>
 
 namespace osgViewer
@@ -15,7 +17,13 @@ namespace MWRender
     class ViewerFrameLifecycle final : public Render::FrameLifecycle
     {
     public:
-        explicit ViewerFrameLifecycle(osgViewer::Viewer& viewer);
+        ViewerFrameLifecycle();
+        ~ViewerFrameLifecycle() override;
+
+        ViewerFrameLifecycle(const ViewerFrameLifecycle&) = delete;
+        ViewerFrameLifecycle& operator=(const ViewerFrameLifecycle&) = delete;
+
+        osgViewer::Viewer* viewer() const { return mViewer.get(); }
 
         bool renderFrame() override;
         bool consumesSceneSubmission() const override { return false; }
@@ -25,7 +33,7 @@ namespace MWRender
         void advanceFrame(double simulationTime) override;
 
     private:
-        osgViewer::Viewer& mViewer;
+        osg::ref_ptr<osgViewer::Viewer> mViewer;
     };
 }
 

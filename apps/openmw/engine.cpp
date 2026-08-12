@@ -987,13 +987,11 @@ void OMW::Engine::go()
     // Create encoder
     mEncoder = std::make_unique<ToUTF8::Utf8Encoder>(mEncoding);
 
-    // Setup viewer
-    mViewer = new osgViewer::Viewer;
-    mPreWorldFrameLifecycle = std::make_unique<MWRender::ViewerFrameLifecycle>(*mViewer);
-    mViewer->setReleaseContextAtEndOfFrameHint(false);
-
-    // Do not try to outsmart the OS thread scheduler (see bug #4785).
-    mViewer->setUseConfigureAffinity(false);
+    // The OSG lifecycle owns its viewer. A future Vulkan lifecycle can replace
+    // this owner without constructing an OSG viewer in the engine.
+    auto viewerLifecycle = std::make_unique<MWRender::ViewerFrameLifecycle>();
+    mViewer = viewerLifecycle->viewer();
+    mPreWorldFrameLifecycle = std::move(viewerLifecycle);
 
     mEnvironment.setFrameRateLimit(Settings::video().mFramerateLimit);
 

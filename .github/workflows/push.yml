@@ -189,6 +189,11 @@ jobs:
           echo "OpenMW frame advancement must go through an explicit renderer owner boundary"
           exit 1
         fi
+        if rg -n 'new[[:space:]]+osgViewer::Viewer' apps/openmw --glob '*.cpp' --glob '*.hpp' \
+            | rg -v 'apps/openmw/mwrender/viewerframelifecycle.cpp'; then
+          echo "The OSG viewer must be created only by its renderer-specific lifecycle owner"
+          exit 1
+        fi
         if rg -n 'mRendering->(renderFrame|advanceFrame)\(' apps/openmw/mwworld/worldimp.cpp; then
           echo "World frame traversal must go through the renderer-neutral frame lifecycle"
           exit 1

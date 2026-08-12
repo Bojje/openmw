@@ -4,38 +4,42 @@
 
 namespace MWRender
 {
-    ViewerFrameLifecycle::ViewerFrameLifecycle(osgViewer::Viewer& viewer)
-        : mViewer(viewer)
+    ViewerFrameLifecycle::ViewerFrameLifecycle()
+        : mViewer(new osgViewer::Viewer)
     {
+        mViewer->setReleaseContextAtEndOfFrameHint(false);
+        mViewer->setUseConfigureAffinity(false);
     }
+
+    ViewerFrameLifecycle::~ViewerFrameLifecycle() = default;
 
     bool ViewerFrameLifecycle::renderFrame()
     {
-        mViewer.eventTraversal();
-        mViewer.updateTraversal();
-        mViewer.renderingTraversals();
+        mViewer->eventTraversal();
+        mViewer->updateTraversal();
+        mViewer->renderingTraversals();
         return true;
     }
 
     bool ViewerFrameLifecycle::done() const
     {
-        return mViewer.done();
+        return mViewer->done();
     }
 
     double ViewerFrameLifecycle::referenceTime() const
     {
-        const osg::FrameStamp* frameStamp = mViewer.getFrameStamp();
+        const osg::FrameStamp* frameStamp = mViewer->getFrameStamp();
         return frameStamp ? frameStamp->getReferenceTime() : 0.0;
     }
 
     unsigned ViewerFrameLifecycle::frameNumber() const
     {
-        const osg::FrameStamp* frameStamp = mViewer.getFrameStamp();
+        const osg::FrameStamp* frameStamp = mViewer->getFrameStamp();
         return frameStamp ? frameStamp->getFrameNumber() : 0;
     }
 
     void ViewerFrameLifecycle::advanceFrame(double simulationTime)
     {
-        mViewer.advance(simulationTime);
+        mViewer->advance(simulationTime);
     }
 }

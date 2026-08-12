@@ -150,7 +150,7 @@ namespace OMW
         Files::PathContainer mDataDirs;
         std::vector<std::string> mArchives;
         std::filesystem::path mResDir;
-        osg::ref_ptr<osgViewer::Viewer> mViewer;
+        osgViewer::Viewer* mViewer = nullptr; // owned by the active OSG frame lifecycle
         osg::ref_ptr<osgViewer::ScreenCaptureHandler> mScreenCaptureHandler;
         osg::ref_ptr<SceneUtil::AsyncScreenCaptureOperation> mScreenCaptureOperation;
         osg::ref_ptr<SceneUtil::SelectDepthFormatOperation> mSelectDepthFormatOperation;

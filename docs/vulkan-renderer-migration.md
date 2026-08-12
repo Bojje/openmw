@@ -249,7 +249,7 @@ The engine public header no longer imports complete OSG viewer/event-handler hea
 are now included only by the implementation files that use them.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-143 files, deleting 1,063 lines and adding 7,490 lines (net `+6,427`). The larger Vulkan-only
+143 files, deleting 1,082 lines and adding 7,524 lines (net `+6,442`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
@@ -450,8 +450,9 @@ the full-game smoke run; it checks the neutral payload every 30 frames and after
 The full game should not be repeatedly started for every change. The main engine loop, loading
 screen, modal/video loops, and screenshot capture now delegate frame advancement, event processing,
 update traversal, and frame submission through one engine-owned frame lifecycle. The engine creates
-one OSG `ViewerFrameLifecycle` before world initialization and passes that service explicitly to
-`World`; the legacy manager receives only screenshot render/advance callbacks and stores no frame lifecycle.
+one OSG `ViewerFrameLifecycle` before world initialization; that lifecycle owns the OSG viewer and
+the engine passes its frame service explicitly to `World`. The legacy manager receives only screenshot
+render/advance callbacks and stores no frame lifecycle.
 Direct OSG frame operations remain only in that adapter, while bootstrap callbacks use the same small
 frame-owner type that can be replaced with the Vulkan presentation owner. This establishes the
 replacement point for a future Vulkan frame owner while current OSG behavior remains unchanged.
