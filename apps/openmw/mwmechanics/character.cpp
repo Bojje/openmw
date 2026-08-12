@@ -52,6 +52,7 @@
 
 #include "actorutil.hpp"
 #include "aicombataction.hpp"
+#include "combat.hpp"
 #include "creaturestats.hpp"
 #include "movement.hpp"
 #include "npcstats.hpp"
@@ -2893,6 +2894,67 @@ namespace MWMechanics
         world->updateNeutralAnimation(mPtr, mCurrentWeapon, 0.f, startKey, stopKey);
     }
 
+    void CharacterController::releaseNeutralProjectile()
+    {
+        if (!mReadyToHit || !mPtr.getClass().hasInventoryStore(mPtr))
+            return;
+
+        MWBase::World* const world = MWBase::Environment::get().getWorld();
+        MWWorld::InventoryStore& inventory = mPtr.getClass().getInventoryStore(mPtr);
+        MWWorld::ContainerStoreIterator weapon = inventory.getSlot(MWWorld::InventoryStore::Slot_CarriedRight);
+        if (weapon == inventory.end() || weapon->getType() != ESM::Weapon::sRecordId)
+        {
+            mReadyToHit = false;
+            return;
+        }
+
+        const int weaponType = weapon->get<ESM::Weapon>()->mBase->mData.mType;
+        const ESM::WeaponType::Class weaponClass = getWeaponType(weaponType)->mWeaponClass;
+        if (weaponClass != ESM::WeaponType::Ranged && weaponClass != ESM::WeaponType::Thrown)
+        {
+            mReadyToHit = false;
+            return;
+        }
+
+        const osg::Vec3f actorPosition = mPtr.getRefData().getPosition().asVec3();
+        const osg::Quat orientation = osg::Quat(mPtr.getRefData().getPosition().rot[0], osg::Vec3f(-1, 0, 0))
+            * osg::Quat(mPtr.getRefData().getPosition().rot[2], osg::Vec3f(0, 0, -1));
+        // The OSG path obtains the launch point from the weapon/arrow bone. The neutral
+        // path has no scene-graph bone, so use the actor's upper-body height as the
+        // renderer-independent equivalent and keep projectile physics authoritative.
+        const osg::Vec3f launchPosition = actorPosition + osg::Vec3f(0.f, 0.f, world->getHalfExtents(mPtr).z() * 1.5f);
+
+        const MWWorld::Store<ESM::GameSetting>& gmst = world->getStore().get<ESM::GameSetting>();
+        applyFatigueLoss(mPtr, *weapon, mAttackStrength);
+
+        if (weaponClass == ESM::WeaponType::Thrown)
+        {
+            const float minimumSpeed = gmst.find("fThrownWeaponMinSpeed")->mValue.getFloat();
+            const float maximumSpeed = gmst.find("fThrownWeaponMaxSpeed")->mValue.getFloat();
+            const float speed = minimumSpeed + (maximumSpeed - minimumSpeed) * mAttackStrength;
+            MWWorld::Ptr projectile = *weapon;
+            world->launchProjectile(
+                mPtr, projectile, launchPosition, orientation, projectile, speed, mAttackStrength, mAttackWindUp);
+            inventory.remove(projectile, 1);
+        }
+        else
+        {
+            MWWorld::ContainerStoreIterator ammunition = inventory.getSlot(MWWorld::InventoryStore::Slot_Ammunition);
+            if (ammunition != inventory.end())
+            {
+                const float minimumSpeed = gmst.find("fProjectileMinSpeed")->mValue.getFloat();
+                const float maximumSpeed = gmst.find("fProjectileMaxSpeed")->mValue.getFloat();
+                const float speed = minimumSpeed + (maximumSpeed - minimumSpeed) * mAttackStrength;
+                MWWorld::Ptr projectile = *ammunition;
+                MWWorld::Ptr bow = *weapon;
+                world->launchProjectile(
+                    mPtr, projectile, launchPosition, orientation, bow, speed, mAttackStrength, mAttackWindUp);
+                inventory.remove(projectile, 1);
+            }
+        }
+        mReadyToHit = false;
+    }
+
     void CharacterController::handleNeutralTextKey(std::string_view groupname, std::string_view event)
     {
         MWBase::Environment::get().getLuaManager()->animationTextKey(mPtr, std::string(event));
@@ -2941,6 +3003,11 @@ namespace MWMechanics
         const std::string_view action = event.substr(prefix.size());
         if (action == mAttackType + " max attack" && !mReadyToHit)
             prepareHit();
+        if (action == "shoot release")
+        {
+            releaseNeutralProjectile();
+            return;
+        }
         int attackType = -1;
         if (action == "chop hit")
             attackType = ESM::Weapon::AT_Chop;
