@@ -4,6 +4,7 @@
 
 #include <osg/Stats>
 
+#include <components/misc/convert.hpp>
 #include <components/misc/rng.hpp>
 
 #include <components/esm/records.hpp>
@@ -1659,7 +1660,7 @@ namespace MWMechanics
         else
         {
             const auto& position = observer.getRefData().getPosition();
-            observerDir = osg::Quat(position.rot[2], osg::Vec3f(0, 0, -1)) * osg::Vec3f(0, 1, 0);
+            observerDir = Misc::Convert::makeActorOsgQuat(position) * osg::Vec3f(0, 1, 0);
         }
         float angleRadians = std::acos(observerDir * vec / (observerDir.length() * vec.length()));
         if (angleRadians > osg::DegreesToRadians(90.f))

@@ -49,7 +49,7 @@ namespace MWScript
 
             const auto& position = ptr.getRefData().getPosition();
             if (ptr.getClass().isActor())
-                return osg::Quat(position.rot[2], osg::Vec3f(0, 0, -1));
+                return Misc::Convert::makeActorOsgQuat(position);
             return Misc::Convert::makeOsgQuat(position);
         }
 

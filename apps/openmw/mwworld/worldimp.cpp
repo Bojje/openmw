@@ -1416,7 +1416,7 @@ namespace MWWorld
         const MWWorld::Ptr actor = getPlayerPtr();
         const float distance = 128.f;
         ESM::Position esmPos = actor.getRefData().getPosition();
-        osg::Quat orientation(esmPos.rot[2], osg::Vec3f(0, 0, -1));
+        osg::Quat orientation = Misc::Convert::makeActorOsgQuat(esmPos);
         osg::Vec3f pos(esmPos.asVec3());
 
         int direction = 0;

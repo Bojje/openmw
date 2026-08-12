@@ -5,6 +5,7 @@
 
 #include <components/detournavigator/agentbounds.hpp>
 #include <components/esm3/loaddoor.hpp>
+#include <components/misc/convert.hpp>
 #include <components/sceneutil/positionattitudetransform.hpp>
 
 #include "../mwbase/environment.hpp"
@@ -57,8 +58,7 @@ namespace MWMechanics
             : mPos(actor.getRefData().getPosition().asVec3())
             , mDir(actor.getRefData().getBaseNode()
                       ? actor.getRefData().getBaseNode()->getAttitude() * osg::Vec3f(0, 1, 0)
-                      : osg::Quat(actor.getRefData().getPosition().rot[2], osg::Vec3f(0, 0, -1))
-                              * osg::Vec3f(0, 1, 0))
+                      : Misc::Convert::makeActorOsgQuat(actor.getRefData().getPosition()) * osg::Vec3f(0, 1, 0))
             , mMinDist(minDist)
         {
             mPos.z() = 0;

@@ -159,8 +159,9 @@ OSG scene-node visibility writes are guarded at the mechanics boundary; this rem
 requirement that every simulated actor already have an OSG node. Combat, pursuit, obstacle-door
 checks, blocking, and awareness now use ESM actor rotation as the neutral fallback for facing,
 so the Vulkan simulation does not silently stop AI behavior merely because a pose node is absent.
-Rotating actor collision shapes now use the same shared ESM-yaw conversion when the OSG base node is absent,
-so neutral physics does not silently fall back to an identity orientation.
+Actor collision shapes, combat/AI facing, obstacle checks, transformation scripts, and scene setup now
+share one ESM-yaw conversion when the OSG base node is absent, so neutral behavior does not silently
+diverge across subsystems or fall back to an identity orientation.
 Player update logic now treats the absent OSG presentation owner as an explicit Vulkan mode, and
 player-only OSG/MyGUI Lua packages, including menu/UI packages, are withheld from that runtime
 instead of exposing null renderer dereferences. Lua lifecycle cleanup and input filtering also

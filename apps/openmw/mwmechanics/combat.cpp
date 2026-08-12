@@ -4,6 +4,7 @@
 #include <array>
 
 #include <components/misc/rng.hpp>
+#include <components/misc/convert.hpp>
 #include <components/settings/values.hpp>
 
 #include <components/sceneutil/positionattitudetransform.hpp>
@@ -94,7 +95,7 @@ namespace MWMechanics
         else
         {
             const auto& position = blocker.getRefData().getPosition();
-            blockerDirection = osg::Quat(position.rot[2], osg::Vec3f(0, 0, -1)) * osg::Vec3f(0, 1, 0);
+            blockerDirection = Misc::Convert::makeActorOsgQuat(position) * osg::Vec3f(0, 1, 0);
         }
         float angleDegrees = osg::RadiansToDegrees(signedAngleRadians(
             (attacker.getRefData().getPosition().asVec3() - blocker.getRefData().getPosition().asVec3()),
@@ -704,7 +705,7 @@ namespace MWMechanics
 
         const ESM::Position& posdata = actor.getRefData().getPosition();
         const osg::Vec3f actorPos(posdata.asVec3());
-        const osg::Vec3f actorDirXY = osg::Quat(posdata.rot[2], osg::Vec3(0, 0, -1)) * osg::Vec3f(0, 1, 0);
+        const osg::Vec3f actorDirXY = Misc::Convert::makeActorOsgQuat(posdata) * osg::Vec3f(0, 1, 0);
         // Only the player can look up, apparently.
         const float actorVerticalAngle = actor == getPlayer() ? -std::sin(posdata.rot[0]) : 0.f;
         const float actorEyeLevel = world->getHalfExtents(actor, true).z() * 2.f * 0.85f;

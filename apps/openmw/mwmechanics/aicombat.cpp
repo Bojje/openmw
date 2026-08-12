@@ -3,6 +3,7 @@
 #include <components/detournavigator/navigatorutils.hpp>
 #include <components/esm3/aisequence.hpp>
 #include <components/misc/coordinateconverter.hpp>
+#include <components/misc/convert.hpp>
 #include <components/misc/mathutil.hpp>
 #include <components/misc/pathgridutils.hpp>
 #include <components/misc/rng.hpp>
@@ -616,7 +617,7 @@ namespace MWMechanics
             else
             {
                 const auto& position = actor.getRefData().getPosition();
-                fallbackDirection = osg::Quat(position.rot[2], osg::Vec3f(0, 0, -1)) * osg::Vec3f(0, -1, 0);
+                fallbackDirection = Misc::Convert::makeActorOsgQuat(position) * osg::Vec3f(0, -1, 0);
             }
             osg::Vec3f destination = source + fallbackDirection * (halfExtents.y() + 16);
 
