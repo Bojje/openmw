@@ -154,8 +154,10 @@ The fast test suite now also contains a backend-neutral RGBA8 image comparator w
 per-channel tolerance, differing-pixel count, maximum error, and mean error metrics.
 The Vulkan smoke path now reads back rendered RGBA8/BGRA8 swapchain frames and compares
 consecutive captures with that comparator when a presentation-capable host is available;
-without a reference image it also replaces the scene once in the same process to exercise
-descriptor growth and frame-safe mesh replacement;
+without a reference image it also runs three neutral scene checkpoints in the same process:
+initial static/dynamic/terrain content, a material/light replacement, and object/terrain
+removal. This exercises descriptor growth, frame-safe mesh replacement, and scene ownership
+updates without repeatedly restarting a game;
 an optional `OPENMW_VULKAN_HEADLESS=1` mode uses `VK_EXT_headless_surface` to exercise the
 same frame lifecycle without SDL/X11/Wayland, omitting only swapchain image readback; CTest
 runs that probe and treats missing validation/headless WSI support as an environment skip;
@@ -224,7 +226,7 @@ Engine GUI fallback frame advancement now also reads simulation time from the ac
 `FrameLifecycle`, keeping renderer orchestration from reaching directly into an OSG frame stamp.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-91 files, deleting 916 lines and adding 7,225 lines (net `+6,309`). The larger Vulkan-only
+91 files, deleting 916 lines and adding 7,241 lines (net `+6,325`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
@@ -340,7 +342,7 @@ real replacement consumes its responsibility and the fast tests cover the bounda
 
 ### 2. Create a deterministic renderer-test foundation
 
-- Add a small test mode or executable that starts one renderer, loads a manifest of test scenes/cameras, renders multiple checkpoints, writes images, and exits. The current renderer-mesh CPU test validates NIF conversion, cache, and material setup; the standalone smoke target submits neutral mesh/terrain data, then covers one textured alpha-blended scene, reads back each rendered swapchain frame, compares consecutive captures when a Vulkan surface is available, and supports optional PPM reference/capture paths.
+- Add a small test mode or executable that starts one renderer, loads a manifest of test scenes/cameras, renders multiple checkpoints, writes images, and exits. The current renderer-mesh CPU test validates NIF conversion, cache, and material setup; the standalone smoke target submits neutral mesh/terrain data, then covers three textured scene-ownership checkpoints in one process, reads back each rendered swapchain frame, compares consecutive captures when a Vulkan surface is available, and supports optional PPM reference/capture paths.
 - Use fixed camera paths, time, weather, random seed, resolution, and content.
 - Add CPU-side tests for matrix conversion, NIF conversion, transforms, resource lookup, and scene snapshots. The current fast tests cover matrix conversion, NIF conversion, parent-child transforms, safe index handling, cache reuse, cell-object transform composition, and renderer-neutral batch layout.
 - Compare Vulkan output with OSG reference images using the neutral image comparator's

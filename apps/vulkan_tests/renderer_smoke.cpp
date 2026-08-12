@@ -290,14 +290,28 @@ int main(int argc, char** argv)
             alternateSubmission.meshes[0].mesh.material.albedoTexture = "textures/vulkan-smoke-alt.rgba";
             alternateSubmission.scene.ambientColor = { 0.25f, 0.2f, 0.15f, 1.0f };
 
+            world.removeObject(&alphaObjectKey);
+            world.setTerrainTiles(&cellKey, {});
+            Render::SceneSubmission removalSubmission
+                = Render::collectSceneSubmission(world, scene, {}, resolveMeshes, true);
+            removalSubmission.textureResolver = smokeTexture;
+            if (removalSubmission.meshes.size() != 1 || !removalSubmission.terrainTiles.empty()
+                || removalSubmission.dynamicMeshes.size() != 1)
+                throw std::runtime_error("Vulkan smoke removal scenario did not update neutral ownership");
+
             unsigned int renderedFrames = 0;
             std::optional<Render::TextureData> previousCapture;
             for (unsigned int frame = 0; frame < frames; ++frame)
             {
                 bool renderWithSubmission = frame == 0;
-                if (!reference && frames > 2 && frame == frames / 2)
+                if (!reference && frames > 2 && frame == frames / 3)
                 {
                     renderer->setScene(alternateSubmission);
+                    previousCapture.reset();
+                }
+                if (!reference && frames > 2 && frame == (frames * 2) / 3)
+                {
+                    renderer->setScene(removalSubmission);
                     previousCapture.reset();
                 }
 
