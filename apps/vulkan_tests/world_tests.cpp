@@ -148,6 +148,9 @@ int main()
     if (world.findCell(&firstCellHandle)->objects.size() != 1 || dynamicObject.model != "meshes/animated.nif"
         || !dynamicObject.visible)
         throw std::runtime_error("renderer-neutral world scene failed dynamic-object handoff");
+    world.updateEffects(0.25f);
+    if (world.findCell(&firstCellHandle)->objects.front().animationTime != 0.25f)
+        throw std::runtime_error("renderer-neutral world scene did not advance dynamic animation time");
     Render::Mat4 dynamicBone = Render::identityMat4();
     dynamicBone.data[12] = 3.f;
     if (!world.updateObjectPose(&dynamicObjectHandle, { dynamicBone })

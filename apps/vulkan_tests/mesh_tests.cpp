@@ -1,3 +1,4 @@
+#include <array>
 #include <cmath>
 #include <iostream>
 #include <stdexcept>
@@ -142,6 +143,7 @@ int main()
     Nif::NiTriShape shape;
     shape.mTransform = Nif::NiTransform::getIdentity();
     shape.mTransform.mTranslation.x() = 2.0f;
+    shape.mController = Nif::NiTimeControllerPtr(nullptr);
     shape.mData = &treeData;
     shape.mShaderProperty = lighting.get();
     shape.mProperties.push_back(&texturing);
@@ -161,6 +163,30 @@ int main()
     Nif::NiNode root;
     root.mTransform = Nif::NiTransform::getIdentity();
     root.mTransform.mTranslation.x() = 10.0f;
+    root.mController = Nif::NiTimeControllerPtr(nullptr);
+
+    auto animatedData = std::make_unique<Nif::NiKeyframeData>();
+    animatedData->mTranslations = std::make_shared<Nif::Vector3KeyMap>();
+    animatedData->mTranslations->mInterpolationType = Nif::InterpolationType_Linear;
+    Nif::KeyT<osg::Vec3f> firstTranslation{};
+    firstTranslation.mValue = osg::Vec3f(0.f, 0.f, 0.f);
+    Nif::KeyT<osg::Vec3f> secondTranslation{};
+    secondTranslation.mValue = osg::Vec3f(4.f, 0.f, 0.f);
+    animatedData->mTranslations->mKeys.emplace_back(0.f, firstTranslation);
+    animatedData->mTranslations->mKeys.emplace_back(1.f, secondTranslation);
+    auto animatedController = std::make_unique<Nif::NiKeyframeController>();
+    animatedController->mFlags = Nif::NiTimeController::Flag_Active;
+    animatedController->mFrequency = 1.f;
+    animatedController->mPhase = 0.f;
+    animatedController->mTimeStart = 0.f;
+    animatedController->mTimeStop = 1.f;
+    animatedController->mInterpolator = Nif::NiInterpolatorPtr(nullptr);
+    animatedController->mData = animatedData.get();
+    Nif::NiNode animatedBone;
+    animatedBone.mName = "Root Bone";
+    animatedBone.mController = animatedController.get();
+    root.mChildren.push_back(&animatedBone);
+
     root.mChildren.push_back(&shape);
     auto file = std::make_shared<Nif::NIFFile>(VFS::Path::Normalized("synthetic.nif"));
     file->mUseSkinning = true;
@@ -186,6 +212,14 @@ int main()
         throw std::runtime_error("NIF skinning metadata was not preserved at the neutral boundary");
     if (!instances.front().mesh.material.emissiveWrapU || instances.front().mesh.material.emissiveWrapV)
         throw std::runtime_error("NIF material conversion lost emissive texture wrapping");
+
+    const std::array<std::string, 1> animatedBoneNames{ "Root Bone" };
+    const std::vector<Render::Mat4> animatedPose
+        = Nif::collectBonePose(Nif::FileView(*file), animatedBoneNames, 0.5f);
+    if (animatedPose.size() != 1)
+        throw std::runtime_error("NIF pose sampler did not find the requested bone");
+    expectNear(animatedPose.front().data[12], 12.f, "sampled bone translation");
+
     expectNear(instances.front().mesh.material.diffuse.x, 0.25f, "material diffuse red");
     expectNear(instances.front().mesh.material.diffuse.w, 0.75f, "material alpha");
     expectNear(instances.front().mesh.material.emissive.z, 0.6f, "material emissive");

@@ -711,6 +711,14 @@ void OMW::Engine::prepareVulkanEngine()
             return std::shared_ptr<const Render::TextureData>();
         return textureManager->get(VFS::Path::Normalized(name));
     };
+    const Render::PoseResolver poseResolver = [resourceSystem = mResourceSystem.get()](
+                                                 std::string_view model, float time,
+                                                 std::span<const std::string> boneNames) {
+        const VFS::Path::Normalized path(model);
+        if (path.extension().value() != "nif")
+            return std::vector<Render::Mat4>();
+        return resourceSystem->getNifMeshManager()->getBonePose(path, time, boneNames);
+    };
     const Render::SceneSynchronizer sceneSynchronizer = [this](Render::SceneData& sceneData) {
         mWorld->updateNeutralSceneData(sceneData);
         int drawableWidth = Settings::video().mResolutionX.get();
@@ -737,7 +745,8 @@ void OMW::Engine::prepareVulkanEngine()
         sceneData.viewInverse = Render::invertMat4(sceneData.view);
         sceneData.projInverse = Render::invertMat4(sceneData.projection);
     };
-    mWorld->initNeutralRenderer(*mFrameLifecycle, sceneSynchronizer, std::move(meshResolver), textureResolver);
+    mWorld->initNeutralRenderer(
+        *mFrameLifecycle, sceneSynchronizer, std::move(meshResolver), textureResolver, poseResolver);
     mEnvironment.setWorldScene(mWorld->getWorldScene());
     mWorld->setupPlayer();
     mWorld->setRandomSeed(mRandomSeed);

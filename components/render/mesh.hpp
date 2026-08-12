@@ -129,6 +129,13 @@ namespace Render
         std::shared_ptr<const SkinningData> skinning;
     };
 
+    // The game/resource layer owns animation state and exposes only the
+    // renderer-neutral pose payload. A resolver may return an empty vector
+    // when a model has no compatible model-local animation data; callers then
+    // retain their bind-pose fallback.
+    using PoseResolver = std::function<std::vector<Mat4>(
+        std::string_view model, float time, std::span<const std::string> boneNames)>;
+
     inline MeshData skinMesh(const MeshData& source, std::span<const Mat4> boneMatrices)
     {
         if (!source.skinning || !source.skinning->valid(source.vertices.size()))

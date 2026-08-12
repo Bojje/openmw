@@ -69,6 +69,20 @@ namespace Resource
         return result;
     }
 
+    std::vector<Render::Mat4> NifMeshManager::getBonePose(
+        VFS::Path::NormalizedView name, float time, std::span<const std::string> boneNames)
+    {
+        return getBonePose(mNifFileManager->get(name), time, boneNames);
+    }
+
+    std::vector<Render::Mat4> NifMeshManager::getBonePose(
+        const Nif::NIFFilePtr& file, float time, std::span<const std::string> boneNames) const
+    {
+        if (!file)
+            return {};
+        return Nif::collectBonePose(Nif::FileView(*file), boneNames, time);
+    }
+
     void NifMeshManager::updateCache(double referenceTime)
     {
         std::lock_guard lock(mMutex);

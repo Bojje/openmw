@@ -75,12 +75,13 @@ backend without inheriting OSG paging visibility. The OSG path remains legacy-ow
 loaded-cell snapshots through cached NIF meshes, filters hidden and dynamic objects from the
 static batch, and composes object transforms with NIF node transforms before batching;
 animated objects are explicitly retained as dynamic snapshots, but are excluded from the static
-mesh batch until a skinning/animation consumer owns them; the ordered `dynamicMeshes` payload provides
-that future backend with the retained visibility, transform, model, and cell ordering together with
-any resolved mesh data. The neutral Vulkan bootstrap still has no per-frame animation producer, but
-skinned records now receive an inverse-bind-derived bind pose so they remain visible while the
-animation owner is ported. The renderer-neutral CPU skinning helper and converted skinning metadata
-remain ready for that later animation owner.
+mesh batch. The ordered `dynamicMeshes` payload provides the Vulkan consumer with retained
+visibility, transform, model, and cell ordering together with resolved mesh data. The neutral
+Vulkan bootstrap now has a model-local NIF pose producer: the resource boundary samples
+`NiKeyframeController` transforms by the converted skinning bone names and the scene owner injects
+the resulting matrices into dynamic submissions. Explicit gameplay poses still take precedence;
+objects without a compatible pose retain the inverse-bind-derived bind pose. Actor `.kf` sequence
+selection, blended controller stacks, particles, and animation-specific shading remain later gates.
 NIF classic texture, diffuse/emissive, glossiness, and alpha properties now cross the
 renderer-neutral mesh boundary and survive batching; the neutral batch applies diffuse
 and alpha to vertex color output. NIF bump/normal texture slots now cross the same boundary
@@ -126,16 +127,15 @@ cannot silently desynchronize the Vulkan shader layout.
 The neutral world snapshot now has an explicit reset path owned by `Scene::clear()` after cell
 teardown, so a game/world unload cannot retain stale object identities, terrain tiles, or cell
 ordering.
-Dynamic `WorldObject` records now own an optional neutral bone-pose snapshot and expose an explicit
-pose-update operation; `SceneSubmission` carries that pose beside each resolved dynamic mesh. The
-scene owner invalidates that pose when a dynamic object changes model, preventing a previous skeleton's
-matrices from being applied to a replacement mesh.
-full-game Vulkan export deliberately supplies only an inverse-bind-derived bind pose until a real
-renderer-neutral animation owner exists; animation timing, live bone updates, animation-specific
-shading, and mismatched multi-part skin orders remain outstanding. NIF skinning metadata preserves
-source bone names beside inverse-bind matrices, making the future Vulkan-side mapping deterministic
-without borrowing OSG types. The removed callback was never backed by a live Vulkan producer and
-was deleted as transitional plumbing rather than retained as a compatibility promise.
+Dynamic `WorldObject` records now own an optional neutral bone-pose snapshot, a per-object animation
+clock, and an explicit pose-update operation; `SceneSubmission` carries that pose beside each
+resolved dynamic mesh. The scene owner invalidates that pose and clock when a dynamic object changes
+model, preventing a previous skeleton's matrices from being applied to a replacement mesh. The
+resource boundary now samples model-local NIF keyframe controllers without constructing an OSG scene,
+while explicit gameplay poses remain authoritative. Animation timing for that fallback producer,
+live actor `.kf` sequence selection, blended controller stacks, animation-specific shading, and
+mismatched multi-part skin orders remain outstanding. NIF skinning metadata preserves source bone
+names beside inverse-bind matrices, making the mapping deterministic without borrowing OSG types.
 The Vulkan composite pass now consumes that single scene-lighting UBO directly; duplicated
 sun push constants were removed, and ambient light is part of the neutral snapshot. The
 world-owned `Scene` now resolves loaded-world meshes and RGBA8 textures through the existing
@@ -181,9 +181,12 @@ full-game Vulkan call site now exists for the no-GUI bootstrap: window/input own
 camera synchronization, neutral image loading, and static scene submission are live, while
 dynamic-content, legacy weather particle fidelity, and GUI/presentation services remain incomplete. Weather ambient, directional-light, fog, and sky-horizon values now cross the neutral frame state, and the Vulkan composite derives its background gradient from that state. Renderer-neutral precipitation state now belongs to `WorldScene` and produces deterministic alpha-blended rain geometry in the Vulkan submission; full weather particle meshes, storm orientation, and water-shader parity remain. NIF skinning metadata now survives conversion, and resolved dynamic
 mesh payloads cross the neutral boundary into the Vulkan consumer. A deterministic CPU skinning
-helper now applies frame bone matrices for future animation integration. Unskinned dynamic meshes and skinned records with a
-supplied pose now enter the raster draw batch with their neutral transforms; skinned records without a resolved pose now
-use an inverse-bind-derived bind pose so dynamic actors remain visible while per-frame animation updates are ported.
+helper now applies frame bone matrices, and model-local NIF keyframe controllers are sampled by
+the neutral resource layer without constructing an OSG scene. Unskinned dynamic meshes, skinned
+records with an explicit pose, and compatible model-local NIF poses now enter the raster draw batch
+with their neutral transforms; records without a resolved pose retain an inverse-bind-derived bind
+pose so dynamic actors remain visible. Actor `.kf` sequence selection, particles, and dynamic shading
+remain outstanding.
 Explicitly identified world VFX now also cross as neutral transformed mesh effects with texture
 overrides and explicit removal; magic VFX preserve the first-root override rule across the flattened
 neutral mesh list, and controller intervals are extracted from the renderer-neutral NIF
@@ -530,8 +533,8 @@ and Vulkan owners supplying their own reference time.
 Neutral mesh and texture resolution, including optional specular-file discovery, now crosses the
 scene boundary as injected callbacks rather than direct `ResourceSystem` calls.
 Neutral scene synchronization and bone-pose production now cross the same boundary as injected
-callbacks; the Vulkan game owner supplies camera synchronization while bone-pose production remains
-explicitly unimplemented until the animation port owns it.
+callbacks; the Vulkan game owner supplies camera synchronization and model-local NIF pose sampling,
+while actor sequence ownership and blended animation remain to be ported.
 RGBA8 conversion is now one renderer-neutral helper shared by image resources and terrain
 blendmaps, so clamping, finite-value rejection, and byte quantization cannot drift between
 resource paths. The conversion helper has direct CPU coverage.
@@ -590,7 +593,7 @@ the game unplayable rather than reduce duplication safely.
 | Inactive raster ray-tracing scaffold | Removed | Reintroduce only with a complete RT pipeline |
 | Vulkan utility/queue helper paths | Removed | Complete |
 | Parsed NIF resource cache wrapper | Removed | Complete; cache now owns shared NIF files directly |
-| NIF-to-neutral mesh conversion | Renderer-neutral NIF boundary, material data, mesh cache, skinning metadata, dynamic mesh payloads, `SceneSubmission`, Vulkan mesh batch, and full-game neutral resolver | Add image-backed texture resolution, per-frame bone updates, and dynamic shading |
+| NIF-to-neutral mesh conversion | Renderer-neutral NIF boundary, material data, mesh cache, skinning metadata, model-local pose sampling, dynamic mesh payloads, `SceneSubmission`, Vulkan mesh batch, and full-game neutral resolver | Add actor `.kf` sequence/blend ownership, image-backed texture resolution, and dynamic shading |
 | Terrain geometry and layer data | Renderer-neutral `Terrain::RenderStorage` contract with cached per-cell LOD snapshots and a Vulkan opaque/normal/parallax/blendmap/specular layer consumer; concrete `MWRender::TerrainStorage` and legacy OSG ChunkManager remain the reference data path, including explicit ESM4 specular textures | Add quadtree-scale terrain streaming and terrain image coverage |
 | Loaded-cell object identity, transforms, terrain snapshots, and paging state | Renderer-neutral `WorldScene`/`CellScene` snapshots updated by scene lifecycle; active-cell static references bypass legacy OSG paging visibility, and cell-lifecycle-cached terrain tiles flow into `SceneSubmission` | Consume snapshots from a backend and migrate visibility/paging policy |
 | GUI, loading screens, screenshots, and presentation | NullWindowManager for Vulkan bootstrap; OSG/MyGUI reference path | Vulkan presentation and GUI coverage, then remove the null compatibility surface |
@@ -611,7 +614,7 @@ real replacement consumes its responsibility and the fast tests cover the bounda
 
 - Add a small test mode or executable that starts one renderer, loads a manifest of test scenes/cameras, renders multiple checkpoints, writes images, and exits. The current renderer-mesh CPU test validates NIF conversion, cache, and material setup; the standalone smoke target submits neutral mesh/terrain data, then covers three textured scene-ownership checkpoints in one process, reads back each rendered swapchain frame, compares consecutive captures when a Vulkan surface is available, and supports optional PPM reference/capture paths.
 - Use fixed camera paths, time, weather, random seed, resolution, and content.
-- Add CPU-side tests for matrix conversion, NIF conversion, transforms, resource lookup, and scene snapshots. The current fast tests cover matrix conversion, NIF conversion, parent-child transforms, safe index handling, cache reuse, cell-object transform composition, renderer-neutral batch layout, and static mesh/terrain removal while dynamic ownership remains.
+- Add CPU-side tests for matrix conversion, NIF conversion, transforms, resource lookup, and scene snapshots. The current fast tests cover matrix conversion, NIF conversion, parent-child transforms, model-local keyframe pose interpolation, safe index handling, cache reuse, cell-object transform composition, renderer-neutral batch layout, dynamic animation clocks, and static mesh/terrain removal.
 - Compare Vulkan output with OSG reference images using the neutral image comparator's
   tolerances and error metrics rather than exact pixel equality. Vulkan-to-Vulkan
   capture comparison is now wired into smoke; OSG reference-image execution remains
@@ -655,6 +658,9 @@ real replacement consumes its responsibility and the fast tests cover the bounda
 ### 7. Port dynamic content and presentation
 
 - Add actors, skinning, animation, particles, weather, water, spell effects, and post-processing.
+  The neutral path now samples model-local NIF keyframe controllers and carries explicit
+  per-object animation clocks; the remaining animation gate is actor `.kf` sequence selection,
+  blending, and controller-stack ownership.
 - Resting actors, owned-item lookup, line-of-sight, moving doors, and transformation-script movement/rotation now use active-cell state and world-model transforms instead of treating an absent OSG node as inactive.
 - Neutral focus selection and gameplay raycasts now use the renderer-neutral camera state and physics collision masks, so activation and targeting no longer require an OSG renderer.
 - The active sound listener now follows the same neutral first-person, third-person, and vanity camera state instead of being disabled with OSG.

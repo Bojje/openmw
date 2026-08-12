@@ -260,6 +260,12 @@ namespace Render
                 return;
             if (mWeatherEffects.enabled && mWeatherEffects.speed > 0.f)
                 mWeatherTime = std::fmod(mWeatherTime + duration, 3600.f);
+
+            for (auto& [cellKey, cell] : mCells)
+                for (WorldObject& object : cell.objects)
+                    if (object.dynamic)
+                        object.animationTime = std::fmod(object.animationTime + duration, 3600.f);
+
             for (auto iter = mEffects.begin(); iter != mEffects.end();)
             {
                 WorldObject& effect = iter->second;
@@ -363,7 +369,10 @@ namespace Render
                         object->visible = visible;
                         object->dynamic = dynamic;
                         if (!dynamic || modelChanged)
+                        {
                             object->boneMatrices.clear();
+                            object->animationTime = 0.f;
+                        }
                         return;
                     }
                 }

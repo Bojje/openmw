@@ -3,10 +3,15 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <iterator>
+#include <string_view>
+#include <unordered_map>
 #include <stdexcept>
 #include <utility>
 
 #include "data.hpp"
+#include "controller.hpp"
+#include "nifkey.hpp"
 #include "node.hpp"
 #include "property.hpp"
 #include "texture.hpp"
@@ -19,6 +24,167 @@ namespace Nif
     namespace
     {
         Render::Mat4 toRenderMatrix(const NiTransform& transform);
+
+        Matrix3 toMatrix3(const osg::Quat& rotation)
+        {
+            const osg::Matrixf matrix(rotation);
+            Matrix3 result;
+            for (int i = 0; i < 3; ++i)
+                for (int j = 0; j < 3; ++j)
+                    result.mValues[i][j] = matrix(j, i);
+            return result;
+        }
+
+        float controllerTime(const NiTimeController& controller, float value)
+        {
+            const float time = controller.mFrequency * value + controller.mPhase;
+            if (time >= controller.mTimeStart && time <= controller.mTimeStop)
+                return time;
+
+            const float delta = controller.mTimeStop - controller.mTimeStart;
+            if (delta <= 0.f)
+                return controller.mTimeStart;
+            switch (controller.extrapolationMode())
+            {
+                case NiTimeController::ExtrapolationMode::Cycle:
+                {
+                    const float cycles = (time - controller.mTimeStart) / delta;
+                    return controller.mTimeStart + (cycles - std::floor(cycles)) * delta;
+                }
+                case NiTimeController::ExtrapolationMode::Reverse:
+                {
+                    const float cycles = (time - controller.mTimeStart) / delta;
+                    const float remainder = (cycles - std::floor(cycles)) * delta;
+                    return (static_cast<int>(std::fabs(std::floor(cycles))) % 2) == 0
+                        ? controller.mTimeStart + remainder
+                        : controller.mTimeStop - remainder;
+                }
+                case NiTimeController::ExtrapolationMode::Constant:
+                default:
+                    return std::clamp(time, controller.mTimeStart, controller.mTimeStop);
+            }
+        }
+
+        template <class Map, class Interpolate>
+        typename Map::ValueType sampleKeys(const std::shared_ptr<Map>& map, float time,
+            typename Map::ValueType defaultValue, Interpolate&& interpolate)
+        {
+            if (!map || map->mKeys.empty())
+                return defaultValue;
+            if (time <= map->mKeys.front().first)
+                return map->mKeys.front().second.mValue;
+
+            const auto high = std::upper_bound(map->mKeys.begin(), map->mKeys.end(), time,
+                [](float value, const auto& key) { return value < key.first; });
+            if (high == map->mKeys.end())
+                return map->mKeys.back().second.mValue;
+            const auto low = std::prev(high);
+            if (high->first == low->first)
+                return low->second.mValue;
+            const float fraction = (time - low->first) / (high->first - low->first);
+            return interpolate(low->second.mValue, high->second.mValue, fraction,
+                map->mInterpolationType);
+        }
+
+        float interpolateFloat(float lhs, float rhs, float fraction, unsigned int type)
+        {
+            if (type == InterpolationType_Constant)
+                return fraction > 0.5f ? rhs : lhs;
+            return lhs + (rhs - lhs) * fraction;
+        }
+
+        osg::Vec3f interpolateVector(osg::Vec3f lhs, osg::Vec3f rhs, float fraction, unsigned int type)
+        {
+            if (type == InterpolationType_Constant)
+                return fraction > 0.5f ? rhs : lhs;
+            return lhs + (rhs - lhs) * fraction;
+        }
+
+        osg::Quat interpolateQuaternion(osg::Quat lhs, osg::Quat rhs, float fraction, unsigned int type)
+        {
+            if (type == InterpolationType_Constant)
+                return fraction > 0.5f ? rhs : lhs;
+            osg::Quat result;
+            result.slerp(fraction, lhs, rhs);
+            return result;
+        }
+
+        struct SampledNodeTransform
+        {
+            NiTransform value;
+        };
+
+        SampledNodeTransform sampleNodeTransform(const NiAVObject& node, float time)
+        {
+            SampledNodeTransform result{ node.mTransform };
+            const auto* controller = dynamic_cast<const NiKeyframeController*>(node.mController.getPtr());
+            if (controller == nullptr)
+                return result;
+
+            const NiKeyframeData* data = nullptr;
+            osg::Quat defaultRotation = result.value.mRotation.toOsgMatrix().getRotate();
+            osg::Vec3f defaultTranslation = result.value.mTranslation;
+            float defaultScale = result.value.mScale;
+            if (!controller->mInterpolator.empty()
+                && controller->mInterpolator->mRecordType == RC_NiTransformInterpolator)
+            {
+                const auto* interpolator
+                    = static_cast<const NiTransformInterpolator*>(controller->mInterpolator.getPtr());
+                data = interpolator->mData.empty() ? nullptr : interpolator->mData.getPtr();
+                defaultRotation = interpolator->mDefaultValue.mRotation;
+                defaultTranslation = interpolator->mDefaultValue.mTranslation;
+                defaultScale = interpolator->mDefaultValue.mScale;
+            }
+            else if (!controller->mData.empty())
+                data = controller->mData.getPtr();
+            if (data == nullptr)
+                return result;
+
+            const float sampleTime = controllerTime(*controller, time);
+            if (data->mRotations && !data->mRotations->mKeys.empty())
+                result.value.mRotation = toMatrix3(sampleKeys(data->mRotations, sampleTime, defaultRotation,
+                    interpolateQuaternion));
+            else if ((data->mXRotations && !data->mXRotations->mKeys.empty())
+                || (data->mYRotations && !data->mYRotations->mKeys.empty())
+                || (data->mZRotations && !data->mZRotations->mKeys.empty()))
+            {
+                const float x = sampleKeys(data->mXRotations, sampleTime, 0.f, interpolateFloat);
+                const float y = sampleKeys(data->mYRotations, sampleTime, 0.f, interpolateFloat);
+                const float z = sampleKeys(data->mZRotations, sampleTime, 0.f, interpolateFloat);
+                const osg::Quat xr(x, osg::X_AXIS), yr(y, osg::Y_AXIS), zr(z, osg::Z_AXIS);
+                switch (data->mAxisOrder)
+                {
+                    case NiKeyframeData::AxisOrder::Order_XYZ: result.value.mRotation = toMatrix3(xr * yr * zr); break;
+                    case NiKeyframeData::AxisOrder::Order_XZY: result.value.mRotation = toMatrix3(xr * zr * yr); break;
+                    case NiKeyframeData::AxisOrder::Order_YZX: result.value.mRotation = toMatrix3(yr * zr * xr); break;
+                    case NiKeyframeData::AxisOrder::Order_YXZ: result.value.mRotation = toMatrix3(yr * xr * zr); break;
+                    case NiKeyframeData::AxisOrder::Order_ZXY: result.value.mRotation = toMatrix3(zr * xr * yr); break;
+                    case NiKeyframeData::AxisOrder::Order_ZYX: result.value.mRotation = toMatrix3(zr * yr * xr); break;
+                    case NiKeyframeData::AxisOrder::Order_XYX: result.value.mRotation = toMatrix3(xr * yr * xr); break;
+                    case NiKeyframeData::AxisOrder::Order_YZY: result.value.mRotation = toMatrix3(yr * zr * yr); break;
+                    case NiKeyframeData::AxisOrder::Order_ZXZ: result.value.mRotation = toMatrix3(zr * xr * zr); break;
+                }
+            }
+            if (data->mTranslations && !data->mTranslations->mKeys.empty())
+                result.value.mTranslation = sampleKeys(data->mTranslations, sampleTime, defaultTranslation,
+                    interpolateVector);
+            if (data->mScales && !data->mScales->mKeys.empty())
+                result.value.mScale = sampleKeys(data->mScales, sampleTime, defaultScale, interpolateFloat);
+            return result;
+        }
+
+        void collectBoneTransforms(const NiAVObject& object, const Render::Mat4& parentTransform, float time,
+            std::unordered_map<std::string, Render::Mat4>& transforms)
+        {
+            const Render::Mat4 transform = Render::multiply(parentTransform,
+                toRenderMatrix(sampleNodeTransform(object, time).value));
+            if (!object.mName.empty())
+                transforms.emplace(object.mName, transform);
+            if (const auto* node = dynamic_cast<const NiNode*>(&object))
+                for (const auto& child : node->mChildren)
+                    if (!child.empty())
+                        collectBoneTransforms(*child.getPtr(), transform, time, transforms);
+        }
 
         std::vector<Render::MeshVertexSource> convertVertices(const NiGeometryData& source)
         {
@@ -369,5 +535,28 @@ namespace Nif
                 collectMeshInstances(*root, identity, meshes, file.getUseSkinning());
         }
         return meshes;
+    }
+
+    std::vector<Render::Mat4> collectBonePose(FileView file, std::span<const std::string> boneNames, float time)
+    {
+        if (boneNames.empty() || !std::isfinite(time))
+            return {};
+
+        const Render::Mat4 identity = Render::identityMat4();
+        std::unordered_map<std::string, Render::Mat4> transforms;
+        for (std::size_t i = 0; i < file.numRoots(); ++i)
+            if (const auto* root = dynamic_cast<const NiAVObject*>(file.getRoot(i)))
+                collectBoneTransforms(*root, identity, time, transforms);
+
+        std::vector<Render::Mat4> result;
+        result.reserve(boneNames.size());
+        for (const std::string& name : boneNames)
+        {
+            const auto found = transforms.find(name);
+            if (found == transforms.end())
+                return {};
+            result.push_back(found->second);
+        }
+        return result;
     }
 }
