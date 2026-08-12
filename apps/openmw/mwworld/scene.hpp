@@ -129,8 +129,8 @@ namespace MWWorld
         Resource::ResourceSystem* mResourceSystem;
         MWPhysics::PhysicsSystem* mPhysics;
         MWRender::RenderingManager* mRendering;
-        Terrain::World*& mTerrain;
-        MWRender::ObjectPaging*& mObjectPaging;
+        Terrain::World* mTerrain;
+        MWRender::ObjectPaging* mObjectPaging;
         Terrain::RenderStorage& mTerrainStorage;
         SceneUtil::WorkQueue* mWorkQueue;
         DetourNavigator::Navigator& mNavigator;
@@ -196,11 +196,17 @@ namespace MWWorld
             Render::SceneSynchronizer sceneSynchronizer, Render::BonePoseResolver bonePoseResolver,
             Render::MeshResolver meshResolver, Render::TextureResolver textureResolver, const VFS::Manager* vfs,
             MWRender::RenderingManager* rendering, MWRender::LandManager* landManager,
-            Terrain::World*& terrain, MWRender::ObjectPaging*& objectPaging,
+            Terrain::World* terrain, MWRender::ObjectPaging* objectPaging,
             Terrain::RenderStorage& terrainStorage, SceneUtil::WorkQueue* workQueue,
             Resource::ResourceSystem* resourceSystem,
             MWPhysics::PhysicsSystem* physics,
             DetourNavigator::Navigator& navigator);
+
+        Scene(MWWorld::World& world, Render::FrameLifecycle& frameLifecycle,
+            Render::SceneSynchronizer sceneSynchronizer, Render::BonePoseResolver bonePoseResolver,
+            Render::MeshResolver meshResolver, Render::TextureResolver textureResolver, const VFS::Manager* vfs,
+            Terrain::RenderStorage& terrainStorage, Resource::ResourceSystem* resourceSystem,
+            MWPhysics::PhysicsSystem* physics, DetourNavigator::Navigator& navigator);
 
         ~Scene();
 

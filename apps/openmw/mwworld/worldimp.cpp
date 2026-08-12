@@ -328,8 +328,7 @@ namespace MWWorld
         mFrameLifecycle = &frameLifecycle;
         mWorldScene = std::make_unique<Scene>(*this, frameLifecycle, std::move(sceneSynchronizer),
             std::move(bonePoseResolver), std::move(meshResolver), std::move(textureResolver), mResourceSystem->getVFS(),
-            nullptr, nullptr, mTerrain, mObjectPaging, terrainStorage, nullptr, mResourceSystem, mPhysics.get(),
-            *mNavigator);
+            terrainStorage, mResourceSystem, mPhysics.get(), *mNavigator);
     }
 
     void World::fillGlobalVariables()
