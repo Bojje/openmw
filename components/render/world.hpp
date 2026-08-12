@@ -264,7 +264,7 @@ namespace Render
             for (auto& [cellKey, cell] : mCells)
                 for (WorldObject& object : cell.objects)
                     if (object.dynamic)
-                        object.animationTime = std::fmod(object.animationTime + duration, 3600.f);
+                        object.animationTime += duration;
 
             for (auto iter = mEffects.begin(); iter != mEffects.end();)
             {
