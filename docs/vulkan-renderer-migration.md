@@ -521,7 +521,7 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the frozen `openmw-vulkan-osg-reference` tag, the current checkpoint changes
-208 files, deleting 2,285 lines and adding 14,586 lines (net `+12,301`). The larger Vulkan-only
+208 files, deleting 2,286 lines and adding 14,659 lines (net `+12,373`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; the current branch continues the reduction
 work with renderer-neutral ownership and compatibility-wrapper deletion. The live no-GUI
 consumer is the first deletion checkpoint; further reduction can now target OSG
@@ -703,10 +703,11 @@ provide a usable surface, while validation errors remain hard failures.
 
 - Add actors, skinning, animation, particles, weather, water, spell effects, and post-processing.
   The neutral path now samples model-local NIF and classic external `.kf` keyframe controllers,
-  honors selected group start/stop segments, and carries explicit per-object animation groups and clocks;
-  the remaining animation gate is actor `.kf` priority/queue selection, OSG-specific presentation
-  events, blending, and controller-stack ownership; neutral Lua/sound/melee/spell text-key dispatch
-  is now covered for the migrated event classes.
+  honors selected group start/stop segments, carries explicit per-object animation groups and clocks,
+  and starts neutral weapon attack queues with attack timing keys; the remaining animation gate is
+  actor `.kf` priority/queue arbitration, OSG-specific presentation events, blending, and
+  controller-stack ownership. Neutral Lua/sound/melee/spell text-key dispatch is now covered for the
+  migrated event classes.
 - Resting actors, owned-item lookup, line-of-sight, moving doors, and transformation-script movement/rotation now use active-cell state and world-model transforms instead of treating an absent OSG node as inactive.
 - Neutral focus selection and gameplay raycasts now use the renderer-neutral camera state and physics collision masks, so activation and targeting no longer require an OSG renderer.
 - The active sound listener now follows the same neutral first-person, third-person, and vanity camera state instead of being disabled with OSG.
