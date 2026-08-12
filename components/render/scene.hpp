@@ -81,6 +81,10 @@ namespace Render
         // x = fog start distance, y = fog end distance. A non-positive range
         // disables fog for fixtures that do not provide atmospheric state.
         Vec4 fogParameters{ 0.f, 0.f, 0.f, 0.f };
+        // Weather-provided horizon color for pixels that do not contain world
+        // geometry. The Vulkan composite derives its sky gradient from this
+        // value instead of keeping a backend-local hard-coded sky.
+        Vec4 skyColor{ 0.6f, 0.75f, 0.9f, 1.f };
 
         bool valid() const
         {

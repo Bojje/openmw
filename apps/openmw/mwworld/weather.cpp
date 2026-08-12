@@ -1078,6 +1078,7 @@ namespace MWWorld
         sceneData.sunColor = toRenderColor(mResult.mSunColor);
         sceneData.sunDirection = { mSunDirection.x(), mSunDirection.y(), mSunDirection.z(), 0.f };
         sceneData.fogColor = toRenderColor(mResult.mFogColor);
+        sceneData.skyColor = toRenderColor(mResult.mSkyColor);
 
         if (Settings::fog().mUseDistantFog)
         {

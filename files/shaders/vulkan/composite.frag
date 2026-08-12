@@ -18,6 +18,7 @@ layout(set = 0, binding = 4) uniform SceneUBO {
     vec4 ambientColor;
     vec4 fogColor;
     vec4 fogParameters;
+    vec4 skyColor;
 } scene;
 
 layout(location = 0) out vec4 outColor;
@@ -39,8 +40,8 @@ void main() {
     float depthSample = texture(gbufferDepth, fragTexCoord).r;
 
     if (depthSample >= 1.0) {
-        vec3 skyTop = vec3(0.2, 0.4, 0.8);
-        vec3 skyHorizon = vec3(0.6, 0.75, 0.9);
+        vec3 skyHorizon = scene.skyColor.rgb;
+        vec3 skyTop = mix(skyHorizon, vec3(0.2, 0.4, 0.8), 0.45);
         float t = fragTexCoord.y;
         outColor = vec4(mix(skyHorizon, skyTop, t), 1.0);
         return;

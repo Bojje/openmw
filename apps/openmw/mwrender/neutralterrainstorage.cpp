@@ -240,8 +240,7 @@ namespace MWRender
             }
             if (col == cellSize - 1 || row == cellSize - 1)
             {
-                if (col == cellSize - 1 || row == cellSize - 1)
-                    normal = getNormal(cellX, cellY, static_cast<int>(col), static_cast<int>(row));
+                normal = getNormal(cellX, cellY, static_cast<int>(col), static_cast<int>(row));
                 if ((row == 0 || row == cellSize - 1) && (col == 0 || col == cellSize - 1))
                 {
                     const auto n1 = getNormal(cellX, cellY, static_cast<int>(col) + 1, static_cast<int>(row));
