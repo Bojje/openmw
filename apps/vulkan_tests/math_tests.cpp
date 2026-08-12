@@ -122,6 +122,12 @@ namespace
         expectNear(result.x, 1.f, "quaternion vector rotation x");
         expectNear(result.y, 0.f, "quaternion vector rotation y");
         expectNear(result.z, 0.f, "quaternion vector rotation z");
+
+        const Render::CameraPose pose = Render::makeCameraPose({ 10.f, 20.f, 30.f }, { 0.f, 0.f, 0.f }, true,
+            false, 0.f, 0.f);
+        expectNear(pose.eye.x, 10.f, "first-person camera eye x");
+        expectNear(pose.eye.z, 154.f, "first-person camera eye z");
+        expectNear(pose.forward.y, 1.f, "first-person camera forward y");
     }
 }
 

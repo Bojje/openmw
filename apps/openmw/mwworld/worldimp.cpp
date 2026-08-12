@@ -1856,24 +1856,18 @@ namespace MWWorld
             return;
         }
 
-        const Render::Quat orientation = Render::makeEulerRotation({ refpos.rot[0], refpos.rot[1], refpos.rot[2] });
-        const Render::Quat cameraOrientation = mNeutralVanityMode
-            ? Render::multiply(orientation,
-                  Render::makeEulerRotation({ mNeutralVanityPitch, 0.f, mNeutralVanityYaw }))
-            : orientation;
-        const Render::Vec3 cameraForward = Render::rotateVector(cameraOrientation, { 0.f, 1.f, 0.f });
         const Render::Vec3 playerPosition{ refpos.pos[0], refpos.pos[1], refpos.pos[2] };
+        const Render::CameraPose camera = Render::makeCameraPose(playerPosition,
+            { refpos.rot[0], refpos.rot[1], refpos.rot[2] }, mNeutralFirstPerson, mNeutralVanityMode,
+            mNeutralVanityPitch, mNeutralVanityYaw);
         if (mNeutralFirstPerson)
-            listenerPos = osg::Vec3f(playerPosition.x, playerPosition.y, playerPosition.z + 124.f);
+            listenerPos = osg::Vec3f(camera.eye.x, camera.eye.y, camera.eye.z);
         else if (Settings::sound().mCameraListener)
-            listenerPos = osg::Vec3f(playerPosition.x - cameraForward.x * 180.f,
-                playerPosition.y - cameraForward.y * 180.f,
-                playerPosition.z + (mNeutralVanityMode ? 90.f : 105.f));
+            listenerPos = osg::Vec3f(camera.eye.x, camera.eye.y, camera.eye.z);
         else
             listenerPos = refpos.asVec3() + osg::Vec3f(0, 0, 1.85f * mPhysics->getHalfExtents(player).z());
-        forward = osg::Vec3f(cameraForward.x, cameraForward.y, cameraForward.z);
-        const Render::Vec3 cameraUp = Render::rotateVector(cameraOrientation, { 0.f, 0.f, 1.f });
-        up = osg::Vec3f(cameraUp.x, cameraUp.y, cameraUp.z);
+        forward = osg::Vec3f(camera.forward.x, camera.forward.y, camera.forward.z);
+        up = osg::Vec3f(camera.up.x, camera.up.y, camera.up.z);
         const bool underwater = isUnderwater(player.getCell(), listenerPos);
         MWBase::Environment::get().getSoundManager()->setListenerPosDir(listenerPos, forward, up, underwater);
     }
@@ -1947,21 +1941,14 @@ namespace MWWorld
         if (player.isEmpty())
             return {};
         const auto& position = player.getRefData().getPosition();
-        const Render::Quat orientation = Render::makeEulerRotation(
-            { position.rot[0], position.rot[1], position.rot[2] });
-        const Render::Quat cameraOrientation = mNeutralVanityMode
-            ? Render::multiply(orientation,
-                  Render::makeEulerRotation({ mNeutralVanityPitch, 0.f, mNeutralVanityYaw }))
-            : orientation;
-        const Render::Vec3 forward = Render::rotateVector(cameraOrientation, { 0.f, 1.f, 0.f });
         const Render::Vec3 playerPosition{ position.pos[0], position.pos[1], position.pos[2] };
-        const Render::Vec3 eye = mNeutralFirstPerson
-            ? Render::Vec3{ playerPosition.x, playerPosition.y, playerPosition.z + 124.f }
-            : Render::Vec3{ playerPosition.x - forward.x * 180.f, playerPosition.y - forward.y * 180.f,
-                  playerPosition.z + (mNeutralVanityMode ? 90.f : 105.f) };
+        const Render::CameraPose camera = Render::makeCameraPose(playerPosition,
+            { position.rot[0], position.rot[1], position.rot[2] }, mNeutralFirstPerson, mNeutralVanityMode,
+            mNeutralVanityPitch, mNeutralVanityYaw);
+        const Render::Vec3& eye = camera.eye;
         const osg::Vec3f from(eye.x, eye.y, eye.z);
-        const osg::Vec3f to(eye.x + forward.x * maxDistance, eye.y + forward.y * maxDistance,
-            eye.z + forward.z * maxDistance);
+        const osg::Vec3f to(eye.x + camera.forward.x * maxDistance, eye.y + camera.forward.y * maxDistance,
+            eye.z + camera.forward.z * maxDistance);
         std::vector<MWWorld::ConstPtr> ignored;
         if (ignorePlayer)
             ignored.emplace_back(player);

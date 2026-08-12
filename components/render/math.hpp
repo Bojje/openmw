@@ -67,6 +67,33 @@ namespace Render
             vector.z + rotation.w * twiceCross.z + crossSecond.z };
     }
 
+    struct CameraPose
+    {
+        Vec3 eye;
+        Vec3 target;
+        Vec3 forward;
+        Vec3 up;
+    };
+
+    inline CameraPose makeCameraPose(const Vec3& playerPosition, const Vec3& playerRotation, bool firstPerson,
+        bool vanity, float vanityPitch, float vanityYaw)
+    {
+        const Quat orientation = makeEulerRotation(playerRotation);
+        const Quat cameraOrientation = vanity
+            ? multiply(orientation, makeEulerRotation({ vanityPitch, 0.f, vanityYaw }))
+            : orientation;
+        const Vec3 forward = rotateVector(cameraOrientation, { 0.f, 1.f, 0.f });
+        const Vec3 up = rotateVector(cameraOrientation, { 0.f, 0.f, 1.f });
+        const Vec3 eye = firstPerson
+            ? Vec3{ playerPosition.x, playerPosition.y, playerPosition.z + 124.f }
+            : Vec3{ playerPosition.x - forward.x * 180.f, playerPosition.y - forward.y * 180.f,
+                  playerPosition.z + (vanity ? 90.f : 105.f) };
+        const Vec3 target = firstPerson
+            ? Vec3{ eye.x + forward.x, eye.y + forward.y, eye.z + forward.z }
+            : Vec3{ playerPosition.x, playerPosition.y, playerPosition.z + 90.f };
+        return { eye, target, forward, up };
+    }
+
     inline Mat4 multiply(const Mat4& lhs, const Mat4& rhs)
     {
         Mat4 result = {};
