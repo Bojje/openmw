@@ -1098,7 +1098,7 @@ namespace MWRender
         };
     }
 
-    void ObjectPaging::getPagedRefnums(const osg::Vec4i& activeGrid, std::vector<ESM::RefNum>& out)
+    void ObjectPaging::updatePagedRefs(const osg::Vec4i& activeGrid)
     {
         mPagedRefs.clear();
         GetRefnumsFunctor grf(mPagedRefs);
@@ -1106,7 +1106,6 @@ namespace MWRender
         mCache->call(grf);
         std::sort(mPagedRefs.begin(), mPagedRefs.end());
         mPagedRefs.erase(std::unique(mPagedRefs.begin(), mPagedRefs.end()), mPagedRefs.end());
-        out = mPagedRefs;
     }
 
     bool ObjectPaging::isPagedRef(ESM::RefNum refnum) const

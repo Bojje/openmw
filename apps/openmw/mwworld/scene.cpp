@@ -775,10 +775,7 @@ namespace MWWorld
                 makeTerrainPreloadPosition(pos, newGrid), mFrameLifecycle.referenceTime()))
             preloadTerrain(pos, playerCellIndex.mWorldspace, true);
         if (mObjectPaging && mRendering)
-        {
-            std::vector<ESM::RefNum> ignored;
-            mObjectPaging->getPagedRefnums(osg::Vec4i(newGrid[0], newGrid[1], newGrid[2], newGrid[3]), ignored);
-        }
+            mObjectPaging->updatePagedRefs(osg::Vec4i(newGrid[0], newGrid[1], newGrid[2], newGrid[3]));
 
         addPostponedPhysicsObjects();
 
