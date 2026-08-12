@@ -422,14 +422,19 @@ namespace
         const std::uint32_t fourCC = read32(data, 84);
         if (!width || !height)
             return {};
+        if (static_cast<std::size_t>(width) > std::numeric_limits<std::size_t>::max() / height)
+            return {};
+        const std::size_t pixelCount = static_cast<std::size_t>(width) * height;
+        if (pixelCount > std::numeric_limits<std::size_t>::max() / 4)
+            return {};
         auto result = std::make_shared<Render::TextureData>();
         result->width = width;
         result->height = height;
-        result->pixels.resize(static_cast<std::size_t>(width) * height * 4);
+        result->pixels.resize(pixelCount * 4);
         if (fourCC == 0x32495441 || fourCC == 0x55354342) // ATI2 / BC5U
         {
-            const std::size_t blocksX = (width + 3) / 4;
-            const std::size_t blocksY = (height + 3) / 4;
+            const std::size_t blocksX = width / 4 + (width % 4 != 0);
+            const std::size_t blocksY = height / 4 + (height % 4 != 0);
             if (blocksX == 0 || blocksY > std::numeric_limits<std::size_t>::max() / blocksX)
                 return {};
             const std::size_t blockCount = blocksX * blocksY;
@@ -467,8 +472,8 @@ namespace
         if (fourCC == 0x31545844 || fourCC == 0x33545844 || fourCC == 0x35545844)
         {
             const std::size_t blockBytes = fourCC == 0x31545844 ? 8 : 16;
-            const std::size_t blocksX = (width + 3) / 4;
-            const std::size_t blocksY = (height + 3) / 4;
+            const std::size_t blocksX = width / 4 + (width % 4 != 0);
+            const std::size_t blocksY = height / 4 + (height % 4 != 0);
             if (blocksX > 0 && blocksY > (data.size() - 128) / (blocksX * blockBytes))
                 return {};
             std::size_t cursor = 128;

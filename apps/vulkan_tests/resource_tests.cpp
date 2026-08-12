@@ -99,6 +99,13 @@ namespace
             || normal->pixels[1] > 130 || normal->pixels[2] < 235 || normal->pixels[2] > 240
             || normal->pixels[3] != 255 || normal->pixels[4] < 62 || normal->pixels[4] > 66)
             throw std::runtime_error("neutral BC5 texture decoding did not reconstruct a normal");
+        {
+            std::ofstream output(root / "textures/test.dds", std::ios::binary | std::ios::trunc);
+            output.write(reinterpret_cast<const char*>(dds.data()), 128);
+        }
+        resources.getNeutralTextureManager()->clearCache();
+        if (resources.getNeutralTextureManager()->get(VFS::Path::Normalized("textures/test.dds")))
+            throw std::runtime_error("truncated neutral BC5 texture unexpectedly decoded");
         std::filesystem::remove_all(root, error);
     }
 
