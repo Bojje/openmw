@@ -323,6 +323,8 @@ dynamic-content milestone.
 Cell-transition loading screens, window-manager cell notifications, actor watching, fades, and
 postprocessor flags now follow the same legacy-service guard, so the neutral bootstrap does not
 silently re-enter the OSG/UI path during cell changes.
+Cell teardown also stops legacy audio only when the presentation owner exists; neutral cell
+unload now remains simulation-only instead of reaching through the absent sound service.
 `World::adjustSky()` also returns before touching the legacy renderer when no OSG services exist,
 covering the first neutral cell transition without a hidden null dereference; CI checks this guard.
 Terrain height queries now cross `Terrain::RenderStorage` as renderer-neutral world data; the
@@ -346,7 +348,7 @@ The engine public header no longer imports complete OSG viewer/event-handler hea
 are now included only by the implementation files that use them.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-156 files, deleting 1,351 lines and adding 8,351 lines (net `+7,000`). The larger Vulkan-only
+156 files, deleting 1,352 lines and adding 8,355 lines (net `+7,003`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.

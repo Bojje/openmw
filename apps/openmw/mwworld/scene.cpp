@@ -492,7 +492,8 @@ namespace MWWorld
 
         mWorld.getLocalScripts().clearCell(cell);
 
-        MWBase::Environment::get().getSoundManager()->stopSound(cell);
+        if (mRendering)
+            MWBase::Environment::get().getSoundManager()->stopSound(cell);
         mActiveCells.erase(cell);
         mNeutralTerrainRegionsDirty = true;
         // Clean up any effects that may have been spawned while unloading all cells
