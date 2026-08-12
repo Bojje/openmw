@@ -91,7 +91,7 @@ jobs:
         -D BUILD_VULKAN_TESTS=ON
 
     - name: Build Vulkan migration targets
-      run: cmake --build build-vulkan --target openmw openmw-vulkan-smoke openmw-vulkan-math-tests openmw-render-world-tests openmw-render-mesh-tests openmw-vulkan-image-tests openmw-vulkan-terrain-tests -- -j$(nproc)
+      run: cmake --build build-vulkan --target openmw openmw-vulkan-smoke openmw-vulkan-math-tests openmw-render-neutral-tests openmw-render-world-tests openmw-render-mesh-tests openmw-vulkan-image-tests openmw-vulkan-terrain-tests -- -j$(nproc)
 
     - name: Verify renderer link isolation
       run: |
@@ -216,12 +216,20 @@ jobs:
           echo "openmw-vulkan-smoke must not contain legacy OSG, NIF, or shared logging symbols"
           exit 1
         fi
+        if readelf -d build-vulkan/openmw-render-neutral-tests | grep -Eiq 'libOpenSceneGraph|libosg'; then
+          echo "renderer-neutral mesh tests must not carry OSG runtime dependencies"
+          exit 1
+        fi
+        if nm -C build-vulkan/openmw-render-neutral-tests | grep -Eiq 'osg::|Nif::|(^| )Log::'; then
+          echo "renderer-neutral mesh tests must not contain legacy OSG, NIF, or shared logging symbols"
+          exit 1
+        fi
 
     - name: Run Vulkan CPU and neutral tests
       run: >
         xvfb-run -a
         ctest --test-dir build-vulkan --output-on-failure
-        -R 'openmw-(vulkan-(math-tests|image-tests|terrain-tests)|render-(world|mesh)-tests)'
+        -R 'openmw-(vulkan-(math-tests|image-tests|terrain-tests)|render-(neutral|world|mesh)-tests)'
 
     - name: Run Vulkan presentation smoke
       run: >
