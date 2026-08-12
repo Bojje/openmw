@@ -3,6 +3,7 @@
 #include <stdexcept>
 
 #include <components/nif/niffile.hpp>
+#include <components/nif/meshconverter.hpp>
 
 #include "niffilemanager.hpp"
 

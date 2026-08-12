@@ -6,7 +6,8 @@
 #include <mutex>
 #include <vector>
 
-#include <components/nif/meshconverter.hpp>
+#include <components/nif/niffile.hpp>
+#include <components/render/mesh.hpp>
 
 #include "cachestats.hpp"
 

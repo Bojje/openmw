@@ -23,6 +23,8 @@ Vulkan-side tests without pulling the OSG-heavy `components` archive into the Vu
 path. The focused neutral test covers index rejection and tangent-frame generation;
 NIF parsing, material extraction, and scene-graph RTTI remain in the legacy adapter,
 which now only translates source arrays into the neutral vertex-source contract.
+The NIF mesh cache header depends on the NIF file and neutral mesh contracts directly;
+the converter API is now an implementation dependency of the cache consumer only.
 The top-level build now also rejects a future `openmw-lib -> openmw_vulkan` link, and CI
 checks the final ELF dependencies and renderer-symbol set in both binaries, making that
 separation a configure- and link-time invariant. This keeps the process lifecycle
@@ -230,7 +232,7 @@ The same interface now owns the engine-visible frame number: the OSG adapter rea
 while the Vulkan owner advances its neutral counter with simulation-frame advancement.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-91 files, deleting 914 lines and adding 7,308 lines (net `+6,394`). The larger Vulkan-only
+91 files, deleting 914 lines and adding 7,312 lines (net `+6,398`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
