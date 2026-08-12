@@ -132,7 +132,7 @@ namespace OMW
         osg::ref_ptr<SceneUtil::WorkQueue> mWorkQueue;
         std::unique_ptr<SceneUtil::UnrefQueue> mUnrefQueue;
         std::unique_ptr<MWWorld::World> mWorld;
-        std::unique_ptr<Render::FrameLifecycle> mPreWorldFrameLifecycle;
+        std::unique_ptr<Render::FrameLifecycle> mFrameLifecycle;
         std::unique_ptr<MWSound::SoundManager> mSoundManager;
         std::unique_ptr<MWScript::ScriptManager> mScriptManager;
         std::unique_ptr<MWGui::WindowManager> mWindowManager;

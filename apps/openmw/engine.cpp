@@ -373,7 +373,7 @@ bool OMW::Engine::frame(unsigned frameNumber, float frametime)
     if (!rendered)
         return false;
 
-    if (mValidateNeutralScene && !mPreWorldFrameLifecycle->consumesSceneSubmission()
+    if (mValidateNeutralScene && !mFrameLifecycle->consumesSceneSubmission()
         && mStateManager->getState() != MWBase::StateManager::State_NoGame
         && (frameNumber % 30 == 0 || mWorld->getWorldScene().hasCellChanged()))
     {
@@ -452,7 +452,7 @@ OMW::Engine::~Engine()
     mUnrefQueue = nullptr;
     mWorkQueue = nullptr;
 
-    mPreWorldFrameLifecycle = nullptr;
+    mFrameLifecycle = nullptr;
     mViewer = nullptr;
 
     mResourceSystem.reset();
@@ -854,11 +854,11 @@ void OMW::Engine::prepareEngine()
         mWorkQueue.get(), mCfgMgr.getLogPath(), mScriptConsoleMode, mTranslationDataStorage, mEncoding, mExportFonts,
         Version::getOpenmwVersionDescription(), mCfgMgr, [this] {
             if (!mWorld || !mWorld->renderFrame())
-                mPreWorldFrameLifecycle->renderFrame();
+                mFrameLifecycle->renderFrame();
         }, [this] {
-            const double simulationTime = mPreWorldFrameLifecycle->referenceTime();
+            const double simulationTime = mFrameLifecycle->referenceTime();
             if (!mWorld || !mWorld->advanceFrame(simulationTime))
-                mPreWorldFrameLifecycle->advanceFrame(simulationTime);
+                mFrameLifecycle->advanceFrame(simulationTime);
         });
     mEnvironment.setWindowManager(*mWindowManager);
 
@@ -939,7 +939,7 @@ void OMW::Engine::prepareEngine()
     }
     listener->loadingOff();
 
-    mWorld->init(mMaxRecastLogLevel, mViewer, *mPreWorldFrameLifecycle, std::move(rootNode), mWorkQueue.get(),
+    mWorld->init(mMaxRecastLogLevel, mViewer, *mFrameLifecycle, std::move(rootNode), mWorkQueue.get(),
         *mUnrefQueue);
     mEnvironment.setWorldScene(mWorld->getWorldScene());
     mWorld->setupPlayer();
@@ -991,7 +991,7 @@ void OMW::Engine::go()
     // this owner without constructing an OSG viewer in the engine.
     auto viewerLifecycle = std::make_unique<MWRender::ViewerFrameLifecycle>();
     mViewer = viewerLifecycle->viewer();
-    mPreWorldFrameLifecycle = std::move(viewerLifecycle);
+    mFrameLifecycle = std::move(viewerLifecycle);
 
     mEnvironment.setFrameRateLimit(Settings::video().mFramerateLimit);
 
@@ -1064,7 +1064,7 @@ void OMW::Engine::go()
     MWWorld::DateTimeManager& timeManager = *mWorld->getTimeManager();
     Misc::FrameRateLimiter frameRateLimiter = Misc::makeFrameRateLimiter(mEnvironment.getFrameRateLimit());
     const std::chrono::steady_clock::duration maxSimulationInterval(std::chrono::milliseconds(200));
-    while (!mPreWorldFrameLifecycle->done() && !mStateManager->hasQuitRequest())
+    while (!mFrameLifecycle->done() && !mStateManager->hasQuitRequest())
     {
         const double dt = std::chrono::duration_cast<std::chrono::duration<double>>(
                               std::min(frameRateLimiter.getLastFrameDuration(), maxSimulationInterval))
@@ -1073,7 +1073,7 @@ void OMW::Engine::go()
 
         mWorld->advanceFrame(timeManager.getRenderingSimulationTime());
 
-        const unsigned frameNumber = mPreWorldFrameLifecycle->frameNumber();
+        const unsigned frameNumber = mFrameLifecycle->frameNumber();
 
         if (!frame(frameNumber, static_cast<float>(dt)))
         {
@@ -1096,7 +1096,7 @@ void OMW::Engine::go()
             {
                 // Viewer frame number can be different from frameNumber because of loading screens which render new
                 // frames inside a simulation frame.
-                const unsigned currentFrameNumber = mPreWorldFrameLifecycle->frameNumber();
+                const unsigned currentFrameNumber = mFrameLifecycle->frameNumber();
                 for (unsigned i = frameNumber; i <= currentFrameNumber; ++i)
                     reportStats(i - statsReportDelay, *mViewer, stats);
             }
