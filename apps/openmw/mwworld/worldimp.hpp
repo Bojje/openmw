@@ -270,6 +270,7 @@ namespace MWWorld
         void useDeathCamera() override;
 
         void setWaterHeight(const float height) override;
+        void emitWaterRipple(const Render::Vec3& position) override;
 
         void rotateWorldObject(const MWWorld::Ptr& ptr, const osg::Quat& rotate) override;
 

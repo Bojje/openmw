@@ -27,6 +27,8 @@
 #include <components/resource/resourcesystem.hpp>
 #include <components/resource/scenemanager.hpp>
 
+#include <components/render/scene.hpp>
+
 #include <components/sceneutil/controller.hpp>
 #include <components/sceneutil/lightmanager.hpp>
 #include <components/sceneutil/nodecallback.hpp>
@@ -51,7 +53,6 @@
 #include "../mwmechanics/spellcasting.hpp"
 
 #include "../mwrender/animation.hpp"
-#include "../mwrender/renderingmanager.hpp"
 #include "../mwrender/util.hpp"
 #include "../mwrender/vismask.hpp"
 
@@ -180,10 +181,9 @@ namespace MWWorld
 {
 
     ProjectileManager::ProjectileManager(osg::Group* parent, Resource::ResourceSystem* resourceSystem,
-        MWRender::RenderingManager* rendering, MWPhysics::PhysicsSystem* physics)
+        MWPhysics::PhysicsSystem* physics)
         : mParent(parent)
         , mResourceSystem(resourceSystem)
-        , mRendering(rendering)
         , mPhysics(physics)
         , mCleanupTimer(0.0f)
     {
@@ -563,10 +563,11 @@ namespace MWWorld
                     bow = *invIt;
             }
 
-            const auto hitPosition = Misc::Convert::toOsg(projectile->getHitPosition());
+            const osg::Vec3f hitPosition = Misc::Convert::toOsg(projectile->getHitPosition());
 
             if (projectile->getHitWater())
-                mRendering->emitWaterRipple(hitPosition);
+                MWBase::Environment::get().getWorld()->emitWaterRipple(
+                    { hitPosition.x(), hitPosition.y(), hitPosition.z() });
 
             MWMechanics::projectileHit(caster, target, bow, projectileRef.getPtr(), hitPosition,
                 projectileState.mAttackStrength, projectileState.mAttackWindUp);

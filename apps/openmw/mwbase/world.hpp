@@ -31,6 +31,11 @@ namespace osg
     class Stats;
 }
 
+namespace Render
+{
+    struct Vec3;
+}
+
 namespace Loading
 {
     class Listener;
@@ -143,6 +148,9 @@ namespace MWBase
         virtual void useDeathCamera() = 0;
 
         virtual void setWaterHeight(const float height) = 0;
+
+        /// Publish a water impact to the active renderer owner.
+        virtual void emitWaterRipple(const Render::Vec3& position) = 0;
 
         virtual bool toggleWater() = 0;
         virtual bool toggleWorld() = 0;

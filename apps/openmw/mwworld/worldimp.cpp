@@ -310,7 +310,7 @@ namespace MWWorld
         if (!lightRoot)
             throw std::logic_error("The OSG rendering manager did not provide a light root");
         mProjectileManager = std::make_unique<ProjectileManager>(
-            lightRoot->asGroup(), mResourceSystem, mRendering.get(), mPhysics.get());
+            lightRoot->asGroup(), mResourceSystem, mPhysics.get());
         mRendering->preloadCommonAssets();
 
         mWeatherManager = std::make_unique<MWWorld::WeatherManager>(mRendering.get(), mSkyManager, mStore);
@@ -2122,6 +2122,14 @@ namespace MWWorld
         }
     }
 
+    void World::emitWaterRipple(const Render::Vec3& position)
+    {
+        if (mRendering)
+            mRendering->emitWaterRipple(osg::Vec3f(position.x, position.y, position.z));
+        if (mWorldScene)
+            mWorldScene->emitNeutralWaterRipple(position);
+    }
+
     bool World::toggleWater()
     {
         if (mRendering)
@@ -3306,10 +3314,7 @@ namespace MWWorld
         if (isUnderwater(MWMechanics::getPlayer().getCell(), worldPos))
         {
             MWMechanics::projectileHit(actor, Ptr(), bow, projectile, worldPos, attackStrength, attackWindUp);
-            if (mRendering)
-                mRendering->emitWaterRipple(worldPos);
-            if (mWorldScene)
-                mWorldScene->emitNeutralWaterRipple({ worldPos.x(), worldPos.y(), worldPos.z() });
+            emitWaterRipple({ worldPos.x(), worldPos.y(), worldPos.z() });
             return;
         }
 

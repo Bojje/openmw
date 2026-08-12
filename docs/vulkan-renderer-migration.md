@@ -401,6 +401,10 @@ explicit alpha-blended planar water material with bounded Fresnel/sky lighting; 
 animated waves now use the neutral effect clock in the Vulkan composite, and underwater projectile impacts
 produce renderer-neutral expiring ripple rings; interior-water bounds,
 and the full legacy water shader remain outstanding.
+Projectile water-hit notification now crosses the world boundary once: the OSG-owned projectile
+service publishes an impact to `MWBase::World`, which fans it out to the active OSG and neutral
+scene owners. This removes the projectile service's direct `RenderingManager` dependency while
+preserving the reference renderer's ripple behavior.
 Malformed neutral water records are
 rejected at the same submission validation boundary as invalid geometry.
 `World` now retains terrain through `Terrain::RenderStorage`; the concrete OSG terrain adapter is
@@ -616,6 +620,7 @@ the game unplayable rather than reduce duplication safely.
 | Full-game scene graph and world rendering | OSG reference path; Vulkan owns the experimental neutral submission path | Vulkan static and dynamic scene consumers reach parity, then delete the OSG owner |
 | Vulkan validation renderer | Vulkan standalone smoke target | Retained as the migration test harness |
 | Vulkan frame-owner forwarding wrapper | Removed; `Vk::Renderer` is the engine's Vulkan `FrameLifecycle` owner | Complete |
+| Projectile water-impact event | World-level neutral water-ripple fan-out; projectile service no longer stores `RenderingManager` | Complete for event ownership; projectile presentation remains OSG-only |
 | Vulkan mesh submission queue | Removed | Complete |
 | Inactive raster ray-tracing scaffold | Removed | Reintroduce only with a complete RT pipeline |
 | Vulkan utility/queue helper paths | Removed | Complete |
