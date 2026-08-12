@@ -627,12 +627,13 @@ void OMW::Engine::prepareVulkanEngine()
     };
     const Render::PoseResolver poseResolver = [resourceSystem = mResourceSystem.get()](
                                                  std::string_view model, std::string_view group, float time,
+                                                 std::string_view startKey, std::string_view stopKey,
                                                  std::span<const std::string> boneNames) {
         const VFS::Path::Normalized path(model);
         if (path.extension().value() != "nif")
             return std::vector<Render::Mat4>();
         std::vector<Render::Mat4> pose
-            = resourceSystem->getNifMeshManager()->getBonePose(path, time, boneNames, group);
+            = resourceSystem->getNifMeshManager()->getBonePose(path, time, boneNames, group, startKey, stopKey);
         if (!pose.empty())
             return pose;
 
@@ -641,7 +642,7 @@ void OMW::Engine::prepareVulkanEngine()
         if (!resourceSystem->getVFS()->exists(kfPath))
             return pose;
         return resourceSystem->getNifMeshManager()->getBonePose(
-            resourceSystem->getNifFileManager()->get(kfPath), time, boneNames, group);
+            resourceSystem->getNifFileManager()->get(kfPath), time, boneNames, group, startKey, stopKey);
     };
     const Render::SceneSynchronizer sceneSynchronizer = [this](Render::SceneData& sceneData) {
         mWorld->updateNeutralSceneData(sceneData);

@@ -22,7 +22,8 @@ namespace Nif
     /// The returned matrices are ordered like a boneNames and are suitable as
     /// the current bone matrices passed to Render::skinMesh.
     std::vector<Render::Mat4> collectBonePose(
-        FileView file, std::span<const std::string> boneNames, float time, std::string_view group = {});
+        FileView file, std::span<const std::string> boneNames, float time, std::string_view group = {},
+        std::string_view startKey = {}, std::string_view stopKey = {});
 
     /// Find the first matching renderer-neutral animation text key.
     std::optional<float> findTextKeyTime(FileView file, std::string_view textKey);

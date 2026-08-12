@@ -213,7 +213,8 @@ namespace MWBase
         // Renderer-neutral animation selection. OSG-only callers retain the
         // default no-op; Vulkan publishes the selected group to its snapshot.
         virtual void updateNeutralAnimation(
-            const MWWorld::Ptr&, std::string_view, std::optional<float> animationTime = std::nullopt)
+            const MWWorld::Ptr&, std::string_view, std::optional<float> animationTime = std::nullopt,
+            std::string_view startKey = {}, std::string_view stopKey = {})
         {
             (void)animationTime;
         }

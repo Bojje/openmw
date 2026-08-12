@@ -4194,10 +4194,11 @@ namespace MWWorld
     }
 
     void World::updateNeutralAnimation(
-        const MWWorld::Ptr& ptr, std::string_view group, std::optional<float> animationTime)
+        const MWWorld::Ptr& ptr, std::string_view group, std::optional<float> animationTime,
+        std::string_view startKey, std::string_view stopKey)
     {
         if (mWorldScene)
-            mWorldScene->updateObjectAnimation(ptr, group, animationTime);
+            mWorldScene->updateObjectAnimation(ptr, group, animationTime, startKey, stopKey);
     }
 
     std::optional<float> World::getNeutralAnimationDuration(

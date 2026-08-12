@@ -555,8 +555,8 @@ now advance from resource duration metadata and hand off to the next queued grou
 finite loop counts; looping groups now retain a wrapped neutral clock, and mechanics exports
 the queue clock at submission time so the resource pose sampler does not invent a second timeline.
 Renderer-neutral NIF/KF metadata now narrows queue completion to group-specific start/stop text keys
-when present; actor priority arbitration, blended controller-stack ownership, and text-key event dispatch
-remain outstanding.
+when present, and pose sampling now starts from the same selected text-key segment; actor priority
+arbitration, blended controller-stack ownership, and text-key event dispatch remain outstanding.
 RGBA8 conversion is now one renderer-neutral helper shared by image resources and terrain
 blendmaps, so clamping, finite-value rejection, and byte quantization cannot drift between
 resource paths. The conversion helper has direct CPU coverage.
@@ -683,9 +683,9 @@ real replacement consumes its responsibility and the fast tests cover the bounda
 
 - Add actors, skinning, animation, particles, weather, water, spell effects, and post-processing.
   The neutral path now samples model-local NIF and classic external `.kf` keyframe controllers,
-  honors selected group start keys, and carries explicit per-object animation groups and clocks;
+  honors selected group start/stop segments, and carries explicit per-object animation groups and clocks;
   the remaining animation gate is actor `.kf` priority/queue selection, full text-key sequence
-  timing, blending, and controller-stack ownership.
+  event dispatch, blending, and controller-stack ownership.
 - Resting actors, owned-item lookup, line-of-sight, moving doors, and transformation-script movement/rotation now use active-cell state and world-model transforms instead of treating an absent OSG node as inactive.
 - Neutral focus selection and gameplay raycasts now use the renderer-neutral camera state and physics collision masks, so activation and targeting no longer require an OSG renderer.
 - The active sound listener now follows the same neutral first-person, third-person, and vanity camera state instead of being disabled with OSG.

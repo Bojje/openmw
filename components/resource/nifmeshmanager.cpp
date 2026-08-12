@@ -92,17 +92,19 @@ namespace Resource
     }
 
     std::vector<Render::Mat4> NifMeshManager::getBonePose(
-        VFS::Path::NormalizedView name, float time, std::span<const std::string> boneNames, std::string_view group)
+        VFS::Path::NormalizedView name, float time, std::span<const std::string> boneNames, std::string_view group,
+        std::string_view startKey, std::string_view stopKey)
     {
-        return getBonePose(mNifFileManager->get(name), time, boneNames, group);
+        return getBonePose(mNifFileManager->get(name), time, boneNames, group, startKey, stopKey);
     }
 
     std::vector<Render::Mat4> NifMeshManager::getBonePose(
-        const Nif::NIFFilePtr& file, float time, std::span<const std::string> boneNames, std::string_view group) const
+        const Nif::NIFFilePtr& file, float time, std::span<const std::string> boneNames, std::string_view group,
+        std::string_view startKey, std::string_view stopKey) const
     {
         if (!file)
             return {};
-        return Nif::collectBonePose(Nif::FileView(*file), boneNames, time, group);
+        return Nif::collectBonePose(Nif::FileView(*file), boneNames, time, group, startKey, stopKey);
     }
 
     void NifMeshManager::updateCache(double referenceTime)

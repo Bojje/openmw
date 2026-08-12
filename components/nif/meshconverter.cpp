@@ -227,9 +227,10 @@ namespace Nif
                         collectBoneTransforms(*child.getPtr(), transform, time, transforms);
         }
 
-        float sequenceStartTime(const NiSequenceStreamHelper& sequence, std::string_view group)
+        float sequenceStartTime(
+            const NiSequenceStreamHelper& sequence, std::string_view group, std::string_view startKey)
         {
-            if (group.empty())
+            if (group.empty() || startKey.empty())
                 return 0.f;
 
             const ExtraList extraList = sequence.getExtraList();
@@ -237,7 +238,7 @@ namespace Nif
                 || extraList.front()->mRecordType != RC_NiTextKeyExtraData)
                 return 0.f;
 
-            const std::string prefix = Misc::StringUtils::lowerCase(std::string(group) + ": start");
+            const std::string prefix = Misc::StringUtils::lowerCase(std::string(group) + ": " + std::string(startKey));
             const auto* textKeys = static_cast<const NiTextKeyExtraData*>(extraList.front().getPtr());
             for (const NiTextKeyExtraData::TextKey& key : textKeys->mList)
             {
@@ -310,10 +311,11 @@ namespace Nif
         }
 
         void collectSequenceTransforms(const NiSequenceStreamHelper& sequence, float time, std::string_view group,
-            std::unordered_map<std::string, Render::Mat4>& transforms)
+            std::string_view startKey, std::unordered_map<std::string, Render::Mat4>& transforms)
         {
             const ExtraList extraList = sequence.getExtraList();
-            const float sampleTime = time + sequenceStartTime(sequence, group);
+            const std::string_view effectiveStartKey = startKey.empty() ? std::string_view("start") : startKey;
+            const float sampleTime = time + sequenceStartTime(sequence, group, effectiveStartKey);
             const NiTimeController* controller
                 = sequence.mController.empty() ? nullptr : sequence.mController.getPtr();
             for (std::size_t i = 1; i < extraList.size() && controller != nullptr;
@@ -684,19 +686,29 @@ namespace Nif
     }
 
     std::vector<Render::Mat4> collectBonePose(
-        FileView file, std::span<const std::string> boneNames, float time, std::string_view group)
+        FileView file, std::span<const std::string> boneNames, float time, std::string_view group,
+        std::string_view startKey, std::string_view stopKey)
     {
         if (boneNames.empty() || !std::isfinite(time))
             return {};
 
+        (void)stopKey;
+
         const Render::Mat4 identity = Render::identityMat4();
+        float sampleTime = time;
+        if (!group.empty() && !startKey.empty())
+        {
+            const std::optional<float> start = findTextKeyTime(file, std::string(group) + ": " + std::string(startKey));
+            if (start)
+                sampleTime += *start;
+        }
         std::unordered_map<std::string, Render::Mat4> transforms;
         for (std::size_t i = 0; i < file.numRoots(); ++i)
         {
             if (const auto* root = dynamic_cast<const NiAVObject*>(file.getRoot(i)))
-                collectBoneTransforms(*root, identity, time, transforms);
+                collectBoneTransforms(*root, identity, sampleTime, transforms);
             else if (const auto* sequence = dynamic_cast<const NiSequenceStreamHelper*>(file.getRoot(i)))
-                collectSequenceTransforms(*sequence, time, group, transforms);
+                collectSequenceTransforms(*sequence, time, group, startKey, transforms);
         }
 
         std::vector<Render::Mat4> result;

@@ -2633,7 +2633,8 @@ namespace MWMechanics
 
         mAnimQueue.pop_front();
         if (!mAnimQueue.empty())
-            MWBase::Environment::get().getWorld()->updateNeutralAnimation(mPtr, mAnimQueue.front().mGroup);
+            MWBase::Environment::get().getWorld()->updateNeutralAnimation(
+                mPtr, mAnimQueue.front().mGroup, std::nullopt, mAnimQueue.front().mStartKey, mAnimQueue.front().mStopKey);
     }
 
     void CharacterController::updateNeutralMovement(float duration)
@@ -2708,7 +2709,9 @@ namespace MWMechanics
         }
         const std::optional<float> animationTime
             = mAnimQueue.empty() ? std::nullopt : std::optional<float>(mAnimQueue.front().mTime);
-        world->updateNeutralAnimation(mPtr, animationGroup, animationTime);
+        const std::string_view startKey = mAnimQueue.empty() ? std::string_view{} : mAnimQueue.front().mStartKey;
+        const std::string_view stopKey = mAnimQueue.empty() ? std::string_view{} : mAnimQueue.front().mStopKey;
+        world->updateNeutralAnimation(mPtr, animationGroup, animationTime, startKey, stopKey);
         settings.mPosition[0] = settings.mPosition[1] = 0.f;
         if (movement.z() == 0.f)
             settings.mPosition[2] = 0.f;
@@ -2831,7 +2834,8 @@ namespace MWMechanics
             entry.mStopKey = "stop";
             entry.mSpeed = 1.f;
             mAnimQueue.push_back(std::move(entry));
-            MWBase::Environment::get().getWorld()->updateNeutralAnimation(mPtr, groupname);
+            MWBase::Environment::get().getWorld()->updateNeutralAnimation(
+                mPtr, groupname, std::nullopt, mAnimQueue.back().mStartKey, mAnimQueue.back().mStopKey);
             return true;
         }
 
@@ -2925,7 +2929,8 @@ namespace MWMechanics
             entry.mTime = 0.f;
             mAnimQueue.clear();
             mAnimQueue.push_back(std::move(entry));
-            MWBase::Environment::get().getWorld()->updateNeutralAnimation(mPtr, groupname);
+            MWBase::Environment::get().getWorld()->updateNeutralAnimation(
+                mPtr, groupname, std::nullopt, startKey, stopKey);
             return true;
         }
 

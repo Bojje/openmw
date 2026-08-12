@@ -17,7 +17,7 @@ int main()
     scene.exterior = true;
     scene.gridX = 2;
     scene.gridY = -3;
-    scene.objects.push_back({ 7, "meshes/test.nif", {}, false, false, {}, {}, {}, {}, {}, {}, {} });
+    scene.objects.push_back({ 7, "meshes/test.nif", {}, false, false, {}, {}, {}, {}, {}, {}, {}, {}, {} });
 
     if (scene.objects.size() != 1 || scene.objects.front().id != 7 || scene.objects.front().model != "meshes/test.nif"
         || scene.objects.front().transform.rotation.w != 1.f || scene.objects.front().transform.scale.x != 1.f
@@ -181,8 +181,10 @@ int main()
     world.updateEffects(0.5f);
     if (world.findCell(&firstCellHandle)->objects.front().animationTime != 0.5f)
         throw std::runtime_error("renderer-neutral world scene did not advance selected animation time");
-    if (!world.updateObjectAnimation(&dynamicObjectHandle, "walkforward", 1.25f)
-        || world.findCell(&firstCellHandle)->objects.front().animationTime != 1.25f)
+    if (!world.updateObjectAnimation(&dynamicObjectHandle, "walkforward", 1.25f, "loop start", "loop stop")
+        || world.findCell(&firstCellHandle)->objects.front().animationTime != 1.25f
+        || world.findCell(&firstCellHandle)->objects.front().animationStartKey != "loop start"
+        || world.findCell(&firstCellHandle)->objects.front().animationStopKey != "loop stop")
         throw std::runtime_error("renderer-neutral world scene did not accept an explicit animation clock");
     Render::Mat4 dynamicBone = Render::identityMat4();
     dynamicBone.data[12] = 3.f;
@@ -567,7 +569,7 @@ int main()
         throw std::runtime_error("renderer-neutral scene submission failed resource handoff");
 
     submission.dynamicMeshes.push_back(
-        { { 17, "meshes/animated.nif", objectTransform, true, true, {}, {}, {}, {}, {}, {}, {} }, {}, {} });
+        { { 17, "meshes/animated.nif", objectTransform, true, true, {}, {}, {}, {}, {}, {}, {}, {}, {} }, {}, {} });
     if (submission.dynamicMeshes.size() != 1 || !submission.dynamicMeshes.front().object.dynamic
         || submission.dynamicMeshes.front().object.model != "meshes/animated.nif" || !submission.valid())
         throw std::runtime_error("renderer-neutral scene submission lost dynamic records");

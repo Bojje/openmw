@@ -95,8 +95,10 @@ namespace Render
         float animationDuration = 0.f;
         float animationTime = 0.f;
         // Neutral gameplay animation selection. Renderer code consumes this
-        // name but does not own gameplay priority or blend policy.
+        // name and segment but does not own gameplay priority or blend policy.
         std::string animationGroup;
+        std::string animationStartKey;
+        std::string animationStopKey;
         // Magic VFX use the legacy first-root texture replacement rule when
         // their flattened neutral mesh list is submitted.
         bool magicVfx = false;
@@ -433,8 +435,9 @@ namespace Render
             return true;
         }
 
-        bool updateObjectAnimation(
-            const void* objectKey, std::string_view group, std::optional<float> animationTime = std::nullopt)
+        bool updateObjectAnimation(const void* objectKey, std::string_view group,
+            std::optional<float> animationTime = std::nullopt, std::string_view startKey = {},
+            std::string_view stopKey = {})
         {
             const auto found = mObjects.find(objectKey);
             if (found == mObjects.end())
@@ -445,9 +448,12 @@ namespace Render
             WorldObject* object = scene->second.findObject(found->second.id);
             if (object == nullptr || !object->dynamic)
                 return false;
-            if (object->animationGroup != group)
+            if (object->animationGroup != group || object->animationStartKey != startKey
+                || object->animationStopKey != stopKey)
             {
                 object->animationGroup = group;
+                object->animationStartKey = startKey;
+                object->animationStopKey = stopKey;
                 object->animationTime = 0.f;
                 object->boneMatrices.clear();
             }

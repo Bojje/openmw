@@ -60,10 +60,10 @@ namespace Resource
         /// scene. The result follows the supplied skinning bone-name order.
         std::vector<Render::Mat4> getBonePose(
             VFS::Path::NormalizedView name, float time, std::span<const std::string> boneNames,
-            std::string_view group = {});
+            std::string_view group = {}, std::string_view startKey = {}, std::string_view stopKey = {});
         std::vector<Render::Mat4> getBonePose(
             const Nif::NIFFilePtr& file, float time, std::span<const std::string> boneNames,
-            std::string_view group = {}) const;
+            std::string_view group = {}, std::string_view startKey = {}, std::string_view stopKey = {}) const;
 
         void updateCache(double referenceTime) override;
         void clearCache() override;

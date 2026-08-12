@@ -227,6 +227,7 @@ int main()
     Nif::NiTextKeyExtraData sequenceTextKeys;
     sequenceTextKeys.mRecordType = Nif::RC_NiTextKeyExtraData;
     sequenceTextKeys.mList.push_back({ 0.25f, "Idle: Start" });
+    sequenceTextKeys.mList.push_back({ 0.5f, "Idle: Mid" });
     sequenceTextKeys.mList.push_back({ 0.75f, "Idle: Stop" });
     Nif::NiStringExtraData sequenceBoneName;
     sequenceBoneName.mRecordType = Nif::RC_NiStringExtraData;
@@ -256,6 +257,9 @@ int main()
     const std::vector<Render::Mat4> groupedExternalPose
         = Nif::collectBonePose(Nif::FileView(*kfFile), animatedBoneNames, 0.25f, "idle");
     expectNear(groupedExternalPose.front().data[12], 2.f, "sampled grouped external KF translation");
+    const std::vector<Render::Mat4> segmentedExternalPose
+        = Nif::collectBonePose(Nif::FileView(*kfFile), animatedBoneNames, 0.25f, "idle", "mid", "stop");
+    expectNear(segmentedExternalPose.front().data[12], 3.375f, "sampled segmented external KF translation");
     expectNear(instances.front().mesh.material.diffuse.x, 0.25f, "material diffuse red");
     expectNear(instances.front().mesh.material.diffuse.w, 0.75f, "material alpha");
     expectNear(instances.front().mesh.material.emissive.z, 0.6f, "material emissive");
@@ -354,15 +358,15 @@ int main()
     expectNear(batch.vertices.front().material[3], 0.6f, "batched material emission");
     expectNear(batch.draws[1].transform.data[12], 12.0f, "batched mesh translation");
 
-    Render::WorldObject object{ 1, "synthetic.nif", {}, true, false, {}, {}, {}, {}, {}, {}, {} };
+    Render::WorldObject object{ 1, "synthetic.nif", {}, true, false, {}, {}, {}, {}, {}, {}, {}, {}, {} };
     object.transform.position.x = 5.0f;
     const Render::MeshInstance transformed = Render::transformMeshInstance(object, instances.front());
     expectNear(transformed.transform.data[12], 17.0f, "cell object translation");
 
     Render::CellScene scene;
-    scene.objects.push_back({ 2, "hidden.nif", {}, false, false, {}, {}, {}, {}, {}, {}, {} });
-    scene.objects.push_back({ 3, "synthetic.nif", {}, true, false, {}, {}, {}, {}, {}, {}, {} });
-    scene.objects.push_back({ 4, "animated.nif", {}, true, true, {}, {}, {}, {}, {}, {}, {} });
+    scene.objects.push_back({ 2, "hidden.nif", {}, false, false, {}, {}, {}, {}, {}, {}, {}, {}, {} });
+    scene.objects.push_back({ 3, "synthetic.nif", {}, true, false, {}, {}, {}, {}, {}, {}, {}, {}, {} });
+    scene.objects.push_back({ 4, "animated.nif", {}, true, true, {}, {}, {}, {}, {}, {}, {}, {}, {} });
     const std::vector<Render::MeshInstance> visibleMeshes = Render::collectCellMeshes(
         scene, [&](std::string_view model) -> const Resource::NifMeshManager::Meshes& {
             if (model != "synthetic.nif")
