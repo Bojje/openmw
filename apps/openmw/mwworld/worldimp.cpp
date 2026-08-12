@@ -324,7 +324,8 @@ namespace MWWorld
         preloader->setPreloadInstances(Settings::cells().mPreloadInstances);
 
         mWorldScene = std::make_unique<Scene>(
-            *this, frameLifecycle, mResourceSystem->getVFS(), mRendering.get(), mObjectPaging,
+            *this, frameLifecycle, Render::SceneSynchronizer(), Render::MeshResolver(), Render::TextureResolver(),
+            Render::PoseResolver(), mResourceSystem->getVFS(), mRendering.get(), mObjectPaging,
             *osgTerrainStoragePtr, std::move(preloader), mPhysics.get(), *mNavigator);
     }
 

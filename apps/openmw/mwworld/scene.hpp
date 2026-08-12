@@ -153,11 +153,6 @@ namespace MWWorld
 
     public:
         Scene(MWWorld::World& world, Render::FrameLifecycle& frameLifecycle,
-            const VFS::Manager* vfs, MWRender::RenderingManager* rendering, MWRender::ObjectPaging* objectPaging,
-            Terrain::RenderStorage& terrainStorage, std::unique_ptr<CellPreloader> preloader,
-            MWPhysics::PhysicsSystem* physics, DetourNavigator::Navigator& navigator);
-
-        Scene(MWWorld::World& world, Render::FrameLifecycle& frameLifecycle,
             Render::SceneSynchronizer sceneSynchronizer, Render::MeshResolver meshResolver,
             Render::TextureResolver textureResolver, Render::PoseResolver poseResolver, const VFS::Manager* vfs,
             MWRender::RenderingManager* rendering, MWRender::ObjectPaging* objectPaging,
