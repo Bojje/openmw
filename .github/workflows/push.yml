@@ -91,7 +91,7 @@ jobs:
         -D BUILD_VULKAN_TESTS=ON
 
     - name: Build Vulkan migration targets
-      run: cmake --build build-vulkan --target openmw openmw-vulkan-smoke openmw-vulkan-math-tests openmw-render-neutral-tests openmw-render-world-tests openmw-render-mesh-tests openmw-vulkan-image-tests openmw-vulkan-terrain-tests -- -j$(nproc)
+      run: cmake --build build-vulkan --target openmw openmw-vulkan-smoke openmw-vulkan-math-tests openmw-render-neutral-tests openmw-render-world-tests openmw-render-mesh-tests openmw-vulkan-image-tests openmw-vulkan-terrain-tests openmw-resource-backend-tests -- -j$(nproc)
 
     - name: Verify renderer link isolation
       run: |
@@ -169,6 +169,10 @@ jobs:
         fi
         if rg -n 'mRendering\.getResourceSystem\(\)' apps/openmw/mwworld/scene.cpp; then
           echo "Scene neutral/resource paths must not use RenderingManager as their resource gateway"
+          exit 1
+        fi
+        if rg -n 'mResourceSystem' apps/openmw/mwworld/scene.hpp apps/openmw/mwworld/scene.cpp; then
+          echo "Scene must not retain the full ResourceSystem as a renderer-service gateway"
           exit 1
         fi
         if rg -n 'getAnimation\(|getNeutralBoneMatrices\(' apps/openmw/mwworld/scene.cpp; then
@@ -288,7 +292,7 @@ jobs:
       run: >
         xvfb-run -a
         ctest --test-dir build-vulkan --output-on-failure
-        -R 'openmw-(vulkan-(math-tests|image-tests|terrain-tests)|render-(neutral|world|mesh)-tests)'
+        -R 'openmw-(vulkan-(math-tests|image-tests|terrain-tests)|render-(neutral|world|mesh)-tests|resource-backend-tests)'
 
     - name: Run Vulkan presentation smoke
       run: >

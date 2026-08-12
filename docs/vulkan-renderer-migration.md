@@ -189,7 +189,8 @@ so an unexpected skip is a failure rather than a green test result; CI also invo
 headless lifecycle probe and permits only its documented capability skip (77).
 CI also rejects OSG/NIF/shared-logging includes and namespaces in the renderer-neutral and Vulkan
 source boundaries before checking the linked smoke binary, preventing static linking from hiding
-a boundary regression.
+a boundary regression. It now also rejects a stored `ResourceSystem` gateway in `MWWorld::Scene`
+and runs the neutral resource-backend regression in the Vulkan job.
 A neutral terrain tile snapshot adapter also converts the legacy
 OSG-array/OSG-image storage contract into vertices, layer metadata, and RGBA8 blendmaps;
 opaque single-layer terrain retains an intentionally absent blendmap. Vulkan now consumes
