@@ -213,6 +213,7 @@ namespace MWBase
         // Renderer-neutral animation selection. OSG-only callers retain the
         // default no-op; Vulkan publishes the selected group to its snapshot.
         virtual void updateNeutralAnimation(const MWWorld::Ptr&, std::string_view) {}
+        virtual std::optional<float> getNeutralAnimationDuration(const MWWorld::Ptr&) const { return std::nullopt; }
 
         virtual MWWorld::TimeStamp getTimeStamp() const = 0;
         ///< Return current in-game time and number of day since new game start.

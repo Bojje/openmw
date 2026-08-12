@@ -214,6 +214,7 @@ namespace MWWorld
         Scene& getWorldScene() { return *mWorldScene; }
         void updateNeutralSceneData(Render::SceneData& sceneData) const;
         void updateNeutralAnimation(const MWWorld::Ptr& ptr, std::string_view group) override;
+        std::optional<float> getNeutralAnimationDuration(const MWWorld::Ptr& ptr) const override;
         bool isNeutralVanityModeEnabled() const { return mNeutralVanityMode; }
         float getNeutralVanityPitch() const { return mNeutralVanityPitch; }
         float getNeutralVanityYaw() const { return mNeutralVanityYaw; }

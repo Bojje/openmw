@@ -42,6 +42,7 @@
 #include <components/files/collections.hpp>
 
 #include <components/resource/bulletshape.hpp>
+#include <components/resource/niffilemanager.hpp>
 #include <components/resource/nifmeshmanager.hpp>
 #include <components/resource/resourcesystem.hpp>
 
@@ -4196,6 +4197,27 @@ namespace MWWorld
     {
         if (mWorldScene)
             mWorldScene->updateObjectAnimation(ptr, group);
+    }
+
+    std::optional<float> World::getNeutralAnimationDuration(const MWWorld::Ptr& ptr) const
+    {
+        if (mResourceSystem == nullptr || mResourceSystem->backend() != Resource::ResourceSystem::Backend::Neutral)
+            return std::nullopt;
+
+        const VFS::Path::Normalized model = ptr.getClass().getCorrectedModel(ptr);
+        if (model.empty())
+            return std::nullopt;
+
+        std::optional<float> duration = mResourceSystem->getNifMeshManager()->getAnimationDuration(model);
+        if (duration && *duration > 0.f)
+            return duration;
+
+        VFS::Path::Normalized keyframes(model);
+        keyframes.changeExtension(VFS::Path::ExtensionView("kf"));
+        if (!mResourceSystem->getVFS()->exists(keyframes))
+            return duration;
+        return mResourceSystem->getNifMeshManager()->getAnimationDuration(
+            mResourceSystem->getNifFileManager()->get(keyframes));
     }
 
     void World::setActorActive(const MWWorld::Ptr& ptr, bool value)

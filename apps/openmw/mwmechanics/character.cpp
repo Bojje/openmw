@@ -2604,6 +2604,36 @@ namespace MWMechanics
             world->updateNeutralAnimation(mPtr, mCurrentHit);
     }
 
+    void CharacterController::updateNeutralAnimationQueue(float duration)
+    {
+        if (mAnimQueue.empty() || duration <= 0.f)
+            return;
+
+        AnimationQueueEntry& current = mAnimQueue.front();
+        if (current.mLooping)
+            return;
+
+        const std::optional<float> animationDuration
+            = MWBase::Environment::get().getWorld()->getNeutralAnimationDuration(mPtr);
+        if (!animationDuration || *animationDuration <= 0.f)
+            return;
+
+        current.mTime += duration * std::max(0.f, current.mSpeed);
+        if (current.mTime < *animationDuration)
+            return;
+
+        if (current.mLoopCount > 0)
+        {
+            --current.mLoopCount;
+            current.mTime = 0.f;
+            return;
+        }
+
+        mAnimQueue.pop_front();
+        if (!mAnimQueue.empty())
+            MWBase::Environment::get().getWorld()->updateNeutralAnimation(mPtr, mAnimQueue.front().mGroup);
+    }
+
     void CharacterController::updateNeutralMovement(float duration)
     {
         if (!mPtr.getClass().isActor())
@@ -2647,6 +2677,7 @@ namespace MWMechanics
 
         world->queueMovement(mPtr, movement);
 
+        updateNeutralAnimationQueue(duration);
         updateNeutralHitAnimation();
 
         std::string animationGroup;
@@ -2735,7 +2766,11 @@ namespace MWMechanics
                 entry.mStartKey = "start";
                 entry.mStopKey = "stop";
                 entry.mSpeed = 1.f;
-                entry.mTime = animation.mTime;
+                // The legacy value is a normalized completion fraction, while
+                // the neutral queue clock is expressed in resource seconds.
+                // Without the OSG text-key owner, restart from the beginning
+                // rather than treating a fraction as elapsed seconds.
+                entry.mTime = mAnimation != nullptr ? animation.mTime : 0.f;
                 if (animation.mAbsolute && mAnimation != nullptr)
                 {
                     float start = mAnimation->getTextKeyTime(animation.mGroup + ": start");

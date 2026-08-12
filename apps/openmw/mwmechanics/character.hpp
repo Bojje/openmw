@@ -255,6 +255,7 @@ namespace MWMechanics
         void prepareHit();
 
         void unpersistAnimationState();
+        void updateNeutralAnimationQueue(float duration);
 
         void playBlendedAnimation(const std::string& groupname, const MWRender::AnimPriority& priority, int blendMask,
             bool autodisable, float speedmult, std::string_view start, std::string_view stop, float startpoint,

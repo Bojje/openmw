@@ -143,7 +143,7 @@ clock. Neutral animation-state restoration no longer dereferences the absent OSG
 scripted group requests remain visible to the neutral resolver and fall back to bind pose when no
 controller is available. Neutral death transitions now publish a deterministic death group instead
 of being discarded when OSG animation is absent. Neutral hit, knockdown, knockout, and block states
-also publish their canonical groups and clear when gameplay recovery ends. Live actor `.kf` priority arbitration, queued sequence completion,
+also publish their canonical groups and clear when gameplay recovery ends. Live actor `.kf` priority arbitration,
 full text-key stop/loop handling, blended controller stacks, animation-specific shading, and
 mismatched multi-part skin orders remain outstanding. NIF skinning metadata preserves source bone
 names beside inverse-bind matrices, making the mapping deterministic without borrowing OSG types.
@@ -547,7 +547,9 @@ Neutral mesh and texture resolution, including optional specular-file discovery,
 scene boundary as injected callbacks rather than direct `ResourceSystem` calls.
 Neutral scene synchronization and bone-pose production now cross the same boundary as injected
 callbacks; the Vulkan game owner supplies camera synchronization and grouped NIF/KF pose sampling,
-while actor priority, sequence queue ownership, and blended animation remain to be ported.
+while actor priority and blended animation remain to be ported. Neutral one-shot animation queues
+now advance from resource duration metadata and hand off to the next queued group, including
+finite loop counts; full text-key timing and controller-stack ownership remain outstanding.
 RGBA8 conversion is now one renderer-neutral helper shared by image resources and terrain
 blendmaps, so clamping, finite-value rejection, and byte quantization cannot drift between
 resource paths. The conversion helper has direct CPU coverage.
