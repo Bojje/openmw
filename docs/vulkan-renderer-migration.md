@@ -448,8 +448,9 @@ The engine simulation/update loop now owns its frame start tick and statistics s
 querying the OSG viewer directly. The OSG lifecycle may still provide its viewer statistics object
 for the reference renderer, while a future Vulkan owner can run the same update loop without an
 OSG viewer query in `Engine::frame()`.
-OSG screen-capture operation and event-handler construction is likewise limited to the OSG frame
-backend; the input action remains safe when a backend has not installed that legacy capture service.
+OSG screen-capture operation and event-handler construction is likewise owned by
+`ViewerFrameLifecycle`, the OSG frame backend; `Engine` supplies only the capture configuration
+and action callback, while the Vulkan input action remains independent of that legacy service.
 OSG profiler/resource event handlers and delayed viewer-stat reporting are also guarded by the
 presence of the OSG viewer, so the engine main loop has no unconditional viewer-stat path.
 Stereo management and OpenGL depth/color selection operations are now constructed only during
@@ -503,7 +504,7 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-206 files, deleting 2,256 lines and adding 13,933 lines (net `+11,677`). The larger Vulkan-only
+206 files, deleting 2,280 lines and adding 13,961 lines (net `+11,681`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. The live no-GUI consumer is the first deletion
 checkpoint; further reduction can now target OSG scene/resource/presentation ownership rather

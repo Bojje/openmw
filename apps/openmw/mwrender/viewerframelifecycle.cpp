@@ -4,6 +4,7 @@
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
+#include <utility>
 
 #include <osgDB/ReaderWriter>
 #include <osgDB/Registry>
@@ -19,10 +20,12 @@
 #include <components/debug/gldebug.hpp>
 #include <components/render/textureconversion.hpp>
 #include <components/resource/stats.hpp>
+#include <components/sceneutil/screencapture.hpp>
 #include <components/sceneutil/color.hpp>
 #include <components/sceneutil/depth.hpp>
 #include <components/sceneutil/glextensions.hpp>
 #include <components/sceneutil/util.hpp>
+#include <components/sceneutil/workqueue.hpp>
 #include <components/sdlutil/imagetosurface.hpp>
 #include <components/sdlutil/sdlgraphicswindow.hpp>
 #include <components/settings/values.hpp>
@@ -257,6 +260,24 @@ namespace MWRender
         mViewer->getEventQueue()->getCurrentEventState()->setWindowRectangle(
             0, 0, graphicsWindow->getTraits()->width, graphicsWindow->getTraits()->height);
         mMaxTextureImageUnits = identifyOp->getMaxTextureImageUnits();
+    }
+
+    void ViewerFrameLifecycle::initializeScreenCapture(osg::ref_ptr<SceneUtil::WorkQueue> workQueue,
+        const std::filesystem::path& screenshotPath, const std::string& screenshotFormat,
+        std::function<void(std::string)> callback)
+    {
+        mScreenCaptureOperation = new SceneUtil::AsyncScreenCaptureOperation(workQueue,
+            new SceneUtil::WriteScreenshotToFileOperation(screenshotPath, screenshotFormat, std::move(callback)));
+        mScreenCaptureHandler = new osgViewer::ScreenCaptureHandler(mScreenCaptureOperation);
+        mViewer->addEventHandler(mScreenCaptureHandler);
+    }
+
+    void ViewerFrameLifecycle::captureNextFrame()
+    {
+        if (!mScreenCaptureHandler || !mViewer)
+            return;
+        mScreenCaptureHandler->setFramesToCapture(1);
+        mScreenCaptureHandler->captureNextFrame(*mViewer);
     }
 
     void ViewerFrameLifecycle::initializeStatsHandlers(

@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <functional>
 #include <iosfwd>
+#include <string>
 #include <osg/ref_ptr>
 
 #include <components/render/frame.hpp>
@@ -11,6 +12,7 @@
 namespace osgViewer
 {
     class Viewer;
+    class ScreenCaptureHandler;
 }
 
 namespace Resource
@@ -31,6 +33,12 @@ namespace VFS
     class Manager;
 }
 
+namespace SceneUtil
+{
+    class AsyncScreenCaptureOperation;
+    class WorkQueue;
+}
+
 namespace MWRender
 {
     /// OSG bootstrap owner used before the game World and RenderingManager exist.
@@ -49,6 +57,10 @@ namespace MWRender
         // Create and realize the OSG window owned by this lifecycle. The
         // engine receives only the resulting SDL handle and GL capability.
         void initializeWindow(SDL_Window*& window, const std::filesystem::path& resourceDirectory);
+        void initializeScreenCapture(osg::ref_ptr<SceneUtil::WorkQueue> workQueue,
+            const std::filesystem::path& screenshotPath, const std::string& screenshotFormat,
+            std::function<void(std::string)> callback);
+        void captureNextFrame();
         void initializeStatsHandlers(const VFS::Manager& vfs, bool writeToFile,
             const std::function<void(Resource::Profiler&)>& configureProfiler);
         void reportStats(unsigned frameNumber, std::ostream& stream) const;
@@ -68,6 +80,8 @@ namespace MWRender
     private:
         osg::ref_ptr<osgViewer::Viewer> mViewer;
         osg::ref_ptr<osg::Group> mSceneRoot;
+        osg::ref_ptr<osgViewer::ScreenCaptureHandler> mScreenCaptureHandler;
+        osg::ref_ptr<SceneUtil::AsyncScreenCaptureOperation> mScreenCaptureOperation;
         int mMaxTextureImageUnits = 0;
     };
 }

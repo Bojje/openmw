@@ -23,7 +23,6 @@ namespace Resource
 namespace SceneUtil
 {
     class WorkQueue;
-    class AsyncScreenCaptureOperation;
     class UnrefQueue;
 }
 
@@ -51,12 +50,6 @@ namespace Stereo
 namespace Files
 {
     struct ConfigurationManager;
-}
-
-namespace osgViewer
-{
-    class Viewer;
-    class ScreenCaptureHandler;
 }
 
 namespace osg
@@ -145,8 +138,6 @@ namespace OMW
         Files::PathContainer mDataDirs;
         std::vector<std::string> mArchives;
         std::filesystem::path mResDir;
-        osg::ref_ptr<osgViewer::ScreenCaptureHandler> mScreenCaptureHandler;
-        osg::ref_ptr<SceneUtil::AsyncScreenCaptureOperation> mScreenCaptureOperation;
         osg::ref_ptr<osg::Stats> mNeutralStats;
         std::string mCellName;
         std::vector<std::string> mContentFiles;
@@ -186,7 +177,6 @@ namespace OMW
         Engine& operator=(const Engine&);
 
         void executeLocalScripts();
-        osgViewer::Viewer* getOsgViewer() const;
         osg::Stats* getOsgStats() const;
 
         bool frame(unsigned frameNumber, float dt);

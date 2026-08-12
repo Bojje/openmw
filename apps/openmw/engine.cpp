@@ -240,12 +240,6 @@ void OMW::Engine::executeLocalScripts()
     }
 }
 
-osgViewer::Viewer* OMW::Engine::getOsgViewer() const
-{
-    const auto* const lifecycle = dynamic_cast<const MWRender::ViewerFrameLifecycle*>(mFrameLifecycle.get());
-    return lifecycle ? lifecycle->viewer() : nullptr;
-}
-
 osg::Stats* OMW::Engine::getOsgStats() const
 {
     const auto* const lifecycle = dynamic_cast<const MWRender::ViewerFrameLifecycle*>(mFrameLifecycle.get());
@@ -446,7 +440,6 @@ bool OMW::Engine::frame(unsigned frameNumber, float frametime)
 OMW::Engine::Engine(Files::ConfigurationManager& configurationManager)
     : mWindow(nullptr)
     , mEncoding(ToUTF8::WINDOWS_1252)
-    , mScreenCaptureOperation(nullptr)
     , mStereoManager(nullptr)
     , mSkipMenu(false)
     , mUseSound(true)
@@ -481,13 +474,6 @@ OMW::Engine::Engine(Files::ConfigurationManager& configurationManager)
 
 OMW::Engine::~Engine()
 {
-    if (mScreenCaptureOperation != nullptr)
-    {
-        mScreenCaptureOperation->stop();
-        mScreenCaptureOperation = nullptr;
-    }
-    mScreenCaptureHandler = nullptr;
-
     mMechanicsManager = nullptr;
     mDialogueManager = nullptr;
     mJournal = nullptr;
@@ -505,10 +491,9 @@ OMW::Engine::~Engine()
 
     mScriptContext = nullptr;
 
+    mFrameLifecycle = nullptr;
     mUnrefQueue = nullptr;
     mWorkQueue = nullptr;
-
-    mFrameLifecycle = nullptr;
     mResourceSystem.reset();
 
     mEncoder = nullptr;
@@ -826,14 +811,10 @@ void OMW::Engine::prepareEngine()
     mWorkQueue = new SceneUtil::WorkQueue(Settings::cells().mPreloadNumThreads);
     mUnrefQueue = std::make_unique<SceneUtil::UnrefQueue>();
 
-    mScreenCaptureOperation = new SceneUtil::AsyncScreenCaptureOperation(mWorkQueue,
-        new SceneUtil::WriteScreenshotToFileOperation(mCfgMgr.getScreenshotPath(),
-            Settings::general().mScreenshotFormat,
-            Settings::general().mNotifyOnSavedScreenshot ? std::function<void(std::string)>(ScreenCaptureMessageBox{})
-                                                         : std::function<void(std::string)>(IgnoreString{})));
-
-    mScreenCaptureHandler = new osgViewer::ScreenCaptureHandler(mScreenCaptureOperation);
-    viewer->addEventHandler(mScreenCaptureHandler);
+    viewerLifecycle->initializeScreenCapture(mWorkQueue, mCfgMgr.getScreenshotPath(),
+        Settings::general().mScreenshotFormat,
+        Settings::general().mNotifyOnSavedScreenshot ? std::function<void(std::string)>(ScreenCaptureMessageBox{})
+                                                     : std::function<void(std::string)>(IgnoreString{}));
 
     mL10nManager = std::make_unique<L10n::Manager>(mVFS.get());
     mL10nManager->setPreferredLocales(Settings::general().mPreferredLocales, Settings::general().mGmstOverridesL10n);
@@ -922,12 +903,8 @@ void OMW::Engine::prepareEngine()
             context->resized(x, y, width, height);
         viewer->getEventQueue()->windowResize(x, y, width, height);
     };
-    mInputManager = std::make_unique<MWInput::InputManager>(mWindow, std::move(inputCallbacks), [this] {
-        osgViewer::Viewer* const captureViewer = getOsgViewer();
-        if (!mScreenCaptureHandler || !captureViewer)
-            return;
-        mScreenCaptureHandler->setFramesToCapture(1);
-        mScreenCaptureHandler->captureNextFrame(*captureViewer);
+    mInputManager = std::make_unique<MWInput::InputManager>(mWindow, std::move(inputCallbacks), [viewerLifecycle] {
+        viewerLifecycle->captureNextFrame();
     }, keybinderUser,
         keybinderUserExists, userGameControllerdb, gameControllerdb, mGrab);
     mEnvironment.setInputManager(*mInputManager);
