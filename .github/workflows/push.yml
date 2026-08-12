@@ -203,6 +203,11 @@ jobs:
           echo "neutral world bootstrap must not construct or reach back into OSG renderer services"
           exit 1
         fi
+        if ! sed -n '/void World::adjustSky/,/^    }$/p' apps/openmw/mwworld/worldimp.cpp \
+            | rg -n 'if[[:space:]]*\(!mRendering\)'; then
+          echo "World::adjustSky must remain safe before an OSG renderer is initialized"
+          exit 1
+        fi
         if rg -n 'mRendering\.getTerrainStorage\(\)' apps/openmw/mwworld/scene.cpp; then
           echo "Scene neutral terrain paths must use their injected RenderStorage contract"
           exit 1

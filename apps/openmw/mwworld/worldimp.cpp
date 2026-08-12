@@ -187,6 +187,9 @@ namespace MWWorld
 
     void World::adjustSky()
     {
+        if (!mRendering)
+            return;
+
         if (mSky && (isCellExterior() || isCellQuasiExterior()))
         {
             mRendering->setSkyEnabled(true);
