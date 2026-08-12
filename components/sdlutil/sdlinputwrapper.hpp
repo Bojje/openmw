@@ -1,25 +1,27 @@
 #ifndef OPENMW_COMPONENTS_SDLUTIL_SDLINPUTWRAPPER_H
 #define OPENMW_COMPONENTS_SDLUTIL_SDLINPUTWRAPPER_H
 
-#include <osg/ref_ptr>
-
 #include <SDL_events.h>
 #include <SDL_version.h>
 
-#include "events.hpp"
+#include <functional>
 
-namespace osgViewer
-{
-    class Viewer;
-}
+#include "events.hpp"
 
 namespace SDLUtil
 {
+    struct InputCallbacks
+    {
+        std::function<void()> frame;
+        std::function<void(int, bool)> functionKey;
+        std::function<void(int, int, int, int)> resize;
+    };
+
     /// \brief A wrapper around SDL's event queue, mostly used for handling input-related events.
     class InputWrapper
     {
     public:
-        InputWrapper(SDL_Window* window, osg::ref_ptr<osgViewer::Viewer> viewer, bool grab);
+        InputWrapper(SDL_Window* window, InputCallbacks callbacks, bool grab);
         ~InputWrapper();
 
         void setMouseEventCallback(MouseListener* listen) { mMouseListener = listen; }
@@ -50,7 +52,7 @@ namespace SDLUtil
         void _setWindowScale();
 
         SDL_Window* mSDLWindow;
-        osg::ref_ptr<osgViewer::Viewer> mViewer;
+        InputCallbacks mCallbacks;
 
         MouseListener* mMouseListener;
         SensorListener* mSensorListener;

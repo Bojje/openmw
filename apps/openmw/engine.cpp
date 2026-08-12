@@ -10,6 +10,7 @@
 
 #include <osgDB/ReaderWriter>
 #include <osgDB/Registry>
+#include <osgGA/GUIEventAdapter>
 #include <osg/Stats>
 #include <osg/Timer>
 #include <osgViewer/Viewer>
@@ -883,7 +884,26 @@ void OMW::Engine::prepareEngine()
         });
     mEnvironment.setWindowManager(*mWindowManager);
 
-    mInputManager = std::make_unique<MWInput::InputManager>(mWindow, mViewer, mScreenCaptureHandler, keybinderUser,
+    SDLUtil::InputCallbacks inputCallbacks;
+    if (mViewer)
+    {
+        osgViewer::Viewer* const viewer = mViewer;
+        inputCallbacks.frame = [viewer] { viewer->getEventQueue()->frame(0.f); };
+        inputCallbacks.functionKey = [viewer](int key, bool pressed) {
+            const int osgKey = osgGA::GUIEventAdapter::KEY_F1 + (key - SDLK_F1);
+            if (pressed)
+                viewer->getEventQueue()->keyPress(osgKey);
+            else
+                viewer->getEventQueue()->keyRelease(osgKey);
+        };
+        inputCallbacks.resize = [viewer](int x, int y, int width, int height) {
+            if (osg::GraphicsContext* const context = viewer->getCamera()->getGraphicsContext())
+                context->resized(x, y, width, height);
+            viewer->getEventQueue()->windowResize(x, y, width, height);
+        };
+    }
+    mInputManager = std::make_unique<MWInput::InputManager>(mWindow, std::move(inputCallbacks), mViewer,
+        mScreenCaptureHandler, keybinderUser,
         keybinderUserExists, userGameControllerdb, gameControllerdb, mGrab);
     mEnvironment.setInputManager(*mInputManager);
 

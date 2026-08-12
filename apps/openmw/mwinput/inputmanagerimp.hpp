@@ -7,6 +7,7 @@
 #include <osgViewer/ViewerEventHandlers>
 
 #include <components/sdlutil/events.hpp>
+#include <components/sdlutil/sdlinputwrapper.hpp>
 #include <components/settings/settings.hpp>
 #include <filesystem>
 
@@ -22,11 +23,6 @@ namespace MWWorld
 namespace MWBase
 {
     class WindowManager;
-}
-
-namespace SDLUtil
-{
-    class InputWrapper;
 }
 
 struct SDL_Window;
@@ -48,7 +44,8 @@ namespace MWInput
     class InputManager final : public MWBase::InputManager
     {
     public:
-        InputManager(SDL_Window* window, osg::ref_ptr<osgViewer::Viewer> viewer,
+        InputManager(SDL_Window* window, SDLUtil::InputCallbacks inputCallbacks,
+            osg::ref_ptr<osgViewer::Viewer> viewer,
             osg::ref_ptr<osgViewer::ScreenCaptureHandler> screenCaptureHandler, const std::filesystem::path& userFile,
             bool userFileExists, const std::filesystem::path& userControllerBindingsFile,
             const std::filesystem::path& controllerBindingsFile, bool grab);

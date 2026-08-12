@@ -3,14 +3,12 @@
 #include <components/debug/debuglog.hpp>
 #include <components/settings/values.hpp>
 
-#include <osgViewer/Viewer>
-
 namespace SDLUtil
 {
 
-    InputWrapper::InputWrapper(SDL_Window* window, osg::ref_ptr<osgViewer::Viewer> viewer, bool grab)
+    InputWrapper::InputWrapper(SDL_Window* window, InputCallbacks callbacks, bool grab)
         : mSDLWindow(window)
-        , mViewer(std::move(viewer))
+        , mCallbacks(std::move(callbacks))
         , mMouseListener(nullptr)
         , mSensorListener(nullptr)
         , mKeyboardListener(nullptr)
@@ -54,7 +52,8 @@ namespace SDLUtil
 
     void InputWrapper::capture(bool windowEventsOnly)
     {
-        mViewer->getEventQueue()->frame(0.f);
+        if (mCallbacks.frame)
+            mCallbacks.frame();
 
         SDL_PumpEvents();
 
@@ -122,8 +121,8 @@ namespace SDLUtil
 
                     if (!isModifierHeld(KMOD_ALT) && evt.key.keysym.sym >= SDLK_F1 && evt.key.keysym.sym <= SDLK_F12)
                     {
-                        mViewer->getEventQueue()->keyPress(
-                            osgGA::GUIEventAdapter::KEY_F1 + (evt.key.keysym.sym - SDLK_F1));
+                        if (mCallbacks.functionKey)
+                            mCallbacks.functionKey(evt.key.keysym.sym, true);
                     }
 
                     break;
@@ -134,8 +133,8 @@ namespace SDLUtil
 
                         if (!isModifierHeld(KMOD_ALT) && evt.key.keysym.sym >= SDLK_F1
                             && evt.key.keysym.sym <= SDLK_F12)
-                            mViewer->getEventQueue()->keyRelease(
-                                osgGA::GUIEventAdapter::KEY_F1 + (evt.key.keysym.sym - SDLK_F1));
+                            if (mCallbacks.functionKey)
+                                mCallbacks.functionKey(evt.key.keysym.sym, false);
                     }
 
                     break;
@@ -268,9 +267,8 @@ namespace SDLUtil
                 if (w == 0 && h == 0)
                     return;
 
-                mViewer->getCamera()->getGraphicsContext()->resized(x, y, w, h);
-
-                mViewer->getEventQueue()->windowResize(x, y, w, h);
+                if (mCallbacks.resize)
+                    mCallbacks.resize(x, y, w, h);
 
                 if (mWindowListener)
                     mWindowListener->windowResized(w, h);

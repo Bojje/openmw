@@ -393,9 +393,13 @@ The engine now honors a failed frame submission from `World`, retrying without a
 focus, or frame statistics; this makes minimized and swapchain-recovery behavior part of the lifecycle contract.
 The engine public header no longer imports complete OSG viewer/event-handler headers; OSG declarations
 are now included only by the implementation files that use them.
+SDL input transport is now renderer-neutral as well: `InputWrapper` owns only SDL state and emits
+backend callbacks for frame events, function keys, and drawable resize. The OSG engine injects its
+viewer event-queue callbacks, leaving a future Vulkan/input owner free to provide those operations
+without linking OSG into the shared SDL input component.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-160 files, deleting 1,521 lines and adding 8,676 lines (net `+7,155`). The larger Vulkan-only
+164 files, deleting 1,551 lines and adding 8,728 lines (net `+7,177`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
