@@ -5,6 +5,7 @@
 
 #include <components/vfs/pathutil.hpp>
 
+#include "cachemanager.hpp"
 #include "objectcache.hpp"
 
 namespace VFS
@@ -21,13 +22,10 @@ namespace osg
 namespace Resource
 {
 
-    class BaseResourceManager
+    class BaseResourceManager : public CacheManager
     {
     public:
         virtual ~BaseResourceManager() = default;
-        virtual void updateCache(double referenceTime) = 0;
-        virtual void clearCache() = 0;
-        virtual void setExpiryDelay(double expiryDelay) = 0;
         virtual void reportStats(unsigned int frameNumber, osg::Stats* stats) const = 0;
         virtual void releaseGLObjects(osg::State* state) = 0;
     };

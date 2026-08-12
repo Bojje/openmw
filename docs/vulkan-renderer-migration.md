@@ -423,10 +423,11 @@ an OSG capability field outside the active frame owner.
 World bootstrap now rejects any non-OSG lifecycle before entering `initOsgRenderer`, making the
 remaining missing Vulkan game-owner path explicit instead of allowing an accidental mixed setup.
 The shared NIF file and converted-mesh caches now use a renderer-neutral `CacheManager` lifecycle;
-only OSG-owned resource managers remain in the `BaseResourceManager` list. Cache expiry, clearing,
-and statistics preserve the existing behavior, while the neutral cache headers no longer import the
-OSG resource-manager interface. CI checks this boundary so the Vulkan resource path cannot regain
-an OSG cache dependency accidentally.
+`BaseResourceManager` extends that same contract and adds only OSG statistics/release hooks. Only
+OSG-owned resource managers remain in the OSG manager list. Cache expiry, clearing, and statistics
+preserve the existing behavior, while the neutral cache headers no longer import the OSG
+resource-manager interface. CI checks this boundary so the Vulkan resource path cannot regain an
+OSG cache dependency accidentally.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
 174 files, deleting 1,974 lines and adding 9,190 lines (net `+7,216`). The larger Vulkan-only
