@@ -1297,32 +1297,6 @@ namespace MWWorld
             return *meshes;
         };
 
-        mNeutralWorldScene->updateDynamicPoses([&](const void*, const Render::WorldObject& object) {
-            const std::vector<Render::MeshInstance>& meshes = resolveMeshes(object.model);
-            const auto skinned = std::find_if(meshes.begin(), meshes.end(), [](const Render::MeshInstance& mesh) {
-                return mesh.mesh.skinning && !mesh.mesh.skinning->boneNames.empty();
-            });
-            if (skinned == meshes.end())
-                return std::vector<Render::Mat4>();
-
-            for (const Render::MeshInstance& mesh : meshes)
-            {
-                if (mesh.mesh.skinning
-                    && (mesh.mesh.skinning->boneNames.empty()
-                        || mesh.mesh.skinning->boneNames != skinned->mesh.skinning->boneNames))
-                    return std::vector<Render::Mat4>();
-            }
-
-            const auto bindPose = [&] {
-                std::vector<Render::Mat4> result;
-                result.reserve(skinned->mesh.skinning->inverseBindMatrices.size());
-                for (const Render::Mat4& inverseBind : skinned->mesh.skinning->inverseBindMatrices)
-                    result.push_back(Render::invertMat4(inverseBind));
-                return result;
-            };
-            return bindPose();
-        });
-
         Render::SceneSubmission result = Render::collectSceneSubmission(
             *mNeutralWorldScene, mNeutralWorldScene->sceneData(), mNeutralWorldScene->activeWorldspace(), resolveMeshes,
             true);

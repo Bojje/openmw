@@ -307,6 +307,28 @@ namespace Render
                     for (const MeshInstance& mesh : resolvedMeshes)
                         dynamic.meshes.push_back(transformMeshInstance(object, mesh));
                 }
+                if (dynamic.boneMatrices.empty())
+                {
+                    const auto skinned = std::find_if(dynamic.meshes.begin(), dynamic.meshes.end(),
+                        [](const MeshInstance& mesh) {
+                            return mesh.mesh.skinning && !mesh.mesh.skinning->boneNames.empty();
+                        });
+                    if (skinned != dynamic.meshes.end())
+                    {
+                        const bool compatible = std::all_of(dynamic.meshes.begin(), dynamic.meshes.end(),
+                            [&](const MeshInstance& mesh) {
+                                return !mesh.mesh.skinning
+                                    || (!mesh.mesh.skinning->boneNames.empty()
+                                        && mesh.mesh.skinning->boneNames == skinned->mesh.skinning->boneNames);
+                            });
+                        if (compatible)
+                        {
+                            dynamic.boneMatrices.reserve(skinned->mesh.skinning->inverseBindMatrices.size());
+                            for (const Mat4& inverseBind : skinned->mesh.skinning->inverseBindMatrices)
+                                dynamic.boneMatrices.push_back(invertMat4(inverseBind));
+                        }
+                    }
+                }
                 result.dynamicMeshes.push_back(std::move(dynamic));
             }
 

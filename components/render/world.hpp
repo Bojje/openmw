@@ -329,21 +329,6 @@ namespace Render
             return true;
         }
 
-        template <class ResolvePose>
-        void updateDynamicPoses(ResolvePose&& resolvePose)
-        {
-            for (const auto& [objectKey, location] : mObjects)
-            {
-                const auto scene = mCells.find(location.cell);
-                if (scene == mCells.end())
-                    continue;
-                WorldObject* object = scene->second.findObject(location.id);
-                if (object == nullptr || !object->dynamic)
-                    continue;
-                object->boneMatrices = resolvePose(objectKey, *object);
-            }
-        }
-
         // Sorting the owned cells makes backend input deterministic without
         // maintaining a second cell-order index.
         std::vector<const CellScene*> cellsInOrder(std::string_view worldspace = {}) const
