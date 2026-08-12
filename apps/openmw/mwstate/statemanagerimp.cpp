@@ -1,7 +1,10 @@
 #include "statemanagerimp.hpp"
 
+#ifndef OPENMW_NEUTRAL_JPEG
 #include <cstring>
+#endif
 #include <filesystem>
+#include <fstream>
 
 #include <SDL_clipboard.h>
 
@@ -20,11 +23,15 @@
 #include <components/files/conversion.hpp>
 #include <components/misc/algorithm.hpp>
 #include <components/render/texture.hpp>
+#ifdef OPENMW_NEUTRAL_JPEG
+#include <components/render/jpeg.hpp>
+#endif
 #include <components/settings/values.hpp>
 
+#ifndef OPENMW_NEUTRAL_JPEG
 #include <osg/Image>
-
 #include <osgDB/Registry>
+#endif
 
 #include "../mwbase/dialoguemanager.hpp"
 #include "../mwbase/environment.hpp"
@@ -858,6 +865,21 @@ bool MWState::StateManager::confirmLoading(const std::vector<std::string_view>& 
 
 void MWState::StateManager::writeScreenshot(std::vector<char>& imageData) const
 {
+#ifdef OPENMW_NEUTRAL_JPEG
+    MWBase::World* const world = MWBase::Environment::get().getWorld();
+    const std::optional<Render::TextureData> captured = world->captureFrame();
+    if (!captured || !captured->valid())
+    {
+        Log(Debug::Warning) << "Unable to capture Vulkan savegame thumbnail before a frame was presented";
+        return;
+    }
+    if (!Render::writeJpeg(*captured, imageData))
+    {
+        Log(Debug::Warning) << "Unable to encode Vulkan savegame thumbnail as JPEG";
+        return;
+    }
+    return;
+#else
     int screenshotW = 259 * 2, screenshotH = 133 * 2; // *2 to get some nice antialiasing
 
     osg::ref_ptr<osg::Image> screenshot(new osg::Image);
@@ -865,11 +887,20 @@ void MWState::StateManager::writeScreenshot(std::vector<char>& imageData) const
     const std::optional<Render::TextureData> captured = world->captureFrame();
     if (captured && captured->valid())
     {
+#ifdef OPENMW_NEUTRAL_JPEG
+        if (!Render::writeJpeg(*captured, imageData))
+        {
+            Log(Debug::Warning) << "Unable to encode Vulkan savegame thumbnail as JPEG";
+            return;
+        }
+        return;
+#else
         auto* const pixels = new unsigned char[captured->pixels.size()];
         std::memcpy(pixels, captured->pixels.data(), captured->pixels.size());
         screenshot->setImage(static_cast<int>(captured->width), static_cast<int>(captured->height), 1, GL_RGBA, GL_RGBA,
             GL_UNSIGNED_BYTE, pixels, osg::Image::USE_NEW_DELETE);
         screenshot->scaleImage(screenshotW, screenshotH, 1);
+#endif
     }
     else if (world->getRenderingManager() != nullptr)
         world->getRenderingManager()->screenshot(screenshot.get(), screenshotW, screenshotH);
@@ -896,4 +927,5 @@ void MWState::StateManager::writeScreenshot(std::vector<char>& imageData) const
 
     std::string data = ostream.str();
     imageData = std::vector<char>(data.begin(), data.end());
+#endif
 }

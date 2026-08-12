@@ -1,9 +1,4 @@
 #include <array>
-#ifdef OPENMW_NEUTRAL_JPEG
-#include <csetjmp>
-#include <cstdio>
-#include <jpeglib.h>
-#endif
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
@@ -12,6 +7,9 @@
 #include <components/files/collections.hpp>
 #include <components/resource/neutraltexturemanager.hpp>
 #include <components/resource/resourcesystem.hpp>
+#ifdef OPENMW_NEUTRAL_JPEG
+#include <components/render/jpeg.hpp>
+#endif
 #include <components/toutf8/toutf8.hpp>
 #include <components/vfs/manager.hpp>
 #include <components/vfs/registerarchives.hpp>
@@ -112,55 +110,6 @@ namespace
 #endif
 
 #ifdef OPENMW_NEUTRAL_JPEG
-    struct JpegTestError
-    {
-        jpeg_error_mgr manager;
-        jmp_buf jump;
-    };
-
-    void jpegTestErrorExit(j_common_ptr cinfo)
-    {
-        auto* const error = reinterpret_cast<JpegTestError*>(cinfo->err);
-        longjmp(error->jump, 1);
-    }
-
-    void writeTestJpeg(const std::filesystem::path& path)
-    {
-        FILE* const file = std::fopen(path.string().c_str(), "wb");
-        if (!file)
-            throw std::runtime_error("could not open neutral JPEG test file");
-
-        jpeg_compress_struct jpeg{};
-        JpegTestError error{};
-        jpeg.err = jpeg_std_error(&error.manager);
-        error.manager.error_exit = jpegTestErrorExit;
-        bool created = false;
-        if (setjmp(error.jump) != 0)
-        {
-            if (created)
-                jpeg_destroy_compress(&jpeg);
-            std::fclose(file);
-            throw std::runtime_error("could not encode neutral JPEG test file");
-        }
-
-        jpeg_create_compress(&jpeg);
-        created = true;
-        jpeg_stdio_dest(&jpeg, file);
-        jpeg.image_width = 1;
-        jpeg.image_height = 1;
-        jpeg.input_components = 1;
-        jpeg.in_color_space = JCS_GRAYSCALE;
-        jpeg_set_defaults(&jpeg);
-        jpeg_set_quality(&jpeg, 100, TRUE);
-        jpeg_start_compress(&jpeg, TRUE);
-        JSAMPLE pixel = 127;
-        JSAMPROW row = &pixel;
-        jpeg_write_scanlines(&jpeg, &row, 1);
-        jpeg_finish_compress(&jpeg);
-        jpeg_destroy_compress(&jpeg);
-        std::fclose(file);
-    }
-
     void testNeutralJpegTexture()
     {
         const std::filesystem::path root = std::filesystem::temp_directory_path() / "openmw-neutral-jpeg-test";
@@ -169,7 +118,14 @@ namespace
         std::filesystem::create_directories(root / "textures", error);
         if (error)
             throw std::runtime_error("could not create neutral JPEG test directory");
-        writeTestJpeg(root / "textures/test.jpg");
+        Render::TextureData source{ .width = 1, .height = 1, .pixels = { 127, 127, 127, 255 } };
+        std::vector<char> encoded;
+        if (!Render::writeJpeg(source, encoded))
+            throw std::runtime_error("could not encode neutral JPEG test file");
+        {
+            std::ofstream output(root / "textures/test.jpg", std::ios::binary);
+            output.write(encoded.data(), static_cast<std::streamsize>(encoded.size()));
+        }
 
         const ToUTF8::Utf8Encoder encoder(ToUTF8::WINDOWS_1252);
         VFS::Manager vfs;
