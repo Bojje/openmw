@@ -2084,6 +2084,9 @@ namespace MWWorld
 
     MWWorld::Ptr World::placeObject(const MWWorld::Ptr& object, float cursorX, float cursorY, int amount, bool copy)
     {
+        if (!mRendering)
+            return {};
+
         const float maxDist = 200.f;
 
         MWRender::RenderingManager::RayResult result
@@ -2117,6 +2120,9 @@ namespace MWWorld
 
     bool World::canPlaceObject(float cursorX, float cursorY)
     {
+        if (!mRendering)
+            return false;
+
         const float maxDist = 200.f;
         MWRender::RenderingManager::RayResult result
             = mRendering->castCameraToViewportRay(cursorX, cursorY, maxDist, true, true, false);
@@ -2223,9 +2229,10 @@ namespace MWWorld
 
         float len = 1000000.0;
 
-        MWRender::RenderingManager::RayResult result = mRendering->castRay(orig, orig + dir * len, true, true, false);
+        MWPhysics::RayCastingResult result;
+        castRenderingRay(result, orig, orig + dir * len, true, true, false, {});
         if (result.mHit)
-            pos.pos[2] = result.mHitPointWorld.z();
+            pos.pos[2] = result.mHitPos.z();
 
         // copy the object and set its count
         Ptr dropped
@@ -3131,8 +3138,8 @@ namespace MWWorld
                         * osg::Quat(actor.getRefData().getPosition().rot[2], osg::Vec3f(0, 0, -1));
                     const osg::Vec3f direction = orient * osg::Vec3f(0, 1, 0);
                     const osg::Vec3f dest = origin + direction * getMaxActivationDistance();
-                    const MWRender::RenderingManager::RayResult result
-                        = mRendering->castRay(origin, dest, true, true, false);
+                    MWPhysics::RayCastingResult result;
+                    castRenderingRay(result, origin, dest, true, true, false, {});
                     if (result.mHit)
                         target = result.mHitObject;
                 }
@@ -3806,6 +3813,9 @@ namespace MWWorld
     std::filesystem::path World::exportSceneGraph(const Ptr& ptr)
     {
         auto file = mUserDataPath / "openmw.osgt";
+        if (!mRendering)
+            return file;
+
         if (!ptr.isEmpty())
         {
             mRendering->pagingBlacklistObject(mStore.find(ptr.getCellRef().getRefId()), ptr);
@@ -3838,12 +3848,14 @@ namespace MWWorld
         const osg::Vec3f& worldPos, float scale, bool isMagicVFX, bool useAmbientLight, std::string_view effectId,
         bool loop)
     {
-        mRendering->spawnEffect(model, textureOverride, worldPos, scale, isMagicVFX, useAmbientLight, effectId, loop);
+        if (mRendering)
+            mRendering->spawnEffect(model, textureOverride, worldPos, scale, isMagicVFX, useAmbientLight, effectId, loop);
     }
 
     void World::removeEffect(std::string_view effectId)
     {
-        mRendering->removeEffect(effectId);
+        if (mRendering)
+            mRendering->removeEffect(effectId);
     }
 
     struct ResetActorsVisitor
