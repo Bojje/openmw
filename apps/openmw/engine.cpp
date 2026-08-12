@@ -782,19 +782,10 @@ void OMW::Engine::go()
                                 << "\": " << std::generic_category().message(errno);
     }
 
-    if (osgViewer::Viewer* const viewer = getOsgViewer())
-    {
-        // Setup OSG profiler and resource event handlers only for the reference renderer.
-        osg::ref_ptr<Resource::Profiler> statsHandler = new Resource::Profiler(stats.is_open(), *mVFS);
-        initStatsHandler(*statsHandler);
-        viewer->addEventHandler(statsHandler);
-
-        osg::ref_ptr<Resource::StatsHandler> resourcesHandler = new Resource::StatsHandler(stats.is_open(), *mVFS);
-        viewer->addEventHandler(resourcesHandler);
-
-        if (stats.is_open())
-            Resource::collectStatistics(*viewer);
-    }
+    auto* const statsLifecycle = dynamic_cast<MWRender::ViewerFrameLifecycle*>(mFrameLifecycle.get());
+    if (!statsLifecycle)
+        throw std::logic_error("OSG statistics setup requires the OSG frame lifecycle");
+    statsLifecycle->initializeStatsHandlers(*mVFS, stats.is_open(), initStatsHandler);
 
     // Start the game
     if (!mSaveGameFile.empty())

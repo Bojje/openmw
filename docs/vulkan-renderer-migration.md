@@ -422,6 +422,10 @@ The lifecycle also retains the discovered OpenGL texture-unit capability; `Engin
 an OSG capability field outside the active frame owner.
 World bootstrap now rejects any non-OSG lifecycle before entering `initOsgRenderer`, making the
 remaining missing Vulkan game-owner path explicit instead of allowing an accidental mixed setup.
+The OSG profiler and resource-statistics event handlers are now installed by
+`ViewerFrameLifecycle`; `Engine` supplies only the existing profiler configuration callback. This
+keeps viewer event-handler ownership with the OSG frame owner and leaves the future Vulkan owner
+free to provide a different statistics/presentation implementation.
 The shared NIF file and converted-mesh caches now use a renderer-neutral `CacheManager` lifecycle;
 `BaseResourceManager` extends that same contract and adds only OSG statistics/release hooks. Only
 OSG-owned resource managers remain in the OSG manager list. Cache expiry, clearing, and statistics
@@ -430,7 +434,7 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-175 files, deleting 1,969 lines and adding 9,173 lines (net `+7,204`). The larger Vulkan-only
+175 files, deleting 1,971 lines and adding 9,194 lines (net `+7,223`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.

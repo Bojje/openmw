@@ -18,6 +18,7 @@
 #include <components/debug/debuglog.hpp>
 #include <components/debug/gldebug.hpp>
 #include <components/render/textureconversion.hpp>
+#include <components/resource/stats.hpp>
 #include <components/sceneutil/color.hpp>
 #include <components/sceneutil/depth.hpp>
 #include <components/sceneutil/glextensions.hpp>
@@ -256,6 +257,20 @@ namespace MWRender
         mViewer->getEventQueue()->getCurrentEventState()->setWindowRectangle(
             0, 0, graphicsWindow->getTraits()->width, graphicsWindow->getTraits()->height);
         mMaxTextureImageUnits = identifyOp->getMaxTextureImageUnits();
+    }
+
+    void ViewerFrameLifecycle::initializeStatsHandlers(
+        const VFS::Manager& vfs, bool writeToFile, const std::function<void(Resource::Profiler&)>& configureProfiler)
+    {
+        osg::ref_ptr<Resource::Profiler> statsHandler = new Resource::Profiler(writeToFile, vfs);
+        configureProfiler(*statsHandler);
+        mViewer->addEventHandler(statsHandler);
+
+        osg::ref_ptr<Resource::StatsHandler> resourcesHandler = new Resource::StatsHandler(writeToFile, vfs);
+        mViewer->addEventHandler(resourcesHandler);
+
+        if (writeToFile)
+            Resource::collectStatistics(*mViewer);
     }
 
     bool ViewerFrameLifecycle::renderFrame()

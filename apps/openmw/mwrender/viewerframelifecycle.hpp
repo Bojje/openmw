@@ -2,6 +2,7 @@
 #define OPENMW_MWRENDER_VIEWER_FRAME_LIFECYCLE_H
 
 #include <filesystem>
+#include <functional>
 #include <osg/ref_ptr>
 
 #include <components/render/frame.hpp>
@@ -11,12 +12,22 @@ namespace osgViewer
     class Viewer;
 }
 
+namespace Resource
+{
+    class Profiler;
+}
+
 namespace osg
 {
     class Group;
 }
 
 struct SDL_Window;
+
+namespace VFS
+{
+    class Manager;
+}
 
 namespace MWRender
 {
@@ -36,6 +47,8 @@ namespace MWRender
         // Create and realize the OSG window owned by this lifecycle. The
         // engine receives only the resulting SDL handle and GL capability.
         void initializeWindow(SDL_Window*& window, const std::filesystem::path& resourceDirectory);
+        void initializeStatsHandlers(const VFS::Manager& vfs, bool writeToFile,
+            const std::function<void(Resource::Profiler&)>& configureProfiler);
         int maxTextureImageUnits() const { return mMaxTextureImageUnits; }
         osg::Group* sceneRoot();
 
