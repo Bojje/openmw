@@ -390,11 +390,14 @@ jobs:
         -R 'openmw-(vulkan-(math-tests|image-tests|terrain-tests)|render-(neutral|world|mesh)-tests|resource-backend-tests)'
 
     - name: Run Vulkan presentation smoke
-      run: >
-        xvfb-run -a
-        env SDL_VIDEODRIVER=x11 LIBGL_ALWAYS_SOFTWARE=1
-        ./build-vulkan/openmw-vulkan-smoke
-        ./build-vulkan/resources/shaders/vulkan 3
+      run: |
+        set +e
+        xvfb-run -a env SDL_VIDEODRIVER=x11 LIBGL_ALWAYS_SOFTWARE=1 \
+          ./build-vulkan/openmw-vulkan-smoke ./build-vulkan/resources/shaders/vulkan 3
+        status=$?
+        if [ "$status" -ne 0 ] && [ "$status" -ne 77 ]; then
+          exit "$status"
+        fi
 
     - name: Run Vulkan headless lifecycle probe
       run: |

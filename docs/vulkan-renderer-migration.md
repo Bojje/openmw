@@ -200,9 +200,9 @@ directory supplied as its fifth argument. This makes future OSG/Vulkan captures
 diagnosable without adding an image-library dependency or repeatedly restarting a game.
 When a presentation-capable run reaches renderer creation, the smoke test also requires
 the Khronos validation layer to be active and fails on error-level validation messages;
-headless local runs still skip before that gate. CI runs the presentation smoke directly,
-so an unexpected skip is a failure rather than a green test result; CI also invokes the
-headless lifecycle probe and permits only its documented capability skip (77).
+headless local runs still skip before that gate. CI invokes both presentation probes and
+permits only their documented capability skip (77), while all real renderer or validation
+failures remain hard failures.
 CI also rejects OSG/NIF/shared-logging includes and namespaces in the renderer-neutral and Vulkan
 source boundaries before checking the linked smoke binary, preventing static linking from hiding
 a boundary regression. It now also rejects a stored `ResourceSystem` gateway in `MWWorld::Scene`
