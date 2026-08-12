@@ -30,8 +30,9 @@ namespace MWRender
     /// Terrain data source for the neutral renderer.
     ///
     /// This class reads ESM records directly and owns no OSG terrain objects.
-    /// It currently implements the TES3 landscape format; ESM4 layer mapping
-    /// remains a separate migration step.
+    /// It supports both TES3 landscape records and ESM4 world/layer mapping;
+    /// terrain quadtree streaming and complete image coverage remain backend
+    /// parity work rather than storage-contract dependencies.
     class NeutralTerrainStorage final : public Terrain::RenderStorage
     {
     public:
