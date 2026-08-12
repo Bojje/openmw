@@ -1013,6 +1013,9 @@ namespace MWWorld
 
     osg::Matrixf World::getActorHeadTransform(const MWWorld::ConstPtr& actor) const
     {
+        if (!mRendering)
+            return osg::Matrixf::translate(actor.getRefData().getPosition().asVec3());
+
         const MWRender::Animation* anim = mRendering->getAnimation(actor);
         if (anim)
         {
@@ -1386,12 +1389,14 @@ namespace MWWorld
 
     void World::rotateWorldObject(const Ptr& ptr, const osg::Quat& rotate)
     {
-        if (ptr.getRefData().getBaseNode() != nullptr)
+        if (mWorldScene && (mRendering == nullptr || ptr.getRefData().getBaseNode() != nullptr))
         {
-            mRendering->pagingBlacklistObject(mStore.find(ptr.getCellRef().getRefId()), ptr);
+            if (mRendering)
+                mRendering->pagingBlacklistObject(mStore.find(ptr.getCellRef().getRefId()), ptr);
             mWorldScene->removeFromPagedRefs(ptr);
 
-            mRendering->rotateObject(ptr, rotate);
+            if (mRendering)
+                mRendering->rotateObject(ptr, rotate);
             mWorldScene->updateNeutralObjectRotation(static_cast<const void*>(ptr.mRef),
                 toRenderQuat(rotate));
             mPhysics->updateRotation(ptr, rotate);
@@ -2423,6 +2428,9 @@ namespace MWWorld
 
     MWRender::Animation* World::getAnimation(const MWWorld::Ptr& ptr)
     {
+        if (!mRendering)
+            return nullptr;
+
         auto* animation = mRendering->getAnimation(ptr);
         if (!animation)
         {
@@ -2436,6 +2444,8 @@ namespace MWWorld
 
     const MWRender::Animation* World::getAnimation(const MWWorld::ConstPtr& ptr) const
     {
+        if (!mRendering)
+            return nullptr;
         return mRendering->getAnimation(ptr);
     }
 
