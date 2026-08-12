@@ -503,8 +503,15 @@ namespace MWWorld
         const int cellY = cell.getCell()->getGridY();
         const MWWorld::Cell& cellVariant = *cell.getCell();
         ESM::RefId worldspace = cellVariant.getWorldSpace();
+        std::optional<Render::WaterSurface> water;
+        if (cellVariant.isExterior())
+        {
+            const float cellSize = static_cast<float>(Constants::CellSizeInUnits);
+            water = Render::WaterSurface{ cellX * cellSize, (cellX + 1) * cellSize,
+                cellY * cellSize, (cellY + 1) * cellSize, cell.getWaterLevel() };
+        }
         mNeutralWorldScene->recordCell(static_cast<const void*>(&cell), cellVariant.isExterior(), cellX,
-            cellY, cellVariant.getNameId(), worldspace.serializeText());
+            cellY, cellVariant.getNameId(), worldspace.serializeText(), std::move(water));
 
         if (cellVariant.isExterior() && Settings::groundcover().mEnabled
             && worldspace == ESM::Cell::sDefaultWorldspaceId)

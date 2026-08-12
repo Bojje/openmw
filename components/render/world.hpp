@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -14,6 +15,21 @@
 
 namespace Render
 {
+    struct WaterSurface
+    {
+        float minX = 0.f;
+        float maxX = 0.f;
+        float minY = 0.f;
+        float maxY = 0.f;
+        float level = 0.f;
+
+        bool valid() const
+        {
+            return std::isfinite(minX) && std::isfinite(maxX) && std::isfinite(minY) && std::isfinite(maxY)
+                && std::isfinite(level) && minX < maxX && minY < maxY;
+        }
+    };
+
     struct ObjectTransform
     {
         Vec3 position{};
@@ -52,6 +68,7 @@ namespace Render
         std::string name;
         std::vector<WorldObject> objects;
         std::vector<TerrainTile> terrainTiles;
+        std::optional<WaterSurface> water;
 
         WorldObject* findObject(uint64_t id)
         {
@@ -93,6 +110,7 @@ namespace Render
         std::vector<TerrainRegion> mTerrainRegions;
         std::string mActiveWorldspace;
         SceneData mSceneData{};
+        bool mWaterEnabled = true;
         uint64_t mNextObjectId = 1;
 
         CellScene& ensureCell(const void* cell, bool exterior, int gridX, int gridY, std::string_view name,
@@ -142,12 +160,16 @@ namespace Render
         SceneData& sceneData() { return mSceneData; }
 
         void recordCell(const void* cellKey, bool exterior, int gridX, int gridY, std::string_view name,
-            std::string_view worldspace = {})
+            std::string_view worldspace = {}, std::optional<WaterSurface> water = {})
         {
             if (cellKey == nullptr)
                 return;
-            ensureCell(cellKey, exterior, gridX, gridY, name, worldspace);
+            ensureCell(cellKey, exterior, gridX, gridY, name, worldspace).water = std::move(water);
         }
+
+        void setWaterEnabled(bool enabled) { mWaterEnabled = enabled; }
+
+        bool waterEnabled() const { return mWaterEnabled; }
 
         void setTerrainTiles(const void* cellKey, std::vector<TerrainTile> tiles)
         {
@@ -374,6 +396,7 @@ namespace Render
             mTerrainRegions.clear();
             mActiveWorldspace.clear();
             mSceneData = {};
+            mWaterEnabled = true;
             mNextObjectId = 1;
         }
     };

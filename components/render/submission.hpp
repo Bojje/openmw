@@ -2,7 +2,9 @@
 #define OPENMW_COMPONENTS_RENDER_SUBMISSION_H
 
 #include <algorithm>
+#include <array>
 #include <cmath>
+#include <iterator>
 #include <string>
 #include <string_view>
 #include <unordered_set>
@@ -70,6 +72,46 @@ namespace Render
         return std::all_of(instance.mesh.indices.begin(), instance.mesh.indices.end(), [&](std::uint32_t index) {
             return index < instance.mesh.vertices.size();
         });
+    }
+
+    inline MeshInstance makeWaterSurfaceMesh(const WaterSurface& surface)
+    {
+        MeshInstance result;
+        result.mesh.material.diffuse = { 0.08f, 0.2f, 0.28f, 0.78f };
+        result.mesh.material.glossiness = 64.f;
+        result.mesh.material.alphaBlend = true;
+        result.mesh.material.doubleSided = true;
+        result.mesh.vertices.resize(4);
+        const std::array<Vec3, 4> positions = { Vec3{ surface.minX, surface.minY, surface.level },
+            Vec3{ surface.maxX, surface.minY, surface.level }, Vec3{ surface.maxX, surface.maxY, surface.level },
+            Vec3{ surface.minX, surface.maxY, surface.level } };
+        const std::array<std::array<float, 2>, 4> texcoords = { std::array<float, 2>{ 0.f, 0.f },
+            std::array<float, 2>{ 1.f, 0.f }, std::array<float, 2>{ 1.f, 1.f }, std::array<float, 2>{ 0.f, 1.f } };
+        for (std::size_t i = 0; i < result.mesh.vertices.size(); ++i)
+        {
+            MeshVertex& vertex = result.mesh.vertices[i];
+            vertex.position[0] = positions[i].x;
+            vertex.position[1] = positions[i].y;
+            vertex.position[2] = positions[i].z;
+            vertex.normal[2] = 1.f;
+            vertex.texcoord[0] = texcoords[i][0];
+            vertex.texcoord[1] = texcoords[i][1];
+            vertex.color[0] = vertex.color[1] = vertex.color[2] = vertex.color[3] = 1.f;
+            vertex.tangent[3] = 1.f;
+        }
+        result.mesh.indices = { 0, 1, 2, 0, 2, 3 };
+        return result;
+    }
+
+    inline std::vector<MeshInstance> collectWaterMeshes(const WorldScene& world, std::string_view worldspace = {})
+    {
+        std::vector<MeshInstance> result;
+        if (!world.waterEnabled())
+            return result;
+        for (const CellScene* cell : world.cellsInOrder(worldspace))
+            if (cell->water && cell->water->valid())
+                result.push_back(makeWaterSurfaceMesh(*cell->water));
+        return result;
     }
 
     struct DynamicMeshSubmission
@@ -213,6 +255,9 @@ namespace Render
         SceneSubmission result;
         result.scene = scene;
         result.meshes = collectWorldMeshes(world, resolveMeshes, worldspace, &result.unresolvedModels);
+        std::vector<MeshInstance> waterMeshes = collectWaterMeshes(world, worldspace);
+        result.meshes.insert(result.meshes.end(), std::make_move_iterator(waterMeshes.begin()),
+            std::make_move_iterator(waterMeshes.end()));
         for (const CellScene* cell : world.cellsInOrder(worldspace))
             for (const WorldObject& object : cell->objects)
             {

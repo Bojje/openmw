@@ -2075,7 +2075,15 @@ namespace MWWorld
 
     bool World::toggleWater()
     {
-        return mRendering && mRendering->toggleRenderMode(MWRender::Render_Water);
+        if (mRendering)
+            return mRendering->toggleRenderMode(MWRender::Render_Water);
+        if (!mWorldScene)
+            return false;
+        Render::WorldScene* const neutralScene = mWorldScene->mNeutralWorldScene.get();
+        if (!neutralScene)
+            return false;
+        neutralScene->setWaterEnabled(!neutralScene->waterEnabled());
+        return neutralScene->waterEnabled();
     }
 
     bool World::toggleWorld()

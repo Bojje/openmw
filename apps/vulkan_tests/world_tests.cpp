@@ -54,6 +54,20 @@ int main()
     if (world.findCell(&emptyCellHandle)->terrainTiles.size() != 1
         || world.findCell(&emptyCellHandle)->terrainTiles.front().lod != 0)
         throw std::runtime_error("renderer-neutral world scene failed to own terrain snapshots");
+
+    int waterCellHandle = 0;
+    world.recordCell(&waterCellHandle, true, 0, 1, "water", "Tamriel",
+        Render::WaterSurface{ 0.f, 10.f, 10.f, 20.f, 4.f });
+    const std::vector<Render::MeshInstance> waterMeshes = Render::collectWaterMeshes(world, "Tamriel");
+    if (waterMeshes.size() != 1 || waterMeshes.front().mesh.vertices.size() != 4
+        || waterMeshes.front().mesh.indices.size() != 6 || waterMeshes.front().mesh.vertices.front().position[2] != 4.f
+        || !waterMeshes.front().mesh.material.alphaBlend)
+        throw std::runtime_error("renderer-neutral world scene failed to emit a water surface");
+    world.setWaterEnabled(false);
+    if (!Render::collectWaterMeshes(world, "Tamriel").empty())
+        throw std::runtime_error("renderer-neutral world scene ignored water visibility state");
+    world.setWaterEnabled(true);
+    world.removeCell(&waterCellHandle);
     world.removeCell(&emptyCellHandle);
 
     int staticCellHandle = 0;
