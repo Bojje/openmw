@@ -274,11 +274,12 @@ namespace Render
                 {
                     if (WorldObject* object = scene->findObject(location.id))
                     {
+                        const bool modelChanged = object->model != model;
                         object->model = model;
                         object->transform = transform;
                         object->visible = visible;
                         object->dynamic = dynamic;
-                        if (!dynamic)
+                        if (!dynamic || modelChanged)
                             object->boneMatrices.clear();
                         return;
                     }

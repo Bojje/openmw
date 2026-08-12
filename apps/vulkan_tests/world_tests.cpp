@@ -130,6 +130,11 @@ int main()
         || world.findCell(&firstCellHandle)->objects.front().boneMatrices.front().data[12] != 3.f)
         throw std::runtime_error("renderer-neutral world scene failed dynamic pose ownership");
 
+    world.recordObject(&dynamicObjectHandle, &firstCellHandle, true, 1, 2, "first", "meshes/replaced.nif",
+        objectTransform, true, {}, true);
+    if (!world.findCell(&firstCellHandle)->objects.front().boneMatrices.empty())
+        throw std::runtime_error("renderer-neutral world scene retained a pose for a replaced dynamic model");
+
     int thirdCellHandle = 0;
     world.recordObject(&objectHandle, &thirdCellHandle, false, 3, 4, "third", "meshes/third.nif", objectTransform, true);
     int fourthObjectHandle = 0;

@@ -126,6 +126,8 @@ teardown, so a game/world unload cannot retain stale object identities, terrain 
 ordering.
 Dynamic `WorldObject` records now own an optional neutral bone-pose snapshot and expose an explicit
 pose-update operation; `SceneSubmission` carries that pose beside each resolved dynamic mesh. The
+scene owner invalidates that pose when a dynamic object changes model, preventing a previous skeleton's
+matrices from being applied to a replacement mesh.
 full-game Vulkan export deliberately supplies only an inverse-bind-derived bind pose until a real
 renderer-neutral animation owner exists; animation timing, live bone updates, animation-specific
 shading, and mismatched multi-part skin orders remain outstanding. NIF skinning metadata preserves
