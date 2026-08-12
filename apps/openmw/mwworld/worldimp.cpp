@@ -279,6 +279,8 @@ namespace MWWorld
             throw std::invalid_argument("The OSG world renderer requires OSG resource services");
         if (!mPhysics || !mNavigator)
             throw std::logic_error("World simulation must be initialized before its renderer");
+        if (mRendering || mWorldScene)
+            throw std::logic_error("World renderer services have already been initialized");
         if (!mResourceSystem->getSceneManager())
             throw std::logic_error("The OSG world renderer requires OSG resource services");
 
@@ -334,7 +336,7 @@ namespace MWWorld
             throw std::invalid_argument("The neutral world renderer requires neutral resource services");
         if (!mPhysics || !mNavigator)
             throw std::logic_error("World simulation must be initialized before its renderer");
-        if (mWorldScene)
+        if (mRendering || mWorldScene || mProjectileManager)
             throw std::logic_error("World renderer services have already been initialized");
         if (mResourceSystem->getSceneManager())
             throw std::logic_error("The neutral world renderer cannot use OSG resource services");

@@ -43,6 +43,8 @@ OSG libraries still remain in the transitional full-game link because GUI, legac
 services, and shared engine code have not yet been deleted. CI must therefore distinguish
 runtime ownership from the temporary link footprint. The standalone Vulkan smoke target
 continues to link only SDL2 and Vulkan at runtime; no OSG library or renderer symbol is present.
+World renderer initialization now rejects an already-created renderer service in either direction,
+so accidental double initialization fails before a second scene owner or frame consumer can exist.
 Vulkan configuration also probes `glslangValidator --version` and rejects a missing or
 no-op shader compiler, so a successful build cannot silently omit the SPIR-V artifacts.
 Its fixture now builds a renderer-neutral `WorldScene`, collects a `SceneSubmission`, and
@@ -484,7 +486,7 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-206 files, deleting 2,243 lines and adding 12,800 lines (net `+10,557`). The larger Vulkan-only
+206 files, deleting 2,245 lines and adding 12,806 lines (net `+10,561`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. The live no-GUI consumer is the first deletion
 checkpoint; further reduction can now target OSG scene/resource/presentation ownership rather
