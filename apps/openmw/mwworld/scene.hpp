@@ -27,11 +27,6 @@ namespace osg
     class Stats;
 }
 
-namespace osgUtil
-{
-    class IncrementalCompileOperation;
-}
-
 namespace ESM
 {
     struct Position;
@@ -134,10 +129,8 @@ namespace MWWorld
         Resource::ResourceSystem* mResourceSystem;
         MWPhysics::PhysicsSystem* mPhysics;
         MWRender::RenderingManager& mRendering;
-        MWRender::LandManager& mLandManager;
         Terrain::World*& mTerrain;
         MWRender::ObjectPaging*& mObjectPaging;
-        osgUtil::IncrementalCompileOperation* mIncrementalCompileOperation;
         Terrain::RenderStorage& mTerrainStorage;
         SceneUtil::WorkQueue* mWorkQueue;
         DetourNavigator::Navigator& mNavigator;
@@ -204,7 +197,6 @@ namespace MWWorld
             Render::MeshResolver meshResolver, Render::TextureResolver textureResolver, const VFS::Manager* vfs,
             MWRender::RenderingManager& rendering, MWRender::LandManager& landManager,
             Terrain::World*& terrain, MWRender::ObjectPaging*& objectPaging,
-            osgUtil::IncrementalCompileOperation* incrementalCompileOperation,
             Terrain::RenderStorage& terrainStorage, SceneUtil::WorkQueue* workQueue,
             Resource::ResourceSystem* resourceSystem,
             MWPhysics::PhysicsSystem* physics,

@@ -833,7 +833,10 @@ namespace MWWorld
     void Scene::testExteriorCells()
     {
         // Note: temporary disable ICO to decrease memory usage
-        mResourceSystem->getSceneManager()->setIncrementalCompileOperation(nullptr);
+        Resource::SceneManager* const sceneManager = mResourceSystem->getSceneManager();
+        osgUtil::IncrementalCompileOperation* const incrementalCompileOperation
+            = sceneManager->getIncrementalCompileOperation();
+        sceneManager->setIncrementalCompileOperation(nullptr);
 
         mResourceSystem->setExpiryDelay(1.f);
 
@@ -891,14 +894,17 @@ namespace MWWorld
             i++;
         }
 
-        mResourceSystem->getSceneManager()->setIncrementalCompileOperation(mIncrementalCompileOperation);
+        sceneManager->setIncrementalCompileOperation(incrementalCompileOperation);
         mResourceSystem->setExpiryDelay(Settings::cells().mCacheExpiryDelay);
     }
 
     void Scene::testInteriorCells()
     {
         // Note: temporary disable ICO to decrease memory usage
-        mResourceSystem->getSceneManager()->setIncrementalCompileOperation(nullptr);
+        Resource::SceneManager* const sceneManager = mResourceSystem->getSceneManager();
+        osgUtil::IncrementalCompileOperation* const incrementalCompileOperation
+            = sceneManager->getIncrementalCompileOperation();
+        sceneManager->setIncrementalCompileOperation(nullptr);
 
         mResourceSystem->setExpiryDelay(1.f);
 
@@ -948,7 +954,7 @@ namespace MWWorld
             i++;
         }
 
-        mResourceSystem->getSceneManager()->setIncrementalCompileOperation(mIncrementalCompileOperation);
+        sceneManager->setIncrementalCompileOperation(incrementalCompileOperation);
         mResourceSystem->setExpiryDelay(Settings::cells().mCacheExpiryDelay);
     }
 
@@ -996,7 +1002,6 @@ namespace MWWorld
         Render::MeshResolver meshResolver, Render::TextureResolver textureResolver, const VFS::Manager* vfs,
         MWRender::RenderingManager& rendering, MWRender::LandManager& landManager,
         Terrain::World*& terrain, MWRender::ObjectPaging*& objectPaging,
-        osgUtil::IncrementalCompileOperation* incrementalCompileOperation,
         Terrain::RenderStorage& terrainStorage, SceneUtil::WorkQueue* workQueue, Resource::ResourceSystem* resourceSystem,
         MWPhysics::PhysicsSystem* physics,
         DetourNavigator::Navigator& navigator)
@@ -1012,10 +1017,8 @@ namespace MWWorld
         , mResourceSystem(resourceSystem)
         , mPhysics(physics)
         , mRendering(rendering)
-        , mLandManager(landManager)
         , mTerrain(terrain)
         , mObjectPaging(objectPaging)
-        , mIncrementalCompileOperation(incrementalCompileOperation)
         , mTerrainStorage(terrainStorage)
         , mWorkQueue(workQueue)
         , mNavigator(navigator)
@@ -1028,7 +1031,7 @@ namespace MWWorld
         , mPredictionTime(Settings::cells().mPredictionTime)
         , mLowestPoint(std::numeric_limits<float>::max())
     {
-        mPreloader = std::make_unique<CellPreloader>(resourceSystem, physics->getShapeManager(), mTerrain, &mLandManager);
+        mPreloader = std::make_unique<CellPreloader>(resourceSystem, physics->getShapeManager(), mTerrain, &landManager);
         mPreloader->setWorkQueue(mWorkQueue);
         mPreloader->setExpiryDelay(Settings::cells().mPreloadCellExpiryDelay);
         mPreloader->setMinCacheSize(Settings::cells().mPreloadCellCacheMin);

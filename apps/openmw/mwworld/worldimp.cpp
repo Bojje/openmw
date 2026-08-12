@@ -310,7 +310,7 @@ namespace MWWorld
         mWorldScene = std::make_unique<Scene>(
             *this, frameLifecycle, sceneSynchronizer, bonePoseResolver, meshResolver, textureResolver,
             mResourceSystem->getVFS(), *mRendering, *mTerrainStorage->getLandManager(), mTerrain, mObjectPaging,
-            incrementalCompileOperation, *mTerrainStorage, workQueue, mResourceSystem, mPhysics.get(), *mNavigator);
+            *mTerrainStorage, workQueue, mResourceSystem, mPhysics.get(), *mNavigator);
     }
 
     void World::fillGlobalVariables()
