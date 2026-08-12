@@ -114,6 +114,11 @@ jobs:
           echo "renderer-neutral terrain storage must not depend on OSG"
           exit 1
         fi
+        if rg -n '#include[[:space:]]*[<"]osg|namespace[[:space:]]+osg|osg::|ESMTerrain::|components/esmterrain/storage' \
+            apps/openmw/mwrender/neutralterrainstorage.hpp apps/openmw/mwrender/neutralterrainstorage.cpp; then
+          echo "neutral terrain provider must not depend on legacy OSG terrain storage"
+          exit 1
+        fi
         if rg -n '#include[[:space:]]*[<"]osg|osg::|BaseResourceManager|resourcemanager\.hpp' \
             components/resource/cachemanager.hpp components/resource/niffilemanager.hpp components/resource/niffilemanager.cpp \
             components/resource/nifmeshmanager.hpp components/resource/nifmeshmanager.cpp; then

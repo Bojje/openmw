@@ -234,7 +234,7 @@ namespace MWWorld
         // OSG rendering, paging, terrain-world, or preloader services.
         void initNeutralRenderer(Render::FrameLifecycle& frameLifecycle, Render::SceneSynchronizer sceneSynchronizer,
             Render::BonePoseResolver bonePoseResolver, Render::MeshResolver meshResolver,
-            Render::TextureResolver textureResolver, Terrain::RenderStorage& terrainStorage);
+            Render::TextureResolver textureResolver);
 
         virtual ~World();
 

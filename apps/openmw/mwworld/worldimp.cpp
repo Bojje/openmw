@@ -78,6 +78,8 @@
 #include "../mwmechanics/levelledlist.hpp"
 #include "../mwmechanics/npcstats.hpp"
 #include "../mwmechanics/spellcasting.hpp"
+
+#include "../mwrender/neutralterrainstorage.hpp"
 #include "../mwmechanics/spellutil.hpp"
 #include "../mwmechanics/summoning.hpp"
 
@@ -364,8 +366,7 @@ namespace MWWorld
 
     void World::initNeutralRenderer(Render::FrameLifecycle& frameLifecycle,
         Render::SceneSynchronizer sceneSynchronizer, Render::BonePoseResolver bonePoseResolver,
-        Render::MeshResolver meshResolver, Render::TextureResolver textureResolver,
-        Terrain::RenderStorage& terrainStorage)
+        Render::MeshResolver meshResolver, Render::TextureResolver textureResolver)
     {
         if (frameLifecycle.backend() != Render::FrameLifecycle::Backend::Vulkan)
             throw std::invalid_argument("The neutral world renderer requires a Vulkan frame owner");
@@ -379,11 +380,16 @@ namespace MWWorld
             throw std::logic_error("The neutral world renderer cannot use OSG resource services");
 
         mFrameLifecycle = &frameLifecycle;
-        mTerrainRenderStorage = &terrainStorage;
+        auto neutralTerrainStorage = std::make_unique<MWRender::NeutralTerrainStorage>(mStore, *mResourceSystem->getVFS(),
+            Settings::shaders().mNormalMapPattern.get(), Settings::shaders().mNormalHeightMapPattern.get(),
+            Settings::shaders().mAutoUseTerrainNormalMaps.get(), Settings::shaders().mTerrainSpecularMapPattern.get(),
+            Settings::shaders().mAutoUseTerrainSpecularMaps.get());
+        mTerrainRenderStorage = neutralTerrainStorage.get();
+        mTerrainStorage = std::move(neutralTerrainStorage);
         mWeatherManager = std::make_unique<MWWorld::WeatherManager>(nullptr, nullptr, mStore);
         mWorldScene = std::make_unique<Scene>(*this, frameLifecycle, std::move(sceneSynchronizer),
             std::move(bonePoseResolver), std::move(meshResolver), std::move(textureResolver), mResourceSystem->getVFS(),
-            terrainStorage, mPhysics.get(), *mNavigator);
+            *mTerrainRenderStorage, mPhysics.get(), *mNavigator);
     }
 
     void World::fillGlobalVariables()

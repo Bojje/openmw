@@ -368,6 +368,12 @@ terrain-data owner and CI checks that boundary.
 `World::initNeutralRenderer()` now exposes that boundary to a submission-consuming Vulkan owner:
 it requires simulation first, rejects an OSG frame owner, and constructs the world scene without
 allocating any OSG rendering, paging, terrain-world, or preloader service.
+That bootstrap now constructs and owns `NeutralTerrainStorage` directly from `ESMStore` and the VFS;
+the provider emits renderer-neutral TES3 vertices, normals, colors, heightfields, bounds, and
+blendmaps without `ESMTerrain::Storage`, `LandObject`, or OSG lifetimes. Its generic grid sampling
+entry point is exposed through the neutral terrain component. ESM4 terrain currently uses an
+explicit opaque fallback layer while its record-to-layer mapping is completed; it is not treated as
+visual parity.
 CI now rejects a neutral bootstrap that regains those legacy service names or calls the OSG
 initializer, keeping the single-backend boundary enforceable during the migration.
 Engine GUI fallback frame advancement now also reads simulation time from the active
@@ -436,7 +442,7 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-175 files, deleting 1,980 lines and adding 9,222 lines (net `+7,242`). The larger Vulkan-only
+178 files, deleting 1,980 lines and adding 9,789 lines (net `+7,809`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
