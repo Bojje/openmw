@@ -228,8 +228,8 @@ int main()
         throw std::runtime_error("renderer-neutral scene submission lost an identified effect");
     if (!world.removeEffect("spark") || world.removeEffect("spark"))
         throw std::runtime_error("renderer-neutral world scene failed effect removal");
-    if (!world.recordEffect("loop", "meshes/effect.nif", { 1.f, 2.f, 3.f }, 1.f)
-        || world.effectsInOrder().size() != 1)
+    if (!world.recordEffect("loop", "meshes/effect.nif", { 1.f, 2.f, 3.f }, 1.f, {}, true)
+        || world.effectsInOrder().size() != 1 || !world.effectsInOrder().front()->looping)
         throw std::runtime_error("renderer-neutral world scene failed to retain an identified effect");
     world.clearEffects();
     if (!world.effectsInOrder().empty())

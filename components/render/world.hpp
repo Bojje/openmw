@@ -59,6 +59,10 @@ namespace Render
         std::vector<Mat4> boneMatrices;
         // Optional texture replacement used by explicitly identified world VFX.
         std::string textureOverride;
+        // World effects retain whether gameplay requested looping playback. A
+        // presentation owner is still responsible for advancing/removing the
+        // effect when animation support is available.
+        bool looping = false;
     };
 
     // A cell snapshot is updated by the world lifecycle, not by a renderer.
@@ -186,7 +190,7 @@ namespace Render
         }
 
         bool recordEffect(std::string_view effectId, std::string_view model, const Vec3& position, float scale,
-            std::string_view textureOverride = {})
+            std::string_view textureOverride = {}, bool looping = false)
         {
             if (effectId.empty() || model.empty() || !valid(position) || !valid(scale) || scale <= 0.f)
                 return false;
@@ -198,6 +202,7 @@ namespace Render
             effect.transform.position = position;
             effect.transform.scale = { scale, scale, scale };
             effect.textureOverride = textureOverride;
+            effect.looping = looping;
             mEffects[std::string(effectId)] = std::move(effect);
             return true;
         }

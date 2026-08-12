@@ -188,6 +188,8 @@ Explicitly identified world VFX now also cross as neutral transformed mesh effec
 overrides and explicit removal; anonymous one-shot VFX still require a lifetime/animation owner.
 Continuous magic VFX now use that neutral effect path when no OSG animation exists, and spell
 cleanup removes them through the neutral world owner instead of dereferencing a missing animation.
+The neutral effect record also preserves the gameplay loop flag through submission; automatic
+controller playback and one-shot lifetime removal still require the future animation owner.
 Mesh submission no longer waits for the whole device or
 rebuilds one global buffer: neutral mesh data is retained on the CPU and uploaded into
 the current frame slot only after its fence is waited, so a future live frame loop can

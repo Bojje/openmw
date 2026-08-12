@@ -3957,7 +3957,7 @@ namespace MWWorld
         else if (mWorldScene && !effectId.empty() && mWorldScene->mNeutralWorldScene)
         {
             mWorldScene->mNeutralWorldScene->recordEffect(effectId, model.value(),
-                { worldPos.x(), worldPos.y(), worldPos.z() }, scale, textureOverride);
+                { worldPos.x(), worldPos.y(), worldPos.z() }, scale, textureOverride, loop);
         }
     }
 
