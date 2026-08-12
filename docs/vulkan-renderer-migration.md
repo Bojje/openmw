@@ -650,9 +650,12 @@ real replacement consumes its responsibility and the fast tests cover the bounda
 - Add CPU-side tests for matrix conversion, NIF conversion, transforms, resource lookup, and scene snapshots. The current fast tests cover matrix conversion, NIF conversion, parent-child transforms, model-local and external `.kf` keyframe pose interpolation, safe index handling, cache reuse, cell-object transform composition, renderer-neutral batch layout, dynamic animation clocks, and static mesh/terrain removal.
 - Compare Vulkan output with OSG reference images using the neutral image comparator's
   tolerances and error metrics rather than exact pixel equality. Vulkan-to-Vulkan
-  capture comparison is now wired into smoke; OSG reference-image execution remains
-  pending until a presentation-capable validation host and reference capture workflow
-  are available.
+capture comparison is now wired into smoke; OSG reference-image execution remains
+pending until a presentation-capable validation host and reference capture workflow
+are available.
+The smoke target also has a headless-surface mode for CI; both windowed and headless
+probes use skip code 77 only when SDL/Vulkan surface creation or the host GPU cannot
+provide a usable surface, while validation errors remain hard failures.
 
 ### 3. Remove the dual-renderer lifecycle
 
