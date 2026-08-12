@@ -138,7 +138,8 @@ external text-key start times are honored for the selected group. No-OSG mechani
 neutral idle, movement, and one-active-scripted groups, and changing groups resets the neutral pose
 clock. Neutral animation-state restoration no longer dereferences the absent OSG animation owner;
 scripted group requests remain visible to the neutral resolver and fall back to bind pose when no
-controller is available. Live actor `.kf` priority arbitration, queued sequence completion,
+controller is available. Neutral death transitions now publish a deterministic death group instead
+of being discarded when OSG animation is absent. Live actor `.kf` priority arbitration, queued sequence completion,
 full text-key stop/loop handling, blended controller stacks, animation-specific shading, and
 mismatched multi-part skin orders remain outstanding. NIF skinning metadata preserves source bone
 names beside inverse-bind matrices, making the mapping deterministic without borrowing OSG types.
@@ -501,7 +502,7 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-206 files, deleting 2,251 lines and adding 13,881 lines (net `+11,630`). The larger Vulkan-only
+206 files, deleting 2,256 lines and adding 13,893 lines (net `+11,637`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. The live no-GUI consumer is the first deletion
 checkpoint; further reduction can now target OSG scene/resource/presentation ownership rather

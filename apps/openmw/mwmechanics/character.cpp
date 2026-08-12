@@ -865,8 +865,11 @@ namespace MWMechanics
         resetCurrentIdleState();
         resetCurrentJumpState();
 
-        playBlendedAnimation(
-            mCurrentDeath, Priority_Death, MWRender::BlendMask_All, false, 1.0f, "start", "stop", startpoint, 0);
+        if (mAnimation)
+            playBlendedAnimation(
+                mCurrentDeath, Priority_Death, MWRender::BlendMask_All, false, 1.0f, "start", "stop", startpoint, 0);
+        else if (!mCurrentDeath.empty())
+            MWBase::Environment::get().getWorld()->updateNeutralAnimation(mPtr, mCurrentDeath);
     }
 
     CharacterState CharacterController::chooseRandomDeathState() const
@@ -889,12 +892,13 @@ namespace MWMechanics
         if (mDeathState == CharState_None && MWBase::Environment::get().getWorld()->isSwimming(mPtr))
             mDeathState = CharState_SwimDeath;
 
-        if (mDeathState == CharState_None
-            || (mAnimation && !mAnimation->hasAnimation(deathStateToAnimGroup(mDeathState))))
+        if (mDeathState == CharState_None)
+            mDeathState = mAnimation ? chooseRandomDeathState() : CharState_Death1;
+        else if (mAnimation && !mAnimation->hasAnimation(deathStateToAnimGroup(mDeathState)))
             mDeathState = chooseRandomDeathState();
 
         // Do not interrupt scripted animation by death
-        if (!mAnimation || isScriptedAnimPlaying())
+        if (isScriptedAnimPlaying())
             return;
 
         playDeath(startpoint, mDeathState);
@@ -2609,7 +2613,9 @@ namespace MWMechanics
         world->queueMovement(mPtr, movement);
 
         std::string animationGroup;
-        if (!mAnimQueue.empty())
+        if (!mCurrentDeath.empty())
+            animationGroup = mCurrentDeath;
+        else if (!mAnimQueue.empty())
             animationGroup = mAnimQueue.front().mGroup;
         else
         {
