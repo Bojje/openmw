@@ -98,19 +98,20 @@
 
 namespace
 {
-    Render::Mat4 neutralLookAt(const Render::Vec3& eye, const Render::Vec3& center)
+    Render::Mat4 neutralLookAt(const Render::Vec3& eye, const Render::Vec3& center, const Render::Vec3& upHint)
     {
         const Render::Vec3 forward = { center.x - eye.x, center.y - eye.y, center.z - eye.z };
         const float length = std::sqrt(forward.x * forward.x + forward.y * forward.y + forward.z * forward.z);
         if (length <= 0.f)
             return Render::identityMat4();
         const Render::Vec3 f = { forward.x / length, forward.y / length, forward.z / length };
-        Render::Vec3 side = { f.y, -f.x, 0.f };
-        const float sideLength = std::sqrt(side.x * side.x + side.y * side.y);
-        if (sideLength <= 0.f)
+        Render::Vec3 side = { f.y * upHint.z - f.z * upHint.y, f.z * upHint.x - f.x * upHint.z,
+            f.x * upHint.y - f.y * upHint.x };
+        const float fullSideLength = std::sqrt(side.x * side.x + side.y * side.y + side.z * side.z);
+        if (fullSideLength <= 0.f)
             side = { 1.f, 0.f, 0.f };
         else
-            side = { side.x / sideLength, side.y / sideLength, 0.f };
+            side = { side.x / fullSideLength, side.y / fullSideLength, side.z / fullSideLength };
         const Render::Vec3 up = { side.y * f.z, -side.x * f.z, side.x * f.y - side.y * f.x };
 
         Render::Mat4 result = Render::identityMat4();
@@ -127,6 +128,20 @@ namespace
         result.data[13] = -(up.x * eye.x + up.y * eye.y + up.z * eye.z);
         result.data[14] = f.x * eye.x + f.y * eye.y + f.z * eye.z;
         return result;
+    }
+
+    Render::Vec3 rotateNeutralVector(const Render::Quat& rotation, const Render::Vec3& vector)
+    {
+        const Render::Vec3 qVector{ rotation.x, rotation.y, rotation.z };
+        const Render::Vec3 crossFirst{ qVector.y * vector.z - qVector.z * vector.y,
+            qVector.z * vector.x - qVector.x * vector.z, qVector.x * vector.y - qVector.y * vector.x };
+        const Render::Vec3 twiceCross{ 2.f * crossFirst.x, 2.f * crossFirst.y, 2.f * crossFirst.z };
+        const Render::Vec3 crossSecond{ qVector.y * twiceCross.z - qVector.z * twiceCross.y,
+            qVector.z * twiceCross.x - qVector.x * twiceCross.z,
+            qVector.x * twiceCross.y - qVector.y * twiceCross.x };
+        return { vector.x + rotation.w * twiceCross.x + crossSecond.x,
+            vector.y + rotation.w * twiceCross.y + crossSecond.y,
+            vector.z + rotation.w * twiceCross.z + crossSecond.z };
     }
 
     Render::Mat4 neutralPerspective(float aspect)
@@ -704,8 +719,11 @@ void OMW::Engine::prepareVulkanEngine()
             return;
         const ESM::Position& position = player.getRefData().getPosition();
         const Render::Vec3 eye = { position.pos[0], position.pos[1], position.pos[2] + 124.f };
-        const Render::Vec3 forward = { -std::sin(position.rot[2]), std::cos(position.rot[2]), 0.f };
-        sceneData.view = neutralLookAt(eye, { eye.x + forward.x, eye.y + forward.y, eye.z + forward.z });
+        const Render::Quat orientation = Render::makeEulerRotation(
+            { position.rot[0], position.rot[1], position.rot[2] });
+        const Render::Vec3 forward = rotateNeutralVector(orientation, { 0.f, 1.f, 0.f });
+        const Render::Vec3 up = rotateNeutralVector(orientation, { 0.f, 0.f, 1.f });
+        sceneData.view = neutralLookAt(eye, { eye.x + forward.x, eye.y + forward.y, eye.z + forward.z }, up);
         sceneData.viewInverse = Render::invertMat4(sceneData.view);
         sceneData.projInverse = Render::invertMat4(sceneData.projection);
     };

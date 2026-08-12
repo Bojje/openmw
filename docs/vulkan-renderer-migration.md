@@ -145,8 +145,8 @@ than re-read from OSG objects during export. `Camera` now exposes neutral `Rende
 for this path while retaining legacy OSG getters for the reference backend. This removes another
 backend-specific type from the future Vulkan handoff.
 The no-GUI Vulkan bootstrap now supplies a renderer-neutral first-person look-at and perspective
-snapshot from the player transform, so its first live frame no longer uses identity camera
-matrices; camera-controller parity and resize-aware projection updates remain outstanding.
+snapshot from the player transform, including full pitch/roll orientation and resize-aware
+projection updates; camera-controller parity remains outstanding.
 Those inputs can now be collected as one `Render::SceneSubmission`; the standalone smoke
 consumer now exercises the same `WorldScene` to `Vk::Renderer` handoff, while the renderer-neutral
 `collectSceneSubmission` helper owns mesh, dynamic-record, worldspace, and terrain selection.
@@ -451,7 +451,7 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-186 files, deleting 1,973 lines and adding 11,199 lines (net `+9,226`). The larger Vulkan-only
+186 files, deleting 1,973 lines and adding 11,208 lines (net `+9,235`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. The live no-GUI consumer is the first deletion
 checkpoint; further reduction can now target OSG scene/resource/presentation ownership rather
