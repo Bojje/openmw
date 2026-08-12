@@ -243,6 +243,9 @@ Neutral object and groundcover snapshots now compose Euler and axis-angle rotati
 renderer-neutral math; OSG quaternion construction remains only for legacy scene-node updates.
 Object scale adjustment now also uses the renderer-neutral `Render::Vec3` contract; OSG scale
 conversion is limited to the legacy rendering-manager and preview boundaries.
+Scene cell-grid decisions, deferred grid changes, and terrain-preload prediction now retain
+positions as `Render::Vec3`; conversion back to OSG is limited to legacy navigator and preloader
+calls.
 The full-game bridge validator runs after that same render boundary, so it validates the
 camera payload that was just submitted rather than the previous frame's cached matrices.
 `FrameLifecycle` now identifies its backend explicitly. The current `World::init` path rejects

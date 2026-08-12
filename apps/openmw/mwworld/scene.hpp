@@ -17,6 +17,7 @@
 #include <components/esm/exteriorcelllocation.hpp>
 #include <components/misc/constants.hpp>
 #include <components/render/frame.hpp>
+#include <components/render/scene.hpp>
 #include <components/render/submission.hpp>
 #include <components/render/world.hpp>
 
@@ -114,7 +115,7 @@ namespace MWWorld
 
         struct ChangeCellGridRequest
         {
-            osg::Vec3f mPosition;
+            Render::Vec3 mPosition;
             ESM::ExteriorCellLocation mCellIndex;
             bool mChangeEvent;
         };
@@ -153,7 +154,7 @@ namespace MWWorld
 
         int mHalfGridSize = Constants::CellGridRadius;
 
-        osg::Vec3f mLastPlayerPos;
+        Render::Vec3 mLastPlayerPos{};
 
         std::vector<ESM::RefNum> mPagedRefs;
 
@@ -172,10 +173,10 @@ namespace MWWorld
         std::array<int, 2> mCurrentGridCenter{};
 
         // Load and unload cells as necessary to create a cell grid with "X" and "Y" in the center
-        void changeCellGrid(const osg::Vec3f& pos, ESM::ExteriorCellLocation playerCellIndex, bool changeEvent = true);
+        void changeCellGrid(const Render::Vec3& pos, ESM::ExteriorCellLocation playerCellIndex, bool changeEvent = true);
 
         void requestChangeCellGrid(
-            const osg::Vec3f& position, const std::array<int, 2>& cell, bool changeEvent = true);
+            const Render::Vec3& position, const std::array<int, 2>& cell, bool changeEvent = true);
 
         void preloadCells(float dt);
         void preloadTeleportDoorDestinations(const osg::Vec3f& playerPos, const osg::Vec3f& predictedPos);
@@ -184,11 +185,11 @@ namespace MWWorld
             const osg::Vec3f& playerPos, std::vector<PositionCellGrid>& exteriorPositions);
         void preloadCellWithSurroundings(MWWorld::CellStore& cell);
         void preloadCell(MWWorld::CellStore& cell);
-        void preloadTerrain(const osg::Vec3f& pos, ESM::RefId worldspace, bool sync = false);
+        void preloadTerrain(const Render::Vec3& pos, ESM::RefId worldspace, bool sync = false);
 
         std::array<int, 4> gridCenterToBounds(const std::array<int, 2>& centerCell) const;
         std::array<int, 2> getNewGridCenter(
-            const osg::Vec3f& pos, const std::array<int, 2>* currentGridCenter = nullptr) const;
+            const Render::Vec3& pos, const std::array<int, 2>* currentGridCenter = nullptr) const;
 
         void unloadCell(CellStore* cell, const DetourNavigator::UpdateGuard* navigatorUpdateGuard);
         void loadCell(CellStore& cell, Loading::Listener* loadingListener, bool respawn, const osg::Vec3f& position,
@@ -213,7 +214,7 @@ namespace MWWorld
 
         void reloadTerrain();
 
-        void playerMoved(const osg::Vec3f& pos);
+        void playerMoved(const Render::Vec3& pos);
 
         void changePlayerCell(CellStore& newCell, const ESM::Position& position, bool adjustPlayerPos);
 

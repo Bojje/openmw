@@ -1165,7 +1165,7 @@ namespace MWWorld
         }
 
         if (isPlayer)
-            mWorldScene->playerMoved(position);
+            mWorldScene->playerMoved({ position.x(), position.y(), position.z() });
         else
         {
             mRendering->pagingBlacklistObject(mStore.find(ptr.getCellRef().getRefId()), ptr);
