@@ -865,13 +865,14 @@ namespace MWWorld
         if (!mRendering)
             return;
 
+        Resource::ResourceSystem& resourceSystem = *MWBase::Environment::get().getResourceSystem();
         // Note: temporary disable ICO to decrease memory usage
-        Resource::SceneManager* const sceneManager = mResourceSystem->getSceneManager();
+        Resource::SceneManager* const sceneManager = mSceneManager;
         osgUtil::IncrementalCompileOperation* const incrementalCompileOperation
             = sceneManager->getIncrementalCompileOperation();
         sceneManager->setIncrementalCompileOperation(nullptr);
 
-        mResourceSystem->setExpiryDelay(1.f);
+        resourceSystem.setExpiryDelay(1.f);
 
         const MWWorld::Store<ESM::Cell>& cells = mWorld.getStore().get<ESM::Cell>();
 
@@ -921,14 +922,14 @@ namespace MWWorld
                 ++iter;
             }
 
-            mResourceSystem->updateCache(mFrameLifecycle.referenceTime());
+            resourceSystem.updateCache(mFrameLifecycle.referenceTime());
 
             loadingListener->increaseProgress(1);
             i++;
         }
 
         sceneManager->setIncrementalCompileOperation(incrementalCompileOperation);
-        mResourceSystem->setExpiryDelay(Settings::cells().mCacheExpiryDelay);
+        resourceSystem.setExpiryDelay(Settings::cells().mCacheExpiryDelay);
     }
 
     void Scene::testInteriorCells()
@@ -936,13 +937,14 @@ namespace MWWorld
         if (!mRendering)
             return;
 
+        Resource::ResourceSystem& resourceSystem = *MWBase::Environment::get().getResourceSystem();
         // Note: temporary disable ICO to decrease memory usage
-        Resource::SceneManager* const sceneManager = mResourceSystem->getSceneManager();
+        Resource::SceneManager* const sceneManager = mSceneManager;
         osgUtil::IncrementalCompileOperation* const incrementalCompileOperation
             = sceneManager->getIncrementalCompileOperation();
         sceneManager->setIncrementalCompileOperation(nullptr);
 
-        mResourceSystem->setExpiryDelay(1.f);
+        resourceSystem.setExpiryDelay(1.f);
 
         const MWWorld::Store<ESM::Cell>& cells = mWorld.getStore().get<ESM::Cell>();
 
@@ -984,14 +986,14 @@ namespace MWWorld
                 ++iter;
             }
 
-            mResourceSystem->updateCache(mFrameLifecycle.referenceTime());
+            resourceSystem.updateCache(mFrameLifecycle.referenceTime());
 
             loadingListener->increaseProgress(1);
             i++;
         }
 
         sceneManager->setIncrementalCompileOperation(incrementalCompileOperation);
-        mResourceSystem->setExpiryDelay(Settings::cells().mCacheExpiryDelay);
+        resourceSystem.setExpiryDelay(Settings::cells().mCacheExpiryDelay);
     }
 
     void Scene::changePlayerCell(CellStore& cell, const ESM::Position& pos, bool adjustPlayerPos)
@@ -1054,7 +1056,6 @@ namespace MWWorld
         , mMeshResolver(std::move(meshResolver))
         , mTextureResolver(std::move(textureResolver))
         , mVfs(vfs)
-        , mResourceSystem(resourceSystem)
         , mSceneManager(sceneManager)
         , mPhysics(physics)
         , mRendering(rendering)

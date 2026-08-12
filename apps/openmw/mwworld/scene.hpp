@@ -127,7 +127,6 @@ namespace MWWorld
         Render::MeshResolver mMeshResolver;
         Render::TextureResolver mTextureResolver;
         const VFS::Manager* mVfs;
-        Resource::ResourceSystem* mResourceSystem;
         Resource::SceneManager* mSceneManager;
         MWPhysics::PhysicsSystem* mPhysics;
         MWRender::RenderingManager* mRendering;

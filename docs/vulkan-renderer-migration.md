@@ -283,10 +283,11 @@ The scene constructor now accepts the legacy `RenderingManager` and `CellPreload
 services. Neutral cell/object/terrain state remains available when they are absent, while every
 OSG paging, object, water, and preload call is guarded; the current game bootstrap still supplies
 both services through the OSG-only initialization path.
-Legacy mesh preloading now receives the OSG `SceneManager` directly and the neutral `Scene`
-constructor no longer accepts a `ResourceSystem` pointer. The neutral path still retains the
-shared VFS and NIF-backed resource services needed for scene data, but cannot accidentally reach
-through the resource facade to construct or query an OSG scene service.
+Legacy mesh preloading now receives the OSG `SceneManager` directly, and `Scene` no longer retains
+a `ResourceSystem` pointer. The neutral path still retains the shared VFS and NIF-backed resource
+services needed for scene data, but cannot accidentally reach through the resource facade to
+construct or query an OSG scene service; the legacy cell-test commands resolve that service only
+inside their OSG-only operations.
 Object insertion now shares one world/physics/mechanics path for both backends: the optional OSG
 adapter handles only scene-graph insertion and water-ripple registration, while neutral object
 snapshots, physics shapes, looping effects, and lifecycle notifications are not skipped when OSG
@@ -357,7 +358,7 @@ The engine public header no longer imports complete OSG viewer/event-handler hea
 are now included only by the implementation files that use them.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-156 files, deleting 1,368 lines and adding 8,420 lines (net `+7,052`). The larger Vulkan-only
+156 files, deleting 1,368 lines and adding 8,425 lines (net `+7,057`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
