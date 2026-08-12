@@ -284,6 +284,7 @@ namespace MWMechanics
         // Advances actor movement without requiring a renderer-owned animation
         // graph. The Vulkan path uses this until neutral animation owns poses.
         void updateNeutralMovement(float duration);
+        void updateNeutralHitAnimation();
 
         bool onOpen() const;
         void onClose() const;

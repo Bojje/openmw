@@ -2569,6 +2569,41 @@ namespace MWMechanics
         }
     }
 
+    void CharacterController::updateNeutralHitAnimation()
+    {
+        if (!mPtr.getClass().isActor())
+            return;
+
+        MWBase::World* world = MWBase::Environment::get().getWorld();
+        CreatureStats& stats = mPtr.getClass().getCreatureStats(mPtr);
+        const bool knockout = stats.getFatigue().getCurrent() < 0 || stats.getFatigue().getBase() == 0;
+        const bool recovery = stats.getHitRecovery();
+        const bool knockdown = stats.getKnockedDown();
+        const bool block = stats.getBlock() && !knockout && !recovery && !knockdown;
+        const bool isSwimming = world->isSwimming(mPtr);
+        stats.setBlock(false);
+
+        if (!knockout && !knockdown && !recovery && !block)
+        {
+            if (mHitState != CharState_None)
+                resetCurrentHitState();
+            return;
+        }
+
+        if (knockout)
+            mHitState = isSwimming ? CharState_SwimKnockOut : CharState_KnockOut;
+        else if (knockdown)
+            mHitState = isSwimming ? CharState_SwimKnockDown : CharState_KnockDown;
+        else if (recovery)
+            mHitState = isSwimming ? CharState_SwimHit : CharState_Hit;
+        else
+            mHitState = CharState_Block;
+
+        mCurrentHit = hitStateToAnimGroup(mHitState);
+        if (!mCurrentHit.empty())
+            world->updateNeutralAnimation(mPtr, mCurrentHit);
+    }
+
     void CharacterController::updateNeutralMovement(float duration)
     {
         if (!mPtr.getClass().isActor())
@@ -2612,9 +2647,13 @@ namespace MWMechanics
 
         world->queueMovement(mPtr, movement);
 
+        updateNeutralHitAnimation();
+
         std::string animationGroup;
         if (!mCurrentDeath.empty())
             animationGroup = mCurrentDeath;
+        else if (!mCurrentHit.empty())
+            animationGroup = mCurrentHit;
         else if (!mAnimQueue.empty())
             animationGroup = mAnimQueue.front().mGroup;
         else
