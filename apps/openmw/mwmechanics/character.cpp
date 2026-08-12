@@ -3449,8 +3449,6 @@ namespace MWMechanics
 
     void CharacterController::setVisibility(float visibility) const
     {
-        if (!mAnimation)
-            return;
         // We should take actor's invisibility in account
         if (mPtr.getClass().isActor())
         {
@@ -3477,6 +3475,12 @@ namespace MWMechanics
             }
 
             visibility = std::min(visibility, alpha);
+        }
+
+        if (!mAnimation)
+        {
+            MWBase::Environment::get().getWorld()->updateObjectVisibility(mPtr, visibility);
+            return;
         }
 
         // TODO: implement a dithering shader rather than just change object transparency.

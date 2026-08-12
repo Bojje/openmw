@@ -567,6 +567,8 @@ namespace MWBase
         virtual void updateEffect(std::string_view effectId, const Render::Vec3& position,
             const Render::Quat& rotation) = 0;
 
+        virtual void updateObjectVisibility(const MWWorld::Ptr& ptr, float visibility) = 0;
+
         /// @see MWWorld::WeatherManager::isInStorm
         virtual bool isInStorm() const = 0;
 

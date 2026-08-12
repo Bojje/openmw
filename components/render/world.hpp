@@ -114,6 +114,7 @@ namespace Render
         // Magic VFX use the legacy first-root texture replacement rule when
         // their flattened neutral mesh list is submitted.
         bool magicVfx = false;
+        float opacity = 1.f;
     };
 
     // A cell snapshot is updated by the world lifecycle, not by a renderer.
@@ -461,6 +462,22 @@ namespace Render
         bool updateObjectScale(const void* objectKey, const Vec3& scale)
         {
             return updateObjectTransform(objectKey, [&](ObjectTransform& transform) { transform.scale = scale; });
+        }
+
+        bool updateObjectVisibility(const void* objectKey, float value)
+        {
+            const auto found = mObjects.find(objectKey);
+            if (found == mObjects.end() || !std::isfinite(value))
+                return false;
+            const auto scene = mCells.find(found->second.cell);
+            if (scene == mCells.end())
+                return false;
+            WorldObject* object = scene->second.findObject(found->second.id);
+            if (object == nullptr)
+                return false;
+            object->opacity = std::clamp(value, 0.f, 1.f);
+            object->visible = object->opacity > 0.f;
+            return true;
         }
 
         bool updateObjectPose(const void* objectKey, std::vector<Mat4> boneMatrices)

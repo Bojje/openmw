@@ -667,6 +667,7 @@ namespace MWWorld
         void removeEffect(std::string_view effectId) override;
         void updateEffect(std::string_view effectId, const Render::Vec3& position,
             const Render::Quat& rotation) override;
+        void updateObjectVisibility(const MWWorld::Ptr& ptr, float visibility) override;
 
         /// @see MWWorld::WeatherManager::isInStorm
         bool isInStorm() const override;

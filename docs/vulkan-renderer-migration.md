@@ -713,8 +713,10 @@ bolts also submit movable mesh effects through the same `WorldScene` effect coll
 magic VFX now use actor-scoped effect IDs, follow neutral actor movement, and are removed when the corresponding
 magic effect expires or death animation completes. Anonymous one-shot VFX now receive generated neutral IDs at the world boundary,
 so existing spell, area, and summon effects are not silently discarded. The remaining animation
- gate is actor `.kf` priority/queue arbitration, OSG-specific presentation events, blending, and
- controller-stack ownership; projectile glows/lights/multi-effect composition and full particle presentation remain.
+gate is actor `.kf` priority/queue arbitration, OSG-specific presentation events, blending, and
+controller-stack ownership; projectile glows/lights/multi-effect composition and full particle presentation remain.
+Neutral actor visibility now also carries opacity and alpha-blend state into dynamic mesh submission, including
+invisibility/chameleon fading without an OSG animation owner.
   Neutral Lua/sound/melee/spell text-key dispatch is now covered for the migrated event classes.
 - Resting actors, owned-item lookup, line-of-sight, moving doors, and transformation-script movement/rotation now use active-cell state and world-model transforms instead of treating an absent OSG node as inactive.
 - Neutral focus selection and gameplay raycasts now use the renderer-neutral camera state and physics collision masks, so activation and targeting no longer require an OSG renderer.

@@ -245,6 +245,12 @@ int main()
         || updated.transform.scale.z != 4.f)
         throw std::runtime_error("renderer-neutral world scene lost explicit transform updates");
 
+    if (!world.updateObjectVisibility(&objectHandle, 0.25f)
+        || world.findCell(&firstCellHandle)->objects.front().opacity != 0.25f
+        || !world.findCell(&firstCellHandle)->objects.front().visible
+        || world.updateObjectVisibility(&objectHandle, std::numeric_limits<float>::quiet_NaN()))
+        throw std::runtime_error("renderer-neutral world scene lost object visibility state");
+
     world.setActiveWorldspace("active");
     if (world.activeWorldspace() != "active")
         throw std::runtime_error("renderer-neutral world scene did not retain active worldspace");

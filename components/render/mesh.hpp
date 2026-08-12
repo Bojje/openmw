@@ -293,6 +293,11 @@ namespace Render
     {
         MeshInstance result = mesh;
         result.transform = multiply(makeObjectTransformMatrix(object.transform), mesh.transform);
+        if (object.opacity < 1.f)
+        {
+            result.mesh.material.diffuse.w *= object.opacity;
+            result.mesh.material.alphaBlend = true;
+        }
         return result;
     }
 

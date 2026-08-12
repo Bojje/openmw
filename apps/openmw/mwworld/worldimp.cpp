@@ -3974,6 +3974,12 @@ namespace MWWorld
             mWorldScene->updateNeutralEffect(effectId, position, rotation);
     }
 
+    void World::updateObjectVisibility(const MWWorld::Ptr& ptr, float visibility)
+    {
+        if (!mRendering && mWorldScene)
+            mWorldScene->updateNeutralObjectVisibility(ptr, visibility);
+    }
+
     struct ResetActorsVisitor
     {
         World& mWorld;
