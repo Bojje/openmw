@@ -127,6 +127,10 @@ jobs:
           echo "The removed renderer object-insertion adapter must not return"
           exit 1
         fi
+        if rg -n '(^|[[:space:]])renderinginterface([[:space:]]|$)' apps/openmw/CMakeLists.txt; then
+          echo "The deleted renderer object-insertion source must not remain in build lists"
+          exit 1
+        fi
         if rg -n -U 'insertObjectRendering\([^;{}]*(RenderingManager|RenderingInterface)' \
             apps/openmw/mwclass apps/openmw/mwworld --glob '*.cpp' --glob '*.hpp'; then
           echo "Object-class insertion must depend directly on MWRender::Objects"
