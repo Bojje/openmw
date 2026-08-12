@@ -518,7 +518,7 @@ namespace MWWorld
                 mTerrainStorage.getRenderTiles(cellX, cellY, worldspace));
     }
 
-    void Scene::loadCell(CellStore& cell, Loading::Listener* loadingListener, bool respawn, const osg::Vec3f& position,
+    void Scene::loadCell(CellStore& cell, Loading::Listener* loadingListener, bool respawn,
         const DetourNavigator::UpdateGuard* navigatorUpdateGuard)
     {
         using DetourNavigator::HeightfieldShape;
@@ -790,8 +790,7 @@ namespace MWWorld
             if (!isCellInCollection(indexToLoad, mActiveCells))
             {
                 CellStore& cell = mWorld.getWorldModel().getExterior(indexToLoad);
-                loadCell(cell, loadingListener, changeEvent, osg::Vec3f(pos.x, pos.y, pos.z),
-                    navigatorUpdateGuard.get());
+                loadCell(cell, loadingListener, changeEvent, navigatorUpdateGuard.get());
             }
         }
 
@@ -866,7 +865,7 @@ namespace MWWorld
             mNavigator.updateBounds(
                 ESM::Cell::sDefaultWorldspaceId, cellGridBounds, position, navigatorUpdateGuard.get());
 
-            loadCell(cell, nullptr, false, position, navigatorUpdateGuard.get());
+            loadCell(cell, nullptr, false, navigatorUpdateGuard.get());
 
             mNavigator.update(position, navigatorUpdateGuard.get());
             navigatorUpdateGuard.reset();
@@ -922,7 +921,7 @@ namespace MWWorld
             mWorld.findInteriorPosition(it->mName, position);
             mNavigator.updateBounds(
                 cell.getCell()->getWorldSpace(), std::nullopt, position.asVec3(), navigatorUpdateGuard.get());
-            loadCell(cell, nullptr, false, position.asVec3(), navigatorUpdateGuard.get());
+            loadCell(cell, nullptr, false, navigatorUpdateGuard.get());
 
             mNavigator.update(position.asVec3(), navigatorUpdateGuard.get());
             navigatorUpdateGuard.reset();
@@ -1099,7 +1098,7 @@ namespace MWWorld
 
         // Load cell.
         mPagedRefs.clear();
-        loadCell(cell, loadingListener, changeEvent, position.asVec3(), navigatorUpdateGuard.get());
+        loadCell(cell, loadingListener, changeEvent, navigatorUpdateGuard.get());
 
         navigatorUpdateGuard.reset();
 

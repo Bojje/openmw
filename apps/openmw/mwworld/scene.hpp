@@ -192,7 +192,7 @@ namespace MWWorld
             const Render::Vec3& pos, const std::array<int, 2>* currentGridCenter = nullptr) const;
 
         void unloadCell(CellStore* cell, const DetourNavigator::UpdateGuard* navigatorUpdateGuard);
-        void loadCell(CellStore& cell, Loading::Listener* loadingListener, bool respawn, const osg::Vec3f& position,
+        void loadCell(CellStore& cell, Loading::Listener* loadingListener, bool respawn,
             const DetourNavigator::UpdateGuard* navigatorUpdateGuard);
         void recordNeutralCell(CellStore& cell);
         void updateNeutralTerrainRegions();
