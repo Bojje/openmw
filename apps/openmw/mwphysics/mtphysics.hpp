@@ -43,6 +43,8 @@ namespace MWPhysics
         PhysicsTaskScheduler(float physicsDt, btCollisionWorld* collisionWorld, MWRender::DebugDrawer* debugDrawer);
         ~PhysicsTaskScheduler();
 
+        void setDebugDrawer(MWRender::DebugDrawer* debugDrawer) { mDebugDrawer = debugDrawer; }
+
         /// @brief move actors taking into account desired movements and collisions
         /// @param numSteps how much simulation step to run
         /// @param timeAccum accumulated time from previous run to interpolate movements

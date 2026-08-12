@@ -245,7 +245,8 @@ namespace MWWorld
         if (frameLifecycle.backend() != Render::FrameLifecycle::Backend::Osg)
             throw std::invalid_argument("The current World initialization path requires the OSG renderer backend");
 
-        mPhysics = std::make_unique<MWPhysics::PhysicsSystem>(mResourceSystem, rootNode);
+        mPhysics = std::make_unique<MWPhysics::PhysicsSystem>(mResourceSystem);
+        mPhysics->enableDebugRendering(rootNode);
 
         if (Settings::navigator().mEnable)
         {

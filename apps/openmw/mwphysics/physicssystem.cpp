@@ -92,7 +92,7 @@ namespace
 
 namespace MWPhysics
 {
-    PhysicsSystem::PhysicsSystem(Resource::ResourceSystem* resourceSystem, osg::ref_ptr<osg::Group> parentNode)
+    PhysicsSystem::PhysicsSystem(Resource::ResourceSystem* resourceSystem)
         : mPhysicsDt(1.f / 60.f)
         , mShapeManager(std::make_unique<Resource::BulletShapeManager>(resourceSystem->getVFS(),
               resourceSystem->getSceneManager(), resourceSystem->getNifFileManager(),
@@ -103,7 +103,6 @@ namespace MWPhysics
         , mProjectileId(0)
         , mWaterHeight(0)
         , mWaterEnabled(false)
-        , mParentNode(std::move(parentNode))
     {
         mResourceSystem->addResourceManager(mShapeManager.get());
 
@@ -130,8 +129,15 @@ namespace MWPhysics
             }
         }
 
-        mDebugDrawer = std::make_unique<MWRender::DebugDrawer>(mParentNode, mCollisionWorld.get(), mDebugDrawEnabled);
-        mTaskScheduler = std::make_unique<PhysicsTaskScheduler>(mPhysicsDt, mCollisionWorld.get(), mDebugDrawer.get());
+        mTaskScheduler = std::make_unique<PhysicsTaskScheduler>(mPhysicsDt, mCollisionWorld.get(), nullptr);
+    }
+
+    void PhysicsSystem::enableDebugRendering(osg::ref_ptr<osg::Group> parentNode)
+    {
+        if (mDebugDrawer)
+            return;
+        mDebugDrawer = std::make_unique<MWRender::DebugDrawer>(std::move(parentNode), mCollisionWorld.get(), false);
+        mTaskScheduler->setDebugDrawer(mDebugDrawer.get());
     }
 
     PhysicsSystem::~PhysicsSystem()
@@ -155,6 +161,8 @@ namespace MWPhysics
 
     bool PhysicsSystem::toggleDebugRendering()
     {
+        if (!mDebugDrawer)
+            return false;
         mDebugDrawEnabled = !mDebugDrawEnabled;
 
         mCollisionWorld->setDebugDrawer(mDebugDrawEnabled ? mDebugDrawer.get() : nullptr);
@@ -873,7 +881,7 @@ namespace MWPhysics
 
     void PhysicsSystem::reportCollision(const btVector3& position, const btVector3& normal)
     {
-        if (mDebugDrawEnabled)
+        if (mDebugDrawEnabled && mDebugDrawer)
             mDebugDrawer->addCollision(position, normal);
     }
 

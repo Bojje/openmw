@@ -814,7 +814,8 @@ namespace MWPhysics
     void PhysicsTaskScheduler::debugDraw()
     {
         MaybeSharedLock lock(mCollisionWorldMutex, mLockingPolicy);
-        mDebugDrawer->step();
+        if (mDebugDrawer != nullptr)
+            mDebugDrawer->step();
     }
 
     void* PhysicsTaskScheduler::getUserPointer(const btCollisionObject* object) const

@@ -152,8 +152,12 @@ namespace MWPhysics
     class PhysicsSystem : public RayCastingInterface
     {
     public:
-        PhysicsSystem(Resource::ResourceSystem* resourceSystem, osg::ref_ptr<osg::Group> parentNode);
+        explicit PhysicsSystem(Resource::ResourceSystem* resourceSystem);
         virtual ~PhysicsSystem();
+
+        /// Enable the optional OSG collision visualization after the simulation
+        /// core has been created. Vulkan and headless owners leave this unset.
+        void enableDebugRendering(osg::ref_ptr<osg::Group> parentNode);
 
         Resource::BulletShapeManager* getShapeManager();
 
@@ -329,8 +333,6 @@ namespace MWPhysics
         std::unique_ptr<btCollisionShape> mWaterCollisionShape;
 
         std::unique_ptr<MWRender::DebugDrawer> mDebugDrawer;
-
-        osg::ref_ptr<osg::Group> mParentNode;
 
         std::size_t mSimulationsCounter = 0;
         std::array<std::vector<Simulation>, 2> mSimulations;

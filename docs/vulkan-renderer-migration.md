@@ -239,6 +239,10 @@ camera payload that was just submitted rather than the previous frame's cached m
 non-OSG owners before allocating OSG physics, terrain, or scene services; this is a deliberate
 fail-fast guard against accidentally constructing Vulkan and OSG in one runtime, while the
 backend-service replacement is still being implemented.
+Physics simulation construction is now independent of an OSG parent node; collision debug
+geometry is an explicit optional OSG setup step. A Vulkan owner can therefore construct the
+simulation core without creating an OSG scene node, while the reference path retains collision
+visualization unchanged.
 The non-owning manager update handle is private to the `Scene` owner, detached during `Scene`
 teardown, and CI guards the manager header against regaining a value-owned neutral frame state.
 Engine GUI fallback frame advancement now also reads simulation time from the active
