@@ -151,6 +151,9 @@ namespace MWWorld
             const DetourNavigator::UpdateGuard* navigatorUpdateGuard);
         void recordNeutralCell(CellStore& cell);
         void updateNeutralTerrainRegions();
+        /// Export the current loaded-world state for the renderer-neutral frame owner.
+        /// Only World may request a submission; renderer adapters do not reach into Scene.
+        Render::SceneSubmission getNeutralScene();
 
     public:
         Scene(MWWorld::World& world, Render::FrameLifecycle& frameLifecycle,
@@ -203,9 +206,6 @@ namespace MWWorld
 
         void clear();
         ///< Change into a void
-
-        /// Export the current loaded-world state for a renderer backend.
-        Render::SceneSubmission getNeutralScene();
 
     public:
         void markCellAsUnchanged();
