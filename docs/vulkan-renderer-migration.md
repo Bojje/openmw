@@ -198,8 +198,9 @@ rejects its headless swapchain allocation. It can optionally
 read a PPM reference image as its fourth argument and write per-frame PPM captures to a
 directory supplied as its fifth argument. This makes future OSG/Vulkan captures
 diagnosable without adding an image-library dependency or repeatedly restarting a game.
-When a presentation-capable run reaches renderer creation, the smoke test also requires
-the Khronos validation layer to be active and fails on error-level validation messages;
+When a presentation-capable run reaches renderer creation, the smoke test enables the
+Khronos validation layer when available and fails on error-level validation messages;
+the CI presentation run additionally requires that layer to be present;
 headless local runs still skip before that gate. CI invokes both presentation probes and
 permits only their documented capability skip (77), while all real renderer or validation
 failures remain hard failures.

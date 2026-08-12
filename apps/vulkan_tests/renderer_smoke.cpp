@@ -236,8 +236,15 @@ int main(int argc, char** argv)
                 throw std::runtime_error("Vulkan smoke renderer reported the wrong backend identity");
             if (!frameOwner.consumesSceneSubmission())
                 throw std::runtime_error("Vulkan smoke renderer did not claim the submission frame path");
+            const char* requireValidationEnvironment = std::getenv("OPENMW_VULKAN_REQUIRE_VALIDATION");
+            const bool requireValidation = requireValidationEnvironment != nullptr
+                && std::string_view(requireValidationEnvironment) == "1";
             if (!renderer->validationEnabled())
+            {
+                if (requireValidation)
+                    throw std::runtime_error("Vulkan validation layers are required but unavailable");
                 std::cerr << "Vulkan validation layers unavailable; continuing without validation\n";
+            }
             if (!renderer->loadShadersAndCreatePipelines(shaderDir))
                 throw std::runtime_error("Vulkan smoke test could not load the raster shaders");
 

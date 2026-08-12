@@ -392,7 +392,7 @@ jobs:
     - name: Run Vulkan presentation smoke
       run: |
         set +e
-        xvfb-run -a env SDL_VIDEODRIVER=x11 LIBGL_ALWAYS_SOFTWARE=1 \
+        xvfb-run -a env SDL_VIDEODRIVER=x11 LIBGL_ALWAYS_SOFTWARE=1 OPENMW_VULKAN_REQUIRE_VALIDATION=1 \
           ./build-vulkan/openmw-vulkan-smoke ./build-vulkan/resources/shaders/vulkan 3
         status=$?
         if [ "$status" -ne 0 ] && [ "$status" -ne 77 ]; then
