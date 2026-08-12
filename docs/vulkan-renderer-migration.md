@@ -241,6 +241,8 @@ boundary; neutral submission export uses the same explicit value snapshot for a 
 backend.
 Neutral object and groundcover snapshots now compose Euler and axis-angle rotations through
 renderer-neutral math; OSG quaternion construction remains only for legacy scene-node updates.
+Object scale adjustment now also uses the renderer-neutral `Render::Vec3` contract; OSG scale
+conversion is limited to the legacy rendering-manager and preview boundaries.
 The full-game bridge validator runs after that same render boundary, so it validates the
 camera payload that was just submitted rather than the previous frame's cached matrices.
 `FrameLifecycle` now identifies its backend explicitly. The current `World::init` path rejects
@@ -269,7 +271,8 @@ The engine public header no longer imports complete OSG viewer/event-handler hea
 are now included only by the implementation files that use them.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-150 files, deleting 1,117 lines and adding 7,684 lines (net `+6,567`). The larger Vulkan-only
+150 files, deleting 1,117 lines and adding 7,684 lines (net `+6,567`) before the current
+scale-boundary cleanup. The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.

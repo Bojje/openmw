@@ -64,9 +64,9 @@ namespace MWRender
         insert->setPosition(osg::Vec3(f[0], f[1], f[2]));
 
         const float scale = ptr.getCellRef().getScale();
-        osg::Vec3f scaleVec(scale, scale, scale);
+        Render::Vec3 scaleVec{ scale, scale, scale };
         ptr.getClass().adjustScale(ptr, scaleVec, true);
-        insert->setScale(scaleVec);
+        insert->setScale(osg::Vec3f(scaleVec.x, scaleVec.y, scaleVec.z));
 
         ptr.getRefData().setBaseNode(std::move(insert));
     }

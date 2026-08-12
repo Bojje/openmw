@@ -250,15 +250,16 @@ namespace MWPhysics
     void Actor::updateScaleUnsafe()
     {
         float scale = mPtr.getCellRef().getScale();
-        osg::Vec3f scaleVec(scale, scale, scale);
+        Render::Vec3 scaleVec{ scale, scale, scale };
 
         mPtr.getClass().adjustScale(mPtr, scaleVec, false);
-        mScale = scaleVec;
-        mHalfExtents = osg::componentMultiply(mOriginalHalfExtents, scaleVec);
+        mScale = osg::Vec3f(scaleVec.x, scaleVec.y, scaleVec.z);
+        mHalfExtents = osg::componentMultiply(mOriginalHalfExtents, mScale);
 
-        scaleVec = osg::Vec3f(scale, scale, scale);
+        scaleVec = { scale, scale, scale };
         mPtr.getClass().adjustScale(mPtr, scaleVec, true);
-        mRenderingHalfExtents = osg::componentMultiply(mOriginalHalfExtents, scaleVec);
+        mRenderingHalfExtents
+            = osg::componentMultiply(mOriginalHalfExtents, osg::Vec3f(scaleVec.x, scaleVec.y, scaleVec.z));
     }
 
     osg::Vec3f Actor::getHalfExtents() const

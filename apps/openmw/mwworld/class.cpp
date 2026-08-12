@@ -304,7 +304,7 @@ namespace MWWorld
         return ESM::RefId();
     }
 
-    void Class::adjustScale(const MWWorld::ConstPtr& ptr, osg::Vec3f& scale, bool rendering) const {}
+    void Class::adjustScale(const MWWorld::ConstPtr& ptr, Render::Vec3& scale, bool rendering) const {}
 
     VFS::Path::NormalizedView Class::getModel(const MWWorld::ConstPtr& ptr) const
     {

@@ -127,13 +127,13 @@ namespace
 
         const MWWorld::CellStore* cell = ptr.getCell();
         const auto& position = ptr.getRefData().getPosition();
-        osg::Vec3f scale(ptr.getCellRef().getScale(), ptr.getCellRef().getScale(), ptr.getCellRef().getScale());
+        Render::Vec3 scale{ ptr.getCellRef().getScale(), ptr.getCellRef().getScale(), ptr.getCellRef().getScale() };
         ptr.getClass().adjustScale(ptr, scale, true);
 
         Render::ObjectTransform transform;
         transform.position = { position.pos[0], position.pos[1], position.pos[2] };
         transform.rotation = makeDirectRenderRotation(ptr);
-        transform.scale = { scale.x(), scale.y(), scale.z() };
+        transform.scale = scale;
         neutralWorld.recordObject(static_cast<const void*>(ptr.mRef), static_cast<const void*>(cell),
             cell->getCell()->isExterior(), cell->getCell()->getGridX(), cell->getCell()->getGridY(),
             cell->getCell()->getNameId(), model, transform, visible, cell->getCell()->getWorldSpace().serializeText(),
@@ -403,11 +403,10 @@ namespace MWWorld
     void Scene::updateObjectScale(const Ptr& ptr)
     {
         float scale = ptr.getCellRef().getScale();
-        osg::Vec3f scaleVec(scale, scale, scale);
+        Render::Vec3 scaleVec{ scale, scale, scale };
         ptr.getClass().adjustScale(ptr, scaleVec, true);
-        mRendering.scaleObject(ptr, scaleVec);
-        mNeutralWorldScene.updateObjectScale(static_cast<const void*>(ptr.mRef),
-            { scaleVec.x(), scaleVec.y(), scaleVec.z() });
+        mRendering.scaleObject(ptr, osg::Vec3f(scaleVec.x, scaleVec.y, scaleVec.z));
+        mNeutralWorldScene.updateObjectScale(static_cast<const void*>(ptr.mRef), scaleVec);
         mPhysics->updateScale(ptr);
     }
 

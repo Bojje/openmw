@@ -131,7 +131,7 @@ namespace MWClass
 
         int getBaseFightRating(const MWWorld::ConstPtr& ptr) const override;
 
-        void adjustScale(const MWWorld::ConstPtr& ptr, osg::Vec3f& scale, bool rendering) const override;
+        void adjustScale(const MWWorld::ConstPtr& ptr, Render::Vec3& scale, bool rendering) const override;
         /// @param rendering Indicates if the scale to adjust is for the rendering mesh, or for the collision mesh
 
         void setBaseAISetting(const ESM::RefId& id, MWMechanics::AiSetting setting, int value) const override;

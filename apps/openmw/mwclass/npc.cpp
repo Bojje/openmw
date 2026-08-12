@@ -1116,7 +1116,7 @@ namespace MWClass
             + shield;
     }
 
-    void Npc::adjustScale(const MWWorld::ConstPtr& ptr, osg::Vec3f& scale, bool rendering) const
+    void Npc::adjustScale(const MWWorld::ConstPtr& ptr, Render::Vec3& scale, bool rendering) const
     {
         if (!rendering)
             return; // collision meshes are not scaled based on race height
@@ -1131,24 +1131,32 @@ namespace MWClass
         if (ptr == MWMechanics::getPlayer() && ptr.isInCell() && MWBase::Environment::get().getWorld()->isFirstPerson())
         {
             if (ref->mBase->isMale())
-                scale *= race->mData.mMaleHeight;
+            {
+                scale.x *= race->mData.mMaleHeight;
+                scale.y *= race->mData.mMaleHeight;
+                scale.z *= race->mData.mMaleHeight;
+            }
             else
-                scale *= race->mData.mFemaleHeight;
+            {
+                scale.x *= race->mData.mFemaleHeight;
+                scale.y *= race->mData.mFemaleHeight;
+                scale.z *= race->mData.mFemaleHeight;
+            }
 
             return;
         }
 
         if (ref->mBase->isMale())
         {
-            scale.x() *= race->mData.mMaleWeight;
-            scale.y() *= race->mData.mMaleWeight;
-            scale.z() *= race->mData.mMaleHeight;
+            scale.x *= race->mData.mMaleWeight;
+            scale.y *= race->mData.mMaleWeight;
+            scale.z *= race->mData.mMaleHeight;
         }
         else
         {
-            scale.x() *= race->mData.mFemaleWeight;
-            scale.y() *= race->mData.mFemaleWeight;
-            scale.z() *= race->mData.mFemaleHeight;
+            scale.x *= race->mData.mFemaleWeight;
+            scale.y *= race->mData.mFemaleWeight;
+            scale.z *= race->mData.mFemaleHeight;
         }
     }
 

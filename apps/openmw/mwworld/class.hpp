@@ -15,6 +15,7 @@
 #include "../mwmechanics/damagesourcetype.hpp"
 
 #include <components/esm/refid.hpp>
+#include <components/render/scene.hpp>
 #include <components/vfs/pathutil.hpp>
 
 namespace osg
@@ -271,7 +272,7 @@ namespace MWWorld
         virtual int getEnchantmentPoints(const MWWorld::ConstPtr& ptr) const;
         ///< @return the number of enchantment points available for possible enchanting
 
-        virtual void adjustScale(const MWWorld::ConstPtr& ptr, osg::Vec3f& scale, bool rendering) const;
+        virtual void adjustScale(const MWWorld::ConstPtr& ptr, Render::Vec3& scale, bool rendering) const;
         /// @param rendering Indicates if the scale to adjust is for the rendering mesh, or for the collision mesh
 
         virtual bool canSell(const MWWorld::ConstPtr& item, int npcServices) const;
