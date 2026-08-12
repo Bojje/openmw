@@ -7,6 +7,7 @@
 #include <string>
 
 #include <components/nif/niffile.hpp>
+#include <components/render/animation.hpp>
 #include <components/render/mesh.hpp>
 
 namespace Nif
@@ -27,6 +28,9 @@ namespace Nif
 
     /// Find the first matching renderer-neutral animation text key.
     std::optional<float> findTextKeyTime(FileView file, std::string_view textKey);
+
+    /// Collect renderer-neutral events belonging to an animation group.
+    std::vector<Render::AnimationTextKey> collectTextKeys(FileView file, std::string_view group);
 }
 
 #endif

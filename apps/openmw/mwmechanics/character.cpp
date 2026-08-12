@@ -29,6 +29,8 @@
 #include <components/misc/strings/algorithm.hpp>
 #include <components/misc/strings/conversion.hpp>
 
+#include <components/render/animation.hpp>
+
 #include <components/settings/values.hpp>
 
 #include <components/sceneutil/positionattitudetransform.hpp>
@@ -2615,13 +2617,43 @@ namespace MWMechanics
         if (!animationDuration || *animationDuration <= 0.f)
             return;
 
-        current.mTime += duration * std::max(0.f, current.mSpeed);
+        const std::vector<Render::AnimationTextKey> textKeys
+            = MWBase::Environment::get().getWorld()->getNeutralAnimationTextKeys(
+                mPtr, current.mGroup, current.mStartKey, current.mStopKey);
+        const auto dispatchTextKeys = [&](float from, float to) {
+            for (const Render::AnimationTextKey& key : textKeys)
+            {
+                const bool atSegmentStart = from <= 0.f && key.time >= 0.f;
+                if ((atSegmentStart ? key.time >= from : key.time > from) && key.time <= to)
+                    handleNeutralTextKey(current.mGroup, key.event);
+            }
+        };
+
+        const float step = duration * std::max(0.f, current.mSpeed);
+        if (step <= 0.f)
+            return;
+
         if (current.mLooping)
         {
-            current.mTime = std::fmod(current.mTime, *animationDuration);
+            float time = std::fmod(current.mTime, *animationDuration);
+            float remaining = step;
+            while (remaining > 0.f)
+            {
+                const float advance = std::min(remaining, *animationDuration - time);
+                dispatchTextKeys(time, time + advance);
+                time += advance;
+                remaining -= advance;
+                if (time >= *animationDuration)
+                    time = 0.f;
+            }
+            current.mTime = time;
             return;
         }
-        if (current.mTime < *animationDuration)
+
+        const float targetTime = current.mTime + step;
+        dispatchTextKeys(current.mTime, std::min(targetTime, *animationDuration));
+        current.mTime = targetTime;
+        if (targetTime < *animationDuration)
             return;
 
         if (current.mLoopCount > 0)
@@ -2635,6 +2667,74 @@ namespace MWMechanics
         if (!mAnimQueue.empty())
             MWBase::Environment::get().getWorld()->updateNeutralAnimation(
                 mPtr, mAnimQueue.front().mGroup, std::nullopt, mAnimQueue.front().mStartKey, mAnimQueue.front().mStopKey);
+    }
+
+    void CharacterController::handleNeutralTextKey(std::string_view groupname, std::string_view event)
+    {
+        MWBase::Environment::get().getLuaManager()->animationTextKey(mPtr, std::string(event));
+
+        if (event.starts_with("sound: "))
+        {
+            MWBase::Environment::get().getSoundManager()->playSound3D(
+                mPtr, ESM::RefId::stringRefId(event.substr(7)), 1.0f, 1.0f);
+            return;
+        }
+
+        if (event.starts_with("soundgen: "))
+        {
+            std::string_view soundgen = event.substr(10);
+            float volume = 1.0f;
+            float pitch = 1.0f;
+            if (soundgen.find(' ') != std::string_view::npos)
+            {
+                std::vector<std::string_view> tokens;
+                Misc::StringUtils::split(soundgen, tokens);
+                soundgen = tokens[0];
+                if (tokens.size() >= 2)
+                    volume = Misc::StringUtils::toNumeric<float>(tokens[1], volume);
+                if (tokens.size() >= 3)
+                    pitch = Misc::StringUtils::toNumeric<float>(tokens[2], pitch);
+            }
+            const ESM::RefId sound = mPtr.getClass().getSoundIdFromSndGen(mPtr, soundgen);
+            if (!sound.empty())
+                MWBase::Environment::get().getSoundManager()->playSound3D(mPtr, sound, volume, pitch);
+            return;
+        }
+
+        const std::string prefix = std::string(groupname) + ": ";
+        if (!event.starts_with(prefix))
+            return;
+        const std::string_view action = event.substr(prefix.size());
+        int attackType = -1;
+        if (action == "chop hit")
+            attackType = ESM::Weapon::AT_Chop;
+        else if (action == "slash hit")
+            attackType = ESM::Weapon::AT_Slash;
+        else if (action == "thrust hit")
+            attackType = ESM::Weapon::AT_Thrust;
+        else if (action == "hit")
+        {
+            if (groupname == "attack1" || groupname == "swimattack1")
+                attackType = ESM::Weapon::AT_Chop;
+            else if (groupname == "attack2" || groupname == "swimattack2")
+                attackType = ESM::Weapon::AT_Slash;
+            else if (groupname == "attack3" || groupname == "swimattack3")
+                attackType = ESM::Weapon::AT_Thrust;
+        }
+        if (attackType >= 0 && mReadyToHit)
+        {
+            mPtr.getClass().hit(mPtr, mAttackStrength, mAttackWindUp, attackType, mAttackVictim, mAttackHitPos,
+                mAttackSuccess);
+            mReadyToHit = false;
+        }
+
+        if (groupname == "spellcast" && action == mAttackType + " release")
+        {
+            if (mCanCast)
+                MWBase::Environment::get().getWorld()->castSpell(mPtr, mCastingScriptedSpell);
+            mCastingScriptedSpell = false;
+            mCanCast = false;
+        }
     }
 
     void CharacterController::updateNeutralMovement(float duration)

@@ -310,6 +310,59 @@ namespace Nif
             return std::nullopt;
         }
 
+        std::string trimTextKey(std::string_view value)
+        {
+            const std::size_t first = value.find_first_not_of(" \t\r\n");
+            if (first == std::string_view::npos)
+                return {};
+            const std::size_t last = value.find_last_not_of(" \t\r\n");
+            return std::string(value.substr(first, last - first + 1));
+        }
+
+        void collectTextKeys(const ExtraList& extras, std::string_view group,
+            std::vector<Render::AnimationTextKey>& result)
+        {
+            const std::string prefix = Misc::StringUtils::lowerCase(std::string(group) + ": ");
+            for (const ExtraPtr& extra : extras)
+            {
+                if (extra.empty() || extra->mRecordType != RC_NiTextKeyExtraData)
+                    continue;
+                const auto* textKeys = static_cast<const NiTextKeyExtraData*>(extra.getPtr());
+                for (const NiTextKeyExtraData::TextKey& key : textKeys->mList)
+                {
+                    if (!std::isfinite(key.mTime))
+                        continue;
+                    const std::string event = trimTextKey(key.mText);
+                    if (Misc::StringUtils::lowerCase(event).starts_with(prefix))
+                        result.push_back({ key.mTime, event });
+                }
+            }
+        }
+
+        void collectTextKeys(const Record& record, std::string_view group,
+            std::vector<Render::AnimationTextKey>& result)
+        {
+            if (const auto* object = dynamic_cast<const NiObjectNET*>(&record))
+                collectTextKeys(object->getExtraList(), group, result);
+            if (const auto* sequence = dynamic_cast<const NiSequence*>(&record))
+            {
+                if (!sequence->mTextKeys.empty())
+                {
+                    const ExtraList extras{ sequence->mTextKeys };
+                    collectTextKeys(extras, group, result);
+                }
+            }
+            if (const auto* node = dynamic_cast<const NiNode*>(&record))
+            {
+                for (const NiAVObjectPtr& child : node->mChildren)
+                    if (!child.empty())
+                        collectTextKeys(*child.getPtr(), group, result);
+                for (const NiAVObjectPtr& effect : node->mEffects)
+                    if (!effect.empty())
+                        collectTextKeys(*effect.getPtr(), group, result);
+            }
+        }
+
         void collectSequenceTransforms(const NiSequenceStreamHelper& sequence, float time, std::string_view group,
             std::string_view startKey, std::unordered_map<std::string, Render::Mat4>& transforms)
         {
@@ -730,5 +783,19 @@ namespace Nif
                 if (const auto time = findTextKeyTime(*root, textKey))
                     return time;
         return std::nullopt;
+    }
+
+    std::vector<Render::AnimationTextKey> collectTextKeys(FileView file, std::string_view group)
+    {
+        std::vector<Render::AnimationTextKey> result;
+        if (group.empty())
+            return result;
+        for (std::size_t i = 0; i < file.numRoots(); ++i)
+            if (const Record* root = file.getRoot(i))
+                collectTextKeys(*root, group, result);
+        std::stable_sort(result.begin(), result.end(), [](const auto& lhs, const auto& rhs) {
+            return lhs.time < rhs.time;
+        });
+        return result;
     }
 }

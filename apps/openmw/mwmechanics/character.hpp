@@ -286,6 +286,7 @@ namespace MWMechanics
         // graph. The Vulkan path uses this until neutral animation owns poses.
         void updateNeutralMovement(float duration);
         void updateNeutralHitAnimation();
+        void handleNeutralTextKey(std::string_view groupname, std::string_view event);
 
         bool onOpen() const;
         void onClose() const;

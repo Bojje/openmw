@@ -38,6 +38,7 @@
 #include <components/misc/rng.hpp>
 
 #include <components/render/math.hpp>
+#include <components/render/animation.hpp>
 
 #include <components/files/collections.hpp>
 
@@ -4228,6 +4229,26 @@ namespace MWWorld
             return duration;
         return mResourceSystem->getNifMeshManager()->getAnimationDuration(
             mResourceSystem->getNifFileManager()->get(keyframes), group, startKey, stopKey);
+    }
+
+    std::vector<Render::AnimationTextKey> World::getNeutralAnimationTextKeys(
+        const MWWorld::Ptr& ptr, std::string_view group, std::string_view startKey, std::string_view stopKey) const
+    {
+        if (mResourceSystem == nullptr || mResourceSystem->backend() != Resource::ResourceSystem::Backend::Neutral
+            || group.empty())
+            return {};
+
+        const VFS::Path::Normalized model = ptr.getClass().getCorrectedModel(ptr);
+        if (model.empty())
+            return {};
+
+        auto keys = mResourceSystem->getNifMeshManager()->getAnimationTextKeys(model, group, startKey, stopKey);
+        VFS::Path::Normalized keyframes(model);
+        keyframes.changeExtension(VFS::Path::ExtensionView("kf"));
+        if (keys.empty() && mResourceSystem->getVFS()->exists(keyframes))
+            keys = mResourceSystem->getNifMeshManager()->getAnimationTextKeys(
+                mResourceSystem->getNifFileManager()->get(keyframes), group, startKey, stopKey);
+        return keys;
     }
 
     void World::setActorActive(const MWWorld::Ptr& ptr, bool value)

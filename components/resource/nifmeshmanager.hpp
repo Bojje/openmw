@@ -8,6 +8,7 @@
 #include <vector>
 
 #include <components/nif/niffile.hpp>
+#include <components/render/animation.hpp>
 #include <components/render/mesh.hpp>
 
 #include "cachemanager.hpp"
@@ -55,6 +56,14 @@ namespace Resource
             std::string_view startKey, std::string_view stopKey);
         std::optional<float> getAnimationDuration(const Nif::NIFFilePtr& file, std::string_view group,
             std::string_view startKey, std::string_view stopKey) const;
+
+        /// Return events in a selected animation segment, rebased to segment time.
+        std::vector<Render::AnimationTextKey> getAnimationTextKeys(
+            VFS::Path::NormalizedView name, std::string_view group, std::string_view startKey = {},
+            std::string_view stopKey = {});
+        std::vector<Render::AnimationTextKey> getAnimationTextKeys(
+            const Nif::NIFFilePtr& file, std::string_view group, std::string_view startKey = {},
+            std::string_view stopKey = {}) const;
 
         /// Sample model-local bone transforms without constructing an OSG
         /// scene. The result follows the supplied skinning bone-name order.

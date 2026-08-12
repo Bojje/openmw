@@ -34,6 +34,7 @@ namespace osg
 namespace Render
 {
     struct Vec3;
+    struct AnimationTextKey;
 }
 
 namespace Loading
@@ -231,6 +232,9 @@ namespace MWBase
         {
             return std::nullopt;
         }
+        virtual std::vector<Render::AnimationTextKey> getNeutralAnimationTextKeys(
+            const MWWorld::Ptr&, std::string_view group = {}, std::string_view startKey = {},
+            std::string_view stopKey = {}) const;
 
         virtual MWWorld::TimeStamp getTimeStamp() const = 0;
         ///< Return current in-game time and number of day since new game start.

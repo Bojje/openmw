@@ -260,6 +260,11 @@ int main()
     const std::vector<Render::Mat4> segmentedExternalPose
         = Nif::collectBonePose(Nif::FileView(*kfFile), animatedBoneNames, 0.25f, "idle", "mid", "stop");
     expectNear(segmentedExternalPose.front().data[12], 3.375f, "sampled segmented external KF translation");
+    const std::vector<Render::AnimationTextKey> externalTextKeys
+        = Nif::collectTextKeys(Nif::FileView(*kfFile), "idle");
+    if (externalTextKeys.size() != 3 || externalTextKeys[0].event != "Idle: Start"
+        || externalTextKeys[1].time != 0.5f || externalTextKeys[2].event != "Idle: Stop")
+        throw std::runtime_error("neutral KF text-key events were not collected in time order");
     expectNear(instances.front().mesh.material.diffuse.x, 0.25f, "material diffuse red");
     expectNear(instances.front().mesh.material.diffuse.w, 0.75f, "material alpha");
     expectNear(instances.front().mesh.material.emissive.z, 0.6f, "material emissive");
@@ -334,6 +339,11 @@ int main()
     const std::optional<float> groupedDuration = meshManager.getAnimationDuration(kfFile, "idle", "start", "stop");
     if (!groupedDuration || *groupedDuration != 0.5f)
         throw std::runtime_error("neutral KF text-key duration was not resolved");
+    const std::vector<Render::AnimationTextKey> segmentedTextKeys
+        = meshManager.getAnimationTextKeys(kfFile, "idle", "start", "stop");
+    if (segmentedTextKeys.size() != 3 || segmentedTextKeys[0].time != 0.f || segmentedTextKeys[1].time != 0.25f
+        || segmentedTextKeys[2].time != 0.5f)
+        throw std::runtime_error("neutral KF text-key segment times were not rebased");
     auto controller = std::make_unique<Nif::NiTimeController>();
     controller->mTimeStart = 1.f;
     controller->mTimeStop = 4.f;

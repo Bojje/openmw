@@ -91,6 +91,41 @@ namespace Resource
         return *stopTime - *startTime;
     }
 
+    std::vector<Render::AnimationTextKey> NifMeshManager::getAnimationTextKeys(
+        VFS::Path::NormalizedView name, std::string_view group, std::string_view startKey,
+        std::string_view stopKey)
+    {
+        return getAnimationTextKeys(mNifFileManager->get(name), group, startKey, stopKey);
+    }
+
+    std::vector<Render::AnimationTextKey> NifMeshManager::getAnimationTextKeys(
+        const Nif::NIFFilePtr& file, std::string_view group, std::string_view startKey,
+        std::string_view stopKey) const
+    {
+        if (!file || group.empty())
+            return {};
+
+        float segmentStart = 0.f;
+        if (!startKey.empty())
+            segmentStart = Nif::findTextKeyTime(Nif::FileView(*file),
+                std::string(group) + ": " + std::string(startKey)).value_or(0.f);
+
+        std::optional<float> segmentStop;
+        if (!stopKey.empty())
+            segmentStop = Nif::findTextKeyTime(Nif::FileView(*file),
+                std::string(group) + ": " + std::string(stopKey));
+
+        std::vector<Render::AnimationTextKey> result;
+        for (Render::AnimationTextKey key : Nif::collectTextKeys(Nif::FileView(*file), group))
+        {
+            if (key.time < segmentStart || (segmentStop && key.time > *segmentStop))
+                continue;
+            key.time -= segmentStart;
+            result.push_back(std::move(key));
+        }
+        return result;
+    }
+
     std::vector<Render::Mat4> NifMeshManager::getBonePose(
         VFS::Path::NormalizedView name, float time, std::span<const std::string> boneNames, std::string_view group,
         std::string_view startKey, std::string_view stopKey)
