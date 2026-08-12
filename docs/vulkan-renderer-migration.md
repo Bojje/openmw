@@ -402,7 +402,7 @@ real replacement consumes its responsibility and the fast tests cover the bounda
 
 ### 6. Port static world rendering
 
-- Wire NIF loading and `MeshConverter` into resource management. The NIF converter now has a tested tree traversal and material boundary, `NifMeshManager` caches converted instances, image resources expose neutral RGBA8 data, and `RenderingManager` can collect a `SceneSubmission` containing static meshes and loaded exterior terrain without exposing OSG objects. The standalone Vulkan path consumes that submission and its resolved textures; a live full-game Vulkan frame consumer, shading, and complete static-world coverage are still outstanding.
+- Wire NIF loading and `MeshConverter` into resource management. The NIF converter now has a tested tree traversal and material boundary, `NifMeshManager` caches converted instances, image resources expose neutral RGBA8 data, and `MWWorld::Scene` can collect a `SceneSubmission` containing static meshes and loaded exterior terrain without exposing OSG objects. The standalone Vulkan path consumes that submission and its resolved textures; a live full-game Vulkan frame consumer, shading, and complete static-world coverage are still outstanding.
 - Implement model caching, cell add/remove, transforms, textures, materials, terrain,
   interiors, and static objects. The terrain adapter now feeds opaque and ordered
   blendmap/multi-layer Vulkan mesh consumers with normal-map sampling, height-based
