@@ -103,7 +103,8 @@ owned by the renderer-neutral `WorldScene`/`CellScene` components rather than th
 manager. `MWWorld::Scene` now owns the neutral `WorldScene`; the world lifecycle writes object
 snapshots during insertion and unpaging, while explicit neutral transform-update methods own
 position, rotation, and scale changes. The manager retains OSG-facing object operations and
-neutral light/fog updates; neutral terrain snapshot production now belongs to the storage
+neutral light/fog updates; object-class insertion now receives `MWRender::Objects` directly
+instead of a virtual manager adapter; neutral terrain snapshot production now belongs to the storage
 contract consumed by `Scene`. `Scene` also exposes the complete
 neutral submission as the future full-game backend call site. World reset is
 also owned by `Scene::clear()` after cell teardown. Terrain tile snapshots are now requested by
@@ -248,7 +249,7 @@ The engine public header no longer imports complete OSG viewer/event-handler hea
 are now included only by the implementation files that use them.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-95 files, deleting 948 lines and adding 7,396 lines (net `+6,448`). The larger Vulkan-only
+143 files, deleting 1,062 lines and adding 7,471 lines (net `+6,409`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
