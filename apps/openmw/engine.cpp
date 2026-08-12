@@ -1009,7 +1009,8 @@ void OMW::Engine::go()
 {
     assert(!mContentFiles.empty());
 
-    Log(Debug::Info) << "OSG version: " << osgGetVersion();
+    if (!mUseVulkan)
+        Log(Debug::Info) << "OSG version: " << osgGetVersion();
     SDL_version sdlVersion;
     SDL_GetVersion(&sdlVersion);
     Log(Debug::Info) << "SDL version: " << (int)sdlVersion.major << "." << (int)sdlVersion.minor << "."
@@ -1063,29 +1064,31 @@ void OMW::Engine::go()
 
     prepareEngine();
 
-#ifdef _WIN32
-    const auto* statsFile = _wgetenv(L"OPENMW_OSG_STATS_FILE");
-#else
-    const auto* statsFile = std::getenv("OPENMW_OSG_STATS_FILE");
-#endif
-
     std::filesystem::path path;
-    if (statsFile != nullptr)
-        path = statsFile;
-
     std::ofstream stats;
-    if (!path.empty())
+    if (!mUseVulkan)
     {
-        stats.open(path, std::ios_base::out);
-        if (stats.is_open())
-            Log(Debug::Info) << "OSG stats will be written to: " << path;
-        else
-            Log(Debug::Warning) << "Failed to open file to write OSG stats \"" << path
-                                << "\": " << std::generic_category().message(errno);
-    }
+#ifdef _WIN32
+        const auto* statsFile = _wgetenv(L"OPENMW_OSG_STATS_FILE");
+#else
+        const auto* statsFile = std::getenv("OPENMW_OSG_STATS_FILE");
+#endif
+        if (statsFile != nullptr)
+            path = statsFile;
 
-    if (auto* const statsLifecycle = dynamic_cast<MWRender::ViewerFrameLifecycle*>(mFrameLifecycle.get()))
-        statsLifecycle->initializeStatsHandlers(*mVFS, stats.is_open(), initStatsHandler);
+        if (!path.empty())
+        {
+            stats.open(path, std::ios_base::out);
+            if (stats.is_open())
+                Log(Debug::Info) << "OSG stats will be written to: " << path;
+            else
+                Log(Debug::Warning) << "Failed to open file to write OSG stats \"" << path
+                                    << "\": " << std::generic_category().message(errno);
+        }
+
+        if (auto* const statsLifecycle = dynamic_cast<MWRender::ViewerFrameLifecycle*>(mFrameLifecycle.get()))
+            statsLifecycle->initializeStatsHandlers(*mVFS, stats.is_open(), initStatsHandler);
+    }
 
     // Start the game
     if (!mSaveGameFile.empty())
