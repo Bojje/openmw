@@ -59,9 +59,9 @@ namespace Render
         std::vector<Mat4> boneMatrices;
         // Optional texture replacement used by explicitly identified world VFX.
         std::string textureOverride;
-        // World effects retain whether gameplay requested looping playback. A
-        // presentation owner is still responsible for advancing/removing the
-        // effect when animation support is available.
+        // World effects retain whether gameplay requested looping playback.
+        // Controller timing is advanced by the world owner; mesh controller
+        // playback remains a separate animation milestone.
         bool looping = false;
         // A zero duration means the resource did not expose a controller
         // interval. Such effects remain explicitly removable by gameplay.
