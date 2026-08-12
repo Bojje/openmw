@@ -19,6 +19,7 @@ layout(set = 0, binding = 4) uniform SceneUBO {
     vec4 fogColor;
     vec4 fogParameters;
     vec4 skyColor;
+    vec4 effectTime;
 } scene;
 
 layout(location = 0) out vec4 outColor;
@@ -73,6 +74,16 @@ void main() {
     viewPos /= viewPos.w;
     vec4 worldPos4 = scene.viewInverse * viewPos;
     vec3 worldPos = worldPos4.xyz;
+
+    if (waterSurface)
+    {
+        vec2 wavePosition = worldPos.xz * 0.018;
+        float waveTime = scene.effectTime.x;
+        float waveA = sin(wavePosition.x * 1.7 + waveTime * 0.8);
+        float waveB = sin(wavePosition.y * 2.1 - waveTime * 0.55);
+        vec3 waveNormal = normalize(vec3(waveA * 0.16 + waveB * 0.08, 1.0, waveB * 0.16 - waveA * 0.08));
+        N = normalize(mix(N, waveNormal, 0.35));
+    }
 
     float specularStrength = objectSpecular ? 1.0
         : terrainSpecular ? materialSample.g : 0.3 * (1.0 - roughness);

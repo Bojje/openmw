@@ -83,13 +83,16 @@ namespace Render
         // geometry. The Vulkan composite derives its sky gradient from this
         // value instead of keeping a backend-local hard-coded sky.
         Vec4 skyColor{ 0.6f, 0.75f, 0.9f, 1.f };
+        // Renderer-neutral effect clock. The Vulkan composite uses x for
+        // procedural water motion; the remaining components are reserved.
+        Vec4 effectTime{ 0.f, 0.f, 0.f, 0.f };
 
         bool valid() const
         {
             return Render::valid(view) && Render::valid(projection) && Render::valid(viewInverse)
                 && Render::valid(projInverse) && Render::valid(sunDirection) && Render::valid(sunColor)
                 && Render::valid(ambientColor) && Render::valid(fogColor) && Render::valid(fogParameters)
-                && Render::valid(skyColor);
+                && Render::valid(skyColor) && Render::valid(effectTime);
         }
     };
 

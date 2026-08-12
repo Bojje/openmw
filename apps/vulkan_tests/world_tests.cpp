@@ -118,7 +118,7 @@ int main()
     if (weatherSubmission.meshes.size() != 2 || !weatherSubmission.valid())
         throw std::runtime_error("renderer-neutral scene submission lost precipitation geometry");
     world.updateEffects(1.f);
-    if (world.weatherTime() != 1.f)
+    if (world.weatherTime() != 1.f || world.sceneData().effectTime.x != 1.f)
         throw std::runtime_error("renderer-neutral world scene failed to advance precipitation time");
     weather.snow = true;
     world.setWeatherEffects(weather);

@@ -270,6 +270,7 @@ namespace Render
         {
             if (!valid(duration) || duration <= 0.f)
                 return;
+            mSceneData.effectTime.x = std::fmod(mSceneData.effectTime.x + duration, 4096.f);
             if (mWeatherEffects.enabled && mWeatherEffects.speed > 0.f)
                 mWeatherTime = std::fmod(mWeatherTime + duration, 3600.f);
 
