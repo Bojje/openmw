@@ -537,9 +537,12 @@ namespace MWMechanics
             playBlendedAnimation(jumpAnimName, Priority_Jump, jumpmask, true, 1.0f, "loop stop", "stop", 0.0f, 0);
     }
 
-    bool CharacterController::onOpen() const
+    bool CharacterController::onOpen()
     {
-        if (mPtr.getType() == ESM::Container::sRecordId && mAnimation)
+        if (mPtr.getType() != ESM::Container::sRecordId)
+            return true;
+
+        if (mAnimation)
         {
             if (!mAnimation->hasAnimation("containeropen"))
                 return true;
@@ -556,14 +559,25 @@ namespace MWMechanics
                 return false;
         }
 
-        return true;
+        MWBase::World* const world = MWBase::Environment::get().getWorld();
+        if (!world->getNeutralAnimationDuration(mPtr, "containeropen", "start", "stop"))
+            return true;
+
+        if (isAnimPlaying("containeropen") || isAnimPlaying("containerclose"))
+            return false;
+
+        playGroup("containeropen", 0, 0, true);
+        return false;
     }
 
-    void CharacterController::onClose() const
+    void CharacterController::onClose()
     {
-        if (mPtr.getType() == ESM::Container::sRecordId)
+        if (mPtr.getType() != ESM::Container::sRecordId)
+            return;
+
+        if (mAnimation)
         {
-            if (!mAnimation || !mAnimation->hasAnimation("containerclose"))
+            if (!mAnimation->hasAnimation("containerclose"))
                 return;
 
             float complete, startPoint = 0.f;
@@ -573,7 +587,36 @@ namespace MWMechanics
 
             mAnimation->play("containerclose", Priority_Scripted, MWRender::BlendMask_All, false, 1.0f, "start", "stop",
                 startPoint, 0);
+            return;
         }
+
+        MWBase::World* const world = MWBase::Environment::get().getWorld();
+        const std::optional<float> closeDuration
+            = world->getNeutralAnimationDuration(mPtr, "containerclose", "start", "stop");
+        if (!closeDuration || *closeDuration <= 0.f)
+            return;
+
+        float startPoint = 0.f;
+        if (!mAnimQueue.empty() && mAnimQueue.front().mGroup == "containeropen")
+        {
+            const std::optional<float> openDuration
+                = world->getNeutralAnimationDuration(mPtr, "containeropen", "start", "stop");
+            if (openDuration && *openDuration > 0.f)
+                startPoint = 1.f - std::clamp(mAnimQueue.front().mTime / *openDuration, 0.f, 1.f);
+        }
+
+        clearAnimQueue(true);
+        AnimationQueueEntry entry;
+        entry.mGroup = "containerclose";
+        entry.mLoopCount = 0;
+        entry.mTime = startPoint * *closeDuration;
+        entry.mLooping = false;
+        entry.mScripted = true;
+        entry.mStartKey = "start";
+        entry.mStopKey = "stop";
+        entry.mSpeed = 1.f;
+        mAnimQueue.push_back(std::move(entry));
+        world->updateNeutralAnimation(mPtr, "containerclose", entry.mTime, "start", "stop");
     }
 
     std::string_view CharacterController::getWeaponAnimation(int weaponType) const
@@ -2001,6 +2044,8 @@ namespace MWMechanics
         if (!mAnimation)
         {
             updateNeutralMovement(duration);
+            if (!mPtr.getClass().isActor())
+                updateNeutralAnimationQueue(duration);
             return;
         }
         MWBase::World* world = MWBase::Environment::get().getWorld();

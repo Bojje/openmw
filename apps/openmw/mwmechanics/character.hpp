@@ -289,8 +289,8 @@ namespace MWMechanics
         void updateNeutralHitAnimation();
         void handleNeutralTextKey(std::string_view groupname, std::string_view event);
 
-        bool onOpen() const;
-        void onClose() const;
+        bool onOpen();
+        void onClose();
 
         void persistAnimationState() const;
         bool playGroup(std::string_view groupname, int mode, uint32_t count, bool scripted = false);
