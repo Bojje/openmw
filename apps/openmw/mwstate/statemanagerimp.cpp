@@ -887,20 +887,11 @@ void MWState::StateManager::writeScreenshot(std::vector<char>& imageData) const
     const std::optional<Render::TextureData> captured = world->captureFrame();
     if (captured && captured->valid())
     {
-#ifdef OPENMW_NEUTRAL_JPEG
-        if (!Render::writeJpeg(*captured, imageData))
-        {
-            Log(Debug::Warning) << "Unable to encode Vulkan savegame thumbnail as JPEG";
-            return;
-        }
-        return;
-#else
         auto* const pixels = new unsigned char[captured->pixels.size()];
         std::memcpy(pixels, captured->pixels.data(), captured->pixels.size());
         screenshot->setImage(static_cast<int>(captured->width), static_cast<int>(captured->height), 1, GL_RGBA, GL_RGBA,
             GL_UNSIGNED_BYTE, pixels, osg::Image::USE_NEW_DELETE);
         screenshot->scaleImage(screenshotW, screenshotH, 1);
-#endif
     }
     else if (world->getRenderingManager() != nullptr)
         world->getRenderingManager()->screenshot(screenshot.get(), screenshotW, screenshotH);
