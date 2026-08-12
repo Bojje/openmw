@@ -123,6 +123,15 @@ jobs:
           echo "RenderingManager must not own the renderer-neutral frame state"
           exit 1
         fi
+        if rg -n 'RenderingInterface|renderinginterface\.hpp' apps/openmw; then
+          echo "The removed renderer object-insertion adapter must not return"
+          exit 1
+        fi
+        if rg -n -U 'insertObjectRendering\([^;{}]*(RenderingManager|RenderingInterface)' \
+            apps/openmw/mwclass apps/openmw/mwworld --glob '*.cpp' --glob '*.hpp'; then
+          echo "Object-class insertion must depend directly on MWRender::Objects"
+          exit 1
+        fi
         if rg -n 'mNeutralSceneData|setNeutralSceneData|clearNeutralSceneData' \
             apps/openmw/mwrender/renderingmanager.hpp apps/openmw/mwrender/renderingmanager.cpp apps/openmw/mwworld/scene.cpp; then
           echo "RenderingManager must not retain a back-pointer into the world-owned neutral frame state"
