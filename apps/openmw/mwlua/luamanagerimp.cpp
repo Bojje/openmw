@@ -2,7 +2,6 @@
 
 #include <filesystem>
 
-#include <MyGUI_InputManager.h>
 #include <osg/Stats>
 
 #include <sol/object.hpp>
@@ -390,7 +389,9 @@ namespace MWLua
     {
         LuaUi::clearGameInterface();
         mUiResourceManager.clear();
-        MWBase::Environment::get().getWorld()->getPostProcessor()->disableDynamicShaders();
+        if (MWRender::PostProcessor* const postProcessor
+            = MWBase::Environment::get().getWorld()->getPostProcessor())
+            postProcessor->disableDynamicShaders();
         mActiveLocalScripts.clear();
         mLuaEvents.clear();
         mEngineEvents.clear();
@@ -695,8 +696,8 @@ namespace MWLua
 
     void LuaManager::inputEvent(const InputEvent& event)
     {
-        if (!MyGUI::InputManager::getInstance().isModalAny()
-            && !MWBase::Environment::get().getWindowManager()->isConsoleMode())
+        MWBase::WindowManager* const windowManager = MWBase::Environment::get().getWindowManager();
+        if (!windowManager->isGuiMode() && !windowManager->isConsoleMode())
         {
             mInputEvents.push_back(event);
         }
