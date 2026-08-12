@@ -96,7 +96,6 @@ namespace MWWorld
         MWWorld::World& mWorld;
         Render::FrameLifecycle& mFrameLifecycle;
         Render::SceneSynchronizer mSceneSynchronizer;
-        Render::BonePoseResolver mBonePoseResolver;
         Render::MeshResolver mMeshResolver;
         Render::TextureResolver mTextureResolver;
         const VFS::Manager* mVfs;
@@ -162,16 +161,16 @@ namespace MWWorld
             MWPhysics::PhysicsSystem* physics, DetourNavigator::Navigator& navigator);
 
         Scene(MWWorld::World& world, Render::FrameLifecycle& frameLifecycle,
-            Render::SceneSynchronizer sceneSynchronizer, Render::BonePoseResolver bonePoseResolver,
-            Render::MeshResolver meshResolver, Render::TextureResolver textureResolver, const VFS::Manager* vfs,
+            Render::SceneSynchronizer sceneSynchronizer, Render::MeshResolver meshResolver,
+            Render::TextureResolver textureResolver, const VFS::Manager* vfs,
             MWRender::RenderingManager* rendering, MWRender::ObjectPaging* objectPaging,
             Terrain::RenderStorage& terrainStorage, std::unique_ptr<CellPreloader> preloader,
             MWPhysics::PhysicsSystem* physics,
             DetourNavigator::Navigator& navigator);
 
         Scene(MWWorld::World& world, Render::FrameLifecycle& frameLifecycle,
-            Render::SceneSynchronizer sceneSynchronizer, Render::BonePoseResolver bonePoseResolver,
-            Render::MeshResolver meshResolver, Render::TextureResolver textureResolver, const VFS::Manager* vfs,
+            Render::SceneSynchronizer sceneSynchronizer, Render::MeshResolver meshResolver,
+            Render::TextureResolver textureResolver, const VFS::Manager* vfs,
             Terrain::RenderStorage& terrainStorage,
             MWPhysics::PhysicsSystem* physics, DetourNavigator::Navigator& navigator);
 

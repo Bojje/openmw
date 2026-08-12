@@ -1060,15 +1060,15 @@ namespace MWWorld
         const VFS::Manager* vfs, MWRender::RenderingManager* rendering, MWRender::ObjectPaging* objectPaging,
         Terrain::RenderStorage& terrainStorage, std::unique_ptr<CellPreloader> preloader,
         MWPhysics::PhysicsSystem* physics, DetourNavigator::Navigator& navigator)
-        : Scene(world, frameLifecycle, Render::SceneSynchronizer(), Render::BonePoseResolver(), Render::MeshResolver(),
-            Render::TextureResolver(), vfs, rendering, objectPaging, terrainStorage, std::move(preloader), physics,
+        : Scene(world, frameLifecycle, Render::SceneSynchronizer(), Render::MeshResolver(), Render::TextureResolver(),
+            vfs, rendering, objectPaging, terrainStorage, std::move(preloader), physics,
             navigator)
     {
     }
 
     Scene::Scene(MWWorld::World& world, Render::FrameLifecycle& frameLifecycle,
-        Render::SceneSynchronizer sceneSynchronizer, Render::BonePoseResolver bonePoseResolver,
-        Render::MeshResolver meshResolver, Render::TextureResolver textureResolver, const VFS::Manager* vfs,
+        Render::SceneSynchronizer sceneSynchronizer, Render::MeshResolver meshResolver,
+        Render::TextureResolver textureResolver, const VFS::Manager* vfs,
         MWRender::RenderingManager* rendering, MWRender::ObjectPaging* objectPaging,
         Terrain::RenderStorage& terrainStorage, std::unique_ptr<CellPreloader> preloader,
         MWPhysics::PhysicsSystem* physics,
@@ -1078,7 +1078,6 @@ namespace MWWorld
         , mWorld(world)
         , mFrameLifecycle(frameLifecycle)
         , mSceneSynchronizer(std::move(sceneSynchronizer))
-        , mBonePoseResolver(std::move(bonePoseResolver))
         , mMeshResolver(std::move(meshResolver))
         , mTextureResolver(std::move(textureResolver))
         , mVfs(vfs)
@@ -1093,11 +1092,11 @@ namespace MWWorld
     }
 
     Scene::Scene(MWWorld::World& world, Render::FrameLifecycle& frameLifecycle,
-        Render::SceneSynchronizer sceneSynchronizer, Render::BonePoseResolver bonePoseResolver,
-        Render::MeshResolver meshResolver, Render::TextureResolver textureResolver, const VFS::Manager* vfs,
+        Render::SceneSynchronizer sceneSynchronizer, Render::MeshResolver meshResolver,
+        Render::TextureResolver textureResolver, const VFS::Manager* vfs,
         Terrain::RenderStorage& terrainStorage,
         MWPhysics::PhysicsSystem* physics, DetourNavigator::Navigator& navigator)
-        : Scene(world, frameLifecycle, std::move(sceneSynchronizer), std::move(bonePoseResolver), std::move(meshResolver),
+        : Scene(world, frameLifecycle, std::move(sceneSynchronizer), std::move(meshResolver),
             std::move(textureResolver), vfs, nullptr, nullptr, terrainStorage, nullptr,
             physics, navigator)
     {
@@ -1298,7 +1297,7 @@ namespace MWWorld
             return *meshes;
         };
 
-        mNeutralWorldScene->updateDynamicPoses([&](const void* objectKey, const Render::WorldObject& object) {
+        mNeutralWorldScene->updateDynamicPoses([&](const void*, const Render::WorldObject& object) {
             const std::vector<Render::MeshInstance>& meshes = resolveMeshes(object.model);
             const auto skinned = std::find_if(meshes.begin(), meshes.end(), [](const Render::MeshInstance& mesh) {
                 return mesh.mesh.skinning && !mesh.mesh.skinning->boneNames.empty();
@@ -1314,11 +1313,6 @@ namespace MWWorld
                     return std::vector<Render::Mat4>();
             }
 
-            std::vector<std::string_view> boneNames;
-            boneNames.reserve(skinned->mesh.skinning->boneNames.size());
-            for (const std::string& boneName : skinned->mesh.skinning->boneNames)
-                boneNames.push_back(boneName);
-
             const auto bindPose = [&] {
                 std::vector<Render::Mat4> result;
                 result.reserve(skinned->mesh.skinning->inverseBindMatrices.size());
@@ -1326,10 +1320,7 @@ namespace MWWorld
                     result.push_back(Render::invertMat4(inverseBind));
                 return result;
             };
-            if (!mBonePoseResolver)
-                return bindPose();
-            std::vector<Render::Mat4> pose = mBonePoseResolver(objectKey, boneNames);
-            return pose.empty() ? bindPose() : pose;
+            return bindPose();
         });
 
         Render::SceneSubmission result = Render::collectSceneSubmission(

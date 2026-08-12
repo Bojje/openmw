@@ -3,9 +3,7 @@
 
 #include <cmath>
 #include <functional>
-#include <span>
 #include <string_view>
-#include <vector>
 
 namespace Render
 {
@@ -96,8 +94,6 @@ namespace Render
     };
 
     using SceneSynchronizer = std::function<void(SceneData&)>;
-    using BonePoseResolver = std::function<std::vector<Mat4>(
-        const void*, std::span<const std::string_view>)>;
 }
 
 #endif

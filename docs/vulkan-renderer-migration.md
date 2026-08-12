@@ -126,12 +126,12 @@ teardown, so a game/world unload cannot retain stale object identities, terrain 
 ordering.
 Dynamic `WorldObject` records now own an optional neutral bone-pose snapshot and expose an explicit
 pose-update operation; `SceneSubmission` carries that pose beside each resolved dynamic mesh. The
-neutral export now has a transitional OSG-backed pose producer: after the reference traversal,
-it maps named NIF skin bones to current animation skeleton matrices and carries matching poses into
-dynamic submissions. The full-game Vulkan frame loop still lacks this producer, animation timing
-ownership, and animation-specific shading; mismatched multi-part skin orders are intentionally left
-unposed. NIF skinning metadata now also preserves source bone names beside inverse-bind matrices,
-making the future Vulkan-side mapping deterministic without borrowing OSG types.
+full-game Vulkan export deliberately supplies only an inverse-bind-derived bind pose until a real
+renderer-neutral animation owner exists; animation timing, live bone updates, animation-specific
+shading, and mismatched multi-part skin orders remain outstanding. NIF skinning metadata preserves
+source bone names beside inverse-bind matrices, making the future Vulkan-side mapping deterministic
+without borrowing OSG types. The removed callback was never backed by a live Vulkan producer and
+was deleted as transitional plumbing rather than retained as a compatibility promise.
 The Vulkan composite pass now consumes that single scene-lighting UBO directly; duplicated
 sun push constants were removed, and ambient light is part of the neutral snapshot. The
 world-owned `Scene` now resolves loaded-world meshes and RGBA8 textures through the existing

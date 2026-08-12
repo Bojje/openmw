@@ -323,8 +323,8 @@ namespace MWWorld
     }
 
     void World::initNeutralRenderer(Render::FrameLifecycle& frameLifecycle,
-        Render::SceneSynchronizer sceneSynchronizer, Render::BonePoseResolver bonePoseResolver,
-        Render::MeshResolver meshResolver, Render::TextureResolver textureResolver)
+        Render::SceneSynchronizer sceneSynchronizer, Render::MeshResolver meshResolver,
+        Render::TextureResolver textureResolver)
     {
         if (frameLifecycle.backend() != Render::FrameLifecycle::Backend::Vulkan)
             throw std::invalid_argument("The neutral world renderer requires a Vulkan frame owner");
@@ -346,7 +346,7 @@ namespace MWWorld
         mTerrainStorage = std::move(neutralTerrainStorage);
         mWeatherManager = std::make_unique<MWWorld::WeatherManager>(nullptr, nullptr, mStore);
         mWorldScene = std::make_unique<Scene>(*this, frameLifecycle, std::move(sceneSynchronizer),
-            std::move(bonePoseResolver), std::move(meshResolver), std::move(textureResolver), mResourceSystem->getVFS(),
+            std::move(meshResolver), std::move(textureResolver), mResourceSystem->getVFS(),
             *mTerrainRenderStorage, mPhysics.get(), *mNavigator);
     }
 

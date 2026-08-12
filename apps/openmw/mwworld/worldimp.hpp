@@ -242,8 +242,7 @@ namespace MWWorld
         // Neutral scene bootstrap for a submission-consuming backend. This does not create
         // OSG rendering, paging, terrain-world, or preloader services.
         void initNeutralRenderer(Render::FrameLifecycle& frameLifecycle, Render::SceneSynchronizer sceneSynchronizer,
-            Render::BonePoseResolver bonePoseResolver, Render::MeshResolver meshResolver,
-            Render::TextureResolver textureResolver);
+            Render::MeshResolver meshResolver, Render::TextureResolver textureResolver);
 
         virtual ~World();
 

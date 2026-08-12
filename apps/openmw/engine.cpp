@@ -764,9 +764,7 @@ void OMW::Engine::prepareVulkanEngine()
         sceneData.viewInverse = Render::invertMat4(sceneData.view);
         sceneData.projInverse = Render::invertMat4(sceneData.projection);
     };
-    mWorld->initNeutralRenderer(*mFrameLifecycle, sceneSynchronizer,
-        [](const void*, std::span<const std::string_view>) { return std::vector<Render::Mat4>(); },
-        std::move(meshResolver), textureResolver);
+    mWorld->initNeutralRenderer(*mFrameLifecycle, sceneSynchronizer, std::move(meshResolver), textureResolver);
     mEnvironment.setWorldScene(mWorld->getWorldScene());
     mWorld->setupPlayer();
     mWorld->setRandomSeed(mRandomSeed);
