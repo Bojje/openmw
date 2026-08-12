@@ -114,6 +114,26 @@ namespace Render
         return result;
     }
 
+    template <class ResolveMeshes>
+    void collectEffectMeshes(const WorldScene& world, ResolveMeshes&& resolveMeshes, std::vector<MeshInstance>& result,
+        std::vector<std::string>& unresolvedModels)
+    {
+        for (const WorldObject* effect : world.effectsInOrder())
+        {
+            const std::vector<MeshInstance> resolvedMeshes = resolveMeshes(effect->model);
+            const bool hasGeometry = std::any_of(resolvedMeshes.begin(), resolvedMeshes.end(), hasRenderableGeometry);
+            if (!hasGeometry)
+                unresolvedModels.push_back(effect->model);
+            for (const MeshInstance& mesh : resolvedMeshes)
+            {
+                MeshInstance instance = transformMeshInstance(*effect, mesh);
+                if (!effect->textureOverride.empty())
+                    instance.mesh.material.albedoTexture = effect->textureOverride;
+                result.push_back(std::move(instance));
+            }
+        }
+    }
+
     struct DynamicMeshSubmission
     {
         WorldObject object;
@@ -264,6 +284,7 @@ namespace Render
         std::vector<MeshInstance> waterMeshes = collectWaterMeshes(world, worldspace);
         result.meshes.insert(result.meshes.end(), std::make_move_iterator(waterMeshes.begin()),
             std::make_move_iterator(waterMeshes.end()));
+        collectEffectMeshes(world, resolveMeshes, result.meshes, result.unresolvedModels);
         for (const CellScene* cell : world.cellsInOrder(worldspace))
             for (const WorldObject& object : cell->objects)
             {

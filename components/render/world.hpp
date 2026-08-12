@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <map>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -56,6 +57,8 @@ namespace Render
         // use the skinning order of the resolved mesh and contain no backend
         // or scene-graph types.
         std::vector<Mat4> boneMatrices;
+        // Optional texture replacement used by explicitly identified world VFX.
+        std::string textureOverride;
     };
 
     // A cell snapshot is updated by the world lifecycle, not by a renderer.
@@ -108,6 +111,7 @@ namespace Render
 
         std::unordered_map<const void*, CellScene> mCells;
         std::unordered_map<const void*, ObjectLocation> mObjects;
+        std::map<std::string, WorldObject, std::less<>> mEffects;
         std::vector<TerrainRegion> mTerrainRegions;
         std::string mActiveWorldspace;
         SceneData mSceneData{};
@@ -179,6 +183,36 @@ namespace Render
                 return false;
             found->second.water->level = level;
             return true;
+        }
+
+        bool recordEffect(std::string_view effectId, std::string_view model, const Vec3& position, float scale,
+            std::string_view textureOverride = {})
+        {
+            if (effectId.empty() || model.empty() || !valid(position) || !valid(scale) || scale <= 0.f)
+                return false;
+            WorldObject effect;
+            effect.id = mNextObjectId++;
+            if (effect.id == 0)
+                effect.id = mNextObjectId++;
+            effect.model = model;
+            effect.transform.position = position;
+            effect.transform.scale = { scale, scale, scale };
+            effect.textureOverride = textureOverride;
+            mEffects[std::string(effectId)] = std::move(effect);
+            return true;
+        }
+
+        bool removeEffect(std::string_view effectId) { return mEffects.erase(std::string(effectId)) != 0; }
+
+        void clearEffects() { mEffects.clear(); }
+
+        std::vector<const WorldObject*> effectsInOrder() const
+        {
+            std::vector<const WorldObject*> result;
+            result.reserve(mEffects.size());
+            for (const auto& [id, effect] : mEffects)
+                result.push_back(&effect);
+            return result;
         }
 
         void setTerrainTiles(const void* cellKey, std::vector<TerrainTile> tiles)
@@ -403,6 +437,7 @@ namespace Render
         {
             mCells.clear();
             mObjects.clear();
+            mEffects.clear();
             mTerrainRegions.clear();
             mActiveWorldspace.clear();
             mSceneData = {};

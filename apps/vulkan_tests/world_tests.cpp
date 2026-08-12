@@ -206,6 +206,21 @@ int main()
     Render::MeshInstance aggregateMesh = {};
     aggregateMesh.mesh.vertices.resize(3);
     aggregateMesh.mesh.indices = { 0, 1, 2 };
+    if (!world.recordEffect("spark", "meshes/effect.nif", { 10.f, 11.f, 12.f }, 2.f, "textures/effect.dds")
+        || world.recordEffect("", "meshes/effect.nif", { 10.f, 11.f, 12.f }, 1.f))
+        throw std::runtime_error("renderer-neutral world scene accepted an invalid or anonymous effect");
+    const Render::SceneSubmission effectSubmission = Render::collectSceneSubmission(world, aggregateScene, "",
+        [&](std::string_view model) -> std::vector<Render::MeshInstance> {
+            if (model != "meshes/first.nif" && model != "meshes/effect.nif")
+                throw std::runtime_error("effect scene submission resolved an unexpected model");
+            return { aggregateMesh };
+        }, false);
+    if (effectSubmission.meshes.size() != 2 || effectSubmission.meshes.back().transform.data[0] != 2.f
+        || effectSubmission.meshes.back().mesh.material.albedoTexture != "textures/effect.dds"
+        || !effectSubmission.valid())
+        throw std::runtime_error("renderer-neutral scene submission lost an identified effect");
+    if (!world.removeEffect("spark") || world.removeEffect("spark"))
+        throw std::runtime_error("renderer-neutral world scene failed effect removal");
     const Render::SceneSubmission aggregate = Render::collectSceneSubmission(world, aggregateScene, "",
         [&](std::string_view model) -> std::vector<Render::MeshInstance> {
             if (model != "meshes/first.nif")

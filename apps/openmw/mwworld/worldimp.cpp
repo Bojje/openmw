@@ -3897,12 +3897,19 @@ namespace MWWorld
     {
         if (mRendering)
             mRendering->spawnEffect(model, textureOverride, worldPos, scale, isMagicVFX, useAmbientLight, effectId, loop);
+        else if (mWorldScene && !effectId.empty() && mWorldScene->mNeutralWorldScene)
+        {
+            mWorldScene->mNeutralWorldScene->recordEffect(effectId, model.value(),
+                { worldPos.x(), worldPos.y(), worldPos.z() }, scale, textureOverride);
+        }
     }
 
     void World::removeEffect(std::string_view effectId)
     {
         if (mRendering)
             mRendering->removeEffect(effectId);
+        else if (mWorldScene && mWorldScene->mNeutralWorldScene)
+            mWorldScene->mNeutralWorldScene->removeEffect(effectId);
     }
 
     struct ResetActorsVisitor

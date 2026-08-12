@@ -166,6 +166,8 @@ mesh payloads cross the neutral boundary into the Vulkan consumer. A determinist
 helper now applies frame bone matrices for future animation integration. Unskinned dynamic meshes and skinned records with a
 supplied pose now enter the raster draw batch with their neutral transforms; skinned records without a resolved pose now
 use an inverse-bind-derived bind pose so dynamic actors remain visible while per-frame animation updates are ported.
+Explicitly identified world VFX now also cross as neutral transformed mesh effects with texture
+overrides and explicit removal; anonymous one-shot VFX still require a lifetime/animation owner.
 Mesh submission no longer waits for the whole device or
 rebuilds one global buffer: neutral mesh data is retained on the CPU and uploaded into
 the current frame slot only after its fence is waited, so a future live frame loop can
