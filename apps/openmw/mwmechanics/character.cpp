@@ -2710,10 +2710,83 @@ namespace MWMechanics
     {
         if (!mPtr.getClass().isActor() || !mPtr.getClass().hasInventoryStore(mPtr)
             || mUpperBodyState != UpperBodyState::WeaponEquipped || !getAttackingOrSpell()
-            || mWeaponType == ESM::Weapon::None || mWeaponType == ESM::Weapon::Spell || !mAnimQueue.empty())
+            || mWeaponType == ESM::Weapon::None || !mAnimQueue.empty())
             return;
 
         MWBase::World* const world = MWBase::Environment::get().getWorld();
+        if (mWeaponType == ESM::Weapon::Spell)
+        {
+            const MWWorld::Class& cls = mPtr.getClass();
+            CreatureStats& stats = cls.getCreatureStats(mPtr);
+            if (mPtr == getPlayer())
+                stats.getSpells().setSelectedSpell(MWBase::Environment::get().getWindowManager()->getSelectedSpell());
+
+            ESM::RefId spellId = stats.getSpells().getSelectedSpell();
+            if (spellId.empty())
+            {
+                const MWWorld::ContainerStore& inventory = cls.getContainerStore(mPtr);
+                if (inventory.getSelectedEnchantItem() != inventory.end())
+                {
+                    const MWWorld::ConstPtr& enchantItem = *inventory.getSelectedEnchantItem();
+                    spellId = enchantItem.getClass().getEnchantment(enchantItem);
+                }
+            }
+
+            const MWWorld::SpellCastState castResult
+                = mCastingScriptedSpell ? MWWorld::SpellCastState::Success : world->startSpellCast(mPtr);
+            mCanCast = castResult == MWWorld::SpellCastState::Success;
+            setAttackingOrSpell(false);
+            if (spellId.empty() || castResult == MWWorld::SpellCastState::PowerAlreadyUsed)
+                return;
+
+            const std::vector<ESM::IndexedENAMstruct>* effects = nullptr;
+            const MWWorld::ESMStore& store = world->getStore();
+            if (stats.getSpells().getSelectedSpell().empty())
+            {
+                const ESM::Enchantment* enchantment = store.get<ESM::Enchantment>().find(spellId);
+                if (enchantment)
+                    effects = &enchantment->mEffects.mList;
+            }
+            else if (const ESM::Spell* spell = store.get<ESM::Spell>().find(spellId))
+                effects = &spell->mEffects.mList;
+            if (effects == nullptr || effects->empty())
+                return;
+
+            switch (effects->front().mData.mRange)
+            {
+                case 0:
+                    mAttackType = "self";
+                    break;
+                case 1:
+                    mAttackType = "touch";
+                    break;
+                case 2:
+                    mAttackType = "target";
+                    break;
+                default:
+                    return;
+            }
+
+            const std::string startKey = mAttackType + " start";
+            const std::string stopKey = mAttackType + " stop";
+            if (mCurrentWeapon.empty() || !world->getNeutralAnimationDuration(mPtr, mCurrentWeapon, startKey, stopKey))
+                return;
+
+            mUpperBodyState = UpperBodyState::Casting;
+            AnimationQueueEntry entry;
+            entry.mGroup = mCurrentWeapon;
+            entry.mLoopCount = 0;
+            entry.mTime = 0.f;
+            entry.mLooping = false;
+            entry.mScripted = false;
+            entry.mStartKey = startKey;
+            entry.mStopKey = stopKey;
+            entry.mSpeed = 1.f;
+            mAnimQueue.push_back(std::move(entry));
+            world->updateNeutralAnimation(mPtr, mCurrentWeapon, 0.f, startKey, stopKey);
+            return;
+        }
+
         std::string group = mCurrentWeapon;
         if (!mPtr.getClass().isBipedal(mPtr) && isRandomAttackAnimation(group))
         {
