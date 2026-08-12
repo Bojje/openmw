@@ -17,7 +17,7 @@ int main()
     scene.exterior = true;
     scene.gridX = 2;
     scene.gridY = -3;
-    scene.objects.push_back({ 7, "meshes/test.nif", {}, false, false, {} });
+    scene.objects.push_back({ 7, "meshes/test.nif", {}, false, false, {}, {} });
 
     if (scene.objects.size() != 1 || scene.objects.front().id != 7 || scene.objects.front().model != "meshes/test.nif"
         || scene.objects.front().transform.rotation.w != 1.f || scene.objects.front().transform.scale.x != 1.f
@@ -459,7 +459,7 @@ int main()
         || !submission.valid() || !submission.validationError().empty())
         throw std::runtime_error("renderer-neutral scene submission failed resource handoff");
 
-    submission.dynamicMeshes.push_back({ { 17, "meshes/animated.nif", objectTransform, true, true, {} }, {}, {} });
+    submission.dynamicMeshes.push_back({ { 17, "meshes/animated.nif", objectTransform, true, true, {}, {} }, {}, {} });
     if (submission.dynamicMeshes.size() != 1 || !submission.dynamicMeshes.front().object.dynamic
         || submission.dynamicMeshes.front().object.model != "meshes/animated.nif" || !submission.valid())
         throw std::runtime_error("renderer-neutral scene submission lost dynamic records");
