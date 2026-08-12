@@ -468,14 +468,14 @@ namespace MWWorld
 
         bool isWerewolf = playerClass.getNpcStats(player).isWerewolf();
         bool isFirstPerson = world->isFirstPerson();
-        if (isWerewolf && isFirstPerson)
+        if (rendering && isWerewolf && isFirstPerson)
         {
             float werewolfFov = Fallback::Map::getFloat("General_Werewolf_FOV");
             if (werewolfFov != 0)
                 rendering->overrideFieldOfView(werewolfFov);
             windowMgr->setWerewolfOverlay(true);
         }
-        else
+        else if (rendering)
         {
             rendering->resetFieldOfView();
             windowMgr->setWerewolfOverlay(false);
@@ -488,10 +488,13 @@ namespace MWWorld
 
         static const float i1stPersonSneakDelta
             = store.get<ESM::GameSetting>().find("i1stPersonSneakDelta")->mValue.getFloat();
-        if (sneaking && !swimming && !flying)
-            rendering->getCamera()->setSneakOffset(i1stPersonSneakDelta);
-        else
-            rendering->getCamera()->setSneakOffset(0.f);
+        if (rendering)
+        {
+            if (sneaking && !swimming && !flying)
+                rendering->getCamera()->setSneakOffset(i1stPersonSneakDelta);
+            else
+                rendering->getCamera()->setSneakOffset(0.f);
+        }
 
         int blind = 0;
         const auto& magicEffects = playerClass.getCreatureStats(player).getMagicEffects();
@@ -500,7 +503,8 @@ namespace MWWorld
         windowMgr->setBlindness(std::clamp(blind, 0, 100));
 
         int nightEye = static_cast<int>(magicEffects.getOrDefault(ESM::MagicEffect::NightEye).getMagnitude());
-        rendering->setNightEyeFactor(std::min(1.f, (nightEye / 100.f)));
+        if (rendering)
+            rendering->setNightEyeFactor(std::min(1.f, (nightEye / 100.f)));
     }
 
 }

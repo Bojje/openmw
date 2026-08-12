@@ -68,14 +68,23 @@ namespace MWLua
 
     std::map<std::string, sol::object> initPlayerPackages(const Context& context)
     {
-        return {
+        std::map<std::string, sol::object> packages{
             { "openmw.ambient", initAmbientPackage(context) },
-            { "openmw.camera", initCameraPackage(context.sol()) },
-            { "openmw.debug", initDebugPackage(context) },
             { "openmw.input", initInputPackage(context) },
-            { "openmw.postprocessing", initPostprocessingPackage(context) },
-            { "openmw.ui", initUserInterfacePackage(context) },
         };
+
+        // The Vulkan experiment intentionally has no legacy presentation owner.
+        // Do not publish player-only OSG/MyGUI bindings into that runtime; a
+        // missing package is safer and more explicit than a null renderer
+        // dereference from a script.
+        if (MWBase::Environment::get().getWorld()->getRenderingManager() != nullptr)
+        {
+            packages.emplace("openmw.camera", initCameraPackage(context.sol()));
+            packages.emplace("openmw.debug", initDebugPackage(context));
+            packages.emplace("openmw.postprocessing", initPostprocessingPackage(context));
+            packages.emplace("openmw.ui", initUserInterfacePackage(context));
+        }
+        return packages;
     }
 
     std::map<std::string, sol::object> initMenuPackages(const Context& context)
