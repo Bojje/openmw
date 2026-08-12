@@ -461,13 +461,6 @@ int main()
     if (Render::collectRasterDynamicMeshes(dynamicSubmission).size() != 1)
         throw std::runtime_error("renderer-neutral unskinned dynamic mesh was not selected for rasterization");
 
-    Render::SceneSubmission invalidAlphaSubmission = dynamicSubmission;
-    invalidAlphaSubmission.meshes.push_back(aggregateMesh);
-    invalidAlphaSubmission.meshes.back().mesh.material.alphaTexture
-        = std::make_shared<const Render::TextureData>();
-    if (invalidAlphaSubmission.valid())
-        throw std::runtime_error("renderer-neutral scene submission accepted an invalid alpha texture");
-
     auto dynamicSkinning = std::make_shared<Render::SkinningData>();
     dynamicSkinning->vertices.resize(3);
     for (Render::SkinVertex& vertex : dynamicSkinning->vertices)
@@ -476,6 +469,29 @@ int main()
     dynamicSkinning->inverseBindMatrices.push_back(Render::identityMat4());
     Render::MeshInstance skinnedDynamicMesh = aggregateMesh;
     skinnedDynamicMesh.mesh.skinning = dynamicSkinning;
+
+    if (!world.updateObjectPose(&dynamicSubmissionHandle, {}))
+        throw std::runtime_error("renderer-neutral dynamic submission failed to clear an explicit pose");
+    const Render::SceneSubmission deferredPoseSubmission = Render::collectSceneSubmission(world, aggregateScene, "",
+        [&](std::string_view model) -> std::vector<Render::MeshInstance> {
+            if (model != "meshes/first.nif")
+                throw std::runtime_error("deferred renderer-neutral pose resolved an unexpected model");
+            return { skinnedDynamicMesh };
+        }, false, false);
+    if (!deferredPoseSubmission.dynamicMeshes.front().boneMatrices.empty())
+        throw std::runtime_error("renderer-neutral submission applied bind pose before animation resolution");
+    Render::DynamicMeshSubmission deferredDynamic = deferredPoseSubmission.dynamicMeshes.front();
+    Render::applyBindPose(deferredDynamic);
+    if (deferredDynamic.boneMatrices.size() != 1 || deferredDynamic.boneMatrices.front().data[12] != 0.f)
+        throw std::runtime_error("renderer-neutral deferred bind pose fallback failed");
+
+    Render::SceneSubmission invalidAlphaSubmission = dynamicSubmission;
+    invalidAlphaSubmission.meshes.push_back(aggregateMesh);
+    invalidAlphaSubmission.meshes.back().mesh.material.alphaTexture
+        = std::make_shared<const Render::TextureData>();
+    if (invalidAlphaSubmission.valid())
+        throw std::runtime_error("renderer-neutral scene submission accepted an invalid alpha texture");
+
     Render::DynamicMeshSubmission posedDynamic;
     posedDynamic.object = dynamicSubmission.dynamicMeshes.front().object;
     posedDynamic.meshes.push_back(skinnedDynamicMesh);

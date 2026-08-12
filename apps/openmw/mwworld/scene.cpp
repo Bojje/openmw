@@ -1369,38 +1369,37 @@ namespace MWWorld
 
         Render::SceneSubmission result = Render::collectSceneSubmission(
             *mNeutralWorldScene, mNeutralWorldScene->sceneData(), mNeutralWorldScene->activeWorldspace(), resolveMeshes,
-            true);
+            true, false);
 
-        if (mPoseResolver)
-            for (Render::DynamicMeshSubmission& dynamic : result.dynamicMeshes)
+        for (Render::DynamicMeshSubmission& dynamic : result.dynamicMeshes)
+        {
+            if (mPoseResolver && dynamic.boneMatrices.empty())
             {
-                // A gameplay/animation owner may already have supplied a
-                // pose. Model-local NIF sampling is only the neutral fallback
-                // for objects that have no explicit pose yet.
-                if (!dynamic.object.boneMatrices.empty())
-                    continue;
-
                 const auto skinned = std::find_if(dynamic.meshes.begin(), dynamic.meshes.end(),
                     [](const Render::MeshInstance& mesh) {
                         return mesh.mesh.skinning && !mesh.mesh.skinning->boneNames.empty();
                     });
-                if (skinned == dynamic.meshes.end())
-                    continue;
-
-                const bool compatible = std::all_of(dynamic.meshes.begin(), dynamic.meshes.end(),
-                    [&](const Render::MeshInstance& mesh) {
-                        return !mesh.mesh.skinning
-                            || (!mesh.mesh.skinning->boneNames.empty()
-                                && mesh.mesh.skinning->boneNames == skinned->mesh.skinning->boneNames);
-                    });
-                if (!compatible)
-                    continue;
-
-                const std::vector<Render::Mat4> pose = mPoseResolver(dynamic.object.model,
-                    dynamic.object.animationGroup, dynamic.object.animationTime, skinned->mesh.skinning->boneNames);
-                if (pose.size() == skinned->mesh.skinning->inverseBindMatrices.size())
-                    dynamic.boneMatrices = pose;
+                if (skinned != dynamic.meshes.end())
+                {
+                    const bool compatible = std::all_of(dynamic.meshes.begin(), dynamic.meshes.end(),
+                        [&](const Render::MeshInstance& mesh) {
+                            return !mesh.mesh.skinning
+                                || (!mesh.mesh.skinning->boneNames.empty()
+                                    && mesh.mesh.skinning->boneNames == skinned->mesh.skinning->boneNames);
+                        });
+                    if (compatible)
+                    {
+                        const std::vector<Render::Mat4> pose = mPoseResolver(dynamic.object.model,
+                            dynamic.object.animationGroup, dynamic.object.animationTime,
+                            skinned->mesh.skinning->boneNames);
+                        if (pose.size() == skinned->mesh.skinning->inverseBindMatrices.size())
+                            dynamic.boneMatrices = pose;
+                    }
+                }
             }
+
+            Render::applyBindPose(dynamic);
+        }
 
         if (Settings::shaders().mAutoUseObjectSpecularMaps
             && !Settings::shaders().mSpecularMapPattern.get().empty())

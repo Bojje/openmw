@@ -380,12 +380,39 @@ namespace Render
         return result;
     }
 
+    inline void applyBindPose(DynamicMeshSubmission& dynamic)
+    {
+        if (!dynamic.boneMatrices.empty())
+            return;
+
+        const auto skinned = std::find_if(dynamic.meshes.begin(), dynamic.meshes.end(),
+            [](const MeshInstance& mesh) {
+                return mesh.mesh.skinning && !mesh.mesh.skinning->boneNames.empty();
+            });
+        if (skinned == dynamic.meshes.end())
+            return;
+
+        const bool compatible = std::all_of(dynamic.meshes.begin(), dynamic.meshes.end(),
+            [&](const MeshInstance& mesh) {
+                return !mesh.mesh.skinning
+                    || (!mesh.mesh.skinning->boneNames.empty()
+                        && mesh.mesh.skinning->boneNames == skinned->mesh.skinning->boneNames);
+            });
+        if (!compatible)
+            return;
+
+        dynamic.boneMatrices.reserve(skinned->mesh.skinning->inverseBindMatrices.size());
+        for (const Mat4& inverseBind : skinned->mesh.skinning->inverseBindMatrices)
+            dynamic.boneMatrices.push_back(invertMat4(inverseBind));
+    }
+
     // Build the backend-neutral portion of a frame from the scene owner. The
     // resource resolver remains supplied by the game layer, while mesh and
     // terrain collection stay independent of any renderer implementation.
     template <class ResolveMeshes>
     SceneSubmission collectSceneSubmission(const WorldScene& world, const SceneData& scene,
-        std::string_view worldspace, ResolveMeshes&& resolveMeshes, bool includeTerrain = true)
+        std::string_view worldspace, ResolveMeshes&& resolveMeshes, bool includeTerrain = true,
+        bool includeBindPose = true)
     {
         SceneSubmission result;
         result.scene = scene;
@@ -418,28 +445,8 @@ namespace Render
                     for (const MeshInstance& mesh : resolvedMeshes)
                         dynamic.meshes.push_back(transformMeshInstance(object, mesh));
                 }
-                if (dynamic.boneMatrices.empty())
-                {
-                    const auto skinned = std::find_if(dynamic.meshes.begin(), dynamic.meshes.end(),
-                        [](const MeshInstance& mesh) {
-                            return mesh.mesh.skinning && !mesh.mesh.skinning->boneNames.empty();
-                        });
-                    if (skinned != dynamic.meshes.end())
-                    {
-                        const bool compatible = std::all_of(dynamic.meshes.begin(), dynamic.meshes.end(),
-                            [&](const MeshInstance& mesh) {
-                                return !mesh.mesh.skinning
-                                    || (!mesh.mesh.skinning->boneNames.empty()
-                                        && mesh.mesh.skinning->boneNames == skinned->mesh.skinning->boneNames);
-                            });
-                        if (compatible)
-                        {
-                            dynamic.boneMatrices.reserve(skinned->mesh.skinning->inverseBindMatrices.size());
-                            for (const Mat4& inverseBind : skinned->mesh.skinning->inverseBindMatrices)
-                                dynamic.boneMatrices.push_back(invertMat4(inverseBind));
-                        }
-                    }
-                }
+                if (includeBindPose)
+                    applyBindPose(dynamic);
                 result.dynamicMeshes.push_back(std::move(dynamic));
             }
 

@@ -141,7 +141,9 @@ external text-key start times are honored for the selected group. No-OSG mechani
 neutral idle, movement, and one-active-scripted groups, and changing groups resets the neutral pose
 clock. Neutral animation-state restoration no longer dereferences the absent OSG animation owner;
 scripted group requests remain visible to the neutral resolver and fall back to bind pose when no
-controller is available. Neutral death transitions now publish a deterministic death group instead
+controller is available. Neutral dynamic submission now defers bind-pose fallback until after the
+injected NIF/KF pose resolver runs, so model-local animation is not masked by an early fallback.
+Neutral death transitions now publish a deterministic death group instead
 of being discarded when OSG animation is absent. Neutral hit, knockdown, knockout, and block states
 also publish their canonical groups and clear when gameplay recovery ends. Live actor `.kf` priority arbitration,
 full text-key stop/loop handling, blended controller stacks, animation-specific shading, and
