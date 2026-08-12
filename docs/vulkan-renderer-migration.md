@@ -164,8 +164,9 @@ camera synchronization, neutral image loading, and static scene submission are l
 dynamic-content, weather particle/water presentation, and GUI/presentation services remain incomplete. Weather ambient, directional-light, fog, and sky-horizon values now cross the neutral frame state, and the Vulkan composite derives its background gradient from that state. NIF skinning metadata now survives conversion, and resolved dynamic
 mesh payloads cross the neutral boundary into the Vulkan consumer. A deterministic CPU skinning
 helper now applies frame bone matrices for future animation integration. Unskinned dynamic meshes and skinned records with a
-supplied pose now enter the raster draw batch with their neutral transforms; skinned records without a pose remain outside it
-until per-frame bone updates are owned. Mesh submission no longer waits for the whole device or
+supplied pose now enter the raster draw batch with their neutral transforms; skinned records without a resolved pose now
+use an inverse-bind-derived bind pose so dynamic actors remain visible while per-frame animation updates are ported.
+Mesh submission no longer waits for the whole device or
 rebuilds one global buffer: neutral mesh data is retained on the CPU and uploaded into
 the current frame slot only after its fence is waited, so a future live frame loop can
 submit scene updates without the previous device-wide stall.

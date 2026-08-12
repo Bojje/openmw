@@ -25,6 +25,7 @@
 #include <components/resource/resourcesystem.hpp>
 #include <components/resource/imagemanager.hpp>
 #include <components/resource/scenemanager.hpp>
+#include <components/render/math.hpp>
 #include <components/sceneutil/positionattitudetransform.hpp>
 #include <components/settings/values.hpp>
 #include <components/terrain/renderstorage.hpp>
@@ -1301,7 +1302,17 @@ namespace MWWorld
             for (const std::string& boneName : skinned->mesh.skinning->boneNames)
                 boneNames.push_back(boneName);
 
-            return mBonePoseResolver ? mBonePoseResolver(objectKey, boneNames) : std::vector<Render::Mat4>();
+            const auto bindPose = [&] {
+                std::vector<Render::Mat4> result;
+                result.reserve(skinned->mesh.skinning->inverseBindMatrices.size());
+                for (const Render::Mat4& inverseBind : skinned->mesh.skinning->inverseBindMatrices)
+                    result.push_back(Render::invertMat4(inverseBind));
+                return result;
+            };
+            if (!mBonePoseResolver)
+                return bindPose();
+            std::vector<Render::Mat4> pose = mBonePoseResolver(objectKey, boneNames);
+            return pose.empty() ? bindPose() : pose;
         });
 
         Render::SceneSubmission result = Render::collectSceneSubmission(
