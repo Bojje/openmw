@@ -1701,7 +1701,8 @@ namespace MWWorld
         // The same thing for "in jail" flag: reset it if:
         // 1. Player was in jail
         // 2. Jailing window was closed
-        if (mPlayerInJail && !mGoToJail && !MWBase::Environment::get().getWindowManager()->containsMode(MWGui::GM_Jail))
+        if (mRendering && mPlayerInJail && !mGoToJail
+            && !MWBase::Environment::get().getWindowManager()->containsMode(MWGui::GM_Jail))
             mPlayerInJail = false;
 
         if (mWeatherManager)
@@ -1722,7 +1723,7 @@ namespace MWWorld
             updateSoundListener();
 
         mSpellPreloadTimer -= duration;
-        if (mSpellPreloadTimer <= 0.f)
+        if (mRendering && mSpellPreloadTimer <= 0.f)
         {
             mSpellPreloadTimer = 0.1f;
             preloadSpells();
@@ -1754,6 +1755,9 @@ namespace MWWorld
 
     void World::preloadSpells()
     {
+        if (!mRendering)
+            return;
+
         const ESM::RefId& selectedSpell = MWBase::Environment::get().getWindowManager()->getSelectedSpell();
         if (!selectedSpell.empty())
         {
