@@ -66,6 +66,8 @@ namespace MWRender
 
         std::unique_ptr<ESM::LandData> loadCell(int gridX, int gridY, ESM::RefId worldspace) const;
         Terrain::LayerInfo getLayerInfo(VFS::Path::NormalizedView texture) const;
+        Terrain::LayerInfo getEsm4DefaultLayerInfo(int gridX, int gridY, ESM::RefId worldspace) const;
+        Terrain::LayerInfo getEsm4LayerInfo(ESM::FormId id) const;
         VFS::Path::Normalized getTextureName(std::uint16_t index, int plugin) const;
 
         MWWorld::ESMStore& mStore;

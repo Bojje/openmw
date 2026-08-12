@@ -371,9 +371,9 @@ allocating any OSG rendering, paging, terrain-world, or preloader service.
 That bootstrap now constructs and owns `NeutralTerrainStorage` directly from `ESMStore` and the VFS;
 the provider emits renderer-neutral TES3 vertices, normals, colors, heightfields, bounds, and
 blendmaps without `ESMTerrain::Storage`, `LandObject`, or OSG lifetimes. Its generic grid sampling
-entry point is exposed through the neutral terrain component. ESM4 terrain currently uses an
-explicit opaque fallback layer while its record-to-layer mapping is completed; it is not treated as
-visual parity.
+entry point is exposed through the neutral terrain component. ESM4 terrain now resolves its default,
+base, and overlay layers directly from `Land`, `LandTexture`, and `TextureSet` records, including
+neutral alpha maps and explicit normal/specular paths.
 The generic grid and blendmap sampling implementation now lives in `components/terrain`; the old
 `components/esmterrain/gridsampling.hpp` header and its CMake entry were removed after its only
 consumer moved to the neutral API.
@@ -445,7 +445,7 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-178 files, deleting 1,985 lines and adding 9,784 lines (net `+7,799`). The larger Vulkan-only
+178 files, deleting 1,985 lines and adding 9,892 lines (net `+7,907`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.

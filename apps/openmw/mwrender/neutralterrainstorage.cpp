@@ -12,6 +12,8 @@
 #include <components/esm3/loadland.hpp>
 #include <components/esm3/loadltex.hpp>
 #include <components/esm4/loadland.hpp>
+#include <components/esm4/loadltex.hpp>
+#include <components/esm4/loadtxst.hpp>
 #include <components/terrain/gridsampling.hpp>
 #include <components/misc/resourcehelpers.hpp>
 #include <components/misc/strings/algorithm.hpp>
@@ -265,6 +267,47 @@ namespace MWRender
                        : VFS::Path::Normalized(defaultTexture);
     }
 
+    Terrain::LayerInfo NeutralTerrainStorage::getEsm4DefaultLayerInfo(int gridX, int gridY, ESM::RefId worldspace) const
+    {
+        constexpr VFS::Path::NormalizedView defaultTexture("_land_default.dds");
+        const ESM4::Land* land = mStore.get<ESM4::Land>().search({ gridX, gridY, worldspace });
+        if (!land || land->mDefaultDiffuseMap.empty())
+            return getLayerInfo(defaultTexture);
+
+        Terrain::LayerInfo result = getLayerInfo(land->mDefaultDiffuseMap);
+        if (!land->mDefaultNormalMap.empty())
+            result.mNormalMap = land->mDefaultNormalMap;
+        return result;
+    }
+
+    Terrain::LayerInfo NeutralTerrainStorage::getEsm4LayerInfo(ESM::FormId id) const
+    {
+        if (id.isZeroOrUnset())
+            return {};
+
+        const ESM4::LandTexture* landTexture = mStore.get<ESM4::LandTexture>().search(id);
+        if (!landTexture)
+            return {};
+
+        if (!landTexture->mTextureFile.empty())
+        {
+            constexpr VFS::Path::NormalizedView landscape("textures/landscape");
+            return getLayerInfo(VFS::Path::join(landscape, landTexture->mTextureFile));
+        }
+
+        const ESM4::TextureSet* textureSet = mStore.get<ESM4::TextureSet>().search(landTexture->mTexture);
+        if (!textureSet || textureSet->mDiffuse.empty())
+            return {};
+
+        constexpr VFS::Path::NormalizedView textures("textures");
+        Terrain::LayerInfo result = getLayerInfo(VFS::Path::join(textures, textureSet->mDiffuse));
+        if (!textureSet->mNormalMap.empty())
+            result.mNormalMap = VFS::Path::join(textures, textureSet->mNormalMap);
+        if (!textureSet->mSpecular.empty())
+            result.mSpecularMap = VFS::Path::join(textures, textureSet->mSpecular);
+        return result;
+    }
+
     Terrain::LayerInfo NeutralTerrainStorage::getLayerInfo(VFS::Path::NormalizedView texture) const
     {
         std::lock_guard lock(mLayerInfoMutex);
@@ -312,12 +355,75 @@ namespace MWRender
         std::vector<Render::TextureData>& blendmaps, std::vector<Terrain::LayerInfo>& layerList,
         ESM::RefId worldspace)
     {
-        // ESM4 uses a different layer record format and is intentionally kept
-        // out of this first neutral provider. Returning an opaque fallback is
-        // preferable to exposing ESMTerrain/OSG types through this boundary.
         if (ESM::isEsm4Ext(worldspace))
         {
-            layerList.push_back(getLayerInfo(VFS::Path::NormalizedView("_land_default.dds")));
+            const std::array<float, 2> origin = { chunkCenter[0] - (chunkSize - 1.f) * 0.5f,
+                chunkCenter[1] - (chunkSize + 1.f) * 0.5f };
+            constexpr int quadsPerCell = 2;
+            constexpr int quadSize = ESM4::Land::sVertsPerSide / quadsPerCell;
+            const int blendmapSize = static_cast<int>(chunkSize * quadsPerCell) * quadSize + 1;
+
+            std::map<ESM::FormId, std::size_t> textureIndices;
+            std::vector<std::vector<std::uint8_t>> alphaMaps;
+            CellCache cache(*this);
+
+            const auto getOrCreateBlendmap = [&](ESM::FormId id, int gridX, int gridY)
+                -> std::vector<std::uint8_t>& {
+                if (const auto found = textureIndices.find(id); found != textureIndices.end())
+                    return alphaMaps[found->second];
+
+                const std::size_t index = alphaMaps.size();
+                textureIndices.emplace(id, index);
+                alphaMaps.emplace_back(static_cast<std::size_t>(blendmapSize) * blendmapSize, 0);
+                layerList.push_back(id.isZeroOrUnset() ? getEsm4DefaultLayerInfo(gridX, gridY, worldspace)
+                                                       : getEsm4LayerInfo(id));
+                return alphaMaps.back();
+            };
+
+            Terrain::sampleBlendmaps(chunkSize, origin[0], origin[1], quadsPerCell,
+                [&](const Terrain::CellSample& sample) {
+                    const ESM::LandData* data = cache.get(sample.mCellX, sample.mCellY, worldspace);
+                    if (!data)
+                        return;
+
+                    int quad = 0;
+                    if (sample.mSrcRow != 0)
+                        quad = sample.mSrcCol == 0 ? 1 : 3;
+                    else if (sample.mSrcCol != 0)
+                        quad = 2;
+                    const ESM4::Land::Texture& texture = data->getEsm4Texture(quad);
+
+                    auto& baseBlendmap
+                        = getOrCreateBlendmap(ESM::FormId::fromUint32(texture.base.formId), sample.mCellX, sample.mCellY);
+                    const int startY = (static_cast<int>(sample.mDstCol) - 1) * quadSize;
+                    const int startX = static_cast<int>(sample.mDstRow) * quadSize;
+                    for (int y = std::max(0, startY + 1); y <= startY + quadSize && y < blendmapSize; ++y)
+                        for (int x = std::max(0, startX); x < startX + quadSize && x < blendmapSize; ++x)
+                            baseBlendmap[static_cast<std::size_t>(y) * blendmapSize + x] = 255;
+
+                    for (const auto& layer : texture.layers)
+                    {
+                        auto& layerBlendmap = getOrCreateBlendmap(
+                            ESM::FormId::fromUint32(layer.texture.formId), sample.mCellX, sample.mCellY);
+                        for (const ESM4::Land::VTXT& vertex : layer.data)
+                        {
+                            const int y = vertex.position / (quadSize + 1);
+                            const int x = vertex.position % (quadSize + 1);
+                            if (x == quadSize || startX + x >= blendmapSize || y == 0 || startY + y >= blendmapSize
+                                || startY + y < 0)
+                                continue;
+                            const std::size_t index = static_cast<std::size_t>((startY + y) * blendmapSize + startX + x);
+                            const auto opacity
+                                = static_cast<std::uint8_t>(std::clamp(static_cast<int>(vertex.opacity * 255.f), 0, 255));
+                            baseBlendmap[index] -= std::min(baseBlendmap[index], opacity);
+                            layerBlendmap[index] = opacity;
+                        }
+                    }
+                });
+
+            if (alphaMaps.size() > 1)
+                for (const auto& alpha : alphaMaps)
+                    blendmaps.push_back(makeAlphaTexture(blendmapSize, alpha));
             return;
         }
 
