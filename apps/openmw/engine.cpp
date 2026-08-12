@@ -33,6 +33,7 @@
 #include <components/resource/scenemanager.hpp>
 #include <components/resource/stats.hpp>
 #include <components/compiler/extensions0.hpp>
+#include <components/render/imagewriter.hpp>
 #include <components/render/texture.hpp>
 #ifdef OPENMW_NEUTRAL_JPEG
 #include <components/render/jpeg.hpp>

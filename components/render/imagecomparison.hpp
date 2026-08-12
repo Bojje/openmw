@@ -9,7 +9,7 @@
 #include <optional>
 #include <string>
 
-#include "texture.hpp"
+#include "imagewriter.hpp"
 
 namespace Render
 {
