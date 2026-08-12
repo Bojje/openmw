@@ -11,6 +11,9 @@ int main()
     Resource::ResourceSystem resourceSystem(
         &vfsManager, 1.0, &encoder.getStatelessEncoder(), Resource::ResourceSystem::Backend::Neutral);
 
+    if (resourceSystem.backend() != Resource::ResourceSystem::Backend::Neutral)
+        throw std::runtime_error("neutral resource backend identity was not retained");
+
     if (resourceSystem.getSceneManager() != nullptr || resourceSystem.getKeyframeManager() != nullptr
         || resourceSystem.getImageManager() != nullptr || resourceSystem.getBgsmFileManager() != nullptr
         || resourceSystem.getAnimBlendRulesManager() != nullptr)

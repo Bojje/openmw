@@ -247,6 +247,12 @@ namespace MWWorld
 
     void World::initSimulation(Debug::Level maxRecastLogLevel, Render::FrameLifecycle::Backend backend)
     {
+        const Resource::ResourceSystem::Backend resourceBackend = backend == Render::FrameLifecycle::Backend::Osg
+            ? Resource::ResourceSystem::Backend::Osg
+            : Resource::ResourceSystem::Backend::Neutral;
+        if (mResourceSystem->backend() != resourceBackend)
+            throw std::invalid_argument("World simulation and resource services use different renderer backends");
+
         Resource::SceneManager* sceneManager = backend == Render::FrameLifecycle::Backend::Osg
             ? mResourceSystem->getSceneManager()
             : nullptr;
@@ -269,6 +275,8 @@ namespace MWWorld
     {
         if (frameLifecycle.backend() != Render::FrameLifecycle::Backend::Osg)
             throw std::invalid_argument("The OSG world renderer requires an OSG frame owner");
+        if (mResourceSystem->backend() != Resource::ResourceSystem::Backend::Osg)
+            throw std::invalid_argument("The OSG world renderer requires OSG resource services");
         if (!mPhysics || !mNavigator)
             throw std::logic_error("World simulation must be initialized before its renderer");
         if (!mResourceSystem->getSceneManager())
@@ -352,6 +360,8 @@ namespace MWWorld
     {
         if (frameLifecycle.backend() != Render::FrameLifecycle::Backend::Vulkan)
             throw std::invalid_argument("The neutral world renderer requires a Vulkan frame owner");
+        if (mResourceSystem->backend() != Resource::ResourceSystem::Backend::Neutral)
+            throw std::invalid_argument("The neutral world renderer requires neutral resource services");
         if (!mPhysics || !mNavigator)
             throw std::logic_error("World simulation must be initialized before its renderer");
         if (mWorldScene)

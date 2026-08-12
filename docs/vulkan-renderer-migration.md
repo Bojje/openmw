@@ -271,6 +271,9 @@ and animation-rule managers. Neutral scene services receive texture data through
 renderer-neutral resolvers, while the world renderer rejects a mismatched resource backend before
 touching presentation services. This keeps the future Vulkan path from paying for OSG scene and
 image ownership merely because the shared resource facade still exists.
+The simulation, OSG renderer, and neutral renderer bootstrap phases now all validate that resource
+backend identity matches the selected frame owner, preventing a partial Vulkan path from silently
+retaining OSG resource services.
 The OSG renderer also validates that its light-root handoff was populated before constructing
 the projectile presenter, turning a previously unchecked startup dereference into a fail-fast
 diagnostic.
@@ -359,7 +362,7 @@ The engine public header no longer imports complete OSG viewer/event-handler hea
 are now included only by the implementation files that use them.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-156 files, deleting 1,368 lines and adding 8,425 lines (net `+7,057`). The larger Vulkan-only
+156 files, deleting 1,368 lines and adding 8,455 lines (net `+7,087`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.

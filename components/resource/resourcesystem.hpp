@@ -49,6 +49,8 @@ namespace Resource
             Backend backend = Backend::Osg);
         ~ResourceSystem();
 
+        Backend backend() const;
+
         SceneManager* getSceneManager();
         /// Returns nullptr for the neutral backend; neutral scene services receive texture data through injected
         /// renderer-neutral resolvers instead of constructing the OSG image/material managers.
@@ -100,6 +102,7 @@ namespace Resource
         std::vector<BaseResourceManager*> mResourceManagers;
 
         const VFS::Manager* mVFS;
+        Backend mBackend;
 
         ResourceSystem(const ResourceSystem&);
         void operator=(const ResourceSystem&);

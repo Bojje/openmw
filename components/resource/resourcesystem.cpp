@@ -16,6 +16,7 @@ namespace Resource
     ResourceSystem::ResourceSystem(
         const VFS::Manager* vfs, double expiryDelay, const ToUTF8::StatelessUtf8Encoder* encoder, Backend backend)
         : mVFS(vfs)
+        , mBackend(backend)
     {
         mNifFileManager = std::make_unique<NifFileManager>(vfs, encoder);
         mNifMeshManager = std::make_unique<NifMeshManager>(mNifFileManager.get());
@@ -49,6 +50,11 @@ namespace Resource
         // this has to be defined in the .cpp file as we can't delete incomplete types
 
         mResourceManagers.clear();
+    }
+
+    ResourceSystem::Backend ResourceSystem::backend() const
+    {
+        return mBackend;
     }
 
     SceneManager* ResourceSystem::getSceneManager()
