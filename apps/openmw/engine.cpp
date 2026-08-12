@@ -347,7 +347,8 @@ bool OMW::Engine::frame(unsigned frameNumber, float frametime)
         stats->setAttribute(frameNumber, "StringRefId Count", static_cast<double>(ESM::StringRefId::totalCount()));
     }
 
-    mStereoManager->updateSettings(Settings::camera().mNearClip, Settings::camera().mViewingDistance);
+    if (mStereoManager)
+        mStereoManager->updateSettings(Settings::camera().mNearClip, Settings::camera().mViewingDistance);
 
     // update focus object for GUI
     {
@@ -393,8 +394,6 @@ OMW::Engine::Engine(Files::ConfigurationManager& configurationManager)
     : mWindow(nullptr)
     , mEncoding(ToUTF8::WINDOWS_1252)
     , mScreenCaptureOperation(nullptr)
-    , mSelectDepthFormatOperation(new SceneUtil::SelectDepthFormatOperation())
-    , mSelectColorFormatOperation(new SceneUtil::Color::SelectColorFormatOperation())
     , mStereoManager(nullptr)
     , mSkipMenu(false)
     , mUseSound(true)
@@ -651,6 +650,9 @@ void OMW::Engine::createWindow()
     camera->setGraphicsContext(graphicsWindow);
     camera->setViewport(0, 0, graphicsWindow->getTraits()->width, graphicsWindow->getTraits()->height);
 
+    mSelectDepthFormatOperation = new SceneUtil::SelectDepthFormatOperation();
+    mSelectColorFormatOperation = new SceneUtil::Color::SelectColorFormatOperation();
+
     osg::ref_ptr<SceneUtil::OperationSequence> realizeOperations = new SceneUtil::OperationSequence(false);
     mViewer->setRealizeOperation(realizeOperations);
     osg::ref_ptr<IdentifyOpenGLOperation> identifyOp = new IdentifyOpenGLOperation();
@@ -762,9 +764,13 @@ void OMW::Engine::prepareEngine()
     mStateManager = std::make_unique<MWState::StateManager>(mCfgMgr.getUserDataPath() / "saves", mContentFiles);
     mEnvironment.setStateManager(*mStateManager);
 
-    const bool stereoEnabled = Settings::stereo().mStereoEnabled || osg::DisplaySettings::instance().get()->getStereo();
-    mStereoManager = std::make_unique<Stereo::Manager>(
-        mViewer, stereoEnabled, Settings::camera().mNearClip, Settings::camera().mViewingDistance);
+    if (mViewer)
+    {
+        const bool stereoEnabled
+            = Settings::stereo().mStereoEnabled || osg::DisplaySettings::instance().get()->getStereo();
+        mStereoManager = std::make_unique<Stereo::Manager>(
+            mViewer, stereoEnabled, Settings::camera().mNearClip, Settings::camera().mViewingDistance);
+    }
 
     osg::ref_ptr<osg::Group> rootNode(new osg::Group);
     mViewer->setSceneData(rootNode);
@@ -861,7 +867,8 @@ void OMW::Engine::prepareEngine()
     osg::ref_ptr<osg::Group> guiRoot = new osg::Group;
     guiRoot->setName("GUI Root");
     guiRoot->setNodeMask(MWRender::Mask_GUI);
-    mStereoManager->disableStereoForNode(guiRoot);
+    if (mStereoManager)
+        mStereoManager->disableStereoForNode(guiRoot);
     rootNode->addChild(guiRoot);
 
     mWindowManager = std::make_unique<MWGui::WindowManager>(mWindow, mViewer, guiRoot, mResourceSystem.get(),
