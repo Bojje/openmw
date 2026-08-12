@@ -1,5 +1,6 @@
 #include "statemanagerimp.hpp"
 
+#include <cstring>
 #include <filesystem>
 
 #include <SDL_clipboard.h>
@@ -18,6 +19,7 @@
 
 #include <components/files/conversion.hpp>
 #include <components/misc/algorithm.hpp>
+#include <components/render/texture.hpp>
 #include <components/settings/values.hpp>
 
 #include <osg/Image>
@@ -857,8 +859,23 @@ void MWState::StateManager::writeScreenshot(std::vector<char>& imageData) const
     int screenshotW = 259 * 2, screenshotH = 133 * 2; // *2 to get some nice antialiasing
 
     osg::ref_ptr<osg::Image> screenshot(new osg::Image);
-
-    MWBase::Environment::get().getWorld()->screenshot(screenshot.get(), screenshotW, screenshotH);
+    MWBase::World* const world = MWBase::Environment::get().getWorld();
+    const std::optional<Render::TextureData> captured = world->captureFrame();
+    if (captured && captured->valid())
+    {
+        auto* const pixels = new unsigned char[captured->pixels.size()];
+        std::memcpy(pixels, captured->pixels.data(), captured->pixels.size());
+        screenshot->setImage(static_cast<int>(captured->width), static_cast<int>(captured->height), 1, GL_RGBA, GL_RGBA,
+            GL_UNSIGNED_BYTE, pixels, osg::Image::USE_NEW_DELETE);
+        screenshot->scaleImage(screenshotW, screenshotH, 1);
+    }
+    else if (world->getRenderingManager() != nullptr)
+        world->screenshot(screenshot.get(), screenshotW, screenshotH);
+    else
+    {
+        Log(Debug::Warning) << "Unable to capture Vulkan savegame thumbnail before a frame was presented";
+        return;
+    }
 
     osgDB::ReaderWriter* readerwriter = osgDB::Registry::instance()->getReaderWriterForExtension("jpg");
     if (!readerwriter)

@@ -4054,6 +4054,13 @@ namespace MWWorld
         return true;
     }
 
+    std::optional<Render::TextureData> World::captureFrame()
+    {
+        if (!mFrameLifecycle)
+            return std::nullopt;
+        return mFrameLifecycle->captureFrame();
+    }
+
     MWRender::PostProcessor* World::getPostProcessor()
     {
         return mPostProcessor;

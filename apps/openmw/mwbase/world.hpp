@@ -4,12 +4,14 @@
 #include "rotationflags.hpp"
 
 #include <deque>
+#include <optional>
 #include <set>
 #include <span>
 #include <string_view>
 #include <vector>
 
 #include <components/misc/rng.hpp>
+#include <components/render/texture.hpp>
 #include <components/vfs/pathutil.hpp>
 
 #include "../mwworld/doorstate.hpp"
@@ -608,6 +610,10 @@ namespace MWBase
         /// Advance the selected renderer's frame state before processing it.
         /// Returns false while the world is being constructed.
         virtual bool advanceFrame(double simulationTime) = 0;
+
+        /// Capture the last presented frame without exposing a backend image
+        /// or presentation object to savegame code.
+        virtual std::optional<Render::TextureData> captureFrame() = 0;
 
         virtual MWRender::RenderingManager* getRenderingManager() = 0;
 

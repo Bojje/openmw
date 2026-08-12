@@ -708,6 +708,7 @@ namespace MWWorld
 
         bool renderFrame() override;
         bool advanceFrame(double simulationTime) override;
+        std::optional<Render::TextureData> captureFrame() override;
 
         MWRender::RenderingManager* getRenderingManager() override { return mRendering.get(); }
 
