@@ -939,7 +939,7 @@ void OMW::Engine::prepareEngine()
     }
     listener->loadingOff();
 
-    mWorld->initSimulation(mMaxRecastLogLevel);
+    mWorld->initSimulation(mMaxRecastLogLevel, mFrameLifecycle->backend());
     mWorld->initOsgRenderer(mViewer, *mFrameLifecycle, std::move(rootNode), mWorkQueue.get(), *mUnrefQueue);
     mEnvironment.setWorldScene(mWorld->getWorldScene());
     mWorld->setupPlayer();

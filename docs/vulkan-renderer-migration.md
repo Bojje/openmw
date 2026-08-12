@@ -298,6 +298,10 @@ optional until the Vulkan water/effects consumer is connected.
 `World` now retains terrain through `Terrain::RenderStorage`; the concrete OSG terrain adapter is
 created only inside OSG initialization and retained polymorphically, removing that concrete type
 from neutral world ownership.
+Simulation initialization now passes the active frame backend into physics. Vulkan/neutral physics
+does not acquire `SceneManager`; NIF collision shapes remain available through the neutral NIF loader,
+while non-NIF scene-derived collision shapes are rejected explicitly until a neutral loader replaces
+that OSG-only path.
 World update no longer performs GUI-dependent spell preloading or jail-window checks without the
 legacy renderer/UI owner.
 Projectile bookkeeping is likewise optional at the neutral simulation boundary; physics can advance
@@ -331,7 +335,7 @@ The engine public header no longer imports complete OSG viewer/event-handler hea
 are now included only by the implementation files that use them.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-154 files, deleting 1,306 lines and adding 8,215 lines (net `+6,909`). The larger Vulkan-only
+155 files, deleting 1,307 lines and adding 8,228 lines (net `+6,921`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.

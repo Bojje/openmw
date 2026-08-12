@@ -121,6 +121,9 @@ namespace Resource
         }
         else
         {
+            if (!mSceneManager)
+                return osg::ref_ptr<const BulletShape>();
+
             // TODO: support .bullet shape files
 
             osg::ref_ptr<const osg::Node> constNode(mSceneManager->getTemplate(name));

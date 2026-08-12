@@ -92,10 +92,10 @@ namespace
 
 namespace MWPhysics
 {
-    PhysicsSystem::PhysicsSystem(Resource::ResourceSystem* resourceSystem)
+    PhysicsSystem::PhysicsSystem(Resource::ResourceSystem* resourceSystem, Resource::SceneManager* sceneManager)
         : mPhysicsDt(1.f / 60.f)
         , mShapeManager(std::make_unique<Resource::BulletShapeManager>(resourceSystem->getVFS(),
-              resourceSystem->getSceneManager(), resourceSystem->getNifFileManager(),
+              sceneManager, resourceSystem->getNifFileManager(),
               Settings::cells().mCacheExpiryDelay))
         , mResourceSystem(resourceSystem)
         , mDebugDrawEnabled(false)

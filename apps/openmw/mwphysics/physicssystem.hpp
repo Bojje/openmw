@@ -38,6 +38,7 @@ namespace MWRender
 namespace Resource
 {
     class BulletShapeManager;
+    class SceneManager;
     class ResourceSystem;
 }
 
@@ -152,7 +153,7 @@ namespace MWPhysics
     class PhysicsSystem : public RayCastingInterface
     {
     public:
-        explicit PhysicsSystem(Resource::ResourceSystem* resourceSystem);
+        explicit PhysicsSystem(Resource::ResourceSystem* resourceSystem, Resource::SceneManager* sceneManager);
         virtual ~PhysicsSystem();
 
         /// Enable the optional OSG collision visualization after the simulation

@@ -222,7 +222,8 @@ namespace MWWorld
 
         // Must be called after `loadData`. This phase only creates simulation
         // services and does not require an OSG scene node.
-        void initSimulation(Debug::Level maxRecastLogLevel);
+        void initSimulation(Debug::Level maxRecastLogLevel,
+            Render::FrameLifecycle::Backend backend = Render::FrameLifecycle::Backend::Osg);
 
         // OSG reference-renderer setup. A future backend must provide its own
         // renderer services after initSimulation instead of calling this.
