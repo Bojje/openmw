@@ -7,6 +7,7 @@
 #include <cstring>
 #include <iterator>
 #include <limits>
+#include <memory>
 #include <new>
 #include <stdexcept>
 #include <vector>
@@ -193,12 +194,11 @@ namespace
             return {};
         }
 
-        png_bytep rows = nullptr;
-        png_bytep* rowPointers = nullptr;
+        std::unique_ptr<png_byte[]> rows;
+        std::unique_ptr<png_bytep[]> rowPointers;
+        std::unique_ptr<std::uint8_t[]> pixels;
         if (setjmp(png_jmpbuf(png)) != 0)
         {
-            delete[] rowPointers;
-            delete[] rows;
             png_destroy_read_struct(&png, &info, nullptr);
             return {};
         }
@@ -241,26 +241,24 @@ namespace
 
         const std::size_t pixelBytes = static_cast<std::size_t>(width) * height * 4;
         const std::size_t rowStorageSize = static_cast<std::size_t>(rowBytes) * height;
-        rows = new (std::nothrow) png_byte[rowStorageSize];
-        rowPointers = new (std::nothrow) png_bytep[height];
-        if (!rows || !rowPointers)
+        rows.reset(new (std::nothrow) png_byte[rowStorageSize]);
+        rowPointers.reset(new (std::nothrow) png_bytep[height]);
+        pixels.reset(new (std::nothrow) std::uint8_t[pixelBytes]);
+        if (!rows || !rowPointers || !pixels)
             png_error(png, "PNG allocation failed");
         for (png_uint_32 y = 0; y < height; ++y)
-            rowPointers[y] = rows + static_cast<std::size_t>(y) * rowBytes;
-        png_read_image(png, rowPointers);
+            rowPointers[y] = rows.get() + static_cast<std::size_t>(y) * rowBytes;
+        png_read_image(png, rowPointers.get());
 
-        std::vector<std::uint8_t> pixels(pixelBytes);
         for (png_uint_32 y = 0; y < height; ++y)
-            std::memcpy(pixels.data() + static_cast<std::size_t>(y) * width * 4,
-                rows + static_cast<std::size_t>(y) * rowBytes, static_cast<std::size_t>(width) * 4);
+            std::memcpy(pixels.get() + static_cast<std::size_t>(y) * width * 4,
+                rows.get() + static_cast<std::size_t>(y) * rowBytes, static_cast<std::size_t>(width) * 4);
 
-        delete[] rowPointers;
-        delete[] rows;
         png_destroy_read_struct(&png, &info, nullptr);
         auto result = std::make_shared<Render::TextureData>();
         result->width = static_cast<std::uint32_t>(width);
         result->height = static_cast<std::uint32_t>(height);
-        result->pixels = std::move(pixels);
+        result->pixels.assign(pixels.get(), pixels.get() + pixelBytes);
         return result;
     }
 #endif

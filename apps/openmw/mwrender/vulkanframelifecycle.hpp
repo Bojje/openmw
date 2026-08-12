@@ -24,8 +24,6 @@ namespace MWRender
         VulkanFrameLifecycle(const VulkanFrameLifecycle&) = delete;
         VulkanFrameLifecycle& operator=(const VulkanFrameLifecycle&) = delete;
 
-        SDL_Window* window() const { return mWindow; }
-
         Render::FrameLifecycle::Backend backend() const override { return Render::FrameLifecycle::Backend::Vulkan; }
         bool renderFrame() override;
         bool renderFrame(const Render::SceneSubmission& submission) override;

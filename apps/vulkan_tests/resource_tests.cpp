@@ -93,6 +93,15 @@ namespace
         if (!texture || texture->width != 1 || texture->height != 1
             || texture->pixels != std::vector<std::uint8_t>({ 255, 0, 0, 255 }))
             throw std::runtime_error("neutral PNG texture decoding changed pixel data");
+
+        {
+            std::ofstream output(root / "textures/test.png", std::ios::binary | std::ios::trunc);
+            output.write(reinterpret_cast<const char*>(png.data()), 32);
+        }
+        resources.getNeutralTextureManager()->clearCache();
+        if (resources.getNeutralTextureManager()->get(VFS::Path::Normalized("textures/test.png")))
+            throw std::runtime_error("malformed neutral PNG unexpectedly decoded");
+
         std::filesystem::remove_all(root, error);
     }
 #endif
