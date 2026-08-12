@@ -515,12 +515,12 @@ preserve the existing behavior, while the neutral cache headers no longer import
 resource-manager interface. CI checks this boundary so the Vulkan resource path cannot regain an
 OSG cache dependency accidentally.
 
-Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-206 files, deleting 2,280 lines and adding 13,961 lines (net `+11,681`). The larger Vulkan-only
-cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
-not the speculative 10k-line reduction. The live no-GUI consumer is the first deletion
-checkpoint; further reduction can now target OSG scene/resource/presentation ownership rather
-than adding another compatibility bridge.
+Against the frozen `openmw-vulkan-osg-reference` tag, the current checkpoint changes
+206 files, deleting 2,285 lines and adding 14,265 lines (net `+11,980`). The larger Vulkan-only
+cleanup was completed in the merged PRs #1–#5; the current branch continues the reduction
+work with renderer-neutral ownership and compatibility-wrapper deletion. The live no-GUI
+consumer is the first deletion checkpoint; further reduction can now target OSG
+scene/resource/presentation ownership rather than adding another compatibility bridge.
 
 Submission validation now lives on the renderer-neutral `SceneSubmission` boundary used by the
 Vulkan consumer, including dynamic mesh textures. The latest validation checkpoint also rejects non-finite scene matrices, transforms, vertex
