@@ -111,7 +111,6 @@ namespace MWWorld
         const VFS::Manager* mVfs;
         MWPhysics::PhysicsSystem* mPhysics;
         MWRender::RenderingManager* mRendering;
-        Terrain::World* mTerrain;
         MWRender::ObjectPaging* mObjectPaging;
         Terrain::RenderStorage& mTerrainStorage;
         DetourNavigator::Navigator& mNavigator;
@@ -165,7 +164,7 @@ namespace MWWorld
             Render::SceneSynchronizer sceneSynchronizer, Render::BonePoseResolver bonePoseResolver,
             Render::MeshResolver meshResolver, Render::TextureResolver textureResolver, const VFS::Manager* vfs,
             MWRender::RenderingManager* rendering, MWRender::LandManager* landManager,
-            Terrain::World* terrain, MWRender::ObjectPaging* objectPaging,
+            MWRender::ObjectPaging* objectPaging,
             Terrain::RenderStorage& terrainStorage, std::unique_ptr<CellPreloader> preloader,
             MWPhysics::PhysicsSystem* physics,
             DetourNavigator::Navigator& navigator);

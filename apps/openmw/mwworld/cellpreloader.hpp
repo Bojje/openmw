@@ -3,6 +3,7 @@
 
 #include "positioncellgrid.hpp"
 
+#include <components/esm/refid.hpp>
 #include <components/sceneutil/workqueue.hpp>
 
 #include <osg/ref_ptr>
@@ -88,7 +89,8 @@ namespace MWWorld
         void syncTerrainLoad(Loading::Listener& listener);
         void abortTerrainPreloadExcept(const PositionCellGrid* exceptPos);
         bool isTerrainLoaded(const PositionCellGrid& position, double referenceTime) const;
-        void setTerrain(Terrain::World* terrain);
+        bool terrainWorldspaceMatches(const ESM::RefId& worldspace);
+        void rebuildTerrainViews();
 
         void reportStats(unsigned int frameNumber, osg::Stats& stats) const;
 

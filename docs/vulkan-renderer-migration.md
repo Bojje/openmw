@@ -307,6 +307,9 @@ an OSG queue or scene-manager plumbing for a service it cannot execute.
 The active paged-reference cache now also belongs to `ObjectPaging`; `Scene` forwards only the legacy
 unpaging transition, while OSG intersection and cull queries ask the paging service directly. This
 removes another OSG-owned vector and lookup helper from the neutral scene owner.
+The duplicate `Terrain::World*` in `Scene` is removed as well: terrain-worldspace checks and
+view rebuilding now stay inside the OSG-only `CellPreloader`, so neutral scene construction no
+longer accepts or stores a legacy terrain-world pointer.
 Object insertion now shares one world/physics/mechanics path for both backends: the optional OSG
 adapter handles only scene-graph insertion and water-ripple registration, while neutral object
 snapshots, physics shapes, looping effects, and lifecycle notifications are not skipped when OSG
@@ -387,7 +390,7 @@ The engine public header no longer imports complete OSG viewer/event-handler hea
 are now included only by the implementation files that use them.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-160 files, deleting 1,505 lines and adding 8,647 lines (net `+7,142`). The larger Vulkan-only
+160 files, deleting 1,514 lines and adding 8,652 lines (net `+7,138`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.

@@ -764,11 +764,9 @@ namespace MWWorld
             mRendering->setActiveGrid(osg::Vec4i(newGrid[0], newGrid[1], newGrid[2], newGrid[3]));
         }
 
-        if (mPreloader)
-            mPreloader->setTerrain(mTerrain);
         if (mPreloader && mObjectPaging && mObjectPaging->unlockCache())
         {
-            mTerrain->rebuildViews();
+            mPreloader->rebuildTerrainViews();
             mPreloader->abortTerrainPreloadExcept(nullptr);
         }
         if (mPreloader && !mPreloader->isTerrainLoaded(
@@ -1033,7 +1031,7 @@ namespace MWWorld
         Render::SceneSynchronizer sceneSynchronizer, Render::BonePoseResolver bonePoseResolver,
         Render::MeshResolver meshResolver, Render::TextureResolver textureResolver, const VFS::Manager* vfs,
         MWRender::RenderingManager* rendering, MWRender::LandManager* landManager,
-        Terrain::World* terrain, MWRender::ObjectPaging* objectPaging,
+        MWRender::ObjectPaging* objectPaging,
         Terrain::RenderStorage& terrainStorage, std::unique_ptr<CellPreloader> preloader,
         MWPhysics::PhysicsSystem* physics,
         DetourNavigator::Navigator& navigator)
@@ -1048,7 +1046,6 @@ namespace MWWorld
         , mVfs(vfs)
         , mPhysics(physics)
         , mRendering(rendering)
-        , mTerrain(terrain)
         , mObjectPaging(objectPaging)
         , mTerrainStorage(terrainStorage)
         , mNavigator(navigator)
@@ -1063,7 +1060,7 @@ namespace MWWorld
         Terrain::RenderStorage& terrainStorage,
         MWPhysics::PhysicsSystem* physics, DetourNavigator::Navigator& navigator)
         : Scene(world, frameLifecycle, std::move(sceneSynchronizer), std::move(bonePoseResolver), std::move(meshResolver),
-            std::move(textureResolver), vfs, nullptr, nullptr, nullptr, nullptr, terrainStorage, nullptr,
+            std::move(textureResolver), vfs, nullptr, nullptr, nullptr, terrainStorage, nullptr,
             physics, navigator)
     {
     }
@@ -1583,10 +1580,10 @@ namespace MWWorld
 
     void Scene::preloadTerrain(const Render::Vec3& pos, ESM::RefId worldspace, bool sync)
     {
-        if (!mPreloader || !mTerrain)
+        if (!mPreloader)
             return;
 
-        if (mTerrain->getWorldspace() != worldspace)
+        if (!mPreloader->terrainWorldspaceMatches(worldspace))
             throw std::runtime_error("preloadTerrain can only work with the current exterior worldspace");
 
         ESM::ExteriorCellLocation cellPos = ESM::positionToExteriorCellLocation(pos.x, pos.y, worldspace);

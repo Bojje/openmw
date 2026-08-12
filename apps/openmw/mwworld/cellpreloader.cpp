@@ -487,13 +487,15 @@ namespace MWWorld
             && contains(mLoadedTerrainPositions, position, Constants::CellSizeInUnits);
     }
 
-    void CellPreloader::setTerrain(Terrain::World* terrain)
+    bool CellPreloader::terrainWorldspaceMatches(const ESM::RefId& worldspace)
     {
-        if (terrain != mTerrain)
-        {
-            clearAllTasks();
-            mTerrain = terrain;
-        }
+        return mTerrain && mTerrain->getWorldspace() == worldspace;
+    }
+
+    void CellPreloader::rebuildTerrainViews()
+    {
+        if (mTerrain)
+            mTerrain->rebuildViews();
     }
 
     void CellPreloader::clearAllTasks()
