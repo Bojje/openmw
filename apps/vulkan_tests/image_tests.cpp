@@ -1,12 +1,15 @@
 #include <cstdlib>
+#include <array>
 #include <cstdint>
 #include <exception>
 #include <filesystem>
+#include <fstream>
 #include <initializer_list>
 #include <iostream>
 #include <stdexcept>
 
 #include <components/render/imagecomparison.hpp>
+#include <components/render/imagewriter.hpp>
 #include <components/render/textureconversion.hpp>
 
 namespace
@@ -97,6 +100,33 @@ namespace
         });
         expect(!invalid.valid(), "RGBA8 conversion should reject non-finite channels");
     }
+
+    void testTgaRoundTripHeader()
+    {
+        const std::filesystem::path path = std::filesystem::temp_directory_path() / "openmw-image-writer.tga";
+        Render::TextureData source;
+        source.width = 513;
+        source.height = 257;
+        source.pixels.resize(static_cast<std::size_t>(source.width) * source.height * 4, 0);
+        source.pixels[0] = 1;
+        source.pixels[1] = 2;
+        source.pixels[2] = 3;
+        source.pixels[3] = 4;
+        expect(Render::writeTga(source, path), "TGA writer failed");
+
+        std::ifstream input(path, std::ios::binary);
+        std::array<std::uint8_t, 18> header{};
+        input.read(reinterpret_cast<char*>(header.data()), static_cast<std::streamsize>(header.size()));
+        expect(input.good() || input.eof(), "TGA header could not be read");
+        expect(header[12] == 1 && header[13] == 2 && header[14] == 1 && header[15] == 1,
+            "TGA dimensions lost their high bytes");
+        std::array<std::uint8_t, 4> pixel{};
+        input.read(reinterpret_cast<char*>(pixel.data()), static_cast<std::streamsize>(pixel.size()));
+        expect(pixel == std::array<std::uint8_t, 4>{ 3, 2, 1, 4 }, "TGA pixel channel order changed");
+        input.close();
+        std::error_code error;
+        std::filesystem::remove(path, error);
+    }
 }
 
 int main()
@@ -108,6 +138,7 @@ int main()
         testInvalidOrDifferentImages();
         testPpmRoundTrip();
         testRgba8Conversion();
+        testTgaRoundTripHeader();
         std::cout << "Vulkan image comparison tests passed\n";
         return EXIT_SUCCESS;
     }

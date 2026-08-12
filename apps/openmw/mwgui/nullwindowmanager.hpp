@@ -179,15 +179,11 @@ namespace MWGui
         std::vector<std::string_view> getAllowedWindowIds(GuiMode) const override;
 
     private:
-        std::string mConsoleMode;
         std::string mVersionDescription;
-        std::string mEmptyString;
-        ESM::RefId mSelectedSpell;
         MWWorld::Ptr mEmptyPtr;
         Translation::Storage mTranslationDataStorage;
         Loading::Listener mLoadingListener;
         MWGui::TextColours mTextColours;
-        std::vector<GuiMode> mGuiModeStack;
         bool mCursorVisible = true;
         bool mHudVisible = true;
         bool mWindowVisible = true;

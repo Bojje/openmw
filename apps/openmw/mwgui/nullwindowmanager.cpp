@@ -128,7 +128,11 @@ namespace MWGui
     MWGui::PostProcessorHud* NullWindowManager::getPostProcessorHud() { return nullptr; }
     std::vector<MWGui::WindowBase*> NullWindowManager::getGuiModeWindows(GuiMode) { return {}; }
     MWWorld::Ptr NullWindowManager::getConsoleSelectedObject() const { return mEmptyPtr; }
-    const std::string& NullWindowManager::getConsoleMode() { return mConsoleMode; }
+    const std::string& NullWindowManager::getConsoleMode()
+    {
+        static const std::string empty;
+        return empty;
+    }
     void NullWindowManager::setCursorVisible(bool visible) { mCursorVisible = visible; }
     void NullWindowManager::getMousePosition(int& x, int& y) { x = 0; y = 0; }
     void NullWindowManager::getMousePosition(float& x, float& y) { x = 0.f; y = 0.f; }
@@ -137,7 +141,11 @@ namespace MWGui
     bool NullWindowManager::toggleFogOfWar() { return false; }
     bool NullWindowManager::toggleFullHelp() { return false; }
     bool NullWindowManager::getFullHelp() const { return false; }
-    const ESM::RefId& NullWindowManager::getSelectedSpell() { return mSelectedSpell; }
+    const ESM::RefId& NullWindowManager::getSelectedSpell()
+    {
+        static const ESM::RefId empty;
+        return empty;
+    }
     const MWWorld::Ptr& NullWindowManager::getSelectedEnchantItem() const { return mEmptyPtr; }
     const MWWorld::Ptr& NullWindowManager::getSelectedWeapon() const { return mEmptyPtr; }
     bool NullWindowManager::setHudVisibility(bool visible) { mHudVisible = visible; return true; }
@@ -174,7 +182,11 @@ namespace MWGui
     int NullWindowManager::getControllerMenuHeight() { return 0; }
     bool NullWindowManager::getControllerTooltipVisible() const { return false; }
     bool NullWindowManager::getControllerTooltipEnabled() const { return false; }
-    const std::vector<GuiMode>& NullWindowManager::getGuiModeStack() const { return mGuiModeStack; }
+    const std::vector<GuiMode>& NullWindowManager::getGuiModeStack() const
+    {
+        static const std::vector<GuiMode> empty;
+        return empty;
+    }
     bool NullWindowManager::isWindowVisible(std::string_view) const { return false; }
     std::vector<std::string_view> NullWindowManager::getAllWindowIds() const { return {}; }
     std::vector<std::string_view> NullWindowManager::getAllowedWindowIds(GuiMode) const { return {}; }
