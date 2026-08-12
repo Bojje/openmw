@@ -24,8 +24,11 @@ add_openmw_dir (mwrender
     renderbin actoranimation landmanager navmesh actorspaths recastmesh fogmanager objectpaging groundcover
     postprocessor pingpongcull luminancecalculator pingpongcanvas transparentpass precipitationocclusion ripples
     actorutil distortion animationpriority bonegroup blendmask animblendcontroller viewerframelifecycle neutralterrainstorage
-    vulkanframelifecycle
     )
+
+if (OPENMW_USE_VULKAN)
+    add_openmw_dir (mwrender vulkanframelifecycle)
+endif()
 
 add_openmw_dir (mwinput
     actions actionmanager bindingsmanager controllermanager controlswitch

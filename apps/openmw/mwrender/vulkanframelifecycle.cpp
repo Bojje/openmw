@@ -20,13 +20,10 @@
 #endif
 #include <components/settings/values.hpp>
 
-#ifdef OPENMW_USE_VULKAN
 #include <components/vk/vkrenderer.hpp>
-#endif
 
 namespace MWRender
 {
-#ifdef OPENMW_USE_VULKAN
     namespace
     {
         bool writeScreenshot(const Render::TextureData& image, const std::filesystem::path& path)
@@ -68,11 +65,9 @@ namespace MWRender
             return Render::writePpm(image, path);
         }
     }
-#endif
 
     struct VulkanFrameLifecycle::Implementation
     {
-#ifdef OPENMW_USE_VULKAN
         explicit Implementation(SDL_Window* window, const std::filesystem::path& shaderDirectory)
             : renderer(std::make_unique<Vk::Renderer>(window, true, Vk::Renderer::SurfaceMode::Window,
                   static_cast<uint32_t>(Settings::video().mResolutionX),
@@ -84,12 +79,6 @@ namespace MWRender
         }
 
         std::unique_ptr<Vk::Renderer> renderer;
-#else
-        Implementation(SDL_Window*, const std::filesystem::path&)
-        {
-            throw std::logic_error("The Vulkan frame lifecycle requires OPENMW_USE_VULKAN");
-        }
-#endif
     };
 
     VulkanFrameLifecycle::VulkanFrameLifecycle(SDL_Window* window, const std::filesystem::path& shaderDirectory,
@@ -107,89 +96,55 @@ namespace MWRender
 
     bool VulkanFrameLifecycle::renderFrame()
     {
-#ifdef OPENMW_USE_VULKAN
         return mImplementation->renderer->renderFrame();
-#else
-        return false;
-#endif
     }
 
     bool VulkanFrameLifecycle::renderFrame(const Render::SceneSubmission& submission)
     {
-#ifdef OPENMW_USE_VULKAN
         return mImplementation->renderer->renderFrame(submission);
-#else
-        static_cast<void>(submission);
-        return false;
-#endif
     }
 
     bool VulkanFrameLifecycle::done() const
     {
-#ifdef OPENMW_USE_VULKAN
         return mImplementation->renderer->done();
-#else
-        return true;
-#endif
     }
 
     void VulkanFrameLifecycle::requestQuit()
     {
-#ifdef OPENMW_USE_VULKAN
         mImplementation->renderer->requestQuit();
-#endif
     }
 
     double VulkanFrameLifecycle::referenceTime() const
     {
-#ifdef OPENMW_USE_VULKAN
         return mImplementation->renderer->referenceTime();
-#else
-        return 0.0;
-#endif
     }
 
     unsigned VulkanFrameLifecycle::frameNumber() const
     {
-#ifdef OPENMW_USE_VULKAN
         return mImplementation->renderer->frameNumber();
-#else
-        return 0;
-#endif
     }
 
     void VulkanFrameLifecycle::advanceFrame(double simulationTime)
     {
-#ifdef OPENMW_USE_VULKAN
         mImplementation->renderer->advanceFrame(simulationTime);
-#else
-        static_cast<void>(simulationTime);
-#endif
     }
 
     void VulkanFrameLifecycle::resize()
     {
-#ifdef OPENMW_USE_VULKAN
         int width = 0;
         int height = 0;
         SDL_Vulkan_GetDrawableSize(mWindow, &width, &height);
         if (width > 0 && height > 0)
             mImplementation->renderer->resize(static_cast<uint32_t>(width), static_cast<uint32_t>(height));
-#endif
     }
 
     std::optional<Render::TextureData> VulkanFrameLifecycle::captureFrame()
     {
-#ifdef OPENMW_USE_VULKAN
         return mImplementation->renderer->captureFrame();
-#else
-        return std::nullopt;
-#endif
     }
 
     void VulkanFrameLifecycle::captureScreenshot()
     {
-#ifdef OPENMW_USE_VULKAN
         const std::optional<Render::TextureData> image = captureFrame();
         if (!image)
         {
@@ -209,6 +164,5 @@ namespace MWRender
             Log(Debug::Warning) << "Failed to write Vulkan screenshot " << path;
         else
             Log(Debug::Info) << "Vulkan screenshot written to " << path;
-#endif
     }
 }

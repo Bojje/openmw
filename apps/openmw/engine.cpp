@@ -79,7 +79,9 @@
 #include "mwrender/renderingmanager.hpp"
 #include "mwrender/vismask.hpp"
 #include "mwrender/viewerframelifecycle.hpp"
+#ifdef OPENMW_USE_VULKAN
 #include "mwrender/vulkanframelifecycle.hpp"
+#endif
 
 #include "mwclass/classes.hpp"
 
