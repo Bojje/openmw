@@ -2713,6 +2713,23 @@ namespace MWMechanics
             || mWeaponType == ESM::Weapon::None || mWeaponType == ESM::Weapon::Spell || !mAnimQueue.empty())
             return;
 
+        MWBase::World* const world = MWBase::Environment::get().getWorld();
+        std::string group = mCurrentWeapon;
+        if (!mPtr.getClass().isBipedal(mPtr) && isRandomAttackAnimation(group))
+        {
+            const std::string prefix = world->isSwimming(mPtr) ? "swimattack" : "attack";
+            std::vector<std::string> candidates;
+            for (int index = 1;; ++index)
+            {
+                const std::string candidate = prefix + std::to_string(index);
+                if (!world->getNeutralAnimationDuration(mPtr, candidate, "start", "stop"))
+                    break;
+                candidates.push_back(candidate);
+            }
+            if (!candidates.empty())
+                group = candidates[Misc::Rng::rollDice(static_cast<int>(candidates.size()), world->getPrng())];
+        }
+
         std::string_view attackType;
         const ESM::WeaponType::Class weaponClass = getWeaponType(mWeaponType)->mWeaponClass;
         if (weaponClass == ESM::WeaponType::Ranged || weaponClass == ESM::WeaponType::Thrown)
@@ -2726,26 +2743,27 @@ namespace MWMechanics
                     : getRandomAttackType();
         }
 
-        if (mCurrentWeapon.empty())
+        if (group.empty())
             return;
 
-        const std::string startKey = std::string(attackType) + " start";
-        const std::string stopKey = std::string(attackType) + " max attack";
-        MWBase::World* const world = MWBase::Environment::get().getWorld();
-        if (!world->getNeutralAnimationDuration(mPtr, mCurrentWeapon, startKey, stopKey))
+        const bool randomAttack = isRandomAttackAnimation(group);
+        const std::string startKey = randomAttack ? "start" : std::string(attackType) + " start";
+        const std::string stopKey = randomAttack ? "stop" : std::string(attackType) + " max attack";
+        if (!world->getNeutralAnimationDuration(mPtr, group, startKey, stopKey))
         {
             setAttackingOrSpell(false);
             return;
         }
 
         mAttackType = attackType;
+        mCurrentWeapon = group;
         mAttackStrength = -1.f;
         mReadyToHit = false;
         mUpperBodyState = UpperBodyState::AttackWindUp;
         setAttackingOrSpell(false);
 
         AnimationQueueEntry entry;
-        entry.mGroup = mCurrentWeapon;
+        entry.mGroup = group;
         entry.mLoopCount = 0;
         entry.mTime = 0.f;
         entry.mLooping = false;
@@ -2821,8 +2839,12 @@ namespace MWMechanics
             else if (groupname == "attack3" || groupname == "swimattack3")
                 attackType = ESM::Weapon::AT_Thrust;
         }
-        if (attackType >= 0 && mReadyToHit)
+        const bool neutralRandomAttack = isRandomAttackAnimation(groupname)
+            && mUpperBodyState >= UpperBodyState::AttackWindUp;
+        if (attackType >= 0 && (mReadyToHit || neutralRandomAttack))
         {
+            if (!mReadyToHit)
+                prepareHit();
             mPtr.getClass().hit(mPtr, mAttackStrength, mAttackWindUp, attackType, mAttackVictim, mAttackHitPos,
                 mAttackSuccess);
             mReadyToHit = false;
