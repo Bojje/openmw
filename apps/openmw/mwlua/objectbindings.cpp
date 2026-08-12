@@ -331,12 +331,18 @@ namespace MWLua
             objectT["startingRotation"] = sol::readonly_property([](const ObjectT& o) -> LuaUtil::TransformQ {
                 return { toQuat(o.ptr().getCellRef().getPosition(), o.ptr().getClass().isActor()) };
             });
-            objectT["getBoundingBox"] = [](const ObjectT& o) {
-                MWRender::RenderingManager* renderingManager
-                    = MWBase::Environment::get().getWorld()->getRenderingManager();
-                osg::BoundingBox bb = renderingManager->getCullSafeBoundingBox(o.ptr());
-                return LuaUtil::Box{ bb.center(), bb._max - bb.center() };
-            };
+            // Bounding boxes are supplied by the legacy scene renderer. The
+            // Vulkan experiment deliberately has no RenderingManager, so do
+            // not publish an API entry that would retain a null dereference
+            // in the common object package.
+            if (MWBase::Environment::get().getWorld()->getRenderingManager() != nullptr)
+            {
+                objectT["getBoundingBox"] = [](const ObjectT& o) {
+                    auto* renderingManager = MWBase::Environment::get().getWorld()->getRenderingManager();
+                    osg::BoundingBox bb = renderingManager->getCullSafeBoundingBox(o.ptr());
+                    return LuaUtil::Box{ bb.center(), bb._max - bb.center() };
+                };
+            }
 
             objectT["type"] = sol::readonly_property(
                 [types = getTypeToPackageTable(context.sol())](
