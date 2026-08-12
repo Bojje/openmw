@@ -137,13 +137,6 @@ namespace MWWorld
         DetourNavigator::Navigator& mNavigator;
         std::unique_ptr<CellPreloader> mPreloader;
         float mCellLoadingThreshold;
-        float mPreloadDistance;
-        bool mPreloadEnabled;
-
-        bool mPreloadExteriorGrid;
-        bool mPreloadDoors;
-        bool mPreloadFastTravel;
-        float mPredictionTime;
         float mLowestPoint;
 
         int mHalfGridSize = Constants::CellGridRadius;

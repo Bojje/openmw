@@ -1065,12 +1065,6 @@ namespace MWWorld
         , mWorkQueue(workQueue)
         , mNavigator(navigator)
         , mCellLoadingThreshold(1024.f)
-        , mPreloadDistance(Settings::cells().mPreloadDistance)
-        , mPreloadEnabled(Settings::cells().mPreloadEnabled)
-        , mPreloadExteriorGrid(Settings::cells().mPreloadExteriorGrid)
-        , mPreloadDoors(Settings::cells().mPreloadDoors)
-        , mPreloadFastTravel(Settings::cells().mPreloadFastTravel)
-        , mPredictionTime(Settings::cells().mPredictionTime)
         , mLowestPoint(std::numeric_limits<float>::max())
     {
         if (mRendering && landManager && mTerrain && mWorkQueue)
@@ -1500,6 +1494,7 @@ namespace MWWorld
     {
         if (!mPreloader || dt <= 1e-06)
             return;
+        const auto& cellSettings = Settings::cells();
         std::vector<PositionCellGrid> exteriorPositions;
 
         const MWWorld::ConstPtr player = mWorld.getPlayerPtr();
@@ -1507,8 +1502,9 @@ namespace MWWorld
         Render::Vec3 playerPos{ position.pos[0], position.pos[1], position.pos[2] };
         Render::Vec3 moved{ playerPos.x - mLastPlayerPos.x, playerPos.y - mLastPlayerPos.y,
             playerPos.z - mLastPlayerPos.z };
-        Render::Vec3 predictedPos{ playerPos.x + moved.x / dt * mPredictionTime,
-            playerPos.y + moved.y / dt * mPredictionTime, playerPos.z + moved.z / dt * mPredictionTime };
+        Render::Vec3 predictedPos{ playerPos.x + moved.x / dt * cellSettings.mPredictionTime,
+            playerPos.y + moved.y / dt * cellSettings.mPredictionTime,
+            playerPos.z + moved.z / dt * cellSettings.mPredictionTime };
 
         if (mCurrentCell->isExterior())
             exteriorPositions.push_back(
@@ -1517,13 +1513,13 @@ namespace MWWorld
 
         mLastPlayerPos = playerPos;
 
-        if (mPreloadEnabled)
+        if (cellSettings.mPreloadEnabled)
         {
-            if (mPreloadDoors)
+            if (cellSettings.mPreloadDoors)
                 preloadTeleportDoorDestinations(playerPos, predictedPos);
-            if (mPreloadExteriorGrid)
+            if (cellSettings.mPreloadExteriorGrid)
                 preloadExteriorGrid(playerPos, predictedPos);
-            if (mPreloadFastTravel)
+            if (cellSettings.mPreloadFastTravel)
                 preloadFastTravelDestinations(playerPos, exteriorPositions);
         }
 
@@ -1532,6 +1528,7 @@ namespace MWWorld
 
     void Scene::preloadTeleportDoorDestinations(const Render::Vec3& playerPos, const Render::Vec3& predictedPos)
     {
+        const float preloadDistance = Settings::cells().mPreloadDistance;
         std::vector<MWWorld::ConstPtr> teleportDoors;
         for (const MWWorld::CellStore* cellStore : mActiveCells)
         {
@@ -1560,7 +1557,7 @@ namespace MWWorld
             float sqrDistToPlayer = squaredDistance(playerPos, doorPos);
             sqrDistToPlayer = std::min(sqrDistToPlayer, squaredDistance(predictedPos, doorPos));
 
-            if (sqrDistToPlayer < mPreloadDistance * mPreloadDistance)
+            if (sqrDistToPlayer < preloadDistance * preloadDistance)
             {
                 try
                 {
@@ -1579,6 +1576,7 @@ namespace MWWorld
     {
         if (!mWorld.isCellExterior())
             return;
+        const float preloadDistance = Settings::cells().mPreloadDistance;
 
         int halfGridSizePlusOne = mHalfGridSize + 1;
 
@@ -1604,7 +1602,7 @@ namespace MWWorld
                 dist = std::min(dist,
                     std::max(std::abs(thisCellCenter.x() - predictedPos.x),
                         std::abs(thisCellCenter.y() - predictedPos.y)));
-                float loadDist = cellSize / 2 + cellSize - mCellLoadingThreshold + mPreloadDistance;
+                const float loadDist = cellSize / 2 + cellSize - mCellLoadingThreshold + preloadDistance;
 
                 if (dist < loadDist)
                     preloadCell(mWorld.getWorldModel().getExterior(cellIndex));
@@ -1726,7 +1724,7 @@ namespace MWWorld
     void Scene::preloadFastTravelDestinations(
         const Render::Vec3& playerPos, std::vector<PositionCellGrid>& exteriorPositions)
     {
-        ListFastTravelDestinationsVisitor listVisitor(mPreloadDistance, playerPos);
+        ListFastTravelDestinationsVisitor listVisitor(Settings::cells().mPreloadDistance, playerPos);
         ESM::RefId extWorldspace = mWorld.getCurrentWorldspace();
         for (MWWorld::CellStore* cellStore : mActiveCells)
         {
