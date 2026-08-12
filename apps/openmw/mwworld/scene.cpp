@@ -484,7 +484,8 @@ namespace MWWorld
         mNeutralWorldScene.removeCell(static_cast<const void*>(cell));
         if (mRendering)
             mRendering->removeCell(cell);
-        MWBase::Environment::get().getWindowManager()->removeCell(cell);
+        if (mRendering)
+            MWBase::Environment::get().getWindowManager()->removeCell(cell);
 
         mWorld.getLocalScripts().clearCell(cell);
 
@@ -607,7 +608,8 @@ namespace MWWorld
             mRendering->addCell(&cell);
         mNeutralTerrainRegionsDirty = true;
 
-        MWBase::Environment::get().getWindowManager()->addCell(&cell);
+        if (mRendering)
+            MWBase::Environment::get().getWindowManager()->addCell(&cell);
         bool waterEnabled = cellVariant.hasWater() || cell.isExterior();
         float waterLevel = cell.getWaterLevel();
         if (mRendering)
@@ -796,10 +798,14 @@ namespace MWWorld
             cellsPositionsToLoad.emplace_back(x, y);
         });
 
-        Loading::Listener* loadingListener = MWBase::Environment::get().getWindowManager()->getLoadingScreen();
+        Loading::Listener* loadingListener
+            = mRendering ? MWBase::Environment::get().getWindowManager()->getLoadingScreen() : nullptr;
         Loading::ScopedLoad load(loadingListener);
-        loadingListener->setLabel("#{OMWEngine:LoadingExterior}");
-        loadingListener->setProgressRange(refsToLoad);
+        if (loadingListener)
+        {
+            loadingListener->setLabel("#{OMWEngine:LoadingExterior}");
+            loadingListener->setProgressRange(refsToLoad);
+        }
 
         sortCellsToLoad(playerCellX, playerCellY, cellsPositionsToLoad);
 
@@ -818,7 +824,8 @@ namespace MWWorld
         navigatorUpdateGuard.reset();
 
         CellStore& current = mWorld.getWorldModel().getExterior(playerCellIndex);
-        MWBase::Environment::get().getWindowManager()->changeCell(&current);
+        if (mRendering)
+            MWBase::Environment::get().getWindowManager()->changeCell(&current);
 
         if (changeEvent)
             mCellChanged = true;
@@ -851,6 +858,9 @@ namespace MWWorld
 
     void Scene::testExteriorCells()
     {
+        if (!mRendering)
+            return;
+
         // Note: temporary disable ICO to decrease memory usage
         Resource::SceneManager* const sceneManager = mResourceSystem->getSceneManager();
         osgUtil::IncrementalCompileOperation* const incrementalCompileOperation
@@ -919,6 +929,9 @@ namespace MWWorld
 
     void Scene::testInteriorCells()
     {
+        if (!mRendering)
+            return;
+
         // Note: temporary disable ICO to decrease memory usage
         Resource::SceneManager* const sceneManager = mResourceSystem->getSceneManager();
         osgUtil::IncrementalCompileOperation* const incrementalCompileOperation
@@ -1008,7 +1021,8 @@ namespace MWWorld
         }
 
         MWBase::Environment::get().getMechanicsManager()->updateCell(old, player);
-        MWBase::Environment::get().getWindowManager()->watchActor(player);
+        if (mRendering)
+            MWBase::Environment::get().getWindowManager()->watchActor(player);
 
         mPhysics->updatePtr(old, player);
 
@@ -1099,12 +1113,14 @@ namespace MWWorld
         std::string_view cellName, const ESM::Position& position, bool adjustPlayerPos, bool changeEvent)
     {
         CellStore& cell = mWorld.getWorldModel().getInterior(cellName);
-        bool useFading = (mCurrentCell != nullptr);
+        bool useFading = mRendering && (mCurrentCell != nullptr);
         if (useFading)
             MWBase::Environment::get().getWindowManager()->fadeScreenOut(0.5);
 
-        Loading::Listener* loadingListener = MWBase::Environment::get().getWindowManager()->getLoadingScreen();
-        loadingListener->setLabel("#{OMWEngine:LoadingInterior}");
+        Loading::Listener* loadingListener
+            = mRendering ? MWBase::Environment::get().getWindowManager()->getLoadingScreen() : nullptr;
+        if (loadingListener)
+            loadingListener->setLabel("#{OMWEngine:LoadingInterior}");
         Loading::ScopedLoad load(loadingListener);
 
         if (mCurrentCell == &cell)
@@ -1114,7 +1130,8 @@ namespace MWWorld
 
             if (adjustPlayerPos)
                 mWorld.getPlayerPtr().getClass().adjustPosition(mWorld.getPlayerPtr(), true);
-            MWBase::Environment::get().getWindowManager()->fadeScreenIn(0.5);
+            if (mRendering)
+                MWBase::Environment::get().getWindowManager()->fadeScreenIn(0.5);
             return;
         }
 
@@ -1130,7 +1147,8 @@ namespace MWWorld
         }
         assert(mActiveCells.empty());
 
-        loadingListener->setProgressRange(cell.count());
+        if (loadingListener)
+            loadingListener->setProgressRange(cell.count());
 
         mNavigator.updateBounds(
             cell.getCell()->getWorldSpace(), std::nullopt, position.asVec3(), navigatorUpdateGuard.get());
@@ -1158,16 +1176,18 @@ namespace MWWorld
         if (useFading)
             MWBase::Environment::get().getWindowManager()->fadeScreenIn(0.5);
 
-        MWBase::Environment::get().getWindowManager()->changeCell(mCurrentCell);
+        if (mRendering)
+            MWBase::Environment::get().getWindowManager()->changeCell(mCurrentCell);
 
-        MWBase::Environment::get().getWorld()->getPostProcessor()->setExteriorFlag(cell.getCell()->isQuasiExterior());
+        if (mRendering)
+            MWBase::Environment::get().getWorld()->getPostProcessor()->setExteriorFlag(cell.getCell()->isQuasiExterior());
     }
 
     void Scene::changeToExteriorCell(
         const ESM::RefId& extCellId, const ESM::Position& position, bool adjustPlayerPos, bool changeEvent)
     {
 
-        if (changeEvent)
+        if (mRendering && changeEvent)
             MWBase::Environment::get().getWindowManager()->fadeScreenOut(0.5);
         CellStore& current = mWorld.getWorldModel().getCell(extCellId);
 
@@ -1178,10 +1198,11 @@ namespace MWWorld
 
         changePlayerCell(current, position, adjustPlayerPos);
 
-        if (changeEvent)
+        if (mRendering && changeEvent)
             MWBase::Environment::get().getWindowManager()->fadeScreenIn(0.5);
 
-        MWBase::Environment::get().getWorld()->getPostProcessor()->setExteriorFlag(true);
+        if (mRendering)
+            MWBase::Environment::get().getWorld()->getPostProcessor()->setExteriorFlag(true);
     }
 
     CellStore* Scene::getCurrentCell()
