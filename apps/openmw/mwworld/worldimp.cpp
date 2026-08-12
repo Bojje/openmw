@@ -1201,11 +1201,12 @@ namespace MWWorld
                     if (!ptr.isEmpty() && !newPtr.isEmpty())
                     {
                         const MWWorld::CellStore* destinationCell = newPtr.getCell();
-                        mWorldScene->updateNeutralObjectCell(static_cast<const void*>(ptr.mRef),
-                            static_cast<const void*>(newPtr.mRef), static_cast<const void*>(destinationCell),
-                            destinationCell->getCell()->isExterior(), destinationCell->getCell()->getGridX(),
-                            destinationCell->getCell()->getGridY(), destinationCell->getCell()->getNameId(),
-                            destinationCell->getCell()->getWorldSpace().serializeText());
+                        if (mWorldScene->mNeutralWorldScene)
+                            mWorldScene->mNeutralWorldScene->updateObjectCell(static_cast<const void*>(ptr.mRef),
+                                static_cast<const void*>(newPtr.mRef), static_cast<const void*>(destinationCell),
+                                destinationCell->getCell()->isExterior(), destinationCell->getCell()->getGridX(),
+                                destinationCell->getCell()->getGridY(), destinationCell->getCell()->getNameId(),
+                                destinationCell->getCell()->getWorldSpace().serializeText());
                     }
                     if (mRendering)
                         MWBase::Environment::get().getSoundManager()->updatePtr(ptr, newPtr);
@@ -1233,8 +1234,9 @@ namespace MWWorld
         {
             if (mRendering)
                 mRendering->moveObject(newPtr, position);
-            mWorldScene->updateNeutralObjectPosition(static_cast<const void*>(newPtr.mRef),
-                { position.x(), position.y(), position.z() });
+            if (mWorldScene->mNeutralWorldScene)
+                mWorldScene->mNeutralWorldScene->updateObjectPosition(static_cast<const void*>(newPtr.mRef),
+                    { position.x(), position.y(), position.z() });
             if (movePhysics)
             {
                 mPhysics->updatePosition(newPtr);
@@ -1447,8 +1449,9 @@ namespace MWWorld
 
             if (mRendering)
                 mRendering->rotateObject(ptr, rotate);
-            mWorldScene->updateNeutralObjectRotation(static_cast<const void*>(ptr.mRef),
-                toRenderQuat(rotate));
+            if (mWorldScene->mNeutralWorldScene)
+                mWorldScene->mNeutralWorldScene->updateObjectRotation(static_cast<const void*>(ptr.mRef),
+                    toRenderQuat(rotate));
             mPhysics->updateRotation(ptr, rotate);
 
             if (const auto object = mPhysics->getObject(ptr))

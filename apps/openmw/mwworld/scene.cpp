@@ -1350,26 +1350,6 @@ namespace MWWorld
         return result;
     }
 
-    void Scene::updateNeutralObjectCell(const void* oldObjectKey, const void* newObjectKey, const void* cellKey,
-        bool exterior, int gridX, int gridY, std::string_view cellName, std::string_view worldspace)
-    {
-        if (mNeutralWorldScene)
-            mNeutralWorldScene->updateObjectCell(
-                oldObjectKey, newObjectKey, cellKey, exterior, gridX, gridY, cellName, worldspace);
-    }
-
-    void Scene::updateNeutralObjectPosition(const void* objectKey, const Render::Vec3& position)
-    {
-        if (mNeutralWorldScene)
-            mNeutralWorldScene->updateObjectPosition(objectKey, position);
-    }
-
-    void Scene::updateNeutralObjectRotation(const void* objectKey, const Render::Quat& rotation)
-    {
-        if (mNeutralWorldScene)
-            mNeutralWorldScene->updateObjectRotation(objectKey, rotation);
-    }
-
     void Scene::markCellAsUnchanged()
     {
         mCellChanged = false;
