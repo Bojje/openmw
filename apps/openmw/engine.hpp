@@ -194,9 +194,6 @@ namespace OMW
         /// Prepare engine for game play
         void prepareEngine();
 
-        void createWindow();
-        void setWindowIcon();
-
     public:
         Engine(Files::ConfigurationManager& configurationManager);
         virtual ~Engine();

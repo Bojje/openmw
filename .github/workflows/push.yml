@@ -122,6 +122,10 @@ jobs:
           echo "the engine public header must not import complete OSG viewer headers"
           exit 1
         fi
+        if rg -n 'SDL_WINDOW_OPENGL|SDL_GL_|GraphicsWindowSDL2' apps/openmw/engine.cpp; then
+          echo "Engine must not own OSG/OpenGL window creation; the active frame lifecycle owns it"
+          exit 1
+        fi
         if rg -n 'mWorldScene\.(record|remove|update|set|clear)' apps/openmw/mwrender/renderingmanager.cpp; then
           echo "RenderingManager must not mutate the renderer-neutral world scene; world lifecycle owns those writes"
           exit 1

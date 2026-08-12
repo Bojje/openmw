@@ -412,9 +412,13 @@ surface creation no longer require OSG in the reusable SDL utilities.
 The engine now keeps its OSG-only depth/color selection operations local to window setup and only
 creates the OSG `UnrefQueue` for the OSG backend; frame cleanup tolerates a backend without OSG
 resource lifetimes.
+OSG window/context creation, icon decoding, OpenGL capability discovery, and stereo setup now live
+in `ViewerFrameLifecycle`; `Engine` receives only the created SDL window and capability result. This
+removes the engine's direct OpenGL window-construction path and gives the future Vulkan lifecycle a
+real exclusive startup boundary.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-173 files, deleting 1,681 lines and adding 8,864 lines (net `+7,183`). The larger Vulkan-only
+173 files, deleting 1,959 lines and adding 9,102 lines (net `+7,143`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.

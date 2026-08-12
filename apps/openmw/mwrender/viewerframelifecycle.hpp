@@ -1,6 +1,7 @@
 #ifndef OPENMW_MWRENDER_VIEWER_FRAME_LIFECYCLE_H
 #define OPENMW_MWRENDER_VIEWER_FRAME_LIFECYCLE_H
 
+#include <filesystem>
 #include <osg/ref_ptr>
 
 #include <components/render/frame.hpp>
@@ -9,6 +10,8 @@ namespace osgViewer
 {
     class Viewer;
 }
+
+struct SDL_Window;
 
 namespace MWRender
 {
@@ -24,6 +27,10 @@ namespace MWRender
         ViewerFrameLifecycle& operator=(const ViewerFrameLifecycle&) = delete;
 
         osgViewer::Viewer* viewer() const { return mViewer.get(); }
+
+        // Create and realize the OSG window owned by this lifecycle. The
+        // engine receives only the resulting SDL handle and GL capability.
+        int initializeWindow(SDL_Window*& window, const std::filesystem::path& resourceDirectory);
 
         Render::FrameLifecycle::Backend backend() const override { return Render::FrameLifecycle::Backend::Osg; }
         bool renderFrame() override;
