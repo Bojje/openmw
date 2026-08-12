@@ -245,7 +245,6 @@ namespace MWWorld
             bool exterior, int gridX, int gridY, std::string_view cellName, std::string_view worldspace);
         void updateNeutralObjectPosition(const void* objectKey, const Render::Vec3& position);
         void updateNeutralObjectRotation(const void* objectKey, const Render::Quat& rotation);
-        void updateNeutralObjectPose(const void* objectKey, std::vector<Render::Mat4> boneMatrices);
 
         /// Export the current loaded-world state for a renderer backend.
         Render::SceneSubmission getNeutralScene();
