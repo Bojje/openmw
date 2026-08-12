@@ -186,14 +186,16 @@ namespace Render
                 unresolvedModels.push_back(effect->model);
             EffectMeshSubmission submission;
             submission.object = *effect;
+            bool textureOverrideApplied = false;
             for (const MeshInstance& mesh : resolvedMeshes)
             {
                 MeshInstance instance = transformMeshInstance(*effect, mesh);
-                if (!effect->textureOverride.empty())
+                if (!effect->textureOverride.empty() && (!effect->magicVfx || !textureOverrideApplied))
                 {
                     instance.mesh.material.albedoTexture = effect->textureOverride;
                     instance.mesh.material.albedoWrapU = false;
                     instance.mesh.material.albedoWrapV = false;
+                    textureOverrideApplied = true;
                 }
                 submission.meshes.push_back(std::move(instance));
             }

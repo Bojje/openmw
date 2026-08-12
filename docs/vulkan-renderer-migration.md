@@ -185,7 +185,8 @@ helper now applies frame bone matrices for future animation integration. Unskinn
 supplied pose now enter the raster draw batch with their neutral transforms; skinned records without a resolved pose now
 use an inverse-bind-derived bind pose so dynamic actors remain visible while per-frame animation updates are ported.
 Explicitly identified world VFX now also cross as neutral transformed mesh effects with texture
-overrides and explicit removal; controller intervals are extracted from the renderer-neutral NIF
+overrides and explicit removal; magic VFX preserve the first-root override rule across the flattened
+neutral mesh list, and controller intervals are extracted from the renderer-neutral NIF
 resource and the world owner advances/removes identified one-shot effects during simulation.
 Continuous magic VFX now use that neutral effect path when no OSG animation exists, and spell
 cleanup removes them through the neutral world owner instead of dereferencing a missing animation.

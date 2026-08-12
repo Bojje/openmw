@@ -3962,7 +3962,7 @@ namespace MWWorld
                 animationDuration = mResourceSystem->getNifMeshManager()->getAnimationDuration(model);
             mWorldScene->mNeutralWorldScene->recordEffect(effectId, model.value(),
                 { worldPos.x(), worldPos.y(), worldPos.z() }, scale, textureOverride, loop,
-                animationDuration.value_or(0.f));
+                animationDuration.value_or(0.f), isMagicVFX);
         }
     }
 

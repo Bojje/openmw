@@ -87,6 +87,9 @@ namespace Render
         // interval. Such effects remain explicitly removable by gameplay.
         float animationDuration = 0.f;
         float animationTime = 0.f;
+        // Magic VFX use the legacy first-root texture replacement rule when
+        // their flattened neutral mesh list is submitted.
+        bool magicVfx = false;
     };
 
     // A cell snapshot is updated by the world lifecycle, not by a renderer.
@@ -229,7 +232,8 @@ namespace Render
         }
 
         bool recordEffect(std::string_view effectId, std::string_view model, const Vec3& position, float scale,
-            std::string_view textureOverride = {}, bool looping = false, float animationDuration = 0.f)
+            std::string_view textureOverride = {}, bool looping = false, float animationDuration = 0.f,
+            bool magicVfx = false)
         {
             if (effectId.empty() || model.empty() || !valid(position) || !valid(scale) || scale <= 0.f)
                 return false;
@@ -243,6 +247,7 @@ namespace Render
             effect.textureOverride = textureOverride;
             effect.looping = looping;
             effect.animationDuration = valid(animationDuration) && animationDuration > 0.f ? animationDuration : 0.f;
+            effect.magicVfx = magicVfx;
             mEffects[std::string(effectId)] = std::move(effect);
             return true;
         }
