@@ -3373,11 +3373,31 @@ namespace MWMechanics
 
     void CharacterController::updateContinuousVfx() const
     {
-        if (!mAnimation)
-            return;
-
         // Keeping track of when to stop a continuous VFX seems to be very difficult to do inside the spells code,
         // as it's extremely spread out (ActiveSpells, Spells, InventoryStore effects, etc...) so we do it here.
+
+        if (!mAnimation)
+        {
+            if (!mPtr.getClass().isActor())
+                return;
+
+            const auto& stats = mPtr.getClass().getCreatureStats(mPtr);
+            const auto& magicEffects = stats.getMagicEffects();
+            const std::string refnum = mPtr.getCellRef().getRefNum().toString();
+            for (const ESM::MagicEffect& effect : MWBase::Environment::get().getESMStore()->get<ESM::MagicEffect>())
+            {
+                if (!(effect.mData.mFlags & ESM::MagicEffect::ContinuousVfx))
+                    continue;
+
+                if (stats.isDeathAnimationFinished()
+                    || magicEffects.getOrDefault(MWMechanics::EffectKey(effect.mId)).getMagnitude() <= 0)
+                {
+                    MWBase::Environment::get().getWorld()->removeEffect(
+                        effect.mId.getRefIdString() + "-" + refnum);
+                }
+            }
+            return;
+        }
 
         // Stop any effects that are no longer active
         std::vector<std::string_view> effects = mAnimation->getLoopingEffects();

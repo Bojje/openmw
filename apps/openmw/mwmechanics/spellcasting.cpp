@@ -28,6 +28,14 @@
 
 namespace MWMechanics
 {
+    namespace
+    {
+        std::string makeNeutralContinuousEffectId(const MWWorld::Ptr& target, const ESM::RefId& effectId)
+        {
+            return effectId.getRefIdString() + "-" + target.getCellRef().getRefNum().toString();
+        }
+    }
+
     CastSpell::CastSpell(
         const MWWorld::Ptr& caster, const MWWorld::Ptr& target, const bool fromProjectile, const bool scriptedSpell)
         : mCaster(caster)
@@ -594,7 +602,7 @@ namespace MWMechanics
                 = Misc::ResourceHelpers::correctMeshPath(castStatic->mModel.getNormalized());
             const osg::Vec3f position = target.getRefData().getPosition().asVec3();
             MWBase::Environment::get().getWorld()->spawnEffect(castStaticModel, magicEffect.mParticle.getOriginal(),
-                position, 1.f, true, true, magicEffect.mId.getRefIdString(), true);
+                position, 1.f, true, true, makeNeutralContinuousEffectId(target, magicEffect.mId), true);
         }
         }
     }
