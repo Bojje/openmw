@@ -1214,16 +1214,7 @@ namespace MWWorld
 
                     if (mRendering)
                         mRendering->updatePtr(ptr, newPtr);
-                    if (!ptr.isEmpty() && !newPtr.isEmpty())
-                    {
-                        const MWWorld::CellStore* destinationCell = newPtr.getCell();
-                        if (mWorldScene->mNeutralWorldScene)
-                            mWorldScene->mNeutralWorldScene->updateObjectCell(static_cast<const void*>(ptr.mRef),
-                                static_cast<const void*>(newPtr.mRef), static_cast<const void*>(destinationCell),
-                                destinationCell->getCell()->isExterior(), destinationCell->getCell()->getGridX(),
-                                destinationCell->getCell()->getGridY(), destinationCell->getCell()->getNameId(),
-                                destinationCell->getCell()->getWorldSpace().serializeText());
-                    }
+                    mWorldScene->updateNeutralObjectCell(ptr, newPtr);
                     if (mRendering)
                         MWBase::Environment::get().getSoundManager()->updatePtr(ptr, newPtr);
                     mPhysics->updatePtr(ptr, newPtr);
@@ -1250,9 +1241,7 @@ namespace MWWorld
         {
             if (mRendering)
                 mRendering->moveObject(newPtr, position);
-            if (mWorldScene->mNeutralWorldScene)
-                mWorldScene->mNeutralWorldScene->updateObjectPosition(static_cast<const void*>(newPtr.mRef),
-                    { position.x(), position.y(), position.z() });
+            mWorldScene->updateNeutralObjectPosition(newPtr, { position.x(), position.y(), position.z() });
             if (movePhysics)
             {
                 mPhysics->updatePosition(newPtr);
@@ -1465,9 +1454,7 @@ namespace MWWorld
 
             if (mRendering)
                 mRendering->rotateObject(ptr, rotate);
-            if (mWorldScene->mNeutralWorldScene)
-                mWorldScene->mNeutralWorldScene->updateObjectRotation(static_cast<const void*>(ptr.mRef),
-                    toRenderQuat(rotate));
+            mWorldScene->updateNeutralObjectRotation(ptr, toRenderQuat(rotate));
             mPhysics->updateRotation(ptr, rotate);
 
             if (const auto object = mPhysics->getObject(ptr))
@@ -2130,9 +2117,7 @@ namespace MWWorld
             mRendering->setWaterHeight(height);
         else if (mWorldScene)
         {
-            const CellStore* const currentCell = mWorldScene->getCurrentCell();
-            if (currentCell != nullptr && mWorldScene->mNeutralWorldScene)
-                mWorldScene->mNeutralWorldScene->updateWaterLevel(static_cast<const void*>(currentCell), height);
+            mWorldScene->updateNeutralWaterLevel(height);
         }
     }
 
@@ -2142,11 +2127,7 @@ namespace MWWorld
             return mRendering->toggleRenderMode(MWRender::Render_Water);
         if (!mWorldScene)
             return false;
-        Render::WorldScene* const neutralScene = mWorldScene->mNeutralWorldScene.get();
-        if (!neutralScene)
-            return false;
-        neutralScene->setWaterEnabled(!neutralScene->waterEnabled());
-        return neutralScene->waterEnabled();
+        return mWorldScene->toggleNeutralWater();
     }
 
     bool World::toggleWorld()
@@ -3955,14 +3936,13 @@ namespace MWWorld
     {
         if (mRendering)
             mRendering->spawnEffect(model, textureOverride, worldPos, scale, isMagicVFX, useAmbientLight, effectId, loop);
-        else if (mWorldScene && !effectId.empty() && mWorldScene->mNeutralWorldScene)
+        else if (mWorldScene && !effectId.empty())
         {
             std::optional<float> animationDuration;
             if (mResourceSystem != nullptr && mResourceSystem->backend() == Resource::ResourceSystem::Backend::Neutral)
                 animationDuration = mResourceSystem->getNifMeshManager()->getAnimationDuration(model);
-            mWorldScene->mNeutralWorldScene->recordEffect(effectId, model.value(),
-                { worldPos.x(), worldPos.y(), worldPos.z() }, scale, textureOverride, loop,
-                animationDuration.value_or(0.f), isMagicVFX);
+            mWorldScene->recordNeutralEffect(effectId, model.value(), { worldPos.x(), worldPos.y(), worldPos.z() },
+                scale, textureOverride, loop, animationDuration.value_or(0.f), isMagicVFX);
         }
     }
 
@@ -3970,8 +3950,8 @@ namespace MWWorld
     {
         if (mRendering)
             mRendering->removeEffect(effectId);
-        else if (mWorldScene && mWorldScene->mNeutralWorldScene)
-            mWorldScene->mNeutralWorldScene->removeEffect(effectId);
+        else if (mWorldScene)
+            mWorldScene->removeNeutralEffect(effectId);
     }
 
     struct ResetActorsVisitor
@@ -4186,15 +4166,15 @@ namespace MWWorld
         if (mWeatherManager)
         {
             mWeatherManager->updateNeutralSceneData(sceneData);
-            if (mWorldScene && mWorldScene->mNeutralWorldScene)
-                mWeatherManager->updateNeutralWeatherEffects(*mWorldScene->mNeutralWorldScene);
+            if (mWorldScene)
+                mWorldScene->updateNeutralWeatherEffects(*mWeatherManager);
         }
 
         const CellStore* const currentCell = mWorldScene ? mWorldScene->getCurrentCell() : nullptr;
         if (currentCell == nullptr || currentCell->isExterior() || currentCell->isQuasiExterior())
             return;
-        if (mWorldScene && mWorldScene->mNeutralWorldScene)
-            mWorldScene->mNeutralWorldScene->clearWeatherEffects();
+        if (mWorldScene)
+            mWorldScene->clearNeutralWeatherEffects();
 
         const auto color = [](unsigned int value) {
             return Render::Vec4{ static_cast<float>((value >> 0) & 0xff) / 255.f,

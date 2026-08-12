@@ -66,6 +66,7 @@ namespace MWWorld
 {
     class CellStore;
     class CellPreloader;
+    class WeatherManager;
     class World;
 
     enum class RotationOrder
@@ -80,8 +81,6 @@ namespace MWWorld
         using CellStoreCollection = std::set<CellStore*, std::less<>>;
 
     private:
-        friend class World;
-
         struct ChangeCellGridRequest
         {
             Render::Vec3 mPosition;
@@ -151,9 +150,6 @@ namespace MWWorld
             const DetourNavigator::UpdateGuard* navigatorUpdateGuard);
         void recordNeutralCell(CellStore& cell);
         void updateNeutralTerrainRegions();
-        /// Export the current loaded-world state for the renderer-neutral frame owner.
-        /// Only World may request a submission; renderer adapters do not reach into Scene.
-        Render::SceneSubmission getNeutralScene();
 
     public:
         Scene(MWWorld::World& world, Render::FrameLifecycle& frameLifecycle,
@@ -226,12 +222,28 @@ namespace MWWorld
         void updateObjectScale(const Ptr& ptr);
         void updateObjectAnimation(const Ptr& ptr, std::string_view group);
 
+        void updateNeutralObjectCell(const Ptr& oldPtr, const Ptr& newPtr);
+        void updateNeutralObjectPosition(const Ptr& ptr, const Render::Vec3& position);
+        void updateNeutralObjectRotation(const Ptr& ptr, const Render::Quat& rotation);
+
+        void updateNeutralWaterLevel(float height);
+        bool toggleNeutralWater();
+
+        void recordNeutralEffect(std::string_view effectId, std::string_view model, const Render::Vec3& position,
+            float scale, std::string_view textureOverride, bool loop, float animationDuration, bool isMagicVfx);
+        void removeNeutralEffect(std::string_view effectId);
+        void updateNeutralWeatherEffects(const WeatherManager& weatherManager);
+        void clearNeutralWeatherEffects();
+
         bool isCellActive(const CellStore& cell);
 
         void preload(const std::string& mesh, bool useAnim = false);
 
         void testExteriorCells();
         void testInteriorCells();
+
+        /// Export the current loaded-world state for the renderer-neutral frame owner.
+        Render::SceneSubmission getNeutralScene();
 
         void reportStats(unsigned int frameNumber, osg::Stats& stats) const;
     };

@@ -110,7 +110,10 @@ and emissive-strength channels into the composite pass. Cell object lookup and r
 owned by the renderer-neutral `WorldScene`/`CellScene` components rather than the OSG-facing
 manager. `MWWorld::Scene` now owns the neutral `WorldScene`; the world lifecycle writes object
 snapshots during insertion and unpaging, while explicit neutral transform-update methods own
-position, rotation, and scale changes. The manager retains OSG-facing object operations and
+position, rotation, and scale changes. Neutral movement, cell transfer, water, effect, and
+weather mutations now also pass through narrow `Scene` operations; `World` no longer reaches
+through `Scene` ownership or requires a friendship escape hatch. A CI boundary check protects
+that deletion. The manager retains OSG-facing object operations and
 neutral light/fog updates; object-class insertion now receives `MWRender::Objects` directly
 instead of a virtual manager adapter; neutral terrain snapshot production now belongs to the storage
 contract consumed by `Scene`. `Scene` also exposes the complete
@@ -607,7 +610,7 @@ the game unplayable rather than reduce duplication safely.
 | Parsed NIF resource cache wrapper | Removed | Complete; cache now owns shared NIF files directly |
 | NIF-to-neutral mesh conversion | Renderer-neutral NIF boundary, material data, mesh cache, skinning metadata, model-local and classic external `.kf` pose sampling, neutral animation-group handoff, dynamic mesh payloads, `SceneSubmission`, Vulkan mesh batch, and full-game neutral resolver | Add actor `.kf` priority/queue, full text-key sequence and blend ownership, image-backed texture resolution, and dynamic shading |
 | Terrain geometry and layer data | Renderer-neutral `Terrain::RenderStorage` contract with cached per-cell LOD snapshots and a Vulkan opaque/normal/parallax/blendmap/specular layer consumer; concrete `MWRender::TerrainStorage` and legacy OSG ChunkManager remain the reference data path, including explicit ESM4 specular textures | Add quadtree-scale terrain streaming and terrain image coverage |
-| Loaded-cell object identity, transforms, terrain snapshots, and paging state | Renderer-neutral `WorldScene`/`CellScene` snapshots updated by scene lifecycle; active-cell static references bypass legacy OSG paging visibility, and cell-lifecycle-cached terrain tiles flow into `SceneSubmission` | Consume snapshots from a backend and migrate visibility/paging policy |
+| Loaded-cell object identity, transforms, terrain snapshots, and paging state | Renderer-neutral `WorldScene`/`CellScene` snapshots updated by scene lifecycle; active-cell static references bypass legacy OSG paging visibility, and cell-lifecycle-cached terrain tiles flow into `SceneSubmission`; neutral movement, cell transfer, water, effect, and weather writes are now encapsulated by `MWWorld::Scene` | Consume snapshots from a backend and migrate visibility/paging policy |
 | GUI, loading screens, screenshots, and presentation | NullWindowManager for Vulkan bootstrap; OSG/MyGUI reference path | Vulkan presentation and GUI coverage, then remove the null compatibility surface |
 
 This ledger is intentionally conservative: a subsystem is marked removable only after a
@@ -687,6 +690,8 @@ real replacement consumes its responsibility and the fast tests cover the bounda
 
 - Compare correctness, visual output, startup time, frame time, memory use, and mod compatibility.
 - Delete duplicate adapters, dead OSG paths, obsolete Vulkan stubs, and transitional interfaces.
+- Keep deletion guards for each removed ownership escape; the world/scene boundary now rejects
+  direct `WorldScene` access from `World` and no longer uses `friend class World`.
 - Update the deletion ledger and line-count report after every subsystem removal.
 
 ### 9. Final OSG policy

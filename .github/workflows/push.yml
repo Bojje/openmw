@@ -237,6 +237,11 @@ jobs:
           echo "OpenMW production code must use Scene neutral-state APIs instead of exposing WorldScene ownership"
           exit 1
         fi
+        if rg -n 'mNeutralWorldScene|friend[[:space:]]+class[[:space:]]+World' \
+            apps/openmw/mwworld/worldimp.cpp apps/openmw/mwworld/worldimp.hpp; then
+          echo "World must use Scene neutral-state operations instead of reaching through Scene ownership"
+          exit 1
+        fi
         if rg -n '\bmPagedRefs\b|Scene::isPagedRef\(|\bbool isPagedRef\b' apps/openmw/mwworld/scene.hpp apps/openmw/mwworld/scene.cpp; then
           echo "OSG paging-reference state must remain owned by ObjectPaging"
           exit 1

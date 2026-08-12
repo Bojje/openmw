@@ -61,6 +61,7 @@
 #include "esmstore.hpp"
 #include "localscripts.hpp"
 #include "player.hpp"
+#include "weather.hpp"
 #include "worldimp.hpp"
 
 namespace
@@ -409,6 +410,70 @@ namespace MWWorld
     {
         if (mNeutralWorldScene)
             mNeutralWorldScene->updateObjectAnimation(static_cast<const void*>(ptr.mRef), group);
+    }
+
+    void Scene::updateNeutralObjectCell(const Ptr& oldPtr, const Ptr& newPtr)
+    {
+        if (!mNeutralWorldScene || oldPtr.isEmpty() || newPtr.isEmpty())
+            return;
+
+        const CellStore* destinationCell = newPtr.getCell();
+        mNeutralWorldScene->updateObjectCell(static_cast<const void*>(oldPtr.mRef), static_cast<const void*>(newPtr.mRef),
+            static_cast<const void*>(destinationCell), destinationCell->getCell()->isExterior(),
+            destinationCell->getCell()->getGridX(), destinationCell->getCell()->getGridY(),
+            destinationCell->getCell()->getNameId(), destinationCell->getCell()->getWorldSpace().serializeText());
+    }
+
+    void Scene::updateNeutralObjectPosition(const Ptr& ptr, const Render::Vec3& position)
+    {
+        if (mNeutralWorldScene)
+            mNeutralWorldScene->updateObjectPosition(static_cast<const void*>(ptr.mRef), position);
+    }
+
+    void Scene::updateNeutralObjectRotation(const Ptr& ptr, const Render::Quat& rotation)
+    {
+        if (mNeutralWorldScene)
+            mNeutralWorldScene->updateObjectRotation(static_cast<const void*>(ptr.mRef), rotation);
+    }
+
+    void Scene::updateNeutralWaterLevel(float height)
+    {
+        if (mNeutralWorldScene && mCurrentCell)
+            mNeutralWorldScene->updateWaterLevel(static_cast<const void*>(mCurrentCell), height);
+    }
+
+    bool Scene::toggleNeutralWater()
+    {
+        if (!mNeutralWorldScene)
+            return false;
+        mNeutralWorldScene->setWaterEnabled(!mNeutralWorldScene->waterEnabled());
+        return mNeutralWorldScene->waterEnabled();
+    }
+
+    void Scene::recordNeutralEffect(std::string_view effectId, std::string_view model, const Render::Vec3& position,
+        float scale, std::string_view textureOverride, bool loop, float animationDuration, bool isMagicVfx)
+    {
+        if (mNeutralWorldScene)
+            mNeutralWorldScene->recordEffect(
+                effectId, model, position, scale, textureOverride, loop, animationDuration, isMagicVfx);
+    }
+
+    void Scene::removeNeutralEffect(std::string_view effectId)
+    {
+        if (mNeutralWorldScene)
+            mNeutralWorldScene->removeEffect(effectId);
+    }
+
+    void Scene::updateNeutralWeatherEffects(const WeatherManager& weatherManager)
+    {
+        if (mNeutralWorldScene)
+            weatherManager.updateNeutralWeatherEffects(*mNeutralWorldScene);
+    }
+
+    void Scene::clearNeutralWeatherEffects()
+    {
+        if (mNeutralWorldScene)
+            mNeutralWorldScene->clearWeatherEffects();
     }
 
     void Scene::update(float duration)
