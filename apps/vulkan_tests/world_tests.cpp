@@ -221,6 +221,12 @@ int main()
         throw std::runtime_error("renderer-neutral scene submission lost an identified effect");
     if (!world.removeEffect("spark") || world.removeEffect("spark"))
         throw std::runtime_error("renderer-neutral world scene failed effect removal");
+    if (!world.recordEffect("loop", "meshes/effect.nif", { 1.f, 2.f, 3.f }, 1.f)
+        || world.effectsInOrder().size() != 1)
+        throw std::runtime_error("renderer-neutral world scene failed to retain an identified effect");
+    world.clearEffects();
+    if (!world.effectsInOrder().empty())
+        throw std::runtime_error("renderer-neutral world scene failed to clear effects");
     const Render::SceneSubmission aggregate = Render::collectSceneSubmission(world, aggregateScene, "",
         [&](std::string_view model) -> std::vector<Render::MeshInstance> {
             if (model != "meshes/first.nif")

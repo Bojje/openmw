@@ -490,8 +490,13 @@ namespace MWWorld
         mActiveCells.erase(cell);
         mNeutralTerrainRegionsDirty = true;
         // Clean up any effects that may have been spawned while unloading all cells
-        if (mActiveCells.empty() && mRendering)
-            mRendering->notifyWorldSpaceChanged();
+        if (mActiveCells.empty())
+        {
+            if (mNeutralWorldScene)
+                mNeutralWorldScene->clearEffects();
+            if (mRendering)
+                mRendering->notifyWorldSpaceChanged();
+        }
     }
 
     void Scene::recordNeutralCell(CellStore& cell)
@@ -1009,7 +1014,12 @@ namespace MWWorld
         mCurrentCell = &cell;
 
         if (mNeutralWorldScene)
-            mNeutralWorldScene->setActiveWorldspace(cell.getCell()->getWorldSpace().serializeText());
+        {
+            const std::string worldspace = cell.getCell()->getWorldSpace().serializeText();
+            if (mNeutralWorldScene->activeWorldspace() != worldspace)
+                mNeutralWorldScene->clearEffects();
+            mNeutralWorldScene->setActiveWorldspace(worldspace);
+        }
         mNeutralTerrainRegionsDirty = true;
         if (mRendering)
             mRendering->enableTerrain(cell.isExterior(), cell.getCell()->getWorldSpace());
