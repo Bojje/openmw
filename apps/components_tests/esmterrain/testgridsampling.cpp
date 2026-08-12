@@ -1,9 +1,9 @@
-#include <components/esmterrain/gridsampling.hpp>
+#include <components/terrain/gridsampling.hpp>
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-namespace ESMTerrain
+namespace Terrain
 {
     namespace
     {
