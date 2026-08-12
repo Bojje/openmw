@@ -13,28 +13,6 @@
 
 namespace Render
 {
-    // PPM is deliberately used for migration captures because it is trivial
-    // to read and write without adding an image-library dependency to the
-    // renderer test harness. The in-memory representation remains RGBA8.
-    inline bool writePpm(const TextureData& image, const std::filesystem::path& path)
-    {
-        if (!image.valid())
-            return false;
-
-        std::ofstream output(path, std::ios::binary);
-        if (!output)
-            return false;
-
-        output << "P6\n" << image.width << ' ' << image.height << "\n255\n";
-        for (std::size_t pixel = 0; pixel < image.pixels.size(); pixel += 4)
-        {
-            output.put(static_cast<char>(image.pixels[pixel + 0]));
-            output.put(static_cast<char>(image.pixels[pixel + 1]));
-            output.put(static_cast<char>(image.pixels[pixel + 2]));
-        }
-        return output.good();
-    }
-
     inline std::optional<TextureData> readPpm(const std::filesystem::path& path)
     {
         std::ifstream input(path, std::ios::binary);
