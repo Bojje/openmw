@@ -198,8 +198,8 @@ jobs:
           echo "World frame traversal must go through the renderer-neutral frame lifecycle"
           exit 1
         fi
-        if rg -n -U 'void[[:space:]]+World::initNeutralRenderer\([^}]*\b(initOsgRenderer|mRendering|mTerrainStorage|mObjectPaging|mPreloader|RenderingManager|LandManager|ObjectPaging)\b' \
-            apps/openmw/mwworld/worldimp.cpp; then
+        if sed -n '/void World::initNeutralRenderer/,/^    }$/p' apps/openmw/mwworld/worldimp.cpp \
+            | rg -n '\b(initOsgRenderer|mRendering|mTerrainStorage|mObjectPaging|mPreloader|RenderingManager|LandManager|ObjectPaging)\b'; then
           echo "neutral world bootstrap must not construct or reach back into OSG renderer services"
           exit 1
         fi
