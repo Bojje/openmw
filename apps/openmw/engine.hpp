@@ -69,7 +69,7 @@ namespace MWState
     class StateManager;
 }
 
-namespace MWGui
+namespace MWBase
 {
     class WindowManager;
 }
@@ -130,7 +130,7 @@ namespace OMW
         std::unique_ptr<Render::FrameLifecycle> mFrameLifecycle;
         std::unique_ptr<MWSound::SoundManager> mSoundManager;
         std::unique_ptr<MWScript::ScriptManager> mScriptManager;
-        std::unique_ptr<MWGui::WindowManager> mWindowManager;
+        std::unique_ptr<MWBase::WindowManager> mWindowManager;
         std::unique_ptr<MWMechanics::MechanicsManager> mMechanicsManager;
         std::unique_ptr<MWDialogue::DialogueManager> mDialogueManager;
         std::unique_ptr<MWDialogue::Journal> mJournal;
@@ -147,6 +147,7 @@ namespace OMW
         std::filesystem::path mResDir;
         osg::ref_ptr<osgViewer::ScreenCaptureHandler> mScreenCaptureHandler;
         osg::ref_ptr<SceneUtil::AsyncScreenCaptureOperation> mScreenCaptureOperation;
+        osg::ref_ptr<osg::Stats> mNeutralStats;
         std::string mCellName;
         std::vector<std::string> mContentFiles;
         std::vector<std::string> mGroundcoverFiles;
@@ -177,6 +178,7 @@ namespace OMW
         Translation::Storage mTranslationDataStorage;
         bool mNewGame;
         bool mValidateNeutralScene;
+        bool mUseVulkan;
 
         Files::ConfigurationManager& mCfgMgr;
 
@@ -192,6 +194,7 @@ namespace OMW
 
         /// Prepare engine for game play
         void prepareEngine();
+        void prepareVulkanEngine();
 
     public:
         Engine(Files::ConfigurationManager& configurationManager);
@@ -256,6 +259,9 @@ namespace OMW
         void setSaveGameFile(const std::filesystem::path& savegame);
 
         void setRandomSeed(unsigned int seed);
+
+        /// Select the experimental Vulkan game path. Requires a Vulkan build.
+        void setVulkan(bool enabled) { mUseVulkan = enabled; }
 
         void setRecastMaxLogLevel(Debug::Level value) { mMaxRecastLogLevel = value; }
     };

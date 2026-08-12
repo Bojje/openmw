@@ -25,9 +25,11 @@
 #include <components/vfs/registerarchives.hpp>
 
 #include <components/resource/resourcesystem.hpp>
+#include <components/resource/nifmeshmanager.hpp>
 #include <components/resource/scenemanager.hpp>
 #include <components/resource/stats.hpp>
 #include <components/compiler/extensions0.hpp>
+#include <components/render/texture.hpp>
 
 #include <components/stereo/stereomanager.hpp>
 
@@ -54,6 +56,7 @@
 #include "mwinput/inputmanagerimp.hpp"
 
 #include "mwgui/windowmanagerimp.hpp"
+#include "mwgui/nullwindowmanager.hpp"
 
 #include "mwlua/luamanagerimp.hpp"
 #include "mwlua/worker.hpp"
@@ -71,6 +74,7 @@
 #include "mwrender/renderingmanager.hpp"
 #include "mwrender/vismask.hpp"
 #include "mwrender/viewerframelifecycle.hpp"
+#include "mwrender/vulkanframelifecycle.hpp"
 
 #include "mwclass/classes.hpp"
 
@@ -83,6 +87,10 @@
 #include "mwstate/statemanagerimp.hpp"
 
 #include "profile.hpp"
+
+#ifndef OPENMW_VULKAN_SHADER_DIR
+#define OPENMW_VULKAN_SHADER_DIR ""
+#endif
 
 namespace
 {
@@ -154,7 +162,7 @@ osgViewer::Viewer* OMW::Engine::getOsgViewer() const
 osg::Stats* OMW::Engine::getOsgStats() const
 {
     const auto* const lifecycle = dynamic_cast<const MWRender::ViewerFrameLifecycle*>(mFrameLifecycle.get());
-    return lifecycle ? lifecycle->stats() : nullptr;
+    return lifecycle ? lifecycle->stats() : mNeutralStats.get();
 }
 
 bool OMW::Engine::frame(unsigned frameNumber, float frametime)
@@ -278,7 +286,8 @@ bool OMW::Engine::frame(unsigned frameNumber, float frametime)
         // update GUI
         {
             ScopedProfile<UserStatsType::Gui> profile(frameStart, frameNumber, *timer, *stats);
-            mWindowManager->update(frametime);
+            if (auto* const gui = dynamic_cast<MWGui::WindowManager*>(mWindowManager.get()))
+                gui->update(frametime);
         }
     }
     catch (const std::exception& e)
@@ -291,7 +300,7 @@ bool OMW::Engine::frame(unsigned frameNumber, float frametime)
     if (reportResource && mUnrefQueue)
         stats->setAttribute(frameNumber, "UnrefQueue", static_cast<double>(mUnrefQueue->getSize()));
 
-    if (mUnrefQueue)
+    if (mUnrefQueue && mWorkQueue)
         mUnrefQueue->flush(*mWorkQueue);
 
     if (reportResource)
@@ -300,8 +309,11 @@ bool OMW::Engine::frame(unsigned frameNumber, float frametime)
 
         mResourceSystem->reportStats(frameNumber, stats);
 
-        stats->setAttribute(frameNumber, "WorkQueue", static_cast<double>(mWorkQueue->getNumItems()));
-        stats->setAttribute(frameNumber, "WorkThread", static_cast<double>(mWorkQueue->getNumActiveThreads()));
+        if (mWorkQueue)
+        {
+            stats->setAttribute(frameNumber, "WorkQueue", static_cast<double>(mWorkQueue->getNumItems()));
+            stats->setAttribute(frameNumber, "WorkThread", static_cast<double>(mWorkQueue->getNumActiveThreads()));
+        }
 
         mMechanicsManager->reportStats(frameNumber, *stats);
         mWorld->reportStats(frameNumber, *stats);
@@ -370,6 +382,7 @@ OMW::Engine::Engine(Files::ConfigurationManager& configurationManager)
     , mRandomSeed(0)
     , mNewGame(false)
     , mValidateNeutralScene(std::getenv("OPENMW_VALIDATE_NEUTRAL_SCENE") != nullptr)
+    , mUseVulkan(false)
     , mCfgMgr(configurationManager)
 {
 #if SDL_VERSION_ATLEAST(2, 24, 0)
@@ -411,6 +424,7 @@ OMW::Engine::~Engine()
     mLuaWorker = nullptr;
     mLuaManager = nullptr;
     mL10nManager = nullptr;
+    mNeutralStats = nullptr;
 
     mScriptContext = nullptr;
 
@@ -479,8 +493,160 @@ void OMW::Engine::setSkipMenu(bool skipMenu, bool newGame)
     mNewGame = newGame;
 }
 
+void OMW::Engine::prepareVulkanEngine()
+{
+    mNeutralStats = new osg::Stats("OpenMW Vulkan");
+
+    mStateManager = std::make_unique<MWState::StateManager>(mCfgMgr.getUserDataPath() / "saves", mContentFiles);
+    mEnvironment.setStateManager(*mStateManager);
+
+    mVFS = std::make_unique<VFS::Manager>();
+    VFS::registerArchives(mVFS.get(), mFileCollections, mArchives, true, &mEncoder.get()->getStatelessEncoder());
+    mResourceSystem = std::make_unique<Resource::ResourceSystem>(
+        mVFS.get(), Settings::cells().mCacheExpiryDelay, &mEncoder.get()->getStatelessEncoder(),
+        Resource::ResourceSystem::Backend::Neutral);
+    mEnvironment.setResourceSystem(*mResourceSystem);
+
+    mL10nManager = std::make_unique<L10n::Manager>(mVFS.get());
+    mL10nManager->setPreferredLocales(Settings::general().mPreferredLocales, Settings::general().mGmstOverridesL10n);
+    mEnvironment.setL10nManager(*mL10nManager);
+    mLuaManager = std::make_unique<MWLua::LuaManager>(mVFS.get(), mResDir / "lua_libs");
+    mEnvironment.setLuaManager(*mLuaManager);
+
+    const auto keybinderUser = mCfgMgr.getUserConfigPath() / "input_v3.xml";
+    const bool keybinderUserExists = std::filesystem::exists(keybinderUser);
+    const auto userdefault = mCfgMgr.getUserConfigPath() / "gamecontrollerdb.txt";
+    const auto localdefault = mCfgMgr.getLocalPath() / "gamecontrollerdb.txt";
+    std::filesystem::path userGameControllerdb;
+    if (std::filesystem::exists(userdefault))
+        userGameControllerdb = userdefault;
+    std::filesystem::path gameControllerdb;
+    if (std::filesystem::exists(localdefault))
+        gameControllerdb = localdefault;
+    else if (!mCfgMgr.getGlobalPath().empty())
+    {
+        const auto globaldefault = mCfgMgr.getGlobalPath() / "gamecontrollerdb.txt";
+        if (std::filesystem::exists(globaldefault))
+            gameControllerdb = globaldefault;
+    }
+
+    mWindowManager = std::make_unique<MWGui::NullWindowManager>(Version::getOpenmwVersionDescription(), [this] {
+        mFrameLifecycle->requestQuit();
+    });
+    mEnvironment.setWindowManager(*mWindowManager);
+
+    SDLUtil::InputCallbacks inputCallbacks;
+    inputCallbacks.frame = [] {};
+    inputCallbacks.functionKey = [](int, bool) {};
+    inputCallbacks.resize = [this](int x, int y, int width, int height) {
+        if (auto* const lifecycle = dynamic_cast<MWRender::VulkanFrameLifecycle*>(mFrameLifecycle.get()))
+            lifecycle->resize();
+        mWindowManager->windowResized(width, height);
+    };
+    mInputManager = std::make_unique<MWInput::InputManager>(mWindow, std::move(inputCallbacks), [] {}, keybinderUser,
+        keybinderUserExists, userGameControllerdb, gameControllerdb, mGrab);
+    mEnvironment.setInputManager(*mInputManager);
+
+    mSoundManager = std::make_unique<MWSound::SoundManager>(mVFS.get(), mUseSound);
+    mEnvironment.setSoundManager(*mSoundManager);
+
+    mWorld = std::make_unique<MWWorld::World>(
+        mResourceSystem.get(), mActivationDistanceOverride, mCellName, mCfgMgr.getUserDataPath());
+    mEnvironment.setWorld(*mWorld);
+    mEnvironment.setWorldModel(mWorld->getWorldModel());
+    mEnvironment.setESMStore(mWorld->getStore());
+
+    const MWWorld::Store<ESM::GameSetting>* gmst = &mWorld->getStore().get<ESM::GameSetting>();
+    mL10nManager->setGmstLoader([gmst, misses = std::set<std::string, Misc::StringUtils::CiComp>()](
+                                    std::string_view gmstName) mutable -> const std::string* {
+        const ESM::GameSetting* res = gmst->search(gmstName);
+        if (res && res->mValue.getType() == ESM::VT_String)
+            return &res->mValue.getString();
+        if (misses.emplace(gmstName).second)
+            Log(Debug::Error) << "GMST " << gmstName << " not found";
+        return nullptr;
+    });
+
+    mTranslationDataStorage.setEncoder(mEncoder.get());
+    for (auto& mContentFile : mContentFiles)
+        mTranslationDataStorage.loadTranslationData(mFileCollections, mContentFile);
+
+    Compiler::registerExtensions(mExtensions);
+    mScriptContext = std::make_unique<MWScript::CompilerContext>(MWScript::CompilerContext::Type_Full);
+    mScriptContext->setExtensions(&mExtensions);
+    mScriptManager = std::make_unique<MWScript::ScriptManager>(mWorld->getStore(), *mScriptContext, mWarningsMode);
+    mEnvironment.setScriptManager(*mScriptManager);
+
+    mMechanicsManager = std::make_unique<MWMechanics::MechanicsManager>();
+    mEnvironment.setMechanicsManager(*mMechanicsManager);
+    mJournal = std::make_unique<MWDialogue::Journal>();
+    mEnvironment.setJournal(*mJournal);
+    mDialogueManager = std::make_unique<MWDialogue::DialogueManager>(mExtensions, mTranslationDataStorage);
+    mEnvironment.setDialogueManager(*mDialogueManager);
+
+    mLuaManager->loadPermanentStorage(mCfgMgr.getUserConfigPath());
+    mLuaManager->initPreLoad();
+
+    Loading::Listener* listener = mWindowManager->getLoadingScreen();
+    Loading::AsyncListener asyncListener(*listener);
+    auto dataLoading = std::async(std::launch::async,
+        [&] { mWorld->loadData(mFileCollections, mContentFiles, mGroundcoverFiles, mEncoder.get(), &asyncListener); });
+    listener->loadingOn();
+    {
+        using namespace std::chrono_literals;
+        while (dataLoading.wait_for(50ms) != std::future_status::ready)
+            asyncListener.update();
+        dataLoading.get();
+    }
+    listener->loadingOff();
+
+    mWorld->initSimulation(mMaxRecastLogLevel, mFrameLifecycle->backend());
+    const Render::MeshResolver meshResolver = [resourceSystem = mResourceSystem.get()](std::string_view model) {
+        const VFS::Path::Normalized path(model);
+        if (path.extension().value() == "nif")
+            return resourceSystem->getNifMeshManager()->get(path);
+        return std::make_shared<const std::vector<Render::MeshInstance>>();
+    };
+    auto fallbackTexture = std::make_shared<Render::TextureData>();
+    fallbackTexture->width = 1;
+    fallbackTexture->height = 1;
+    fallbackTexture->pixels = { 255, 255, 255, 255 };
+    const Render::TextureResolver textureResolver = [fallbackTexture](std::string_view) {
+        return std::shared_ptr<const Render::TextureData>(fallbackTexture);
+    };
+    mWorld->initNeutralRenderer(*mFrameLifecycle, [](Render::SceneData&) {},
+        [](const void*, std::span<const std::string_view>) { return std::vector<Render::Mat4>(); },
+        std::move(meshResolver), textureResolver);
+    mEnvironment.setWorldScene(mWorld->getWorldScene());
+    mWorld->setupPlayer();
+    mWorld->setRandomSeed(mRandomSeed);
+    mLuaManager->initPostLoad();
+
+    if (mCompileAll)
+    {
+        std::pair<int, int> result = mScriptManager->compileAll();
+        if (result.first)
+            Log(Debug::Info) << "compiled " << result.second << " of " << result.first << " scripts ("
+                             << 100 * static_cast<double>(result.second) / result.first << "%)";
+    }
+    if (mCompileAllDialogue)
+    {
+        std::pair<int, int> result = MWDialogue::ScriptTest::compileAll(&mExtensions, mWarningsMode);
+        if (result.first)
+            Log(Debug::Info) << "compiled " << result.second << " of " << result.first << " dialogue scripts ("
+                             << 100 * static_cast<double>(result.second) / result.first << "%)";
+    }
+    mLuaWorker = std::make_unique<MWLua::Worker>(*mLuaManager);
+}
+
 void OMW::Engine::prepareEngine()
 {
+    if (mUseVulkan)
+    {
+        prepareVulkanEngine();
+        return;
+    }
+
     if (mFrameLifecycle->backend() != Render::FrameLifecycle::Backend::Osg)
         throw std::logic_error("The full game currently requires the OSG frame lifecycle");
 
@@ -647,7 +813,8 @@ void OMW::Engine::prepareEngine()
         return nullptr;
     });
 
-    mWindowManager->setStore(mWorld->getStore());
+    if (auto* const gui = dynamic_cast<MWGui::WindowManager*>(mWindowManager.get()))
+        gui->setStore(mWorld->getStore());
 
     // Load translation data
     mTranslationDataStorage.setEncoder(mEncoder.get());
@@ -703,7 +870,8 @@ void OMW::Engine::prepareEngine()
     mEnvironment.setWorldScene(mWorld->getWorldScene());
     mWorld->setupPlayer();
     mWorld->setRandomSeed(mRandomSeed);
-    mWindowManager->initUI();
+    if (auto* const gui = dynamic_cast<MWGui::WindowManager*>(mWindowManager.get()))
+        gui->initUI();
     mLuaManager->initPostLoad();
 
     // scripts
@@ -746,10 +914,40 @@ void OMW::Engine::go()
     // Create encoder
     mEncoder = std::make_unique<ToUTF8::Utf8Encoder>(mEncoding);
 
-    // The OSG lifecycle owns its viewer. A future Vulkan lifecycle can replace
-    // this owner without constructing an OSG viewer in the engine.
-    auto viewerLifecycle = std::make_unique<MWRender::ViewerFrameLifecycle>();
-    mFrameLifecycle = std::move(viewerLifecycle);
+    if (mUseVulkan)
+    {
+#ifndef OPENMW_USE_VULKAN
+        throw std::logic_error("--vulkan requires an OpenMW build configured with OPENMW_USE_VULKAN=ON");
+#else
+        const int screen = Settings::video().mScreen;
+        const int width = Settings::video().mResolutionX;
+        const int height = Settings::video().mResolutionY;
+        int posX = SDL_WINDOWPOS_CENTERED_DISPLAY(screen);
+        int posY = SDL_WINDOWPOS_CENTERED_DISPLAY(screen);
+        Uint32 flags = SDL_WINDOW_VULKAN | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI;
+        if (Settings::video().mWindowMode == Settings::WindowMode::Fullscreen)
+        {
+            flags |= SDL_WINDOW_FULLSCREEN;
+            posX = SDL_WINDOWPOS_UNDEFINED_DISPLAY(screen);
+            posY = SDL_WINDOWPOS_UNDEFINED_DISPLAY(screen);
+        }
+        else if (Settings::video().mWindowMode == Settings::WindowMode::WindowedFullscreen)
+        {
+            flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
+            posX = SDL_WINDOWPOS_UNDEFINED_DISPLAY(screen);
+            posY = SDL_WINDOWPOS_UNDEFINED_DISPLAY(screen);
+        }
+        if (!Settings::video().mWindowBorder)
+            flags |= SDL_WINDOW_BORDERLESS;
+        mWindow = SDL_CreateWindow("OpenMW", posX, posY, width, height, flags);
+        if (!mWindow)
+            throw std::runtime_error(std::string("Failed to create Vulkan SDL window: ") + SDL_GetError());
+
+        mFrameLifecycle = std::make_unique<MWRender::VulkanFrameLifecycle>(mWindow, OPENMW_VULKAN_SHADER_DIR);
+#endif
+    }
+    else
+        mFrameLifecycle = std::make_unique<MWRender::ViewerFrameLifecycle>();
 
     mEnvironment.setFrameRateLimit(Settings::video().mFramerateLimit);
 
@@ -776,17 +974,15 @@ void OMW::Engine::go()
                                 << "\": " << std::generic_category().message(errno);
     }
 
-    auto* const statsLifecycle = dynamic_cast<MWRender::ViewerFrameLifecycle*>(mFrameLifecycle.get());
-    if (!statsLifecycle)
-        throw std::logic_error("OSG statistics setup requires the OSG frame lifecycle");
-    statsLifecycle->initializeStatsHandlers(*mVFS, stats.is_open(), initStatsHandler);
+    if (auto* const statsLifecycle = dynamic_cast<MWRender::ViewerFrameLifecycle*>(mFrameLifecycle.get()))
+        statsLifecycle->initializeStatsHandlers(*mVFS, stats.is_open(), initStatsHandler);
 
     // Start the game
     if (!mSaveGameFile.empty())
     {
         mStateManager->loadGame(mSaveGameFile);
     }
-    else if (!mSkipMenu)
+    else if (!mSkipMenu && !mUseVulkan)
     {
         // start in main menu
         mWindowManager->pushGuiMode(MWGui::GM_MainMenu);
@@ -802,7 +998,13 @@ void OMW::Engine::go()
     }
     else
     {
-        mStateManager->newGame(!mNewGame);
+        if (mUseVulkan)
+        {
+            Log(Debug::Warning) << "Vulkan mode has no GUI yet; starting a bypassed new game";
+            mStateManager->newGame(true);
+        }
+        else
+            mStateManager->newGame(!mNewGame);
     }
 
     if (!mStartupScript.empty() && mStateManager->getState() == MWState::StateManager::State_Running)

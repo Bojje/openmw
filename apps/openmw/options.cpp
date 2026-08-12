@@ -46,6 +46,9 @@ namespace OpenMW
 
         addOption("no-sound", bpo::value<bool>()->implicit_value(true)->default_value(false), "disable all sounds");
 
+        addOption("vulkan", bpo::value<bool>()->implicit_value(true)->default_value(false),
+            "use the experimental Vulkan game renderer (requires a Vulkan build; GUI is not available yet)");
+
         addOption("script-all", bpo::value<bool>()->implicit_value(true)->default_value(false),
             "compile all scripts (excluding dialogue scripts) at startup");
 

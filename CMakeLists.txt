@@ -260,7 +260,7 @@ if(MSVC)
     add_compile_options("/utf-8")
 endif()
 
-option(OPENMW_USE_VULKAN "Build the standalone Vulkan migration renderer and tests (requires Vulkan SDK)" OFF)
+option(OPENMW_USE_VULKAN "Build the experimental Vulkan game renderer and migration tests (requires Vulkan SDK)" OFF)
 
 # Dependencies
 if (APPLE)
@@ -705,19 +705,6 @@ add_subdirectory (components)
 # Apps and tools
 if (BUILD_OPENMW OR BUILD_OPENMW_TESTS)
     add_subdirectory( apps/openmw )
-endif()
-
-# The migration renderer is intentionally a standalone target while the full
-# game remains OSG-only. Keep the link boundary explicit so enabling Vulkan
-# cannot accidentally make both renderer implementations part of the game.
-if (OPENMW_USE_VULKAN AND TARGET openmw_vulkan AND TARGET openmw-lib)
-    get_target_property(_openmw_link_libraries openmw-lib LINK_LIBRARIES)
-    if (_openmw_link_libraries)
-        list(FIND _openmw_link_libraries openmw_vulkan _vulkan_link_index)
-        if (NOT _vulkan_link_index EQUAL -1)
-            message(FATAL_ERROR "openmw-lib must not link the standalone openmw_vulkan target")
-        endif()
-    endif()
 endif()
 
 if (BUILD_BSATOOL)

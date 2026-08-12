@@ -24,6 +24,7 @@ add_openmw_dir (mwrender
     renderbin actoranimation landmanager navmesh actorspaths recastmesh fogmanager objectpaging groundcover
     postprocessor pingpongcull luminancecalculator pingpongcanvas transparentpass precipitationocclusion ripples
     actorutil distortion animationpriority bonegroup blendmask animblendcontroller viewerframelifecycle neutralterrainstorage
+    vulkanframelifecycle
     )
 
 add_openmw_dir (mwinput
@@ -45,6 +46,7 @@ add_openmw_dir (mwgui
     recharge mode videowidget backgroundimage itemwidget screenfader debugwindow spellmodel spellview
     draganddrop timeadvancer jailscreen itemchargeview keyboardnavigation textcolours statswatcher
     postprocessorhud settings worlditemmodel itemtransfer controllerbuttonsoverlay inventorytabsoverlay
+    nullwindowmanager
     )
 
 add_openmw_dir (mwdialogue
@@ -191,6 +193,15 @@ target_link_libraries(openmw-lib
     oics
     components
 )
+
+if (OPENMW_USE_VULKAN)
+    target_link_libraries(openmw-lib PRIVATE openmw_vulkan)
+    target_compile_definitions(openmw-lib PRIVATE
+        OPENMW_USE_VULKAN
+        OPENMW_VULKAN_SHADER_DIR="${VK_SHADER_OUTPUT_DIR}"
+    )
+    add_dependencies(openmw-lib VulkanShaders)
+endif()
 
 if (MSVC AND PRECOMPILE_HEADERS_WITH_MSVC)
     target_precompile_headers(openmw-lib PRIVATE

@@ -75,6 +75,7 @@ bool parseOptions(int argc, char** argv, OMW::Engine& engine, Files::Configurati
     MWGui::DebugWindow::startLogRecording();
 
     engine.setGrabMouse(!variables["no-grab"].as<bool>());
+    engine.setVulkan(variables["vulkan"].as<bool>());
 
     // Font encoding settings
     std::string encoding(variables["encoding"].as<std::string>());
