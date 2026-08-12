@@ -92,6 +92,17 @@ namespace
             expectMatrixEntry(fullInverse, i, 0.0f, "singular full inverse");
         }
     }
+
+    void testSceneDataValidation()
+    {
+        Render::SceneData scene;
+        if (!scene.valid() || std::abs(scene.skyColor.x - 0.6f) > epsilon)
+            throw std::runtime_error("renderer-neutral scene sky state did not initialize");
+
+        scene.skyColor.x = std::numeric_limits<float>::quiet_NaN();
+        if (scene.valid())
+            throw std::runtime_error("renderer-neutral scene accepted a non-finite sky color");
+    }
 }
 
 int main()
@@ -102,6 +113,7 @@ int main()
         testAffineInverse();
         testNormalMatrix();
         testSingularMatrices();
+        testSceneDataValidation();
         std::cout << "Vulkan math tests passed\n";
         return EXIT_SUCCESS;
     }

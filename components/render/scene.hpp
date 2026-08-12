@@ -90,7 +90,8 @@ namespace Render
         {
             return Render::valid(view) && Render::valid(projection) && Render::valid(viewInverse)
                 && Render::valid(projInverse) && Render::valid(sunDirection) && Render::valid(sunColor)
-                && Render::valid(ambientColor) && Render::valid(fogColor) && Render::valid(fogParameters);
+                && Render::valid(ambientColor) && Render::valid(fogColor) && Render::valid(fogParameters)
+                && Render::valid(skyColor);
         }
     };
 
