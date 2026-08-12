@@ -99,6 +99,13 @@ jobs:
           echo "renderer-neutral and Vulkan source boundaries must not depend on OSG, NIF, or shared logging"
           exit 1
         fi
+        if rg -n '#include[[:space:]]*[<"]osg|osg::|osgViewer' \
+            components/sdlutil/sdlinputwrapper.hpp components/sdlutil/sdlinputwrapper.cpp \
+            apps/openmw/mwinput/actionmanager.hpp apps/openmw/mwinput/actionmanager.cpp \
+            apps/openmw/mwinput/inputmanagerimp.hpp apps/openmw/mwinput/inputmanagerimp.cpp; then
+          echo "Shared SDL input and action layers must not depend on OSG presentation types"
+          exit 1
+        fi
         if rg -n '#include[[:space:]]*[<"]osg|namespace[[:space:]]+osg|osg::' components/terrain/renderstorage.hpp components/terrain/renderstorage.cpp; then
           echo "renderer-neutral terrain storage must not depend on OSG"
           exit 1
