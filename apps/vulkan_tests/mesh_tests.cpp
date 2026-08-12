@@ -5,6 +5,7 @@
 
 #include <components/nif/data.hpp>
 #include <components/nif/controller.hpp>
+#include <components/nif/extra.hpp>
 #include <components/nif/meshconverter.hpp>
 #include <components/nif/property.hpp>
 #include <components/nif/texture.hpp>
@@ -222,6 +223,33 @@ int main()
     const std::vector<Render::Mat4> earlyAnimatedPose
         = Nif::collectBonePose(Nif::FileView(*file), animatedBoneNames, 0.25f);
     expectNear(earlyAnimatedPose.front().data[12], 10.625f, "quadratic sampled bone translation");
+
+    Nif::NiTextKeyExtraData sequenceTextKeys;
+    sequenceTextKeys.mRecordType = Nif::RC_NiTextKeyExtraData;
+    Nif::NiStringExtraData sequenceBoneName;
+    sequenceBoneName.mRecordType = Nif::RC_NiStringExtraData;
+    sequenceBoneName.mData = "Root Bone";
+    auto sequenceController = std::make_unique<Nif::NiKeyframeController>();
+    sequenceController->mRecordType = Nif::RC_NiKeyframeController;
+    sequenceController->mFlags = Nif::NiTimeController::Flag_Active;
+    sequenceController->mFrequency = 1.f;
+    sequenceController->mPhase = 0.f;
+    sequenceController->mTimeStart = 0.f;
+    sequenceController->mTimeStop = 1.f;
+    sequenceController->mInterpolator = Nif::NiInterpolatorPtr(nullptr);
+    sequenceController->mNext = Nif::NiTimeControllerPtr(nullptr);
+    sequenceController->mData = animatedData.get();
+    Nif::NiSequenceStreamHelper sequence;
+    sequence.mExtra = Nif::ExtraPtr(nullptr);
+    sequence.mController = sequenceController.get();
+    sequence.mExtraList = { &sequenceTextKeys, &sequenceBoneName };
+    auto kfFile = std::make_shared<Nif::NIFFile>(VFS::Path::Normalized("synthetic.kf"));
+    kfFile->mRoots.push_back(&sequence);
+    const std::vector<Render::Mat4> externalPose
+        = Nif::collectBonePose(Nif::FileView(*kfFile), animatedBoneNames, 0.25f);
+    if (externalPose.size() != 1)
+        throw std::runtime_error("neutral KF pose sampler did not find the controller bone");
+    expectNear(externalPose.front().data[12], 0.625f, "sampled external KF translation");
 
     expectNear(instances.front().mesh.material.diffuse.x, 0.25f, "material diffuse red");
     expectNear(instances.front().mesh.material.diffuse.w, 0.75f, "material alpha");

@@ -11,6 +11,7 @@
 
 #include "data.hpp"
 #include "controller.hpp"
+#include "extra.hpp"
 #include "nifkey.hpp"
 #include "node.hpp"
 #include "property.hpp"
@@ -135,33 +136,30 @@ namespace Nif
             NiTransform value;
         };
 
-        SampledNodeTransform sampleNodeTransform(const NiAVObject& node, float time)
+        SampledNodeTransform sampleKeyframeController(
+            const NiKeyframeController& controller, NiTransform defaultTransform, float time)
         {
-            SampledNodeTransform result{ node.mTransform };
-            const auto* controller = dynamic_cast<const NiKeyframeController*>(node.mController.getPtr());
-            if (controller == nullptr)
-                return result;
-
+            SampledNodeTransform result{ defaultTransform };
             const NiKeyframeData* data = nullptr;
             osg::Quat defaultRotation = result.value.mRotation.toOsgMatrix().getRotate();
             osg::Vec3f defaultTranslation = result.value.mTranslation;
             float defaultScale = result.value.mScale;
-            if (!controller->mInterpolator.empty()
-                && controller->mInterpolator->mRecordType == RC_NiTransformInterpolator)
+            if (!controller.mInterpolator.empty()
+                && controller.mInterpolator->mRecordType == RC_NiTransformInterpolator)
             {
                 const auto* interpolator
-                    = static_cast<const NiTransformInterpolator*>(controller->mInterpolator.getPtr());
+                    = static_cast<const NiTransformInterpolator*>(controller.mInterpolator.getPtr());
                 data = interpolator->mData.empty() ? nullptr : interpolator->mData.getPtr();
                 defaultRotation = interpolator->mDefaultValue.mRotation;
                 defaultTranslation = interpolator->mDefaultValue.mTranslation;
                 defaultScale = interpolator->mDefaultValue.mScale;
             }
-            else if (!controller->mData.empty())
-                data = controller->mData.getPtr();
+            else if (!controller.mData.empty())
+                data = controller.mData.getPtr();
             if (data == nullptr)
                 return result;
 
-            const float sampleTime = controllerTime(*controller, time);
+            const float sampleTime = controllerTime(controller, time);
             if (data->mRotations && !data->mRotations->mKeys.empty())
                 result.value.mRotation = toMatrix3(sampleKeys(data->mRotations, sampleTime, defaultRotation,
                     interpolateQuaternion));
@@ -194,6 +192,15 @@ namespace Nif
             return result;
         }
 
+        SampledNodeTransform sampleNodeTransform(const NiAVObject& node, float time)
+        {
+            SampledNodeTransform result{ node.mTransform };
+            const auto* controller = dynamic_cast<const NiKeyframeController*>(node.mController.getPtr());
+            if (controller == nullptr)
+                return result;
+            return sampleKeyframeController(*controller, result.value, time);
+        }
+
         void collectBoneTransforms(const NiAVObject& object, const Render::Mat4& parentTransform, float time,
             std::unordered_map<std::string, Render::Mat4>& transforms)
         {
@@ -205,6 +212,28 @@ namespace Nif
                 for (const auto& child : node->mChildren)
                     if (!child.empty())
                         collectBoneTransforms(*child.getPtr(), transform, time, transforms);
+        }
+
+        void collectSequenceTransforms(const NiSequenceStreamHelper& sequence, float time,
+            std::unordered_map<std::string, Render::Mat4>& transforms)
+        {
+            const ExtraList extraList = sequence.getExtraList();
+            const NiTimeController* controller
+                = sequence.mController.empty() ? nullptr : sequence.mController.getPtr();
+            for (std::size_t i = 1; i < extraList.size() && controller != nullptr;
+                 ++i, controller = controller->mNext.empty() ? nullptr : controller->mNext.getPtr())
+            {
+                const ExtraPtr& extra = extraList[i];
+                if (extra.empty() || extra->mRecordType != RC_NiStringExtraData
+                    || controller->mRecordType != RC_NiKeyframeController)
+                    continue;
+
+                const auto* name = static_cast<const NiStringExtraData*>(extra.getPtr());
+                const auto* keyframe = static_cast<const NiKeyframeController*>(controller);
+                const NiTransform sampled
+                    = sampleKeyframeController(*keyframe, NiTransform::getIdentity(), time).value;
+                transforms.emplace(name->mData, toRenderMatrix(sampled));
+            }
         }
 
         std::vector<Render::MeshVertexSource> convertVertices(const NiGeometryData& source)
@@ -566,8 +595,12 @@ namespace Nif
         const Render::Mat4 identity = Render::identityMat4();
         std::unordered_map<std::string, Render::Mat4> transforms;
         for (std::size_t i = 0; i < file.numRoots(); ++i)
+        {
             if (const auto* root = dynamic_cast<const NiAVObject*>(file.getRoot(i)))
                 collectBoneTransforms(*root, identity, time, transforms);
+            else if (const auto* sequence = dynamic_cast<const NiSequenceStreamHelper*>(file.getRoot(i)))
+                collectSequenceTransforms(*sequence, time, transforms);
+        }
 
         std::vector<Render::Mat4> result;
         result.reserve(boneNames.size());

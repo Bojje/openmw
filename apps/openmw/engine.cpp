@@ -27,6 +27,7 @@
 #include <components/vfs/registerarchives.hpp>
 
 #include <components/resource/resourcesystem.hpp>
+#include <components/resource/niffilemanager.hpp>
 #include <components/resource/nifmeshmanager.hpp>
 #include <components/resource/neutraltexturemanager.hpp>
 #include <components/resource/scenemanager.hpp>
@@ -717,7 +718,16 @@ void OMW::Engine::prepareVulkanEngine()
         const VFS::Path::Normalized path(model);
         if (path.extension().value() != "nif")
             return std::vector<Render::Mat4>();
-        return resourceSystem->getNifMeshManager()->getBonePose(path, time, boneNames);
+        std::vector<Render::Mat4> pose = resourceSystem->getNifMeshManager()->getBonePose(path, time, boneNames);
+        if (!pose.empty())
+            return pose;
+
+        VFS::Path::Normalized kfPath(path);
+        kfPath.changeExtension(VFS::Path::ExtensionView("kf"));
+        if (!resourceSystem->getVFS()->exists(kfPath))
+            return pose;
+        return resourceSystem->getNifMeshManager()->getBonePose(
+            resourceSystem->getNifFileManager()->get(kfPath), time, boneNames);
     };
     const Render::SceneSynchronizer sceneSynchronizer = [this](Render::SceneData& sceneData) {
         mWorld->updateNeutralSceneData(sceneData);
