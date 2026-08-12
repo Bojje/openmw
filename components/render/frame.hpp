@@ -1,6 +1,10 @@
 #ifndef OPENMW_COMPONENTS_RENDER_FRAME_H
 #define OPENMW_COMPONENTS_RENDER_FRAME_H
 
+#include <optional>
+
+#include "texture.hpp"
+
 namespace Render
 {
     struct SceneSubmission;
@@ -29,6 +33,12 @@ namespace Render
         /// A backend may use this for window/input shutdown without exposing
         /// backend-specific viewer or device types to the engine.
         virtual void requestQuit() {}
+        /// Notify the active presentation owner that the drawable changed.
+        /// Backends that do not need an explicit resize operation may ignore it.
+        virtual void resize() {}
+        /// Capture the last presented frame in renderer-neutral RGBA8 form.
+        /// Backends without capture support report no image.
+        virtual std::optional<TextureData> captureFrame() { return std::nullopt; }
         virtual double referenceTime() const = 0;
         virtual unsigned frameNumber() const = 0;
         virtual void advanceFrame(double simulationTime) = 0;

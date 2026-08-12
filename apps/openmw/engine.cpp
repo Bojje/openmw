@@ -610,16 +610,12 @@ void OMW::Engine::prepareVulkanEngine()
     SDLUtil::InputCallbacks inputCallbacks;
     inputCallbacks.frame = [] {};
     inputCallbacks.functionKey = [](int, bool) {};
-    inputCallbacks.resize = [this](int x, int y, int width, int height) {
-        if (auto* const lifecycle = dynamic_cast<MWRender::VulkanFrameLifecycle*>(mFrameLifecycle.get()))
-            lifecycle->resize();
+    inputCallbacks.resize = [this](int, int, int width, int height) {
+        mFrameLifecycle->resize();
         mWindowManager->windowResized(width, height);
     };
     const auto screenshot = [this] {
-        auto* const lifecycle = dynamic_cast<MWRender::VulkanFrameLifecycle*>(mFrameLifecycle.get());
-        if (!lifecycle)
-            return;
-        const std::optional<Render::TextureData> image = lifecycle->captureFrame();
+        const std::optional<Render::TextureData> image = mFrameLifecycle->captureFrame();
         if (!image)
         {
             Log(Debug::Warning) << "Vulkan screenshot requested before a frame was presented";

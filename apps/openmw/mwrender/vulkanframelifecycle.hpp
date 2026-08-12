@@ -36,8 +36,8 @@ namespace MWRender
         unsigned frameNumber() const override;
         void advanceFrame(double simulationTime) override;
 
-        void resize();
-        std::optional<Render::TextureData> captureFrame();
+        void resize() override;
+        std::optional<Render::TextureData> captureFrame() override;
 
     private:
         struct Implementation;
