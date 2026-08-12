@@ -1235,10 +1235,11 @@ namespace MWWorld
             mNavigator->removeAgent(getPathfindingAgentBounds(ptr));
 
         ptr.getCellRef().setScale(scale);
-        mRendering->pagingBlacklistObject(mStore.find(ptr.getCellRef().getRefId()), ptr);
+        if (mRendering)
+            mRendering->pagingBlacklistObject(mStore.find(ptr.getCellRef().getRefId()), ptr);
         mWorldScene->removeFromPagedRefs(ptr);
 
-        if (ptr.getRefData().getBaseNode() != nullptr)
+        if (mRendering ? ptr.getRefData().getBaseNode() != nullptr : true)
             mWorldScene->updateObjectScale(ptr);
 
         if (mPhysics->getActor(ptr))
@@ -1281,10 +1282,11 @@ namespace MWWorld
 
         ptr.getRefData().setPosition(pos);
 
-        mRendering->pagingBlacklistObject(mStore.find(ptr.getCellRef().getRefId()), ptr);
+        if (mRendering)
+            mRendering->pagingBlacklistObject(mStore.find(ptr.getCellRef().getRefId()), ptr);
         mWorldScene->removeFromPagedRefs(ptr);
 
-        if (ptr.getRefData().getBaseNode() != nullptr)
+        if (mRendering ? ptr.getRefData().getBaseNode() != nullptr : true)
         {
             const auto order
                 = flags & MWBase::RotationFlag_inverseOrder ? RotationOrder::inverse : RotationOrder::direct;
@@ -1305,7 +1307,7 @@ namespace MWWorld
 
         osg::Vec3f pos(ptr.getRefData().getPosition().asVec3());
 
-        if (!ptr.getRefData().getBaseNode())
+        if (!ptr.getRefData().getBaseNode() && (mRendering || !mWorldScene))
         {
             // will be adjusted when Ptr's cell becomes active
             return;
@@ -2339,14 +2341,16 @@ namespace MWWorld
             MWBase::Environment::get().getMechanicsManager()->remove(getPlayerPtr(), true);
             mNavigator->removeAgent(getPathfindingAgentBounds(getPlayerConstPtr()));
             mPhysics->remove(getPlayerPtr());
-            mRendering->removePlayer(getPlayerPtr());
+            if (mRendering)
+                mRendering->removePlayer(getPlayerPtr());
             MWBase::Environment::get().getLuaManager()->objectRemovedFromScene(getPlayerPtr());
 
             mPlayer->set(player);
         }
 
         Ptr ptr = mPlayer->getPlayer();
-        mRendering->setupPlayer(ptr);
+        if (mRendering)
+            mRendering->setupPlayer(ptr);
         MWBase::Environment::get().getLuaManager()->setupPlayer(ptr);
     }
 
@@ -2356,8 +2360,12 @@ namespace MWWorld
 
         MWWorld::Ptr player = getPlayerPtr();
 
-        mRendering->renderPlayer(player);
-        MWRender::NpcAnimation* anim = static_cast<MWRender::NpcAnimation*>(mRendering->getAnimation(player));
+        MWRender::NpcAnimation* anim = nullptr;
+        if (mRendering)
+        {
+            mRendering->renderPlayer(player);
+            anim = static_cast<MWRender::NpcAnimation*>(mRendering->getAnimation(player));
+        }
         player.getClass().getInventoryStore(player).setInvListener(anim);
         player.getClass().getInventoryStore(player).setContListener(anim);
 
@@ -2365,7 +2373,8 @@ namespace MWWorld
         rotateObject(player, osg::Vec3f(), MWBase::RotationFlag_inverseOrder | MWBase::RotationFlag_adjust);
 
         MWBase::Environment::get().getMechanicsManager()->add(getPlayerPtr());
-        MWBase::Environment::get().getWindowManager()->watchActor(getPlayerPtr());
+        if (mRendering)
+            MWBase::Environment::get().getWindowManager()->watchActor(getPlayerPtr());
 
         mPhysics->remove(getPlayerPtr());
         mPhysics->addActor(getPlayerPtr(), getPlayerPtr().getClass().getCorrectedModel(getPlayerPtr()));
