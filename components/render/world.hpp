@@ -360,13 +360,7 @@ namespace Render
         {
             if (cellKey == nullptr)
                 return;
-            for (auto iter = mObjects.begin(); iter != mObjects.end();)
-            {
-                if (iter->second.cell == cellKey)
-                    iter = mObjects.erase(iter);
-                else
-                    ++iter;
-            }
+            std::erase_if(mObjects, [cellKey](const auto& entry) { return entry.second.cell == cellKey; });
             mCells.erase(cellKey);
         }
 
