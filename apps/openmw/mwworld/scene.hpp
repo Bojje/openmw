@@ -179,10 +179,10 @@ namespace MWWorld
             const Render::Vec3& position, const std::array<int, 2>& cell, bool changeEvent = true);
 
         void preloadCells(float dt);
-        void preloadTeleportDoorDestinations(const osg::Vec3f& playerPos, const osg::Vec3f& predictedPos);
-        void preloadExteriorGrid(const osg::Vec3f& playerPos, const osg::Vec3f& predictedPos);
+        void preloadTeleportDoorDestinations(const Render::Vec3& playerPos, const Render::Vec3& predictedPos);
+        void preloadExteriorGrid(const Render::Vec3& playerPos, const Render::Vec3& predictedPos);
         void preloadFastTravelDestinations(
-            const osg::Vec3f& playerPos, std::vector<PositionCellGrid>& exteriorPositions);
+            const Render::Vec3& playerPos, std::vector<PositionCellGrid>& exteriorPositions);
         void preloadCellWithSurroundings(MWWorld::CellStore& cell);
         void preloadCell(MWWorld::CellStore& cell);
         void preloadTerrain(const Render::Vec3& pos, ESM::RefId worldspace, bool sync = false);
