@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <bit>
+#include <cmath>
 #include <cstdint>
 #include <cstring>
 #include <iterator>
@@ -377,6 +378,41 @@ namespace
     }
 #endif
 
+    std::array<std::uint8_t, 16> decodeBc4Block(const Bytes& data, std::size_t offset)
+    {
+        if (offset > data.size() || data.size() - offset < 8)
+            throw std::runtime_error("truncated BC4 block");
+
+        std::array<std::uint8_t, 8> palette = {};
+        palette[0] = data[offset];
+        palette[1] = data[offset + 1];
+        if (palette[0] > palette[1])
+        {
+            for (unsigned i = 1; i <= 6; ++i)
+                palette[i + 1] = static_cast<std::uint8_t>(((7 - i) * palette[0] + i * palette[1]) / 7);
+        }
+        else
+        {
+            for (unsigned i = 1; i <= 4; ++i)
+                palette[i + 1] = static_cast<std::uint8_t>(((5 - i) * palette[0] + i * palette[1]) / 5);
+            palette[6] = 0;
+            palette[7] = 255;
+        }
+        std::uint64_t indices = 0;
+        for (unsigned byte = 0; byte < 6; ++byte)
+            indices |= static_cast<std::uint64_t>(data[offset + 2 + byte]) << (8 * byte);
+
+        std::array<std::uint8_t, 16> values = {};
+        for (unsigned pixel = 0; pixel < 16; ++pixel)
+            values[pixel] = palette[(indices >> (3 * pixel)) & 7];
+        return values;
+    }
+
+    std::uint8_t encodeNormalComponent(float value)
+    {
+        return static_cast<std::uint8_t>(std::clamp(std::lround((value * 0.5f + 0.5f) * 255.f), 0l, 255l));
+    }
+
     std::shared_ptr<const Render::TextureData> decodeDds(const Bytes& data)
     {
         if (data.size() < 128 || data[0] != 'D' || data[1] != 'D' || data[2] != 'S' || data[3] != ' ')
@@ -390,6 +426,39 @@ namespace
         result->width = width;
         result->height = height;
         result->pixels.resize(static_cast<std::size_t>(width) * height * 4);
+        if (fourCC == 0x32495441 || fourCC == 0x55354342) // ATI2 / BC5U
+        {
+            const std::size_t blocksX = (width + 3) / 4;
+            const std::size_t blocksY = (height + 3) / 4;
+            if (blocksX == 0 || blocksY > std::numeric_limits<std::size_t>::max() / blocksX)
+                return {};
+            const std::size_t blockCount = blocksX * blocksY;
+            if (blockCount > (data.size() - 128) / 16)
+                return {};
+
+            std::size_t cursor = 128;
+            for (std::size_t by = 0; by < blocksY; ++by)
+                for (std::size_t bx = 0; bx < blocksX; ++bx)
+                {
+                    const auto redValues = decodeBc4Block(data, cursor);
+                    const auto greenValues = decodeBc4Block(data, cursor + 8);
+                    for (unsigned y = 0; y < 4; ++y)
+                        for (unsigned x = 0; x < 4; ++x)
+                        {
+                            if (bx * 4 + x >= width || by * 4 + y >= height)
+                                continue;
+                            const unsigned index = y * 4 + x;
+                            const float normalX = static_cast<float>(redValues[index]) / 127.5f - 1.f;
+                            const float normalY = static_cast<float>(greenValues[index]) / 127.5f - 1.f;
+                            const float normalZ = std::sqrt(std::max(0.f,
+                                1.f - normalX * normalX - normalY * normalY));
+                            setPixel(*result, bx * 4 + x, by * 4 + y, encodeNormalComponent(normalX),
+                                encodeNormalComponent(normalY), encodeNormalComponent(normalZ), 255);
+                        }
+                    cursor += 16;
+                }
+            return result;
+        }
         const auto color565 = [](std::uint16_t color) {
             return std::array<std::uint8_t, 3>{ static_cast<std::uint8_t>(((color >> 11) & 31) * 255 / 31),
                 static_cast<std::uint8_t>(((color >> 5) & 63) * 255 / 63),

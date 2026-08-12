@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <fstream>
 #include <stdexcept>
+#include <vector>
 
 #include <components/files/collections.hpp>
 #include <components/resource/neutraltexturemanager.hpp>
@@ -20,6 +21,14 @@
 namespace
 {
     void write32(std::array<std::uint8_t, 58>& data, std::size_t offset, std::uint32_t value)
+    {
+        data[offset + 0] = static_cast<std::uint8_t>(value);
+        data[offset + 1] = static_cast<std::uint8_t>(value >> 8);
+        data[offset + 2] = static_cast<std::uint8_t>(value >> 16);
+        data[offset + 3] = static_cast<std::uint8_t>(value >> 24);
+    }
+
+    void write32(std::vector<std::uint8_t>& data, std::size_t offset, std::uint32_t value)
     {
         data[offset + 0] = static_cast<std::uint8_t>(value);
         data[offset + 1] = static_cast<std::uint8_t>(value >> 8);
@@ -49,9 +58,29 @@ namespace
         bmp[55] = 0;
         bmp[56] = 255;
         bmp[57] = 0;
+        std::vector<std::uint8_t> dds(144, 0);
+        dds[0] = 'D';
+        dds[1] = 'D';
+        dds[2] = 'S';
+        dds[3] = ' ';
+        write32(dds, 4, 124);
+        write32(dds, 12, 4);
+        write32(dds, 16, 4);
+        write32(dds, 76, 32);
+        write32(dds, 84, 0x32495441); // ATI2 / BC5U
+        dds[128] = 64;
+        dds[129] = 192;
+        dds[136] = 128;
+        dds[137] = 128;
+        dds[130] = 1; // The first pixel uses BC4 palette entry 1.
+        dds[138] = 1;
         {
             std::ofstream output(root / "textures/test.bmp", std::ios::binary);
             output.write(reinterpret_cast<const char*>(bmp.data()), static_cast<std::streamsize>(bmp.size()));
+        }
+        {
+            std::ofstream output(root / "textures/test.dds", std::ios::binary);
+            output.write(reinterpret_cast<const char*>(dds.data()), static_cast<std::streamsize>(dds.size()));
         }
 
         const ToUTF8::Utf8Encoder encoder(ToUTF8::WINDOWS_1252);
@@ -64,6 +93,12 @@ namespace
         if (!texture || texture->width != 1 || texture->height != 1
             || texture->pixels != std::vector<std::uint8_t>({ 255, 0, 0, 255 }))
             throw std::runtime_error("neutral BMP texture decoding changed pixel data");
+        const auto normal = resources.getNeutralTextureManager()->get(VFS::Path::Normalized("textures/test.dds"));
+        if (!normal || normal->width != 4 || normal->height != 4 || normal->pixels.size() != 4 * 4 * 4
+            || normal->pixels[0] < 190 || normal->pixels[0] > 194 || normal->pixels[1] < 126
+            || normal->pixels[1] > 130 || normal->pixels[2] < 235 || normal->pixels[2] > 240
+            || normal->pixels[3] != 255 || normal->pixels[4] < 62 || normal->pixels[4] > 66)
+            throw std::runtime_error("neutral BC5 texture decoding did not reconstruct a normal");
         std::filesystem::remove_all(root, error);
     }
 
