@@ -120,6 +120,12 @@ int main()
     world.updateEffects(1.f);
     if (world.weatherTime() != 1.f)
         throw std::runtime_error("renderer-neutral world scene failed to advance precipitation time");
+    weather.snow = true;
+    world.setWeatherEffects(weather);
+    const std::vector<Render::MeshInstance> snowMeshes = Render::collectWeatherMeshes(world, world.sceneData());
+    if (snowMeshes.empty()
+        || snowMeshes.front().mesh.vertices[2].position[2] - snowMeshes.front().mesh.vertices[0].position[2] <= -1.f)
+        throw std::runtime_error("renderer-neutral snow did not use short flake geometry");
     world.clearWeatherEffects();
     if (!Render::collectWeatherMeshes(world, world.sceneData()).empty())
         throw std::runtime_error("renderer-neutral world scene failed to clear precipitation geometry");

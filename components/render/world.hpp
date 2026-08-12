@@ -26,6 +26,7 @@ namespace Render
         float maxHeight = 0.f;
         float speed = 0.f;
         int maxParticles = 0;
+        bool snow = false;
         // Horizontal storm direction plus downward fall. This keeps
         // precipitation motion renderer-neutral instead of baking a vertical
         // particle assumption into the Vulkan consumer.

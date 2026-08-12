@@ -124,8 +124,8 @@ namespace Render
 
         const int particleCount = std::min(weather.maxParticles, 256);
         const float height = weather.maxHeight - weather.minHeight;
-        const float lineLength = std::clamp(height * 0.08f, 2.f, 32.f);
-        const float halfWidth = std::clamp(weather.diameter / 400.f, 0.02f, 0.2f);
+        const float lineLength = weather.snow ? 0.6f : std::clamp(height * 0.08f, 2.f, 32.f);
+        const float halfWidth = weather.snow ? 0.12f : std::clamp(weather.diameter / 400.f, 0.02f, 0.2f);
         const float cameraX = scene.viewInverse.data[12];
         const float cameraY = scene.viewInverse.data[13];
         const float cameraZ = scene.viewInverse.data[14];
