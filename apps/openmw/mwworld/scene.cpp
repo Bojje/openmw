@@ -1042,6 +1042,7 @@ namespace MWWorld
         MWRender::RenderingManager* rendering, MWRender::LandManager* landManager,
         Terrain::World* terrain, MWRender::ObjectPaging* objectPaging,
         Terrain::RenderStorage& terrainStorage, SceneUtil::WorkQueue* workQueue, Resource::ResourceSystem* resourceSystem,
+        Resource::SceneManager* sceneManager,
         MWPhysics::PhysicsSystem* physics,
         DetourNavigator::Navigator& navigator)
         : mCurrentCell(nullptr)
@@ -1054,6 +1055,7 @@ namespace MWWorld
         , mTextureResolver(std::move(textureResolver))
         , mVfs(vfs)
         , mResourceSystem(resourceSystem)
+        , mSceneManager(sceneManager)
         , mPhysics(physics)
         , mRendering(rendering)
         , mTerrain(terrain)
@@ -1085,10 +1087,10 @@ namespace MWWorld
     Scene::Scene(MWWorld::World& world, Render::FrameLifecycle& frameLifecycle,
         Render::SceneSynchronizer sceneSynchronizer, Render::BonePoseResolver bonePoseResolver,
         Render::MeshResolver meshResolver, Render::TextureResolver textureResolver, const VFS::Manager* vfs,
-        Terrain::RenderStorage& terrainStorage, Resource::ResourceSystem* resourceSystem,
+        Terrain::RenderStorage& terrainStorage,
         MWPhysics::PhysicsSystem* physics, DetourNavigator::Navigator& navigator)
         : Scene(world, frameLifecycle, std::move(sceneSynchronizer), std::move(bonePoseResolver), std::move(meshResolver),
-            std::move(textureResolver), vfs, nullptr, nullptr, nullptr, nullptr, terrainStorage, nullptr, resourceSystem,
+            std::move(textureResolver), vfs, nullptr, nullptr, nullptr, nullptr, terrainStorage, nullptr, nullptr, nullptr,
             physics, navigator)
     {
     }
@@ -1475,16 +1477,18 @@ namespace MWWorld
 
     void Scene::preload(const std::string& mesh, bool useAnim)
     {
-        const VFS::Path::Normalized meshPath = useAnim
-            ? Misc::ResourceHelpers::correctActorModelPath(
-                VFS::Path::toNormalized(mesh), mResourceSystem->getVFS())
-            : VFS::Path::toNormalized(mesh);
-
-        if (mResourceSystem->getSceneManager()->checkLoaded(meshPath, mFrameLifecycle.referenceTime()))
+        if (!mSceneManager)
             return;
 
-        osg::ref_ptr<PreloadMeshItem> item(
-            new PreloadMeshItem(meshPath, mResourceSystem->getSceneManager()));
+        const VFS::Path::Normalized meshPath = useAnim
+            ? Misc::ResourceHelpers::correctActorModelPath(
+                VFS::Path::toNormalized(mesh), mVfs)
+            : VFS::Path::toNormalized(mesh);
+
+        if (mSceneManager->checkLoaded(meshPath, mFrameLifecycle.referenceTime()))
+            return;
+
+        osg::ref_ptr<PreloadMeshItem> item(new PreloadMeshItem(meshPath, mSceneManager));
         mWorkQueue->addWorkItem(item);
         const auto isDone = [](const osg::ref_ptr<SceneUtil::WorkItem>& v) { return v->isDone(); };
         mWorkItems.erase(std::remove_if(mWorkItems.begin(), mWorkItems.end(), isDone), mWorkItems.end());

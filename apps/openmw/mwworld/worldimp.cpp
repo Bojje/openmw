@@ -342,7 +342,7 @@ namespace MWWorld
         mWorldScene = std::make_unique<Scene>(
             *this, frameLifecycle, sceneSynchronizer, bonePoseResolver, meshResolver, textureResolver,
             mResourceSystem->getVFS(), mRendering.get(), osgTerrainStoragePtr->getLandManager(), mTerrain, mObjectPaging,
-            *osgTerrainStoragePtr, workQueue, mResourceSystem, mPhysics.get(), *mNavigator);
+            *osgTerrainStoragePtr, workQueue, mResourceSystem, mResourceSystem->getSceneManager(), mPhysics.get(), *mNavigator);
     }
 
     void World::initNeutralRenderer(Render::FrameLifecycle& frameLifecycle,
@@ -364,7 +364,7 @@ namespace MWWorld
         mWeatherManager = std::make_unique<MWWorld::WeatherManager>(nullptr, nullptr, mStore);
         mWorldScene = std::make_unique<Scene>(*this, frameLifecycle, std::move(sceneSynchronizer),
             std::move(bonePoseResolver), std::move(meshResolver), std::move(textureResolver), mResourceSystem->getVFS(),
-            terrainStorage, mResourceSystem, mPhysics.get(), *mNavigator);
+            terrainStorage, mPhysics.get(), *mNavigator);
     }
 
     void World::fillGlobalVariables()

@@ -69,6 +69,7 @@ namespace SceneUtil
 
 namespace Resource
 {
+    class SceneManager;
     class ResourceSystem;
 }
 
@@ -127,6 +128,7 @@ namespace MWWorld
         Render::TextureResolver mTextureResolver;
         const VFS::Manager* mVfs;
         Resource::ResourceSystem* mResourceSystem;
+        Resource::SceneManager* mSceneManager;
         MWPhysics::PhysicsSystem* mPhysics;
         MWRender::RenderingManager* mRendering;
         Terrain::World* mTerrain;
@@ -199,13 +201,14 @@ namespace MWWorld
             Terrain::World* terrain, MWRender::ObjectPaging* objectPaging,
             Terrain::RenderStorage& terrainStorage, SceneUtil::WorkQueue* workQueue,
             Resource::ResourceSystem* resourceSystem,
+            Resource::SceneManager* sceneManager,
             MWPhysics::PhysicsSystem* physics,
             DetourNavigator::Navigator& navigator);
 
         Scene(MWWorld::World& world, Render::FrameLifecycle& frameLifecycle,
             Render::SceneSynchronizer sceneSynchronizer, Render::BonePoseResolver bonePoseResolver,
             Render::MeshResolver meshResolver, Render::TextureResolver textureResolver, const VFS::Manager* vfs,
-            Terrain::RenderStorage& terrainStorage, Resource::ResourceSystem* resourceSystem,
+            Terrain::RenderStorage& terrainStorage,
             MWPhysics::PhysicsSystem* physics, DetourNavigator::Navigator& navigator);
 
         ~Scene();
