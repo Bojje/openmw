@@ -184,6 +184,10 @@ jobs:
           echo "Scene preload API must not expose the OSG SceneManager"
           exit 1
         fi
+        if rg -n 'Terrain::World|MWRender::LandManager' apps/openmw/mwworld/scene.hpp; then
+          echo "Scene must not retain OSG terrain or land-manager plumbing"
+          exit 1
+        fi
         if rg -n 'getAnimation\(|getNeutralBoneMatrices\(' apps/openmw/mwworld/scene.cpp; then
           echo "Scene neutral state and bone poses must use injected renderer providers"
           exit 1
