@@ -2975,6 +2975,8 @@ namespace MWMechanics
             mCastingScriptedSpell = false;
             mCanCast = false;
         }
+        else if (groupname == "containeropen" && action == "loot")
+            MWBase::Environment::get().getWindowManager()->pushGuiMode(MWGui::GM_Container, mPtr);
     }
 
     void CharacterController::updateNeutralMovement(float duration)
