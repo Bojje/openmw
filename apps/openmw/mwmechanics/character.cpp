@@ -3384,17 +3384,21 @@ namespace MWMechanics
             const auto& stats = mPtr.getClass().getCreatureStats(mPtr);
             const auto& magicEffects = stats.getMagicEffects();
             const std::string refnum = mPtr.getCellRef().getRefNum().toString();
+            const osg::Vec3f position = mPtr.getRefData().getPosition().asVec3();
             for (const ESM::MagicEffect& effect : MWBase::Environment::get().getESMStore()->get<ESM::MagicEffect>())
             {
                 if (!(effect.mData.mFlags & ESM::MagicEffect::ContinuousVfx))
                     continue;
 
+                const std::string effectId = effect.mId.getRefIdString() + "-" + refnum;
                 if (stats.isDeathAnimationFinished()
                     || magicEffects.getOrDefault(MWMechanics::EffectKey(effect.mId)).getMagnitude() <= 0)
                 {
-                    MWBase::Environment::get().getWorld()->removeEffect(
-                        effect.mId.getRefIdString() + "-" + refnum);
+                    MWBase::Environment::get().getWorld()->removeEffect(effectId);
                 }
+                else
+                    MWBase::Environment::get().getWorld()->updateEffect(
+                        effectId, { position.x(), position.y(), position.z() }, { 0.f, 0.f, 0.f, 1.f });
             }
             return;
         }

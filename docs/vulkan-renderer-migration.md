@@ -521,7 +521,7 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the frozen `openmw-vulkan-osg-reference` tag, the current checkpoint changes
-207 code files excluding this ledger, deleting 2,279 lines and adding 14,213 lines (net `+11,934`). The larger Vulkan-only
+207 code files excluding this ledger, deleting 2,279 lines and adding 14,221 lines (net `+11,942`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; the current branch continues the reduction
 work with renderer-neutral ownership and compatibility-wrapper deletion. The live no-GUI
 consumer is the first deletion checkpoint; further reduction can now target OSG
@@ -710,8 +710,8 @@ the OSG animation owner is absent, so repeated group requests and death completi
 prematurely clear or finish the active queue. Projectile collision, hit, spell, sound, save/load, and cleanup
  behavior now also run through neutral state without an OSG scene parent. Neutral arrows and magic
 bolts also submit movable mesh effects through the same `WorldScene` effect collection. Neutral continuous
-magic VFX now use actor-scoped effect IDs and are removed when the corresponding magic effect expires or
-death animation completes. Anonymous one-shot VFX now receive generated neutral IDs at the world boundary,
+magic VFX now use actor-scoped effect IDs, follow neutral actor movement, and are removed when the corresponding
+magic effect expires or death animation completes. Anonymous one-shot VFX now receive generated neutral IDs at the world boundary,
 so existing spell, area, and summon effects are not silently discarded. The remaining animation
  gate is actor `.kf` priority/queue arbitration, OSG-specific presentation events, blending, and
  controller-stack ownership; projectile glows/lights/multi-effect composition and full particle presentation remain.
