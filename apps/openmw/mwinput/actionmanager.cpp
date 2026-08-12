@@ -168,6 +168,8 @@ namespace MWInput
 
     void ActionManager::screenshot()
     {
+        if (!mScreenCaptureHandler || !mViewer)
+            return;
         mScreenCaptureHandler->setFramesToCapture(1);
         mScreenCaptureHandler->captureNextFrame(*mViewer);
     }

@@ -792,15 +792,17 @@ void OMW::Engine::prepareEngine()
     mWorkQueue = new SceneUtil::WorkQueue(Settings::cells().mPreloadNumThreads);
     mUnrefQueue = std::make_unique<SceneUtil::UnrefQueue>();
 
-    mScreenCaptureOperation = new SceneUtil::AsyncScreenCaptureOperation(mWorkQueue,
-        new SceneUtil::WriteScreenshotToFileOperation(mCfgMgr.getScreenshotPath(),
-            Settings::general().mScreenshotFormat,
-            Settings::general().mNotifyOnSavedScreenshot ? std::function<void(std::string)>(ScreenCaptureMessageBox{})
-                                                         : std::function<void(std::string)>(IgnoreString{})));
+    if (mFrameLifecycle->backend() == Render::FrameLifecycle::Backend::Osg)
+    {
+        mScreenCaptureOperation = new SceneUtil::AsyncScreenCaptureOperation(mWorkQueue,
+            new SceneUtil::WriteScreenshotToFileOperation(mCfgMgr.getScreenshotPath(),
+                Settings::general().mScreenshotFormat,
+                Settings::general().mNotifyOnSavedScreenshot ? std::function<void(std::string)>(ScreenCaptureMessageBox{})
+                                                             : std::function<void(std::string)>(IgnoreString{})));
 
-    mScreenCaptureHandler = new osgViewer::ScreenCaptureHandler(mScreenCaptureOperation);
-
-    mViewer->addEventHandler(mScreenCaptureHandler);
+        mScreenCaptureHandler = new osgViewer::ScreenCaptureHandler(mScreenCaptureOperation);
+        mViewer->addEventHandler(mScreenCaptureHandler);
+    }
 
     mL10nManager = std::make_unique<L10n::Manager>(mVFS.get());
     mL10nManager->setPreferredLocales(Settings::general().mPreferredLocales, Settings::general().mGmstOverridesL10n);
