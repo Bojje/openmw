@@ -17,12 +17,12 @@ OSG-only, and `OPENMW_USE_VULKAN` currently builds the standalone Vulkan migrati
 and smoke tests; it is not yet a full-game backend selector. Vulkan translation units now
 live in a separate `openmw_vulkan` library used by the migration targets instead of the
 shared `components` archive, so the OSG game target does not link the inactive backend.
-The first renderer-neutral mesh conversion primitives now live in a separate
+Renderer-neutral mesh vertex normalization, index conversion, and tangent generation now live in a separate
 `openmw_render_neutral` library, which is consumed by both the legacy NIF adapter and
 Vulkan-side tests without pulling the OSG-heavy `components` archive into the Vulkan
 path. The focused neutral test covers index rejection and tangent-frame generation;
-NIF parsing, material extraction, and scene-graph RTTI remain in the legacy adapter
-until that data model is separated.
+NIF parsing, material extraction, and scene-graph RTTI remain in the legacy adapter,
+which now only translates source arrays into the neutral vertex-source contract.
 The top-level build now also rejects a future `openmw-lib -> openmw_vulkan` link, and CI
 checks the final ELF dependencies and renderer-symbol set in both binaries, making that
 separation a configure- and link-time invariant. This keeps the process lifecycle
@@ -222,7 +222,7 @@ The non-owning manager update handle is private to the `Scene` owner, detached d
 teardown, and CI guards the manager header against regaining a value-owned neutral frame state.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-91 files, deleting 916 lines and adding 7,183 lines (net `+6,267`). The larger Vulkan-only
+91 files, deleting 916 lines and adding 7,214 lines (net `+6,298`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.

@@ -7,6 +7,40 @@
 
 namespace Render
 {
+    MeshData makeMeshData(std::span<const MeshVertexSource> source)
+    {
+        MeshData result;
+        result.vertices.resize(source.size());
+
+        for (std::size_t i = 0; i < source.size(); ++i)
+        {
+            const MeshVertexSource& sourceVertex = source[i];
+            MeshVertex& vertex = result.vertices[i];
+            for (std::size_t axis = 0; axis < sourceVertex.position.size(); ++axis)
+                vertex.position[axis] = sourceVertex.position[axis];
+            for (std::size_t axis = 0; axis < sourceVertex.normal.size(); ++axis)
+                vertex.normal[axis] = sourceVertex.hasNormal ? sourceVertex.normal[axis] : (axis == 2 ? 1.f : 0.f);
+            for (std::size_t axis = 0; axis < sourceVertex.texcoord.size(); ++axis)
+            {
+                vertex.texcoord[axis] = sourceVertex.hasTexcoord ? sourceVertex.texcoord[axis] : 0.f;
+                vertex.blendTexcoord[axis] = vertex.texcoord[axis];
+            }
+            for (std::size_t axis = 0; axis < sourceVertex.color.size(); ++axis)
+                vertex.color[axis] = sourceVertex.hasColor ? sourceVertex.color[axis] : 1.f;
+
+            vertex.material[0] = 1.f;
+            vertex.material[1] = 0.f;
+            vertex.material[2] = 1.f;
+            vertex.material[3] = 0.f;
+            vertex.tangent[0] = 1.f;
+            vertex.tangent[1] = 0.f;
+            vertex.tangent[2] = 0.f;
+            vertex.tangent[3] = 1.f;
+        }
+
+        return result;
+    }
+
     void appendMeshIndex(MeshData& mesh, std::uint32_t index)
     {
         if (index >= mesh.vertices.size())

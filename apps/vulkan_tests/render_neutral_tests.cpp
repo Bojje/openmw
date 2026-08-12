@@ -5,15 +5,15 @@
 
 int main()
 {
-    Render::MeshData mesh;
-    mesh.vertices.resize(3);
-    mesh.vertices[0].normal[2] = 1.f;
-    mesh.vertices[1].position[0] = 1.f;
-    mesh.vertices[1].normal[2] = 1.f;
-    mesh.vertices[1].texcoord[0] = 1.f;
-    mesh.vertices[2].position[1] = 1.f;
-    mesh.vertices[2].normal[2] = 1.f;
-    mesh.vertices[2].texcoord[1] = 1.f;
+    std::vector<Render::MeshVertexSource> source(3);
+    source[1].position[0] = 1.f;
+    source[1].texcoord[0] = 1.f;
+    source[2].position[1] = 1.f;
+    source[2].texcoord[1] = 1.f;
+    for (Render::MeshVertexSource& vertex : source)
+        vertex.hasNormal = true;
+
+    Render::MeshData mesh = Render::makeMeshData(source);
 
     Render::appendMeshIndex(mesh, 0);
     Render::appendMeshIndex(mesh, 1);

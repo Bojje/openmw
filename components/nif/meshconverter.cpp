@@ -20,10 +20,9 @@ namespace Nif
     {
         Render::Mat4 toRenderMatrix(const NiTransform& transform);
 
-        Render::MeshData convertVertices(const NiGeometryData& source)
+        std::vector<Render::MeshVertexSource> convertVertices(const NiGeometryData& source)
         {
-            Render::MeshData result;
-            result.vertices.resize(source.mVertices.size());
+            std::vector<Render::MeshVertexSource> result(source.mVertices.size());
 
             const bool hasNormals = source.mNormals.size() == source.mVertices.size();
             const bool hasColors = source.mColors.size() == source.mVertices.size();
@@ -33,7 +32,7 @@ namespace Nif
             for (std::size_t i = 0; i < source.mVertices.size(); ++i)
             {
                 const auto& position = source.mVertices[i];
-                auto& vertex = result.vertices[i];
+                auto& vertex = result[i];
                 vertex.position[0] = position.x();
                 vertex.position[1] = position.y();
                 vertex.position[2] = position.z();
@@ -44,12 +43,7 @@ namespace Nif
                     vertex.normal[0] = normal.x();
                     vertex.normal[1] = normal.y();
                     vertex.normal[2] = normal.z();
-                }
-                else
-                {
-                    vertex.normal[0] = 0.0f;
-                    vertex.normal[1] = 0.0f;
-                    vertex.normal[2] = 1.0f;
+                    vertex.hasNormal = true;
                 }
 
                 if (hasTexcoords)
@@ -57,14 +51,8 @@ namespace Nif
                     const auto& texcoord = source.mUVList.front()[i];
                     vertex.texcoord[0] = texcoord.x();
                     vertex.texcoord[1] = texcoord.y();
+                    vertex.hasTexcoord = true;
                 }
-                else
-                {
-                    vertex.texcoord[0] = 0.0f;
-                    vertex.texcoord[1] = 0.0f;
-                }
-                vertex.blendTexcoord[0] = vertex.texcoord[0];
-                vertex.blendTexcoord[1] = vertex.texcoord[1];
 
                 if (hasColors)
                 {
@@ -73,23 +61,8 @@ namespace Nif
                     vertex.color[1] = color.y();
                     vertex.color[2] = color.z();
                     vertex.color[3] = color.w();
+                    vertex.hasColor = true;
                 }
-                else
-                {
-                    vertex.color[0] = 1.0f;
-                    vertex.color[1] = 1.0f;
-                    vertex.color[2] = 1.0f;
-                    vertex.color[3] = 1.0f;
-                }
-
-                vertex.material[0] = 1.0f;
-                vertex.material[1] = 0.0f;
-                vertex.material[2] = 1.0f;
-                vertex.material[3] = 0.0f;
-                vertex.tangent[0] = 1.0f;
-                vertex.tangent[1] = 0.0f;
-                vertex.tangent[2] = 0.0f;
-                vertex.tangent[3] = 1.0f;
             }
 
             return result;
@@ -306,7 +279,8 @@ namespace Nif
         if (source.mTriangles.size() % 3 != 0)
             throw std::runtime_error("NIF triangle index data is not a multiple of three");
 
-        Render::MeshData result = convertVertices(source);
+        const std::vector<Render::MeshVertexSource> vertices = convertVertices(source);
+        Render::MeshData result = Render::makeMeshData(vertices);
         result.indices.reserve(source.mTriangles.size());
         for (unsigned short index : source.mTriangles)
             Render::appendMeshIndex(result, index);
@@ -316,7 +290,8 @@ namespace Nif
 
     Render::MeshData convertMesh(const NiTriStripsData& source)
     {
-        Render::MeshData result = convertVertices(source);
+        const std::vector<Render::MeshVertexSource> vertices = convertVertices(source);
+        Render::MeshData result = Render::makeMeshData(vertices);
         for (const std::vector<unsigned short>& strip : source.mStrips)
         {
             if (strip.size() < 3)
