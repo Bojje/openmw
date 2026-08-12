@@ -271,15 +271,18 @@ namespace MWWorld
         const std::string& normalMapPattern = Settings::shaders().mNormalMapPattern;
         const std::string& heightMapPattern = Settings::shaders().mNormalHeightMapPattern;
         const std::string& specularMapPattern = Settings::shaders().mTerrainSpecularMapPattern;
-        mTerrainStorage = std::make_unique<MWRender::TerrainStorage>(mResourceSystem, normalMapPattern,
+        auto osgTerrainStorage = std::make_unique<MWRender::TerrainStorage>(mResourceSystem, normalMapPattern,
             heightMapPattern, Settings::shaders().mAutoUseTerrainNormalMaps, specularMapPattern,
             Settings::shaders().mAutoUseTerrainSpecularMaps);
-        mTerrainRenderStorage = mTerrainStorage.get();
+        MWRender::TerrainStorage* const osgTerrainStoragePtr = osgTerrainStorage.get();
+        mTerrainStorage = std::move(osgTerrainStorage);
+        mTerrainRenderStorage = osgTerrainStoragePtr;
 
         osgUtil::IncrementalCompileOperation* incrementalCompileOperation = nullptr;
         SceneUtil::LightManager* lightRoot = nullptr;
         mRendering = std::make_unique<MWRender::RenderingManager>(
-            viewer, rootNode, mResourceSystem, workQueue, *mNavigator, mGroundcoverStore, unrefQueue, *mTerrainStorage,
+            viewer, rootNode, mResourceSystem, workQueue, *mNavigator, mGroundcoverStore, unrefQueue,
+            *osgTerrainStoragePtr,
             mTerrain, mObjectPaging, incrementalCompileOperation, lightRoot, mSkyManager, mPostProcessor,
             [&frameLifecycle] { frameLifecycle.renderFrame(); },
             [&frameLifecycle] { frameLifecycle.advanceFrame(frameLifecycle.referenceTime()); });
@@ -313,8 +316,8 @@ namespace MWWorld
         };
         mWorldScene = std::make_unique<Scene>(
             *this, frameLifecycle, sceneSynchronizer, bonePoseResolver, meshResolver, textureResolver,
-            mResourceSystem->getVFS(), mRendering.get(), mTerrainStorage->getLandManager(), mTerrain, mObjectPaging,
-            *mTerrainStorage, workQueue, mResourceSystem, mPhysics.get(), *mNavigator);
+            mResourceSystem->getVFS(), mRendering.get(), osgTerrainStoragePtr->getLandManager(), mTerrain, mObjectPaging,
+            *osgTerrainStoragePtr, workQueue, mResourceSystem, mPhysics.get(), *mNavigator);
     }
 
     void World::initNeutralRenderer(Render::FrameLifecycle& frameLifecycle,
