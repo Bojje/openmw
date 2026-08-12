@@ -25,6 +25,10 @@ namespace Render
         virtual bool renderFrame(const SceneSubmission& /*submission*/) { return false; }
         virtual bool consumesSceneSubmission() const = 0;
         virtual bool done() const = 0;
+        /// Request termination through the active renderer owner.
+        /// A backend may use this for window/input shutdown without exposing
+        /// backend-specific viewer or device types to the engine.
+        virtual void requestQuit() {}
         virtual double referenceTime() const = 0;
         virtual unsigned frameNumber() const = 0;
         virtual void advanceFrame(double simulationTime) = 0;

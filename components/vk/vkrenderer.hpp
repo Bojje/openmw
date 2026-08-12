@@ -78,7 +78,8 @@ namespace Vk
             return render();
         }
         bool consumesSceneSubmission() const override { return true; }
-        bool done() const override { return false; }
+        bool done() const override { return mDone; }
+        void requestQuit() override { mDone = true; }
         double referenceTime() const override { return mReferenceTime; }
         unsigned frameNumber() const override { return mFrameNumber; }
         void advanceFrame(double simulationTime) override
@@ -234,6 +235,7 @@ namespace Vk
         uint32_t mLastSubmittedFrame = 0;
         uint32_t mLastSubmittedImage = 0;
         bool mHasSubmittedFrame = false;
+        bool mDone = false;
     };
 }
 

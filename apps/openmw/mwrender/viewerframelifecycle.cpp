@@ -26,6 +26,11 @@ namespace MWRender
         return mViewer->done();
     }
 
+    void ViewerFrameLifecycle::requestQuit()
+    {
+        mViewer->setDone(true);
+    }
+
     double ViewerFrameLifecycle::referenceTime() const
     {
         const osg::FrameStamp* frameStamp = mViewer->getFrameStamp();

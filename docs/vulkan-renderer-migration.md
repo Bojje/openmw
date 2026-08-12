@@ -376,6 +376,9 @@ The same interface now owns the engine-visible frame number: the OSG adapter rea
 while the Vulkan owner advances its neutral counter with simulation-frame advancement.
 Loop termination is also delegated through the lifecycle; the OSG adapter preserves viewer shutdown
 semantics, while a Vulkan owner can use the engine quit-request path without an OSG viewer query.
+The lifecycle now exposes a renderer-neutral quit request as well: OSG forwards it to the viewer,
+and Vulkan records it in its owner state. This gives future input/window services one shutdown path
+without reintroducing backend-specific viewer access into the engine.
 The engine simulation/update loop now owns its frame start tick and statistics sink instead of
 querying the OSG viewer directly. The OSG lifecycle may still provide its viewer statistics object
 for the reference renderer, while a future Vulkan owner can run the same update loop without an
@@ -392,7 +395,7 @@ The engine public header no longer imports complete OSG viewer/event-handler hea
 are now included only by the implementation files that use them.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-160 files, deleting 1,521 lines and adding 8,657 lines (net `+7,136`). The larger Vulkan-only
+160 files, deleting 1,521 lines and adding 8,676 lines (net `+7,155`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
