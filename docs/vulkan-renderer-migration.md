@@ -424,8 +424,9 @@ viewer event-queue callbacks, leaving a future Vulkan/input owner free to provid
 without linking OSG into the shared SDL input component.
 Screenshot scheduling now follows the same callback boundary: `ActionManager` no longer owns an
 OSG viewer or `ScreenCaptureHandler`; the reference engine supplies its capture action, while
-the Vulkan presentation owner now reads back its last submitted frame and writes an explicit PPM
-capture. Native PNG/JPEG output and savegame thumbnail integration remain presentation work.
+the Vulkan presentation owner reads back its last submitted frame and writes neutral PPM, TGA, PNG,
+or JPEG captures. Neutral JPEG savegame thumbnail integration is also wired; interactive GUI/video
+presentation remains outstanding.
 Gyroscope orientation correction now uses a scalar Z rotation and neutral float storage rather than
 OSG matrix/vector types, so SDL sensor input can be reused by a non-OSG backend without importing
 presentation math.
