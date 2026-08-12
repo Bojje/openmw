@@ -608,8 +608,7 @@ namespace MWWorld
     {
         // Must be cleared before mRendering is destroyed
         if (mProjectileManager)
-            if (mProjectileManager)
-                mProjectileManager->clear();
+            mProjectileManager->clear();
 
         if (Settings::navigator().mWaitForAllJobsOnExit && mNavigator != nullptr)
         {
@@ -997,7 +996,8 @@ namespace MWWorld
         if (changeEvent && mCurrentWorldSpace != destinationCell->getNameId())
         {
             // changed worldspace
-            mProjectileManager->clear();
+            if (mProjectileManager)
+                mProjectileManager->clear();
             if (mRendering)
                 mRendering->notifyWorldSpaceChanged();
             mCurrentWorldSpace = destinationCell->getNameId();

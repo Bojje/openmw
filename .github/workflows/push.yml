@@ -335,6 +335,11 @@ jobs:
           echo "World must not retain the removed backend-specific screenshot bridge"
           exit 1
         fi
+        if ! sed -n '/void World::changeToCell/,/removeContainerScripts(getPlayerPtr())/p' \
+            apps/openmw/mwworld/worldimp.cpp | rg -q -U 'if \(mProjectileManager\)\s+mProjectileManager->clear\(\);'; then
+          echo "World cell changes must guard the optional projectile presenter"
+          exit 1
+        fi
         frame_lifecycle_count=$(rg -n 'mFrameLifecycle = std::make_unique<[^>]*FrameLifecycle>' apps/openmw/engine.cpp | wc -l)
         if [ "$frame_lifecycle_count" -ne 2 ] || ! rg -q 'VulkanFrameLifecycle' apps/openmw/engine.cpp || ! rg -q 'ViewerFrameLifecycle' apps/openmw/engine.cpp; then
           echo "The engine must select exactly one of the two renderer frame lifecycle implementations"
