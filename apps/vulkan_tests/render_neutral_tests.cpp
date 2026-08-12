@@ -38,4 +38,9 @@ int main()
     }
     if (!rejectedInvalidIndex)
         throw std::runtime_error("neutral mesh conversion accepted an invalid index");
+
+    Render::MeshData stripMesh = Render::makeMeshData(std::vector<Render::MeshVertexSource>(4));
+    Render::appendTriangleStripIndices(stripMesh, std::vector<uint16_t>{ 0, 1, 2, 3 });
+    if (stripMesh.indices != std::vector<uint32_t>({ 0, 1, 2, 1, 3, 2 }))
+        throw std::runtime_error("neutral triangle-strip conversion returned the wrong winding");
 }

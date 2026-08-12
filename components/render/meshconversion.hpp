@@ -22,6 +22,7 @@ namespace Render
 
     MeshData makeMeshData(std::span<const MeshVertexSource> source);
     void appendMeshIndex(MeshData& mesh, std::uint32_t index);
+    void appendTriangleStripIndices(MeshData& mesh, std::span<const std::uint16_t> strip);
     void computeMeshTangents(MeshData& mesh);
 }
 

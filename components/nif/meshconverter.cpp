@@ -293,32 +293,7 @@ namespace Nif
         const std::vector<Render::MeshVertexSource> vertices = convertVertices(source);
         Render::MeshData result = Render::makeMeshData(vertices);
         for (const std::vector<unsigned short>& strip : source.mStrips)
-        {
-            if (strip.size() < 3)
-                continue;
-
-            result.indices.reserve(result.indices.size() + (strip.size() - 2) * 3);
-            for (std::size_t i = 2; i < strip.size(); ++i)
-            {
-                const unsigned short a = strip[i - 2];
-                const unsigned short b = strip[i - 1];
-                const unsigned short c = strip[i];
-                if (a == b || b == c || a == c)
-                    continue;
-                if (i % 2 == 0)
-                {
-                    Render::appendMeshIndex(result, a);
-                    Render::appendMeshIndex(result, b);
-                    Render::appendMeshIndex(result, c);
-                }
-                else
-                {
-                    Render::appendMeshIndex(result, a);
-                    Render::appendMeshIndex(result, c);
-                    Render::appendMeshIndex(result, b);
-                }
-            }
-        }
+            Render::appendTriangleStripIndices(result, strip);
 
         Render::computeMeshTangents(result);
         return result;

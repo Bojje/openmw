@@ -48,6 +48,34 @@ namespace Render
         mesh.indices.push_back(index);
     }
 
+    void appendTriangleStripIndices(MeshData& mesh, std::span<const std::uint16_t> strip)
+    {
+        if (strip.size() < 3)
+            return;
+
+        mesh.indices.reserve(mesh.indices.size() + (strip.size() - 2) * 3);
+        for (std::size_t i = 2; i < strip.size(); ++i)
+        {
+            const std::uint16_t a = strip[i - 2];
+            const std::uint16_t b = strip[i - 1];
+            const std::uint16_t c = strip[i];
+            if (a == b || b == c || a == c)
+                continue;
+            if (i % 2 == 0)
+            {
+                appendMeshIndex(mesh, a);
+                appendMeshIndex(mesh, b);
+                appendMeshIndex(mesh, c);
+            }
+            else
+            {
+                appendMeshIndex(mesh, a);
+                appendMeshIndex(mesh, c);
+                appendMeshIndex(mesh, b);
+            }
+        }
+    }
+
     void computeMeshTangents(MeshData& mesh)
     {
         std::vector<std::array<float, 3>> tangents(mesh.vertices.size());

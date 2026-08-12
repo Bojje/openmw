@@ -17,7 +17,7 @@ OSG-only, and `OPENMW_USE_VULKAN` currently builds the standalone Vulkan migrati
 and smoke tests; it is not yet a full-game backend selector. Vulkan translation units now
 live in a separate `openmw_vulkan` library used by the migration targets instead of the
 shared `components` archive, so the OSG game target does not link the inactive backend.
-Renderer-neutral mesh vertex normalization, index conversion, and tangent generation now live in a separate
+Renderer-neutral mesh vertex normalization, index conversion, triangle-strip topology, and tangent generation now live in a separate
 `openmw_render_neutral` library, which is consumed by both the legacy NIF adapter and
 Vulkan-side tests without pulling the OSG-heavy `components` archive into the Vulkan
 path. The focused neutral test covers index rejection and tangent-frame generation;
@@ -224,7 +224,7 @@ Engine GUI fallback frame advancement now also reads simulation time from the ac
 `FrameLifecycle`, keeping renderer orchestration from reaching directly into an OSG frame stamp.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-91 files, deleting 916 lines and adding 7,216 lines (net `+6,300`). The larger Vulkan-only
+91 files, deleting 916 lines and adding 7,225 lines (net `+6,309`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
