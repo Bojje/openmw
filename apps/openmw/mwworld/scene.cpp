@@ -490,16 +490,8 @@ namespace MWWorld
             mRendering.notifyWorldSpaceChanged();
     }
 
-    void Scene::loadCell(CellStore& cell, Loading::Listener* loadingListener, bool respawn, const osg::Vec3f& position,
-        const DetourNavigator::UpdateGuard* navigatorUpdateGuard)
+    void Scene::recordNeutralCell(CellStore& cell)
     {
-        using DetourNavigator::HeightfieldShape;
-
-        assert(mActiveCells.find(&cell) == mActiveCells.end());
-        mActiveCells.insert(&cell);
-
-        Log(Debug::Info) << "Loading cell " << cell.getCell()->getDescription();
-
         const int cellX = cell.getCell()->getGridX();
         const int cellY = cell.getCell()->getGridY();
         const MWWorld::Cell& cellVariant = *cell.getCell();
@@ -522,6 +514,27 @@ namespace MWWorld
                     cellVariant.getNameId(), record.model.value(), transform, true, worldspace.serializeText());
             }
         }
+
+        if (cellVariant.isExterior())
+            mNeutralWorldScene.setTerrainTiles(static_cast<const void*>(&cell),
+                mTerrainStorage.getRenderTiles(cellX, cellY, worldspace));
+    }
+
+    void Scene::loadCell(CellStore& cell, Loading::Listener* loadingListener, bool respawn, const osg::Vec3f& position,
+        const DetourNavigator::UpdateGuard* navigatorUpdateGuard)
+    {
+        using DetourNavigator::HeightfieldShape;
+
+        assert(mActiveCells.find(&cell) == mActiveCells.end());
+        mActiveCells.insert(&cell);
+
+        Log(Debug::Info) << "Loading cell " << cell.getCell()->getDescription();
+
+        const int cellX = cell.getCell()->getGridX();
+        const int cellY = cell.getCell()->getGridY();
+        const MWWorld::Cell& cellVariant = *cell.getCell();
+        ESM::RefId worldspace = cellVariant.getWorldSpace();
+        recordNeutralCell(cell);
 
         if (cellVariant.isExterior())
         {
@@ -585,10 +598,6 @@ namespace MWWorld
         insertCell(cell, loadingListener, navigatorUpdateGuard);
 
         mRendering.addCell(&cell);
-        if (cellVariant.isExterior())
-            mNeutralWorldScene.setTerrainTiles(static_cast<const void*>(&cell),
-                mTerrainStorage.getRenderTiles(
-                    cell.getCell()->getGridX(), cell.getCell()->getGridY(), cell.getCell()->getWorldSpace()));
         mNeutralTerrainRegionsDirty = true;
 
         MWBase::Environment::get().getWindowManager()->addCell(&cell);

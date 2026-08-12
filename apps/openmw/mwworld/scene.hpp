@@ -193,6 +193,7 @@ namespace MWWorld
         void unloadCell(CellStore* cell, const DetourNavigator::UpdateGuard* navigatorUpdateGuard);
         void loadCell(CellStore& cell, Loading::Listener* loadingListener, bool respawn, const osg::Vec3f& position,
             const DetourNavigator::UpdateGuard* navigatorUpdateGuard);
+        void recordNeutralCell(CellStore& cell);
         void updateNeutralTerrainRegions();
         void synchronizeNeutralScene();
 
