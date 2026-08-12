@@ -1,6 +1,7 @@
 #include "windowmanagerimp.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cassert>
 #include <chrono>
 #include <filesystem>
@@ -28,6 +29,8 @@
 #include <components/esm3/esmwriter.hpp>
 
 #include <components/fontloader/fontloader.hpp>
+
+#include <components/render/textureconversion.hpp>
 
 #include <components/resource/imagemanager.hpp>
 #include <components/resource/resourcesystem.hpp>
@@ -2494,13 +2497,21 @@ namespace MWGui
 
             if (image.valid())
             {
+                const Render::TextureData cursorImage = Render::makeRgba8Texture(image->s(), image->t(),
+                    [image](std::uint32_t x, std::uint32_t y) {
+                        const osg::Vec4f color = image->getColor(static_cast<int>(x), static_cast<int>(y));
+                        return std::array<float, 4>{ color.r(), color.g(), color.b(), color.a() };
+                    });
+                if (!cursorImage.valid())
+                    continue;
+
                 // everything looks good, send it to the cursor manager
                 const Uint8 hotspotX = static_cast<Uint8>(imgSetPointer->getHotSpot().left);
                 const Uint8 hotspotY = static_cast<Uint8>(imgSetPointer->getHotSpot().top);
                 int rotation = imgSetPointer->getRotation();
                 MyGUI::IntSize pointerSize = imgSetPointer->getSize();
 
-                mCursorManager->createCursor(imgSetPointer->getResourceName(), rotation, image, hotspotX, hotspotY,
+                mCursorManager->createCursor(imgSetPointer->getResourceName(), rotation, cursorImage, hotspotX, hotspotY,
                     pointerSize.width, pointerSize.height);
             }
         }

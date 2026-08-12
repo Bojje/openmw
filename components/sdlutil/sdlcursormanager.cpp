@@ -7,22 +7,10 @@
 #include <SDL_mouse.h>
 #include <SDL_render.h>
 
-#include <osg/Geometry>
-#include <osg/GraphicsContext>
-#include <osg/TexMat>
-#include <osg/Texture2D>
-#include <osg/Version>
-#include <osgViewer/GraphicsWindow>
-
 #include <components/debug/debuglog.hpp>
+#include <components/render/texture.hpp>
 
 #include "imagetosurface.hpp"
-
-#if defined(OSG_LIBRARY_STATIC) && (!defined(ANDROID) || OSG_VERSION_GREATER_THAN(3, 6, 5))
-// Sets the default windowing system interface according to the OS.
-// Necessary for OpenSceneGraph to do some things, like decompression.
-USE_GRAPHICSWINDOW()
-#endif
 
 namespace SDLUtil
 {
@@ -79,7 +67,8 @@ namespace SDLUtil
             SDL_SetCursor(it->second);
     }
 
-    void SDLCursorManager::createCursor(std::string_view name, int rotDegrees, osg::Image* image, Uint8 hotspotX,
+    void SDLCursorManager::createCursor(std::string_view name, int rotDegrees, const Render::TextureData& image,
+        Uint8 hotspotX,
         Uint8 hotspotY, int cursorWidth, int cursorHeight)
     {
 #ifndef ANDROID
@@ -88,26 +77,21 @@ namespace SDLUtil
     }
 
     SDLUtil::SurfaceUniquePtr decompress(
-        osg::ref_ptr<osg::Image> source, float rotDegrees, int cursorWidth, int cursorHeight)
+        const Render::TextureData& source, float rotDegrees, int cursorWidth, int cursorHeight)
     {
-        int width = source->s();
-        int height = source->t();
-        bool useAlpha = source->isImageTranslucent();
+        if (!source.valid())
+            return { nullptr, SDL_FreeSurface };
 
-        osg::ref_ptr<osg::Image> decompressedImage = new osg::Image;
-        decompressedImage->setFileName(source->getFileName());
-        decompressedImage->allocateImage(width, height, 1, useAlpha ? GL_RGBA : GL_RGB, GL_UNSIGNED_BYTE);
-        for (int s = 0; s < width; ++s)
-            for (int t = 0; t < height; ++t)
-                decompressedImage->setColor(source->getColor(s, t, 0), s, t, 0);
+        const int width = static_cast<int>(source.width);
+        const int height = static_cast<int>(source.height);
 
         Uint32 redMask = 0x000000ff;
         Uint32 greenMask = 0x0000ff00;
         Uint32 blueMask = 0x00ff0000;
-        Uint32 alphaMask = useAlpha ? 0xff000000 : 0;
+        Uint32 alphaMask = 0xff000000;
 
-        SDL_Surface* cursorSurface = SDL_CreateRGBSurfaceFrom(decompressedImage->data(), width, height,
-            decompressedImage->getPixelSizeInBits(), decompressedImage->getRowSizeInBytes(), redMask, greenMask,
+        SDL_Surface* cursorSurface = SDL_CreateRGBSurfaceFrom(const_cast<Uint8*>(source.pixels.data()), width, height,
+            32, width * 4, redMask, greenMask,
             blueMask, alphaMask);
 
         SDL_Surface* targetSurface
@@ -128,7 +112,8 @@ namespace SDLUtil
         return SDLUtil::SurfaceUniquePtr(targetSurface, SDL_FreeSurface);
     }
 
-    void SDLCursorManager::_createCursorFromResource(std::string_view name, int rotDegrees, osg::Image* image,
+    void SDLCursorManager::_createCursorFromResource(std::string_view name, int rotDegrees,
+        const Render::TextureData& image,
         Uint8 hotspotX, Uint8 hotspotY, int cursorWidth, int cursorHeight)
     {
         if (mCursorMap.find(name) != mCursorMap.end())

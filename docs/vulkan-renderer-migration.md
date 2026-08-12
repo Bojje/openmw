@@ -406,9 +406,12 @@ presentation math.
 SDL video policy and gamma/window-mode handling now live behind a renderer-neutral `VideoWrapper`
 callback; only the OSG GUI boundary traverses OSG windows to apply VSync. This keeps shared SDL
 window policy reusable by a Vulkan presentation owner.
+SDL cursor creation and window-icon conversion now consume neutral RGBA8 texture data. OSG image
+sampling remains at the active engine boundary, while cursor scaling, rotation, alpha, and SDL
+surface creation no longer require OSG in the reusable SDL utilities.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-169 files, deleting 1,619 lines and adding 8,791 lines (net `+7,172`). The larger Vulkan-only
+173 files, deleting 1,667 lines and adding 8,852 lines (net `+7,185`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.

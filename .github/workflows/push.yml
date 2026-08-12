@@ -104,7 +104,9 @@ jobs:
             apps/openmw/mwinput/actionmanager.hpp apps/openmw/mwinput/actionmanager.cpp \
             apps/openmw/mwinput/inputmanagerimp.hpp apps/openmw/mwinput/inputmanagerimp.cpp \
             apps/openmw/mwinput/sensormanager.hpp apps/openmw/mwinput/sensormanager.cpp \
-            components/sdlutil/sdlvideowrapper.hpp components/sdlutil/sdlvideowrapper.cpp; then
+            components/sdlutil/sdlvideowrapper.hpp components/sdlutil/sdlvideowrapper.cpp \
+            components/sdlutil/sdlcursormanager.hpp components/sdlutil/sdlcursormanager.cpp \
+            components/sdlutil/imagetosurface.hpp components/sdlutil/imagetosurface.cpp; then
           echo "Shared SDL transport layers must not depend on OSG presentation types"
           exit 1
         fi

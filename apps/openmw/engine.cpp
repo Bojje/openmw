@@ -24,6 +24,8 @@
 #include <components/misc/rng.hpp>
 #include <components/misc/strings/format.hpp>
 
+#include <components/render/textureconversion.hpp>
+
 #include <components/vfs/manager.hpp>
 #include <components/vfs/registerarchives.hpp>
 
@@ -753,7 +755,12 @@ void OMW::Engine::setWindowIcon()
     else
     {
         osg::ref_ptr<osg::Image> image = result.getImage();
-        auto surface = SDLUtil::imageToSurface(image, true);
+        const Render::TextureData iconImage = Render::makeRgba8Texture(image->s(), image->t(),
+            [image](std::uint32_t x, std::uint32_t y) {
+                const osg::Vec4f color = image->getColor(static_cast<int>(x), static_cast<int>(y));
+                return std::array<float, 4>{ color.r(), color.g(), color.b(), color.a() };
+            });
+        auto surface = SDLUtil::imageToSurface(iconImage, true);
         SDL_SetWindowIcon(mWindow, surface.get());
     }
 }

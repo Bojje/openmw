@@ -5,17 +5,17 @@
 
 struct SDL_Surface;
 
-namespace osg
+namespace Render
 {
-    class Image;
+    struct TextureData;
 }
 
 namespace SDLUtil
 {
     typedef std::unique_ptr<SDL_Surface, void (*)(SDL_Surface*)> SurfaceUniquePtr;
 
-    /// Convert an osg::Image to an SDL_Surface.
-    SurfaceUniquePtr imageToSurface(osg::Image* image, bool flip = false);
+    /// Convert tightly packed RGBA8 data to an SDL_Surface.
+    SurfaceUniquePtr imageToSurface(const Render::TextureData& image, bool flip = false);
 
 }
 

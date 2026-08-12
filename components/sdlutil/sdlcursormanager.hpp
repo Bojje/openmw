@@ -9,9 +9,9 @@
 struct SDL_Cursor;
 struct SDL_Surface;
 
-namespace osg
+namespace Render
 {
-    class Image;
+    struct TextureData;
 }
 
 namespace SDLUtil
@@ -29,11 +29,11 @@ namespace SDLUtil
         ///        name of the cursor we changed to ("arrow", "ibeam", etc)
         virtual void cursorChanged(std::string_view name);
 
-        virtual void createCursor(std::string_view name, int rotDegrees, osg::Image* image, Uint8 hotspotX,
+        virtual void createCursor(std::string_view name, int rotDegrees, const Render::TextureData& image, Uint8 hotspotX,
             Uint8 hotspotY, int cursorWidth, int cursorHeight);
 
     private:
-        void _createCursorFromResource(std::string_view name, int rotDegrees, osg::Image* image, Uint8 hotspotX,
+        void _createCursorFromResource(std::string_view name, int rotDegrees, const Render::TextureData& image, Uint8 hotspotX,
             Uint8 hotspotY, int cursorWidth, int cursorHeight);
         void _putPixel(SDL_Surface* surface, int x, int y, Uint32 pixel);
 
