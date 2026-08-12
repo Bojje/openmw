@@ -398,7 +398,8 @@ it without sky/fog pointers, while the OSG adapter receives the same state for l
 Water height remains owned by physics in neutral mode, and exterior cell bounds now cross the
 neutral world snapshot as bounded `WaterSurface` records. The Vulkan submission path emits an
 explicit alpha-blended planar water material with bounded Fresnel/sky lighting; refraction,
-animated waves now use the neutral effect clock in the Vulkan composite; ripples, interior-water bounds,
+animated waves now use the neutral effect clock in the Vulkan composite, and underwater projectile impacts
+produce renderer-neutral expiring ripple rings; interior-water bounds,
 and the full legacy water shader remain outstanding.
 Malformed neutral water records are
 rejected at the same submission validation boundary as invalid geometry.

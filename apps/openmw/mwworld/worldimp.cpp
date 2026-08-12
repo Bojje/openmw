@@ -3308,6 +3308,8 @@ namespace MWWorld
             MWMechanics::projectileHit(actor, Ptr(), bow, projectile, worldPos, attackStrength, attackWindUp);
             if (mRendering)
                 mRendering->emitWaterRipple(worldPos);
+            if (mWorldScene)
+                mWorldScene->emitNeutralWaterRipple({ worldPos.x(), worldPos.y(), worldPos.z() });
             return;
         }
 

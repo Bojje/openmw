@@ -438,6 +438,12 @@ namespace MWWorld
             mNeutralWorldScene->updateObjectRotation(static_cast<const void*>(ptr.mRef), rotation);
     }
 
+    void Scene::emitNeutralWaterRipple(const Render::Vec3& position, float size)
+    {
+        if (mNeutralWorldScene)
+            mNeutralWorldScene->emitWaterRipple(position, size);
+    }
+
     void Scene::updateNeutralWaterLevel(float height)
     {
         if (mNeutralWorldScene && mCurrentCell)

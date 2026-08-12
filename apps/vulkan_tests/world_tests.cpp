@@ -66,6 +66,14 @@ int main()
     if (!world.updateWaterLevel(&waterCellHandle, 7.f)
         || Render::collectWaterMeshes(world, "Tamriel").front().mesh.vertices.front().position[2] != 7.f)
         throw std::runtime_error("renderer-neutral world scene failed to update a water surface level");
+    world.emitWaterRipple({ 5.f, 15.f, 7.f }, 8.f);
+    const std::vector<Render::MeshInstance> waterRippleMeshes = Render::collectWaterMeshes(world, "Tamriel");
+    if (waterRippleMeshes.size() != 2 || waterRippleMeshes.back().mesh.vertices.size() != 32
+        || !waterRippleMeshes.back().mesh.material.alphaBlend)
+        throw std::runtime_error("renderer-neutral world scene failed to emit a water ripple");
+    world.updateEffects(2.f);
+    if (Render::collectWaterMeshes(world, "Tamriel").size() != 1 || !world.waterRipples().empty())
+        throw std::runtime_error("renderer-neutral world scene failed to expire a water ripple");
     world.setWaterEnabled(false);
     if (!Render::collectWaterMeshes(world, "Tamriel").empty())
         throw std::runtime_error("renderer-neutral world scene ignored water visibility state");
@@ -118,7 +126,7 @@ int main()
     if (weatherSubmission.meshes.size() != 2 || !weatherSubmission.valid())
         throw std::runtime_error("renderer-neutral scene submission lost precipitation geometry");
     world.updateEffects(1.f);
-    if (world.weatherTime() != 1.f || world.sceneData().effectTime.x != 1.f)
+    if (world.weatherTime() != 1.f || world.sceneData().effectTime.x != 3.f)
         throw std::runtime_error("renderer-neutral world scene failed to advance precipitation time");
     weather.snow = true;
     world.setWeatherEffects(weather);

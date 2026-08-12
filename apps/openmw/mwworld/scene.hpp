@@ -227,6 +227,7 @@ namespace MWWorld
         void updateNeutralObjectCell(const Ptr& oldPtr, const Ptr& newPtr);
         void updateNeutralObjectPosition(const Ptr& ptr, const Render::Vec3& position);
         void updateNeutralObjectRotation(const Ptr& ptr, const Render::Quat& rotation);
+        void emitNeutralWaterRipple(const Render::Vec3& position, float size = 12.f);
 
         void updateNeutralWaterLevel(float height);
         bool toggleNeutralWater();

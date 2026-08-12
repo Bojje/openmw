@@ -111,8 +111,53 @@ namespace Render
         if (!world.waterEnabled())
             return result;
         for (const CellScene* cell : world.cellsInOrder(worldspace))
+        {
             if (cell->water && cell->water->valid())
                 result.push_back(makeWaterSurfaceMesh(*cell->water));
+            if (!cell->water || !cell->water->valid())
+                continue;
+            for (const WaterRipple& ripple : world.waterRipples())
+            {
+                if (ripple.position.x < cell->water->minX || ripple.position.x > cell->water->maxX
+                    || ripple.position.y < cell->water->minY || ripple.position.y > cell->water->maxY)
+                    continue;
+
+                constexpr std::size_t segments = 16;
+                constexpr float lifetime = 1.5f;
+                const float progress = std::clamp(ripple.age / lifetime, 0.f, 1.f);
+                const float innerRadius = ripple.size * (0.15f + progress * 0.65f);
+                const float outerRadius = innerRadius + ripple.size * 0.12f;
+                MeshInstance ring;
+                ring.mesh.material.diffuse = { 0.65f, 0.85f, 1.f, 0.5f * (1.f - progress) };
+                ring.mesh.material.alphaBlend = true;
+                ring.mesh.material.doubleSided = true;
+                ring.mesh.material.waterSurface = true;
+                ring.mesh.vertices.reserve(segments * 2);
+                ring.mesh.indices.reserve(segments * 6);
+                for (std::size_t segment = 0; segment < segments; ++segment)
+                {
+                    const float angle = 2.f * 3.14159265358979323846f * static_cast<float>(segment) / segments;
+                    const float cosine = std::cos(angle);
+                    const float sine = std::sin(angle);
+                    for (const float radius : { innerRadius, outerRadius })
+                    {
+                        MeshVertex vertex;
+                        vertex.position[0] = ripple.position.x + cosine * radius;
+                        vertex.position[1] = ripple.position.y + sine * radius;
+                        vertex.position[2] = cell->water->level + 0.02f;
+                        vertex.normal[2] = 1.f;
+                        vertex.color[0] = vertex.color[1] = vertex.color[2] = vertex.color[3] = 1.f;
+                        vertex.tangent[3] = 1.f;
+                        ring.mesh.vertices.push_back(vertex);
+                    }
+                    const uint32_t current = static_cast<uint32_t>(segment * 2);
+                    const uint32_t next = static_cast<uint32_t>(((segment + 1) % segments) * 2);
+                    ring.mesh.indices.insert(ring.mesh.indices.end(), { current, next, current + 1, current + 1, next,
+                        next + 1 });
+                }
+                result.push_back(std::move(ring));
+            }
+        }
         return result;
     }
 

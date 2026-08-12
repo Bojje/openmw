@@ -59,6 +59,18 @@ namespace Render
         }
     };
 
+    struct WaterRipple
+    {
+        Vec3 position{ 0.f, 0.f, 0.f };
+        float age = 0.f;
+        float size = 12.f;
+
+        bool valid() const
+        {
+            return Render::valid(position) && std::isfinite(age) && age >= 0.f && std::isfinite(size) && size > 0.f;
+        }
+    };
+
     struct ObjectTransform
     {
         Vec3 position{};
@@ -160,6 +172,7 @@ namespace Render
         SceneData mSceneData{};
         WeatherEffects mWeatherEffects;
         float mWeatherTime = 0.f;
+        std::vector<WaterRipple> mWaterRipples;
         bool mWaterEnabled = true;
         uint64_t mNextObjectId = 1;
 
@@ -234,6 +247,21 @@ namespace Render
 
         bool waterEnabled() const { return mWaterEnabled; }
 
+        void emitWaterRipple(const Vec3& position, float size = 12.f)
+        {
+            WaterRipple ripple;
+            ripple.position = position;
+            ripple.size = size;
+            if (ripple.valid())
+            {
+                if (mWaterRipples.size() >= 128)
+                    mWaterRipples.erase(mWaterRipples.begin());
+                mWaterRipples.push_back(ripple);
+            }
+        }
+
+        const std::vector<WaterRipple>& waterRipples() const { return mWaterRipples; }
+
         bool updateWaterLevel(const void* cellKey, float level)
         {
             const auto found = mCells.find(cellKey);
@@ -273,6 +301,10 @@ namespace Render
             mSceneData.effectTime.x = std::fmod(mSceneData.effectTime.x + duration, 4096.f);
             if (mWeatherEffects.enabled && mWeatherEffects.speed > 0.f)
                 mWeatherTime = std::fmod(mWeatherTime + duration, 3600.f);
+
+            for (WaterRipple& ripple : mWaterRipples)
+                ripple.age += duration;
+            std::erase_if(mWaterRipples, [](const WaterRipple& ripple) { return ripple.age >= 1.5f; });
 
             for (auto& [cellKey, cell] : mCells)
                 for (WorldObject& object : cell.objects)
@@ -562,6 +594,7 @@ namespace Render
             mSceneData = {};
             mWeatherEffects = {};
             mWeatherTime = 0.f;
+            mWaterRipples.clear();
             mWaterEnabled = true;
             mNextObjectId = 1;
         }
