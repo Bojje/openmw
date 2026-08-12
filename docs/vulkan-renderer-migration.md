@@ -389,9 +389,10 @@ and sky services; those simulation state changes no longer require an OSG render
 `WeatherManager` now owns weather/time simulation independently of OSG; neutral bootstrap creates
 it without sky/fog pointers, while the OSG adapter receives the same state for legacy presentation.
 Water height remains owned by physics in neutral mode, and exterior cell bounds now cross the
-neutral world snapshot as bounded `WaterSurface` records. The Vulkan submission path emits a simple
-toggleable alpha-blended planar water consumer; reflections, refraction, ripples, interior-water
-bounds, and the full legacy water shader remain outstanding. Malformed neutral water records are
+neutral world snapshot as bounded `WaterSurface` records. The Vulkan submission path emits an
+explicit alpha-blended planar water material with bounded Fresnel/sky lighting; refraction,
+animated waves, ripples, interior-water bounds, and the full legacy water shader remain outstanding.
+Malformed neutral water records are
 rejected at the same submission validation boundary as invalid geometry.
 `World` now retains terrain through `Terrain::RenderStorage`; the concrete OSG terrain adapter is
 created only inside OSG initialization and retained polymorphically, removing that concrete type
@@ -500,7 +501,7 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-206 files, deleting 2,251 lines and adding 13,865 lines (net `+11,614`). The larger Vulkan-only
+206 files, deleting 2,251 lines and adding 13,881 lines (net `+11,630`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. The live no-GUI consumer is the first deletion
 checkpoint; further reduction can now target OSG scene/resource/presentation ownership rather

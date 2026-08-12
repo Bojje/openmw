@@ -56,6 +56,7 @@ namespace Render
         uint8_t alphaTestThreshold = 0;
         bool terrainBlend = false;
         bool terrainFirstLayer = false;
+        bool waterSurface = false;
         bool normalMap = false;
         bool terrainNormalMap = false;
         bool terrainParallax = false;

@@ -59,6 +59,7 @@ void main() {
 
     float roughness = clamp(materialSample.r, 0.05, 1.0);
     bool terrainSpecular = materialSample.b > 1.5 && materialSample.b < 2.5;
+    bool waterSurface = abs(materialSample.b - 2.5) < 0.01;
     bool objectSpecular = materialSample.b > 2.5;
     float ao = clamp(materialSample.b, 0.0, 1.0);
     float emission = max(materialSample.a, 0.0);
@@ -81,6 +82,14 @@ void main() {
     vec3 specular = specularColor * sunCol * spec * specularStrength * shadow;
 
     vec3 color = ambient + diffuse + specular + reflectionColor + albedo * emission;
+
+    if (waterSurface)
+    {
+        float fresnel = pow(1.0 - clamp(dot(N, V), 0.0, 1.0), 3.0);
+        vec3 reflectedSky = mix(scene.skyColor.rgb, scene.sunColor.rgb,
+            pow(max(dot(reflect(-L, N), V), 0.0), 32.0));
+        color = mix(color, reflectedSky, 0.25 + 0.35 * fresnel);
+    }
 
     if (scene.fogParameters.y > scene.fogParameters.x && scene.fogParameters.y > 0.0)
     {

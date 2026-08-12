@@ -82,6 +82,7 @@ namespace Render
         result.mesh.material.glossiness = 64.f;
         result.mesh.material.alphaBlend = true;
         result.mesh.material.doubleSided = true;
+        result.mesh.material.waterSurface = true;
         result.mesh.vertices.resize(4);
         const std::array<Vec3, 4> positions = { Vec3{ surface.minX, surface.minY, surface.level },
             Vec3{ surface.maxX, surface.minY, surface.level }, Vec3{ surface.maxX, surface.maxY, surface.level },

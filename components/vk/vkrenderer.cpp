@@ -1418,6 +1418,8 @@ namespace Vk
                             materialFlags |= 4u;
                         if (draw.material.terrainParallax)
                             materialFlags |= 8u;
+                        if (draw.material.waterSurface)
+                            materialFlags |= 16u;
                         const PushData pushData = {
                             draw.transform,
                             { draw.normalMatrix.data[0], draw.normalMatrix.data[1], draw.normalMatrix.data[2], 0.f,

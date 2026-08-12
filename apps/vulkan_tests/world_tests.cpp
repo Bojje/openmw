@@ -61,7 +61,7 @@ int main()
     const std::vector<Render::MeshInstance> waterMeshes = Render::collectWaterMeshes(world, "Tamriel");
     if (waterMeshes.size() != 1 || waterMeshes.front().mesh.vertices.size() != 4
         || waterMeshes.front().mesh.indices.size() != 6 || waterMeshes.front().mesh.vertices.front().position[2] != 4.f
-        || !waterMeshes.front().mesh.material.alphaBlend)
+        || !waterMeshes.front().mesh.material.alphaBlend || !waterMeshes.front().mesh.material.waterSurface)
         throw std::runtime_error("renderer-neutral world scene failed to emit a water surface");
     if (!world.updateWaterLevel(&waterCellHandle, 7.f)
         || Render::collectWaterMeshes(world, "Tamriel").front().mesh.vertices.front().position[2] != 7.f)

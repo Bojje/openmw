@@ -109,4 +109,6 @@ void main() {
         outMaterial.g = albedoSample.a;
     else if (fragSpecularTextureIndex != 0u)
         outMaterial.b = 3.0;
+    if ((fragMaterialFlags & 16u) != 0u)
+        outMaterial.b = 2.5;
 }
