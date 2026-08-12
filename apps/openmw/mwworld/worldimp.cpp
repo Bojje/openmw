@@ -3673,7 +3673,15 @@ namespace MWWorld
     osg::Vec3f World::getHalfExtents(const ConstPtr& object, bool rendering) const
     {
         if (!object.getClass().isActor())
-            return mRendering->getHalfExtents(object);
+        {
+            if (mRendering)
+                return mRendering->getHalfExtents(object);
+
+            const osg::BoundingBox bounds = mPhysics->getBoundingBox(object);
+            if (!bounds.valid())
+                return osg::Vec3f();
+            return (bounds._max - bounds._min) * 0.5f;
+        }
 
         // Handle actors separately because of bodyparts
         if (rendering)
