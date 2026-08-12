@@ -67,6 +67,15 @@ int main()
     if (!Render::collectWaterMeshes(world, "Tamriel").empty())
         throw std::runtime_error("renderer-neutral world scene ignored water visibility state");
     world.setWaterEnabled(true);
+    int invalidWaterCellHandle = 0;
+    world.recordCell(&invalidWaterCellHandle, true, 0, 2, "invalid-water", "Tamriel",
+        Render::WaterSurface{ 0.f, 0.f, 10.f, 20.f, 4.f });
+    const Render::SceneSubmission invalidWaterSubmission = Render::collectSceneSubmission(world, Render::SceneData(),
+        "Tamriel", [](std::string_view) { return std::vector<Render::MeshInstance>(); }, false);
+    if (invalidWaterSubmission.invalidWaterSurfaces != 1 || invalidWaterSubmission.valid()
+        || invalidWaterSubmission.validationError() != "invalid water surface")
+        throw std::runtime_error("renderer-neutral submission accepted an invalid water surface");
+    world.removeCell(&invalidWaterCellHandle);
     world.removeCell(&waterCellHandle);
     world.removeCell(&emptyCellHandle);
 

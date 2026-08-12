@@ -354,7 +354,8 @@ it without sky/fog pointers, while the OSG adapter receives the same state for l
 Water height remains owned by physics in neutral mode, and exterior cell bounds now cross the
 neutral world snapshot as bounded `WaterSurface` records. The Vulkan submission path emits a simple
 toggleable alpha-blended planar water consumer; reflections, refraction, ripples, interior-water
-bounds, and the full legacy water shader remain outstanding.
+bounds, and the full legacy water shader remain outstanding. Malformed neutral water records are
+rejected at the same submission validation boundary as invalid geometry.
 `World` now retains terrain through `Terrain::RenderStorage`; the concrete OSG terrain adapter is
 created only inside OSG initialization and retained polymorphically, removing that concrete type
 from neutral world ownership.

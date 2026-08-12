@@ -2,6 +2,7 @@
 #define OPENMW_COMPONENTS_RENDER_WORLD_H
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <optional>
 #include <string>

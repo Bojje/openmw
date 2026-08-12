@@ -133,6 +133,7 @@ namespace Render
         std::vector<MeshInstance> meshes;
         std::vector<TerrainTile> terrainTiles;
         std::vector<std::string> unresolvedModels;
+        std::size_t invalidWaterSurfaces = 0;
         // Dynamic records and their resolved meshes cross the frame boundary
         // together, so a future animation backend can consume skinning data
         // without borrowing WorldScene storage or re-resolving assets.
@@ -143,7 +144,7 @@ namespace Render
         {
             if (!scene.valid())
                 return false;
-            if (!unresolvedModels.empty())
+            if (!unresolvedModels.empty() || invalidWaterSurfaces != 0)
                 return false;
 
             for (const MeshInstance& instance : meshes)
@@ -205,6 +206,8 @@ namespace Render
 
         std::string validationError() const
         {
+            if (invalidWaterSurfaces != 0)
+                return "invalid water surface";
             if (!valid())
                 return "invalid geometry";
             if (!textureResolver)
@@ -255,6 +258,9 @@ namespace Render
         SceneSubmission result;
         result.scene = scene;
         result.meshes = collectWorldMeshes(world, resolveMeshes, worldspace, &result.unresolvedModels);
+        for (const CellScene* cell : world.cellsInOrder(worldspace))
+            if (cell->water && !cell->water->valid())
+                ++result.invalidWaterSurfaces;
         std::vector<MeshInstance> waterMeshes = collectWaterMeshes(world, worldspace);
         result.meshes.insert(result.meshes.end(), std::make_move_iterator(waterMeshes.begin()),
             std::make_move_iterator(waterMeshes.end()));
