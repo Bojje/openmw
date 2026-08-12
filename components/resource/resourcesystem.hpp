@@ -38,8 +38,15 @@ namespace Resource
     class ResourceSystem
     {
     public:
+        enum class Backend
+        {
+            Osg,
+            Neutral,
+        };
+
         explicit ResourceSystem(
-            const VFS::Manager* vfs, double expiryDelay, const ToUTF8::StatelessUtf8Encoder* encoder);
+            const VFS::Manager* vfs, double expiryDelay, const ToUTF8::StatelessUtf8Encoder* encoder,
+            Backend backend = Backend::Osg);
         ~ResourceSystem();
 
         SceneManager* getSceneManager();

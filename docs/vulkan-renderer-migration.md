@@ -261,6 +261,13 @@ visualization unchanged.
 physics/navigation services, and `initOsgRenderer()` creates the OSG terrain, scene graph,
 legacy manager, and OSG-backed neutral resource callbacks. The engine calls these phases
 explicitly, leaving a concrete insertion point for a Vulkan renderer-services phase.
+`ResourceSystem` now has an explicit OSG/neutral backend mode: neutral initialization does
+not construct `SceneManager` or `KeyframeManager`, and the world renderer rejects a mismatched
+resource backend before touching presentation services. This keeps the future Vulkan path from
+paying for OSG scene ownership merely because the shared resource facade still exists.
+The OSG renderer also validates that its light-root handoff was populated before constructing
+the projectile presenter, turning a previously unchecked startup dereference into a fail-fast
+diagnostic.
 The non-owning manager update handle is private to the `Scene` owner, detached during `Scene`
 teardown, and CI guards the manager header against regaining a value-owned neutral frame state.
 `Scene` no longer retains pass-through ownership of the legacy land manager, and its temporary
@@ -335,7 +342,7 @@ The engine public header no longer imports complete OSG viewer/event-handler hea
 are now included only by the implementation files that use them.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-155 files, deleting 1,307 lines and adding 8,228 lines (net `+6,921`). The larger Vulkan-only
+156 files, deleting 1,322 lines and adding 8,287 lines (net `+6,965`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.

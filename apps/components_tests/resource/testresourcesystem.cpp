@@ -48,4 +48,17 @@ namespace
         for (std::thread& thread : threads)
             thread.join();
     }
+
+    TEST(ResourceResourceSystem, neutral_backend_does_not_construct_osg_scene_services)
+    {
+        const VFS::Manager vfsManager;
+        const ToUTF8::Utf8Encoder encoder(ToUTF8::WINDOWS_1252);
+        Resource::ResourceSystem resourceSystem(
+            &vfsManager, 1.0, &encoder.getStatelessEncoder(), Resource::ResourceSystem::Backend::Neutral);
+
+        EXPECT_EQ(resourceSystem.getSceneManager(), nullptr);
+        EXPECT_EQ(resourceSystem.getKeyframeManager(), nullptr);
+        EXPECT_NE(resourceSystem.getImageManager(), nullptr);
+        EXPECT_NE(resourceSystem.getNifMeshManager(), nullptr);
+    }
 }

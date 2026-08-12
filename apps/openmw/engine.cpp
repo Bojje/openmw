@@ -769,13 +769,17 @@ void OMW::Engine::prepareEngine()
     VFS::registerArchives(mVFS.get(), mFileCollections, mArchives, true, &mEncoder.get()->getStatelessEncoder());
 
     mResourceSystem = std::make_unique<Resource::ResourceSystem>(
-        mVFS.get(), Settings::cells().mCacheExpiryDelay, &mEncoder.get()->getStatelessEncoder());
-    mResourceSystem->getSceneManager()->getShaderManager().setMaxTextureUnits(mGlMaxTextureImageUnits);
-    mResourceSystem->getSceneManager()->setUnRefImageDataAfterApply(
-        false); // keep to Off for now to allow better state sharing
-    mResourceSystem->getSceneManager()->setFilterSettings(Settings::general().mTextureMagFilter,
-        Settings::general().mTextureMinFilter, Settings::general().mTextureMipmap,
-        static_cast<float>(Settings::general().mAnisotropy));
+        mVFS.get(), Settings::cells().mCacheExpiryDelay, &mEncoder.get()->getStatelessEncoder(),
+        mFrameLifecycle->backend() == Render::FrameLifecycle::Backend::Osg
+            ? Resource::ResourceSystem::Backend::Osg
+            : Resource::ResourceSystem::Backend::Neutral);
+    if (Resource::SceneManager* const sceneManager = mResourceSystem->getSceneManager())
+    {
+        sceneManager->getShaderManager().setMaxTextureUnits(mGlMaxTextureImageUnits);
+        sceneManager->setUnRefImageDataAfterApply(false); // keep to Off for now to allow better state sharing
+        sceneManager->setFilterSettings(Settings::general().mTextureMagFilter, Settings::general().mTextureMinFilter,
+            Settings::general().mTextureMipmap, static_cast<float>(Settings::general().mAnisotropy));
+    }
     mEnvironment.setResourceSystem(*mResourceSystem);
 
     mWorkQueue = new SceneUtil::WorkQueue(Settings::cells().mPreloadNumThreads);
@@ -834,7 +838,8 @@ void OMW::Engine::prepareEngine()
     // else if it doesn't exist, pass in an empty path
 
     // gui needs our shaders path before everything else
-    mResourceSystem->getSceneManager()->setShaderPath(mResDir / "shaders");
+    if (Resource::SceneManager* const sceneManager = mResourceSystem->getSceneManager())
+        sceneManager->setShaderPath(mResDir / "shaders");
 
     osg::GLExtensions& exts = SceneUtil::getGLExtensions();
 

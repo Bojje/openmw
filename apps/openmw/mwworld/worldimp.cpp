@@ -268,6 +268,8 @@ namespace MWWorld
             throw std::invalid_argument("The OSG world renderer requires an OSG frame owner");
         if (!mPhysics || !mNavigator)
             throw std::logic_error("World simulation must be initialized before its renderer");
+        if (!mResourceSystem->getSceneManager())
+            throw std::logic_error("The OSG world renderer requires OSG resource services");
 
         mPhysics->enableDebugRendering(rootNode);
 
@@ -290,6 +292,8 @@ namespace MWWorld
             [&frameLifecycle] { frameLifecycle.renderFrame(); },
             [&frameLifecycle] { frameLifecycle.advanceFrame(frameLifecycle.referenceTime()); });
         mFrameLifecycle = &frameLifecycle;
+        if (!lightRoot)
+            throw std::logic_error("The OSG rendering manager did not provide a light root");
         mProjectileManager = std::make_unique<ProjectileManager>(
             lightRoot->asGroup(), mResourceSystem, mRendering.get(), mPhysics.get());
         mRendering->preloadCommonAssets();
@@ -334,6 +338,8 @@ namespace MWWorld
             throw std::logic_error("World simulation must be initialized before its renderer");
         if (mWorldScene)
             throw std::logic_error("World renderer services have already been initialized");
+        if (mResourceSystem->getSceneManager())
+            throw std::logic_error("The neutral world renderer cannot use OSG resource services");
 
         mFrameLifecycle = &frameLifecycle;
         mTerrainRenderStorage = &terrainStorage;
