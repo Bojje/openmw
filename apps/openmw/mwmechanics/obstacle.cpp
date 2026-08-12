@@ -55,7 +55,10 @@ namespace MWMechanics
 
         GetNearbyDoorVisitor(const MWWorld::Ptr& actor, const float minDist)
             : mPos(actor.getRefData().getPosition().asVec3())
-            , mDir(actor.getRefData().getBaseNode()->getAttitude() * osg::Vec3f(0, 1, 0))
+            , mDir(actor.getRefData().getBaseNode()
+                      ? actor.getRefData().getBaseNode()->getAttitude() * osg::Vec3f(0, 1, 0)
+                      : osg::Quat(actor.getRefData().getPosition().rot[2], osg::Vec3f(0, 0, -1))
+                              * osg::Vec3f(0, 1, 0))
             , mMinDist(minDist)
         {
             mPos.z() = 0;

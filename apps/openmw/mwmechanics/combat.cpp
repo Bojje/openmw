@@ -88,12 +88,17 @@ namespace MWMechanics
         if (shield == inv.end() || shield->getType() != ESM::Armor::sRecordId)
             return false;
 
-        if (!blocker.getRefData().getBaseNode())
-            return false; // shouldn't happen
-
+        osg::Vec3f blockerDirection;
+        if (const auto* baseNode = blocker.getRefData().getBaseNode())
+            blockerDirection = baseNode->getAttitude() * osg::Vec3f(0, 1, 0);
+        else
+        {
+            const auto& position = blocker.getRefData().getPosition();
+            blockerDirection = osg::Quat(position.rot[2], osg::Vec3f(0, 0, -1)) * osg::Vec3f(0, 1, 0);
+        }
         float angleDegrees = osg::RadiansToDegrees(signedAngleRadians(
             (attacker.getRefData().getPosition().asVec3() - blocker.getRefData().getPosition().asVec3()),
-            blocker.getRefData().getBaseNode()->getAttitude() * osg::Vec3f(0, 1, 0), osg::Vec3f(0, 0, 1)));
+            blockerDirection, osg::Vec3f(0, 0, 1)));
 
         const MWWorld::Store<ESM::GameSetting>& gmst
             = MWBase::Environment::get().getESMStore()->get<ESM::GameSetting>();

@@ -154,7 +154,9 @@ renderer-neutral actor path also queues local movement, jump, rotation, collisio
 activation without entering the OSG animation update; this closes the earlier gap where actors
 were registered for AI but could never advance through physics.
 OSG scene-node visibility writes are guarded at the mechanics boundary; this removes a hidden
-requirement that every simulated actor already have an OSG node.
+requirement that every simulated actor already have an OSG node. Combat, pursuit, obstacle-door
+checks, blocking, and awareness now use ESM actor rotation as the neutral fallback for facing,
+so the Vulkan simulation does not silently stop AI behavior merely because a pose node is absent.
 Player update logic now treats the absent OSG presentation owner as an explicit Vulkan mode, and
 player-only OSG/MyGUI Lua packages, including menu/UI packages, are withheld from that runtime
 instead of exposing null renderer dereferences. Lua lifecycle cleanup and input filtering also

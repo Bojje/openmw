@@ -116,7 +116,7 @@ namespace MWMechanics
 
         // Stop if the target doesn't exist
         if (target.isEmpty() || !target.getCellRef().getCount() || !target.getRefData().isEnabled()
-            || target.getClass().getCreatureStats(target).isDead() || !target.getRefData().getBaseNode())
+            || target.getClass().getCreatureStats(target).isDead())
             return true;
 
         if (actor == target) // This should never happen.
@@ -610,7 +610,14 @@ namespace MWMechanics
             osg::Vec3f halfExtents = MWBase::Environment::get().getWorld()->getHalfExtents(actor);
             osg::Vec3f pos = actor.getRefData().getPosition().asVec3();
             osg::Vec3f source = pos + osg::Vec3f(0, 0, 0.75f * halfExtents.z());
-            osg::Vec3f fallbackDirection = actor.getRefData().getBaseNode()->getAttitude() * osg::Vec3f(0, -1, 0);
+            osg::Vec3f fallbackDirection;
+            if (const auto* baseNode = actor.getRefData().getBaseNode())
+                fallbackDirection = baseNode->getAttitude() * osg::Vec3f(0, -1, 0);
+            else
+            {
+                const auto& position = actor.getRefData().getPosition();
+                fallbackDirection = osg::Quat(position.rot[2], osg::Vec3f(0, 0, -1)) * osg::Vec3f(0, -1, 0);
+            }
             osg::Vec3f destination = source + fallbackDirection * (halfExtents.y() + 16);
 
             const auto* rayCasting = MWBase::Environment::get().getWorld()->getRayCasting();

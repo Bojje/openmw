@@ -36,8 +36,7 @@ namespace MWMechanics
         const MWWorld::Ptr target = getTarget(); // The target to follow
 
         // Stop if the target doesn't exist
-        if (target.isEmpty() || !target.getCellRef().getCount() || !target.getRefData().isEnabled()
-            || !target.getRefData().getBaseNode())
+        if (target.isEmpty() || !target.getCellRef().getCount() || !target.getRefData().isEnabled())
             return true;
 
         if (isTargetMagicallyHidden(target)

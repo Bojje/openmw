@@ -1651,16 +1651,21 @@ namespace MWMechanics
         static float fSneakViewMult = store.find("fSneakViewMult")->mValue.getFloat();
         float y = 0;
         osg::Vec3f vec = pos1 - pos2;
-        if (observer.getRefData().getBaseNode())
+        osg::Vec3f observerDir;
+        if (const auto* baseNode = observer.getRefData().getBaseNode())
         {
-            osg::Vec3f observerDir = (observer.getRefData().getBaseNode()->getAttitude() * osg::Vec3f(0, 1, 0));
-
-            float angleRadians = std::acos(observerDir * vec / (observerDir.length() * vec.length()));
-            if (angleRadians > osg::DegreesToRadians(90.f))
-                y = obsTerm * observerStats.getFatigueTerm() * fSneakNoViewMult;
-            else
-                y = obsTerm * observerStats.getFatigueTerm() * fSneakViewMult;
+            observerDir = baseNode->getAttitude() * osg::Vec3f(0, 1, 0);
         }
+        else
+        {
+            const auto& position = observer.getRefData().getPosition();
+            observerDir = osg::Quat(position.rot[2], osg::Vec3f(0, 0, -1)) * osg::Vec3f(0, 1, 0);
+        }
+        float angleRadians = std::acos(observerDir * vec / (observerDir.length() * vec.length()));
+        if (angleRadians > osg::DegreesToRadians(90.f))
+            y = obsTerm * observerStats.getFatigueTerm() * fSneakNoViewMult;
+        else
+            y = obsTerm * observerStats.getFatigueTerm() * fSneakViewMult;
 
         float target = x - y;
         if (useCache)
