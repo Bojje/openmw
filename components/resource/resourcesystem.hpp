@@ -31,6 +31,7 @@ namespace Resource
     class KeyframeManager;
     class BaseResourceManager;
     class AnimBlendRulesManager;
+    class CacheManager;
 
     /// @brief Wrapper class that constructs and provides access to the most commonly used resource subsystems.
     /// @par Resource subsystems can be used with multiple OpenGL contexts, just like the OSG equivalents, but
@@ -97,9 +98,10 @@ namespace Resource
         std::unique_ptr<KeyframeManager> mKeyframeManager;
         std::unique_ptr<AnimBlendRulesManager> mAnimBlendRulesManager;
 
-        // Store the base classes separately to get convenient access to the common interface
-        // Here users can register their own resourcemanager as well
+        // OSG managers expose releaseGLObjects and are kept separate from
+        // renderer-neutral cache managers.
         std::vector<BaseResourceManager*> mResourceManagers;
+        std::vector<CacheManager*> mCacheManagers;
 
         const VFS::Manager* mVFS;
         Backend mBackend;

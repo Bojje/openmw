@@ -4,6 +4,8 @@
 
 #include "animblendrulesmanager.hpp"
 #include "bgsmfilemanager.hpp"
+#include "cachemanager.hpp"
+#include "cachestats.hpp"
 #include "imagemanager.hpp"
 #include "keyframemanager.hpp"
 #include "niffilemanager.hpp"
@@ -31,7 +33,8 @@ namespace Resource
             mKeyframeManager = std::make_unique<KeyframeManager>(vfs, mSceneManager.get(), expiryDelay, encoder);
         }
 
-        addResourceManager(mNifFileManager.get());
+        mCacheManagers.push_back(mNifFileManager.get());
+        mCacheManagers.push_back(mNifMeshManager.get());
         if (mBgsmFileManager)
             addResourceManager(mBgsmFileManager.get());
         if (mKeyframeManager)
@@ -94,7 +97,8 @@ namespace Resource
 
     void ResourceSystem::setExpiryDelay(double expiryDelay)
     {
-        mNifMeshManager->setExpiryDelay(expiryDelay);
+        for (CacheManager* const cacheManager : mCacheManagers)
+            cacheManager->setExpiryDelay(expiryDelay);
         for (std::vector<BaseResourceManager*>::iterator it = mResourceManagers.begin(); it != mResourceManagers.end();
              ++it)
             (*it)->setExpiryDelay(expiryDelay);
@@ -106,7 +110,8 @@ namespace Resource
 
     void ResourceSystem::updateCache(double referenceTime)
     {
-        mNifMeshManager->updateCache(referenceTime);
+        for (CacheManager* const cacheManager : mCacheManagers)
+            cacheManager->updateCache(referenceTime);
         for (std::vector<BaseResourceManager*>::iterator it = mResourceManagers.begin(); it != mResourceManagers.end();
              ++it)
             (*it)->updateCache(referenceTime);
@@ -114,7 +119,8 @@ namespace Resource
 
     void ResourceSystem::clearCache()
     {
-        mNifMeshManager->clearCache();
+        for (CacheManager* const cacheManager : mCacheManagers)
+            cacheManager->clearCache();
         for (std::vector<BaseResourceManager*>::iterator it = mResourceManagers.begin(); it != mResourceManagers.end();
              ++it)
             (*it)->clearCache();
@@ -140,6 +146,7 @@ namespace Resource
 
     void ResourceSystem::reportStats(unsigned int frameNumber, osg::Stats* stats) const
     {
+        Resource::reportStats("Nif", frameNumber, mNifFileManager->getStats(), *stats);
         Resource::reportStats("NifMesh", frameNumber, mNifMeshManager->getStats(), *stats);
         for (std::vector<BaseResourceManager*>::const_iterator it = mResourceManagers.begin();
              it != mResourceManagers.end(); ++it)

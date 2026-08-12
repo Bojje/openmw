@@ -9,6 +9,7 @@
 #include <components/nif/niffile.hpp>
 #include <components/render/mesh.hpp>
 
+#include "cachemanager.hpp"
 #include "cachestats.hpp"
 
 namespace Resource
@@ -17,7 +18,7 @@ namespace Resource
 
     /// @brief Caches renderer-neutral mesh instances converted from NIF files.
     /// @note May be used from any thread. Cached meshes do not retain the parsed NIF file.
-    class NifMeshManager
+    class NifMeshManager : public CacheManager
     {
     public:
         using Meshes = std::vector<Render::MeshInstance>;
@@ -45,9 +46,9 @@ namespace Resource
         /// Convert an already-loaded NIF, using the same path-keyed cache.
         std::shared_ptr<const Meshes> get(const Nif::NIFFilePtr& file);
 
-        void updateCache(double referenceTime);
-        void clearCache();
-        void setExpiryDelay(double expiryDelay);
+        void updateCache(double referenceTime) override;
+        void clearCache() override;
+        void setExpiryDelay(double expiryDelay) override;
         CacheStats getStats() const;
     };
 }

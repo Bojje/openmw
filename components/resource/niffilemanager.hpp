@@ -6,12 +6,17 @@
 
 #include <components/nif/niffile.hpp>
 
+#include "cachemanager.hpp"
 #include "cachestats.hpp"
-#include "resourcemanager.hpp"
 
 namespace ToUTF8
 {
     class StatelessUtf8Encoder;
+}
+
+namespace VFS
+{
+    class Manager;
 }
 
 namespace Resource
@@ -19,7 +24,7 @@ namespace Resource
 
     /// @brief Handles caching of NIFFiles.
     /// @note May be used from any thread.
-    class NifFileManager : public BaseResourceManager
+    class NifFileManager : public CacheManager
     {
         struct CacheItem
         {
@@ -46,8 +51,7 @@ namespace Resource
         void updateCache(double referenceTime) override;
         void clearCache() override;
         void setExpiryDelay(double expiryDelay) override;
-        void reportStats(unsigned int frameNumber, osg::Stats* stats) const override;
-        void releaseGLObjects(osg::State*) override {}
+        CacheStats getStats() const;
     };
 
 }

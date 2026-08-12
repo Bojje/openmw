@@ -62,12 +62,12 @@ namespace Resource
         mExpiryDelay = expiryDelay;
     }
 
-    void NifFileManager::reportStats(unsigned int frameNumber, osg::Stats* stats) const
+    CacheStats NifFileManager::getStats() const
     {
         std::lock_guard lock(mMutex);
         CacheStats statsCopy = mStats;
         statsCopy.mSize = mCache.size();
-        Resource::reportStats("Nif", frameNumber, statsCopy, *stats);
+        return statsCopy;
     }
 
 }
