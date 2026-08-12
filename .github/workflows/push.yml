@@ -268,6 +268,11 @@ jobs:
           echo "neutral world bootstrap must not construct or reach back into OSG renderer services"
           exit 1
         fi
+        if sed -n '/void World::initOsgRenderer/,/void World::initNeutralRenderer/p' apps/openmw/mwworld/worldimp.cpp \
+            | rg -n 'getNeutralFrameData|getNeutralBoneMatrices|getNeutralTextureManager|SceneSynchronizer|BonePoseResolver|MeshResolver|TextureResolver'; then
+          echo "OSG world bootstrap must not construct or retain a duplicate neutral scene producer"
+          exit 1
+        fi
         if sed -n '/void OMW::Engine::prepareVulkanEngine/,/^}/p' apps/openmw/engine.cpp \
             | rg -n 'std::make_unique<MWGui::WindowManager>|initUI|setStore|initOsgRenderer|SceneManager|ViewerFrameLifecycle|mWorkQueue|mUnrefQueue'; then
           echo "Vulkan engine bootstrap must not construct OSG scene or GUI services"

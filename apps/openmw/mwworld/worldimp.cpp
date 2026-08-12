@@ -1,7 +1,6 @@
 #include "worldimp.hpp"
 
 #include <charconv>
-#include <array>
 #include <stdexcept>
 #include <vector>
 
@@ -38,14 +37,10 @@
 #include <components/misc/resourcehelpers.hpp>
 #include <components/misc/rng.hpp>
 
-#include <components/render/textureconversion.hpp>
-
 #include <components/files/collections.hpp>
 
 #include <components/resource/bulletshape.hpp>
 #include <components/resource/resourcesystem.hpp>
-#include <components/resource/imagemanager.hpp>
-#include <components/resource/nifmeshmanager.hpp>
 
 #include <components/sceneutil/lightmanager.hpp>
 #include <components/sceneutil/positionattitudetransform.hpp>
@@ -322,45 +317,8 @@ namespace MWWorld
         preloader->setMaxCacheSize(Settings::cells().mPreloadCellCacheMax);
         preloader->setPreloadInstances(Settings::cells().mPreloadInstances);
 
-        const Render::MeshResolver meshResolver = [resourceSystem = mResourceSystem](std::string_view model) {
-            const VFS::Path::Normalized path(model);
-            if (path.extension().value() == "nif")
-                return resourceSystem->getNifMeshManager()->get(path);
-            return std::make_shared<const std::vector<Render::MeshInstance>>();
-        };
-        Resource::ImageManager* const imageManager = mResourceSystem->getImageManager();
-        const Render::TextureResolver textureResolver = [imageManager](std::string_view path) {
-            if (path.empty())
-                return std::shared_ptr<const Render::TextureData>();
-            const osg::ref_ptr<osg::Image> image = imageManager->getImage(VFS::Path::Normalized(path));
-            // The legacy renderer uses a warning image as a fallback for missing
-            // or unsupported resources. A neutral backend must not mistake that
-            // fallback for the requested asset.
-            if (!image || image.get() == imageManager->getWarningImage() || image->s() <= 0 || image->t() <= 0)
-                return std::shared_ptr<const Render::TextureData>();
-
-            Render::TextureData texture = Render::makeRgba8Texture(static_cast<std::uint32_t>(image->s()),
-                static_cast<std::uint32_t>(image->t()), [image](std::uint32_t x, std::uint32_t y) {
-                    const osg::Vec4 color = image->getColor(static_cast<int>(x), static_cast<int>(y), 0);
-                    return std::array<float, 4>{ color.r(), color.g(), color.b(), color.a() };
-                });
-            if (!texture.valid())
-                return std::shared_ptr<const Render::TextureData>();
-            return std::make_shared<const Render::TextureData>(std::move(texture));
-        };
-        const Render::SceneSynchronizer sceneSynchronizer = [rendering = mRendering.get()](Render::SceneData& sceneData) {
-            sceneData = rendering->getNeutralFrameData();
-        };
-        const Render::BonePoseResolver bonePoseResolver = [rendering = mRendering.get()](
-                                                               const void* objectKey,
-                                                               std::span<const std::string_view> boneNames) {
-            const MWRender::Animation* animation
-                = rendering->getAnimation(MWWorld::ConstPtr(static_cast<const LiveCellRefBase*>(objectKey)));
-            return animation ? animation->getNeutralBoneMatrices(boneNames) : std::vector<Render::Mat4>();
-        };
         mWorldScene = std::make_unique<Scene>(
-            *this, frameLifecycle, sceneSynchronizer, bonePoseResolver, meshResolver, textureResolver,
-            mResourceSystem->getVFS(), mRendering.get(), mObjectPaging,
+            *this, frameLifecycle, mResourceSystem->getVFS(), mRendering.get(), mObjectPaging,
             *osgTerrainStoragePtr, std::move(preloader), mPhysics.get(), *mNavigator);
     }
 

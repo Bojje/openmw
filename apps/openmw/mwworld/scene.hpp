@@ -112,7 +112,10 @@ namespace MWWorld
 
         Render::Vec3 mLastPlayerPos{};
 
-        Render::WorldScene mNeutralWorldScene;
+        // Only the Vulkan scene owns renderer-neutral world state. The OSG
+        // path uses its legacy scene graph directly and must not maintain a
+        // second scene representation.
+        std::unique_ptr<Render::WorldScene> mNeutralWorldScene;
         bool mNeutralTerrainRegionsDirty = true;
         mutable std::unordered_map<std::string, std::weak_ptr<const std::vector<Render::MeshInstance>>>
             mNeutralMeshCache;
@@ -151,6 +154,11 @@ namespace MWWorld
         void synchronizeNeutralScene();
 
     public:
+        Scene(MWWorld::World& world, Render::FrameLifecycle& frameLifecycle,
+            const VFS::Manager* vfs, MWRender::RenderingManager* rendering, MWRender::ObjectPaging* objectPaging,
+            Terrain::RenderStorage& terrainStorage, std::unique_ptr<CellPreloader> preloader,
+            MWPhysics::PhysicsSystem* physics, DetourNavigator::Navigator& navigator);
+
         Scene(MWWorld::World& world, Render::FrameLifecycle& frameLifecycle,
             Render::SceneSynchronizer sceneSynchronizer, Render::BonePoseResolver bonePoseResolver,
             Render::MeshResolver meshResolver, Render::TextureResolver textureResolver, const VFS::Manager* vfs,

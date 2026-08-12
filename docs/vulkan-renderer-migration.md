@@ -76,11 +76,10 @@ static batch, and composes object transforms with NIF node transforms before bat
 animated objects are explicitly retained as dynamic snapshots, but are excluded from the static
 mesh batch until a skinning/animation consumer owns them; the ordered `dynamicMeshes` payload provides
 that future backend with the retained visibility, transform, model, and cell ordering together with
-any resolved mesh data. A transitional OSG-backed producer now attaches current neutral bone matrices
-after reference traversal, and the Vulkan consumer applies supplied poses through the
-renderer-neutral CPU skinning helper before rasterization. Full-game Vulkan pose timing and
-animation-specific shading remain outstanding, so records without a supplied pose are still
-deliberately excluded rather than silently rendered in a bind pose.
+any resolved mesh data. The neutral Vulkan bootstrap currently leaves bone-pose production empty,
+so skinned records are deliberately excluded rather than silently rendered in a bind pose. The
+renderer-neutral CPU skinning helper and converted skinning metadata remain ready for the later
+animation owner.
 NIF classic texture, diffuse/emissive, glossiness, and alpha properties now cross the
 renderer-neutral mesh boundary and survive batching; the neutral batch applies diffuse
 and alpha to vertex color output. NIF bump/normal texture slots now cross the same boundary
@@ -168,9 +167,6 @@ until per-frame bone updates are owned. Mesh submission no longer waits for the 
 rebuilds one global buffer: neutral mesh data is retained on the CPU and uploaded into
 the current frame slot only after its fence is waited, so a future live frame loop can
 submit scene updates without the previous device-wide stall.
-An opt-in `OPENMW_VALIDATE_NEUTRAL_SCENE=1` full-game run validates the submission and
-resolves every referenced mesh/terrain texture periodically during one world session,
-providing a bridge check without initializing a second renderer.
 Neutral cells now retain worldspace identity, and both mesh and terrain collection filter
 to the active worldspace so an unloaded or inactive worldspace cannot leak into a Vulkan
 submission.
@@ -262,8 +258,6 @@ Scene cell-grid decisions, deferred grid changes, and terrain-preload prediction
 positions as `Render::Vec3`; conversion back to OSG is limited to legacy navigator, cell-loading,
 and preloader calls. Cell loading also no longer carries an unused player-position argument,
 removing a stale OSG conversion from every load path.
-The full-game bridge validator runs after that same render boundary, so it validates the
-camera payload that was just submitted rather than the previous frame's cached matrices.
 `FrameLifecycle` now identifies its backend explicitly. The current `World::init` path rejects
 non-OSG owners before allocating OSG physics, terrain, or scene services; this is a deliberate
 fail-fast guard against accidentally constructing Vulkan and OSG in one runtime, while the
@@ -273,9 +267,10 @@ geometry is an explicit optional OSG setup step. A Vulkan owner can therefore co
 simulation core without creating an OSG scene node, while the reference path retains collision
 visualization unchanged.
 `World` initialization now follows the same ownership split: `initSimulation()` creates
-physics/navigation services, and `initOsgRenderer()` creates the OSG terrain, scene graph,
-legacy manager, and OSG-backed neutral resource callbacks. The engine calls these phases
-explicitly, leaving a concrete insertion point for a Vulkan renderer-services phase.
+physics/navigation services, `initOsgRenderer()` creates only the OSG terrain, scene graph, and
+legacy manager, and `initNeutralRenderer()` creates only the neutral scene and resource handoff.
+The engine calls these phases explicitly, so the OSG path no longer maintains a duplicate
+renderer-neutral scene for validation.
 `ResourceSystem` now has an explicit OSG/neutral backend mode: neutral initialization constructs
 only the shared NIF file/mesh services and omits `SceneManager`, `KeyframeManager`, image, material,
 and animation-rule managers. Neutral scene services receive texture data through injected
@@ -457,15 +452,14 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-186 files, deleting 1,971 lines and adding 11,233 lines (net `+9,262`). The larger Vulkan-only
+186 files, deleting 1,973 lines and adding 11,199 lines (net `+9,226`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. The live no-GUI consumer is the first deletion
 checkpoint; further reduction can now target OSG scene/resource/presentation ownership rather
 than adding another compatibility bridge.
 
-Submission validation now lives on the renderer-neutral `SceneSubmission` boundary: the
-full-game bridge and Vulkan consumer use the same geometry, resolver, and texture-resource
-gate, including dynamic mesh textures. The latest validation checkpoint also rejects non-finite scene matrices, transforms, vertex
+Submission validation now lives on the renderer-neutral `SceneSubmission` boundary used by the
+Vulkan consumer, including dynamic mesh textures. The latest validation checkpoint also rejects non-finite scene matrices, transforms, vertex
 attributes, skinning payloads, and terrain coordinates at the renderer-neutral submission boundary, before
 they reach Vulkan. This protects the backend from corrupted engine state without relying
 on GPU validation diagnostics. Visible models that resolve only to empty mesh batches are also
@@ -497,16 +491,15 @@ and Vulkan owners supplying their own reference time.
 Neutral mesh and texture resolution, including optional specular-file discovery, now crosses the
 scene boundary as injected callbacks rather than direct `ResourceSystem` calls.
 Neutral scene synchronization and bone-pose production now cross the same boundary as injected
-callbacks; the current providers remain OSG-backed until a Vulkan game owner replaces them.
+callbacks; the Vulkan game owner supplies camera synchronization while bone-pose production remains
+explicitly unimplemented until the animation port owns it.
 RGBA8 conversion is now one renderer-neutral helper shared by image resources and terrain
 blendmaps, so clamping, finite-value rejection, and byte quantization cannot drift between
 resource paths. The conversion helper has direct CPU coverage.
-Neutral image resolution also rejects the legacy warning-image fallback, so the opt-in
-full-game bridge validator cannot report missing or unsupported textures as successful
-RGBA8 resources. The RGBA8 conversion is now an OSG initialization adapter rather than an
-`ImageManager` API; neutral resource construction therefore has no image-manager dependency,
-and the future Vulkan resource provider can replace that adapter without preserving a mixed
-OSG/neutral manager contract.
+Neutral image resolution rejects unsupported resources at the Vulkan submission boundary instead
+of converting them through the legacy warning-image fallback. The RGBA8 conversion is now owned
+by the neutral resource provider rather than an `ImageManager` API, so neutral resource
+construction has no image-manager dependency.
 The scene collector also carries visible models that resolve to no converted geometry as
 explicit unresolved entries; submission validation rejects those entries instead of silently
 dropping world references.
@@ -605,9 +598,9 @@ real replacement consumes its responsibility and the fast tests cover the bounda
 
 ### 5. Replace OSG scene ownership
 
-- Separate cell visibility, transforms, camera state, lighting, and material data from OSG scene nodes. Camera/light scene data now has an OSG-to-neutral snapshot source, alongside transform-preserving neutral mesh instances, updateable `WorldScene`/`CellScene` snapshots, neutral visibility for active-cell static references, neutral NIF material extraction, a cached-mesh cell composition adapter, loaded exterior terrain tiles, and a pure `collectSceneSubmission` handoff exposed by `MWWorld::Scene`. The Vulkan game owner now consumes that handoff in the live frame loop.
-- Feed both reference and Vulkan implementations from renderer-neutral scene data during the transition.
-- Delete OSG scene ownership once Vulkan consumes all required scene events.
+- Separate cell visibility, transforms, camera state, lighting, and material data from OSG scene nodes. The Vulkan path now owns `WorldScene`/`CellScene` snapshots, neutral visibility for active-cell static references, neutral NIF material extraction, a cached-mesh cell composition adapter, loaded exterior terrain tiles, and a pure `collectSceneSubmission` handoff exposed by `MWWorld::Scene`.
+- Keep the OSG reference path on its legacy scene graph while the Vulkan path consumes the neutral handoff.
+- Delete remaining OSG scene ownership after dynamic content, presentation, and parity gates are complete.
 
 ### 6. Port static world rendering
 
@@ -656,9 +649,6 @@ Normal development should use this order:
 4. One validation-layer run.
 5. A small number of full-game startup, save/load, GUI, and gameplay smoke tests.
 
-When scene-bridge changes are in progress, enable `OPENMW_VALIDATE_NEUTRAL_SCENE=1` for
-the full-game smoke run; it checks the neutral payload every 30 frames and after cell changes.
-
 The full game should not be repeatedly started for every change. The main engine loop, loading
 screen, modal/video loops, and screenshot capture now delegate frame advancement, event processing,
 update traversal, and frame submission through one engine-owned frame lifecycle. The engine creates
@@ -671,5 +661,5 @@ replacement point for a future Vulkan frame owner while current OSG behavior rem
 The interface now has an explicit submission-consuming path: the Vulkan owner
 receives a synchronized `SceneSubmission` from `World` and validates it before upload, while the OSG owner
 explicitly reports that it does not consume submissions and continues its legacy traversal.
-The engine-side periodic bridge validator skips its duplicate export when that path is active,
-leaving submission validation at the single world/frame-owner boundary.
+Submission validation remains at the single Vulkan world/frame-owner boundary; the OSG path does
+not construct or export a duplicate neutral scene.

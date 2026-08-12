@@ -420,15 +420,6 @@ bool OMW::Engine::frame(unsigned frameNumber, float frametime)
     if (!rendered)
         return false;
 
-    if (mValidateNeutralScene && !mFrameLifecycle->consumesSceneSubmission()
-        && mStateManager->getState() != MWBase::StateManager::State_NoGame
-        && (frameNumber % 30 == 0 || mWorld->getWorldScene().hasCellChanged()))
-    {
-        const Render::SceneSubmission submission = mWorld->getWorldScene().getNeutralScene();
-        if (const std::string error = submission.validationError(); !error.empty())
-            throw std::runtime_error("full-game neutral scene submission: " + error);
-    }
-
     return true;
 }
 
@@ -448,7 +439,6 @@ OMW::Engine::Engine(Files::ConfigurationManager& configurationManager)
     , mExportFonts(false)
     , mRandomSeed(0)
     , mNewGame(false)
-    , mValidateNeutralScene(std::getenv("OPENMW_VALIDATE_NEUTRAL_SCENE") != nullptr)
     , mUseVulkan(false)
     , mCfgMgr(configurationManager)
 {

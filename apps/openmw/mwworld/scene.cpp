@@ -116,12 +116,14 @@ namespace
     }
 
     void recordNeutralObject(const MWWorld::Ptr& ptr, std::string_view model, bool visible,
-        Render::WorldScene& neutralWorld)
+        Render::WorldScene* neutralWorld)
     {
+        if (neutralWorld == nullptr)
+            return;
         if (ptr.isEmpty() || model.empty())
         {
             if (!ptr.isEmpty())
-                neutralWorld.removeObject(static_cast<const void*>(ptr.mRef));
+                neutralWorld->removeObject(static_cast<const void*>(ptr.mRef));
             return;
         }
 
@@ -134,7 +136,7 @@ namespace
         transform.position = { position.pos[0], position.pos[1], position.pos[2] };
         transform.rotation = makeDirectRenderRotation(ptr);
         transform.scale = scale;
-        neutralWorld.recordObject(static_cast<const void*>(ptr.mRef), static_cast<const void*>(cell),
+        neutralWorld->recordObject(static_cast<const void*>(ptr.mRef), static_cast<const void*>(cell),
             cell->getCell()->isExterior(), cell->getCell()->getGridX(), cell->getCell()->getGridY(),
             cell->getCell()->getNameId(), model, transform, visible, cell->getCell()->getWorldSpace().serializeText(),
             ptr.getClass().useAnim());
@@ -158,7 +160,7 @@ namespace
     static osg::ref_ptr<SceneUtil::PositionAttitudeTransform> pagedNode = new SceneUtil::PositionAttitudeTransform;
 
     void addObject(const MWWorld::Ptr& ptr, const MWWorld::World& world, MWRender::ObjectPaging* objectPaging,
-        MWPhysics::PhysicsSystem& physics, MWRender::RenderingManager* rendering, Render::WorldScene& neutralWorld)
+        MWPhysics::PhysicsSystem& physics, MWRender::RenderingManager* rendering, Render::WorldScene* neutralWorld)
     {
         if (ptr.getRefData().getBaseNode() || physics.getActor(ptr))
         {
@@ -380,7 +382,7 @@ namespace MWWorld
             const VFS::Path::Normalized model = getModel(ptr);
             ptr.getClass().insertObjectRendering(ptr, model, mRendering->getObjects());
             setNodeRotation(ptr, *mRendering, makeNodeRotation(ptr, RotationOrder::direct));
-            recordNeutralObject(ptr, model.view(), true, mNeutralWorldScene);
+            recordNeutralObject(ptr, model.view(), true, mNeutralWorldScene.get());
             reloadTerrain();
         }
     }
@@ -390,7 +392,8 @@ namespace MWWorld
         const auto rot = makeNodeRotation(ptr, order);
         if (mRendering)
             setNodeRotation(ptr, *mRendering, rot);
-        mNeutralWorldScene.updateObjectRotation(static_cast<const void*>(ptr.mRef), makeDirectRenderRotation(ptr));
+        if (mNeutralWorldScene)
+            mNeutralWorldScene->updateObjectRotation(static_cast<const void*>(ptr.mRef), makeDirectRenderRotation(ptr));
         mPhysics->updateRotation(ptr, rot);
     }
 
@@ -401,7 +404,8 @@ namespace MWWorld
         ptr.getClass().adjustScale(ptr, scaleVec, true);
         if (mRendering)
             mRendering->scaleObject(ptr, osg::Vec3f(scaleVec.x, scaleVec.y, scaleVec.z));
-        mNeutralWorldScene.updateObjectScale(static_cast<const void*>(ptr.mRef), scaleVec);
+        if (mNeutralWorldScene)
+            mNeutralWorldScene->updateObjectScale(static_cast<const void*>(ptr.mRef), scaleVec);
         mPhysics->updateScale(ptr);
     }
 
@@ -471,7 +475,8 @@ namespace MWWorld
 
         MWBase::Environment::get().getMechanicsManager()->drop(cell);
 
-        mNeutralWorldScene.removeCell(static_cast<const void*>(cell));
+        if (mNeutralWorldScene)
+            mNeutralWorldScene->removeCell(static_cast<const void*>(cell));
         if (mRendering)
             mRendering->removeCell(cell);
         if (mRendering)
@@ -490,11 +495,14 @@ namespace MWWorld
 
     void Scene::recordNeutralCell(CellStore& cell)
     {
+        if (!mNeutralWorldScene)
+            return;
+
         const int cellX = cell.getCell()->getGridX();
         const int cellY = cell.getCell()->getGridY();
         const MWWorld::Cell& cellVariant = *cell.getCell();
         ESM::RefId worldspace = cellVariant.getWorldSpace();
-        mNeutralWorldScene.recordCell(static_cast<const void*>(&cell), cellVariant.isExterior(), cellX,
+        mNeutralWorldScene->recordCell(static_cast<const void*>(&cell), cellVariant.isExterior(), cellX,
             cellY, cellVariant.getNameId(), worldspace.serializeText());
 
         if (cellVariant.isExterior() && Settings::groundcover().mEnabled
@@ -508,13 +516,13 @@ namespace MWWorld
                 transform.rotation = Render::makeEulerRotation(
                     { record.position.rot[0], record.position.rot[1], record.position.rot[2] });
                 transform.scale = { record.scale, record.scale, record.scale };
-                mNeutralWorldScene.recordStaticObject(static_cast<const void*>(&cell), true, cellX, cellY,
+                mNeutralWorldScene->recordStaticObject(static_cast<const void*>(&cell), true, cellX, cellY,
                     cellVariant.getNameId(), record.model.value(), transform, true, worldspace.serializeText());
             }
         }
 
         if (cellVariant.isExterior())
-            mNeutralWorldScene.setTerrainTiles(static_cast<const void*>(&cell),
+            mNeutralWorldScene->setTerrainTiles(static_cast<const void*>(&cell),
                 mTerrainStorage.getRenderTiles(cellX, cellY, worldspace));
     }
 
@@ -644,9 +652,11 @@ namespace MWWorld
         }
         navigatorUpdateGuard.reset();
         assert(mActiveCells.empty());
-        mNeutralWorldScene.clear();
+        if (mNeutralWorldScene)
+            mNeutralWorldScene->clear();
         mNeutralTerrainRegionsDirty = false;
-        mNeutralMeshCache.clear();
+        if (mNeutralWorldScene)
+            mNeutralMeshCache.clear();
         mCurrentCell = nullptr;
         mLowestPoint = std::numeric_limits<float>::max();
 
@@ -990,7 +1000,8 @@ namespace MWWorld
         mHalfGridSize = cell.getCell()->isEsm4() ? Constants::ESM4CellGridRadius : Constants::CellGridRadius;
         mCurrentCell = &cell;
 
-        mNeutralWorldScene.setActiveWorldspace(cell.getCell()->getWorldSpace().serializeText());
+        if (mNeutralWorldScene)
+            mNeutralWorldScene->setActiveWorldspace(cell.getCell()->getWorldSpace().serializeText());
         mNeutralTerrainRegionsDirty = true;
         if (mRendering)
             mRendering->enableTerrain(cell.isExterior(), cell.getCell()->getWorldSpace());
@@ -1028,6 +1039,16 @@ namespace MWWorld
     }
 
     Scene::Scene(MWWorld::World& world, Render::FrameLifecycle& frameLifecycle,
+        const VFS::Manager* vfs, MWRender::RenderingManager* rendering, MWRender::ObjectPaging* objectPaging,
+        Terrain::RenderStorage& terrainStorage, std::unique_ptr<CellPreloader> preloader,
+        MWPhysics::PhysicsSystem* physics, DetourNavigator::Navigator& navigator)
+        : Scene(world, frameLifecycle, Render::SceneSynchronizer(), Render::BonePoseResolver(), Render::MeshResolver(),
+            Render::TextureResolver(), vfs, rendering, objectPaging, terrainStorage, std::move(preloader), physics,
+            navigator)
+    {
+    }
+
+    Scene::Scene(MWWorld::World& world, Render::FrameLifecycle& frameLifecycle,
         Render::SceneSynchronizer sceneSynchronizer, Render::BonePoseResolver bonePoseResolver,
         Render::MeshResolver meshResolver, Render::TextureResolver textureResolver, const VFS::Manager* vfs,
         MWRender::RenderingManager* rendering, MWRender::ObjectPaging* objectPaging,
@@ -1062,6 +1083,7 @@ namespace MWWorld
             std::move(textureResolver), vfs, nullptr, nullptr, terrainStorage, nullptr,
             physics, navigator)
     {
+        mNeutralWorldScene = std::make_unique<Render::WorldScene>();
     }
 
     Scene::~Scene() = default;
@@ -1178,10 +1200,13 @@ namespace MWWorld
 
     void Scene::updateNeutralTerrainRegions()
     {
-        mNeutralTerrainRegionsDirty = false;
-        mNeutralWorldScene.setTerrainRegions({});
+        if (!mNeutralWorldScene)
+            return;
 
-        if (mActiveCells.empty() || mNeutralWorldScene.activeWorldspace().empty())
+        mNeutralTerrainRegionsDirty = false;
+        mNeutralWorldScene->setTerrainRegions({});
+
+        if (mActiveCells.empty() || mNeutralWorldScene->activeWorldspace().empty())
             return;
 
         bool foundExteriorCell = false;
@@ -1196,7 +1221,7 @@ namespace MWWorld
                 continue;
 
             const ESM::RefId cellWorldspace = cell->getCell()->getWorldSpace();
-            if (cellWorldspace.serializeText() != mNeutralWorldScene.activeWorldspace())
+            if (cellWorldspace.serializeText() != mNeutralWorldScene->activeWorldspace())
                 continue;
 
             const int cellX = cell->getCell()->getGridX();
@@ -1228,11 +1253,14 @@ namespace MWWorld
                }))
             return;
 
-        mNeutralWorldScene.setTerrainRegions(std::move(regions));
+        mNeutralWorldScene->setTerrainRegions(std::move(regions));
     }
 
     Render::SceneSubmission Scene::getNeutralScene()
     {
+        if (!mNeutralWorldScene)
+            throw std::logic_error("Neutral scene requested from the OSG world path");
+
         if (mNeutralTerrainRegionsDirty)
             updateNeutralTerrainRegions();
 
@@ -1251,7 +1279,7 @@ namespace MWWorld
             return *meshes;
         };
 
-        mNeutralWorldScene.updateDynamicPoses([&](const void* objectKey, const Render::WorldObject& object) {
+        mNeutralWorldScene->updateDynamicPoses([&](const void* objectKey, const Render::WorldObject& object) {
             const std::vector<Render::MeshInstance>& meshes = resolveMeshes(object.model);
             const auto skinned = std::find_if(meshes.begin(), meshes.end(), [](const Render::MeshInstance& mesh) {
                 return mesh.mesh.skinning && !mesh.mesh.skinning->boneNames.empty();
@@ -1276,7 +1304,7 @@ namespace MWWorld
         });
 
         Render::SceneSubmission result = Render::collectSceneSubmission(
-            mNeutralWorldScene, mNeutralWorldScene.sceneData(), mNeutralWorldScene.activeWorldspace(), resolveMeshes,
+            *mNeutralWorldScene, mNeutralWorldScene->sceneData(), mNeutralWorldScene->activeWorldspace(), resolveMeshes,
             true);
 
         if (Settings::shaders().mAutoUseObjectSpecularMaps
@@ -1312,25 +1340,28 @@ namespace MWWorld
 
     void Scene::synchronizeNeutralScene()
     {
-        if (mSceneSynchronizer)
-            mSceneSynchronizer(mNeutralWorldScene.sceneData());
+        if (mNeutralWorldScene && mSceneSynchronizer)
+            mSceneSynchronizer(mNeutralWorldScene->sceneData());
     }
 
     void Scene::updateNeutralObjectCell(const void* oldObjectKey, const void* newObjectKey, const void* cellKey,
         bool exterior, int gridX, int gridY, std::string_view cellName, std::string_view worldspace)
     {
-        mNeutralWorldScene.updateObjectCell(
-            oldObjectKey, newObjectKey, cellKey, exterior, gridX, gridY, cellName, worldspace);
+        if (mNeutralWorldScene)
+            mNeutralWorldScene->updateObjectCell(
+                oldObjectKey, newObjectKey, cellKey, exterior, gridX, gridY, cellName, worldspace);
     }
 
     void Scene::updateNeutralObjectPosition(const void* objectKey, const Render::Vec3& position)
     {
-        mNeutralWorldScene.updateObjectPosition(objectKey, position);
+        if (mNeutralWorldScene)
+            mNeutralWorldScene->updateObjectPosition(objectKey, position);
     }
 
     void Scene::updateNeutralObjectRotation(const void* objectKey, const Render::Quat& rotation)
     {
-        mNeutralWorldScene.updateObjectRotation(objectKey, rotation);
+        if (mNeutralWorldScene)
+            mNeutralWorldScene->updateObjectRotation(objectKey, rotation);
     }
 
     void Scene::markCellAsUnchanged()
@@ -1345,7 +1376,7 @@ namespace MWWorld
         InsertVisitor insertVisitor(cell, loadingListener);
         cell.forEach(insertVisitor);
         insertVisitor.insert([&](const MWWorld::Ptr& ptr) {
-            addObject(ptr, mWorld, mObjectPaging, *mPhysics, mRendering, mNeutralWorldScene);
+            addObject(ptr, mWorld, mObjectPaging, *mPhysics, mRendering, mNeutralWorldScene.get());
         });
         insertVisitor.insert([&](const MWWorld::Ptr& ptr) {
             addObject(ptr, mWorld, *mPhysics, mLowestPoint, isInterior, mNavigator, navigatorUpdateGuard);
@@ -1357,7 +1388,7 @@ namespace MWWorld
         const bool isInterior = mCurrentCell && !mCurrentCell->isExterior();
         try
         {
-            addObject(ptr, mWorld, mObjectPaging, *mPhysics, mRendering, mNeutralWorldScene);
+            addObject(ptr, mWorld, mObjectPaging, *mPhysics, mRendering, mNeutralWorldScene.get());
             addObject(ptr, mWorld, *mPhysics, mLowestPoint, isInterior, mNavigator);
             mWorld.scaleObject(ptr, ptr.getCellRef().getScale());
         }
@@ -1387,7 +1418,8 @@ namespace MWWorld
         }
         mPhysics->remove(ptr);
         if (!ptr.isEmpty())
-            mNeutralWorldScene.removeObject(static_cast<const void*>(ptr.mRef));
+            if (mNeutralWorldScene)
+                mNeutralWorldScene->removeObject(static_cast<const void*>(ptr.mRef));
         if (mRendering)
             mRendering->removeObject(ptr);
         if (ptr.getClass().isActor())

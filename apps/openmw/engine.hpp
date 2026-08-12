@@ -177,7 +177,6 @@ namespace OMW
         Files::Collections mFileCollections;
         Translation::Storage mTranslationDataStorage;
         bool mNewGame;
-        bool mValidateNeutralScene;
         bool mUseVulkan;
 
         Files::ConfigurationManager& mCfgMgr;
