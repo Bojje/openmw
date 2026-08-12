@@ -77,6 +77,15 @@ int main()
         expect(!defaultLayer.mParallax && !defaultLayer.mSpecular,
             "terrain layer feature flags must default to disabled");
 
+        Render::TerrainHeightField heightField;
+        heightField.verticesPerSide = 2;
+        heightField.heights = { -1.f, 0.f, 1.f, 2.f };
+        heightField.minHeight = -1.f;
+        heightField.maxHeight = 2.f;
+        expect(heightField.valid(), "neutral terrain heightfield data should validate");
+        heightField.heights.pop_back();
+        expect(!heightField.valid(), "neutral terrain heightfield must reject incomplete samples");
+
         TestStorage storage;
         Terrain::RenderStorage& neutralStorage = storage;
         const auto tile = neutralStorage.getRenderTile(2, 4.f, { 3.f, -2.f }, ESM::RefId());
