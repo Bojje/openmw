@@ -426,6 +426,8 @@ The OSG profiler and resource-statistics event handlers, plus the delayed viewer
 report, are now owned by `ViewerFrameLifecycle`; `Engine` supplies only the existing profiler
 configuration callback. This keeps viewer event-handler ownership with the OSG frame owner and
 leaves the future Vulkan owner free to provide a different statistics/presentation implementation.
+The viewer statistics object itself is also retained and exposed by the lifecycle; `Engine` no
+longer owns an OSG stats reference and only requests the active owner’s stats for profiling.
 The shared NIF file and converted-mesh caches now use a renderer-neutral `CacheManager` lifecycle;
 `BaseResourceManager` extends that same contract and adds only OSG statistics/release hooks. Only
 OSG-owned resource managers remain in the OSG manager list. Cache expiry, clearing, and statistics
@@ -434,7 +436,7 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-175 files, deleting 1,979 lines and adding 9,209 lines (net `+7,230`). The larger Vulkan-only
+175 files, deleting 1,980 lines and adding 9,220 lines (net `+7,240`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.

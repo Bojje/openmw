@@ -151,11 +151,17 @@ osgViewer::Viewer* OMW::Engine::getOsgViewer() const
     return lifecycle ? lifecycle->viewer() : nullptr;
 }
 
+osg::Stats* OMW::Engine::getOsgStats() const
+{
+    const auto* const lifecycle = dynamic_cast<const MWRender::ViewerFrameLifecycle*>(mFrameLifecycle.get());
+    return lifecycle ? lifecycle->stats() : nullptr;
+}
+
 bool OMW::Engine::frame(unsigned frameNumber, float frametime)
 {
     const osg::Timer_t frameStart = osg::Timer::instance()->tick();
     const osg::Timer* const timer = osg::Timer::instance();
-    osg::Stats* const stats = mFrameStats.get();
+    osg::Stats* const stats = getOsgStats();
     if (!stats)
         throw std::logic_error("Engine frame statistics were not initialized");
 
@@ -412,8 +418,6 @@ OMW::Engine::~Engine()
     mWorkQueue = nullptr;
 
     mFrameLifecycle = nullptr;
-    mFrameStats = nullptr;
-
     mResourceSystem.reset();
 
     mEncoder = nullptr;
@@ -484,7 +488,6 @@ void OMW::Engine::prepareEngine()
     if (!viewerLifecycle)
         throw std::logic_error("OSG engine setup requires the OSG frame lifecycle");
     osgViewer::Viewer* const viewer = viewerLifecycle->viewer();
-    mFrameStats = viewer->getViewerStats();
 
     mStateManager = std::make_unique<MWState::StateManager>(mCfgMgr.getUserDataPath() / "saves", mContentFiles);
     mEnvironment.setStateManager(*mStateManager);

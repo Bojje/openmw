@@ -145,7 +145,6 @@ namespace OMW
         Files::PathContainer mDataDirs;
         std::vector<std::string> mArchives;
         std::filesystem::path mResDir;
-        osg::ref_ptr<osg::Stats> mFrameStats;
         osg::ref_ptr<osgViewer::ScreenCaptureHandler> mScreenCaptureHandler;
         osg::ref_ptr<SceneUtil::AsyncScreenCaptureOperation> mScreenCaptureOperation;
         std::string mCellName;
@@ -187,6 +186,7 @@ namespace OMW
 
         void executeLocalScripts();
         osgViewer::Viewer* getOsgViewer() const;
+        osg::Stats* getOsgStats() const;
 
         bool frame(unsigned frameNumber, float dt);
 

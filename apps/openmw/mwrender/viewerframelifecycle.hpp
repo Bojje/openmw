@@ -21,6 +21,7 @@ namespace Resource
 namespace osg
 {
     class Group;
+    class Stats;
 }
 
 struct SDL_Window;
@@ -51,6 +52,7 @@ namespace MWRender
         void initializeStatsHandlers(const VFS::Manager& vfs, bool writeToFile,
             const std::function<void(Resource::Profiler&)>& configureProfiler);
         void reportStats(unsigned frameNumber, std::ostream& stream) const;
+        osg::Stats* stats() const;
         int maxTextureImageUnits() const { return mMaxTextureImageUnits; }
         osg::Group* sceneRoot();
 
