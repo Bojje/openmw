@@ -68,6 +68,11 @@ namespace MWRender
         return result;
     }
 
+    float TerrainStorage::getHeightAt(const Render::Vec3& worldPos, ESM::RefId worldspace)
+    {
+        return ESMTerrain::Storage::getHeightAt(osg::Vec3f(worldPos.x, worldPos.y, worldPos.z), worldspace);
+    }
+
     static void BoundUnion(float& minX, float& maxX, float& minY, float& maxY, float x, float y)
     {
         if (x < minX)

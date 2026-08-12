@@ -26,6 +26,7 @@ namespace Terrain
     class Storage : public RenderStorage
     {
     public:
+        using RenderStorage::getHeightAt;
         virtual ~Storage() = default;
 
     public:

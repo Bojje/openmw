@@ -274,6 +274,7 @@ namespace MWWorld
         mTerrainStorage = std::make_unique<MWRender::TerrainStorage>(mResourceSystem, normalMapPattern,
             heightMapPattern, Settings::shaders().mAutoUseTerrainNormalMaps, specularMapPattern,
             Settings::shaders().mAutoUseTerrainSpecularMaps);
+        mTerrainRenderStorage = mTerrainStorage.get();
 
         osgUtil::IncrementalCompileOperation* incrementalCompileOperation = nullptr;
         SceneUtil::LightManager* lightRoot = nullptr;
@@ -329,6 +330,7 @@ namespace MWWorld
             throw std::logic_error("World renderer services have already been initialized");
 
         mFrameLifecycle = &frameLifecycle;
+        mTerrainRenderStorage = &terrainStorage;
         mWorldScene = std::make_unique<Scene>(*this, frameLifecycle, std::move(sceneSynchronizer),
             std::move(bonePoseResolver), std::move(meshResolver), std::move(textureResolver), mResourceSystem->getVFS(),
             terrainStorage, mResourceSystem, mPhysics.get(), *mNavigator);
@@ -3663,7 +3665,9 @@ namespace MWWorld
 
     float World::getTerrainHeightAt(const osg::Vec3f& worldPos, ESM::RefId worldspace) const
     {
-        return mRendering->getTerrainHeightAt(worldPos, worldspace);
+        if (!mTerrainRenderStorage)
+            return 0.f;
+        return mTerrainRenderStorage->getHeightAt({ worldPos.x(), worldPos.y(), worldPos.z() }, worldspace);
     }
 
     osg::Vec3f World::getHalfExtents(const ConstPtr& object, bool rendering) const

@@ -79,6 +79,7 @@ namespace ESMTerrain
     class Storage : public Terrain::Storage
     {
     public:
+        using Terrain::Storage::getHeightAt;
         Storage(const VFS::Manager* vfs, std::string_view normalMapPattern = {},
             std::string_view normalHeightMapPattern = {}, bool autoUseNormalMaps = false,
             std::string_view specularMapPattern = {}, bool autoUseSpecularMaps = false);

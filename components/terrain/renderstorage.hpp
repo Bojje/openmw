@@ -8,6 +8,7 @@
 #include <vector>
 
 #include <components/esm/refid.hpp>
+#include <components/render/scene.hpp>
 #include <components/render/terrain.hpp>
 
 #include "defs.hpp"
@@ -36,6 +37,13 @@ namespace Terrain
         virtual float getCellWorldSize(ESM::RefId worldspace) = 0;
         virtual int getCellVertices(ESM::RefId worldspace) = 0;
         virtual int getTextureTileCount(float chunkSize, ESM::RefId worldspace) = 0;
+
+        /// Query terrain height without exposing the legacy terrain-world API.
+        /// Adapters with no terrain data may return their documented default.
+        virtual float getHeightAt(const Render::Vec3& worldPos, ESM::RefId worldspace)
+        {
+            return 0.f;
+        }
 
         /// Optional neutral collision samples for one exterior cell.
         virtual std::optional<Render::TerrainHeightField> getHeightField(

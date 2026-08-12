@@ -57,6 +57,7 @@ namespace
         }
 
         float getHeightAt(const osg::Vec3f&, ESM::RefId) override { return 1.f; }
+        float getHeightAt(const Render::Vec3&, ESM::RefId) override { return 1.f; }
         float getCellWorldSize(ESM::RefId) override { return 1.f; }
         int getCellVertices(ESM::RefId) override { return 3; }
         int getTextureTileCount(float, ESM::RefId) override { return 1; }
@@ -88,6 +89,8 @@ int main()
 
         TestStorage storage;
         Terrain::RenderStorage& neutralStorage = storage;
+        expect(neutralStorage.getHeightAt({ 0.f, 0.f, 0.f }, ESM::RefId()) == 1.f,
+            "renderer-neutral terrain height query was not exposed");
         const auto tile = neutralStorage.getRenderTile(2, 4.f, { 3.f, -2.f }, ESM::RefId());
         const auto cellLodTiles = neutralStorage.getRenderTiles(3, -2, ESM::RefId());
         expect(cellLodTiles.size() == 2 && cellLodTiles[0].lod == 0 && cellLodTiles[1].lod == 1

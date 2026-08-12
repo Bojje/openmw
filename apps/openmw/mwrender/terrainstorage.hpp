@@ -15,6 +15,7 @@ namespace MWRender
     class TerrainStorage : public ESMTerrain::Storage
     {
     public:
+        using ESMTerrain::Storage::getHeightAt;
         TerrainStorage(Resource::ResourceSystem* resourceSystem, std::string_view normalMapPattern = {},
             std::string_view normalHeightMapPattern = {}, bool autoUseNormalMaps = false,
             std::string_view specularMapPattern = {}, bool autoUseSpecularMaps = false);
@@ -30,6 +31,8 @@ namespace MWRender
 
         std::optional<Render::TerrainHeightField> getHeightField(
             int gridX, int gridY, ESM::RefId worldspace) override;
+
+        float getHeightAt(const Render::Vec3& worldPos, ESM::RefId worldspace) override;
 
         /// Get bounds of the whole terrain in cell units
         void getBounds(float& minX, float& maxX, float& minY, float& maxY, ESM::RefId worldspace) override;

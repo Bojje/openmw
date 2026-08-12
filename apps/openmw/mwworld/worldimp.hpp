@@ -115,6 +115,7 @@ namespace MWWorld
         std::unique_ptr<MWPhysics::PhysicsSystem> mPhysics;
         std::unique_ptr<DetourNavigator::Navigator> mNavigator;
         std::unique_ptr<MWRender::TerrainStorage> mTerrainStorage;
+        Terrain::RenderStorage* mTerrainRenderStorage = nullptr;
         Terrain::World* mTerrain = nullptr;
         MWRender::ObjectPaging* mObjectPaging = nullptr;
         MWRender::SkyManager* mSkyManager = nullptr;

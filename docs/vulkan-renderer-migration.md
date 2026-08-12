@@ -276,6 +276,10 @@ postprocessor flags now follow the same legacy-service guard, so the neutral boo
 silently re-enter the OSG/UI path during cell changes.
 `World::adjustSky()` also returns before touching the legacy renderer when no OSG services exist,
 covering the first neutral cell transition without a hidden null dereference; CI checks this guard.
+Terrain height queries now cross `Terrain::RenderStorage` as renderer-neutral world data; the
+legacy `TerrainStorage` adapter performs the only conversion back to OSG coordinates. `World`
+does not fall back to `RenderingManager` for terrain queries, so the neutral bootstrap has one
+terrain-data owner and CI checks that boundary.
 `World::initNeutralRenderer()` now exposes that boundary to a submission-consuming Vulkan owner:
 it requires simulation first, rejects an OSG frame owner, and constructs the world scene without
 allocating any OSG rendering, paging, terrain-world, or preloader service.
@@ -293,7 +297,7 @@ The engine public header no longer imports complete OSG viewer/event-handler hea
 are now included only by the implementation files that use them.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-154 files, deleting 1,230 lines and adding 7,974 lines (net `+6,744`). The larger Vulkan-only
+154 files, deleting 1,231 lines and adding 8,012 lines (net `+6,781`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
