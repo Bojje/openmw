@@ -3945,13 +3945,18 @@ namespace MWWorld
     {
         if (mRendering)
             mRendering->spawnEffect(model, textureOverride, worldPos, scale, isMagicVFX, useAmbientLight, effectId, loop);
-        else if (mWorldScene && !effectId.empty())
+        else if (mWorldScene)
         {
+            std::string neutralEffectId(effectId);
+            if (neutralEffectId.empty())
+                neutralEffectId = "effect-" + std::to_string(mNextNeutralEffectId++);
+
             std::optional<float> animationDuration;
             if (mResourceSystem != nullptr && mResourceSystem->backend() == Resource::ResourceSystem::Backend::Neutral)
                 animationDuration = mResourceSystem->getNifMeshManager()->getAnimationDuration(model);
-            mWorldScene->recordNeutralEffect(effectId, model.value(), { worldPos.x(), worldPos.y(), worldPos.z() },
-                scale, textureOverride, loop, animationDuration.value_or(0.f), isMagicVFX);
+            mWorldScene->recordNeutralEffect(neutralEffectId, model.value(),
+                { worldPos.x(), worldPos.y(), worldPos.z() }, scale, textureOverride, loop,
+                animationDuration.value_or(0.f), isMagicVFX);
         }
     }
 

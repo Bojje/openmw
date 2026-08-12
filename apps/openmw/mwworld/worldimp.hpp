@@ -1,6 +1,8 @@
 #ifndef GAME_MWWORLD_WORLDIMP_H
 #define GAME_MWWORLD_WORLDIMP_H
 
+#include <cstdint>
+
 #include <osg/Timer>
 #include <osg/ref_ptr>
 
@@ -125,6 +127,7 @@ namespace MWWorld
         std::unique_ptr<MWWorld::WeatherManager> mWeatherManager;
         std::unique_ptr<MWWorld::DateTimeManager> mTimeManager;
         std::unique_ptr<ProjectileManager> mProjectileManager;
+        std::uint64_t mNextNeutralEffectId = 1;
 
         bool mSky;
         bool mGodMode;
