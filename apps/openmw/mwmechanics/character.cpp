@@ -579,7 +579,7 @@ namespace MWMechanics
     std::string_view CharacterController::getWeaponAnimation(int weaponType) const
     {
         std::string_view weaponGroup = getWeaponType(weaponType)->mLongGroup;
-        if (isRealWeapon(weaponType) && !mAnimation->hasAnimation(weaponGroup))
+        if (isRealWeapon(weaponType) && (!mAnimation || !mAnimation->hasAnimation(weaponGroup)))
         {
             static const std::string_view oneHandFallback = getWeaponType(ESM::Weapon::LongBladeOneHand)->mLongGroup;
             static const std::string_view twoHandFallback = getWeaponType(ESM::Weapon::LongBladeTwoHand)->mLongGroup;
@@ -931,6 +931,15 @@ namespace MWMechanics
             // renderer backends can register actors before they have a pose owner.
             if (cls.isActor())
             {
+                if (cls.hasInventoryStore(mPtr))
+                {
+                    getActiveWeapon(mPtr, &mWeaponType);
+                    if (mWeaponType != ESM::Weapon::None)
+                    {
+                        mUpperBodyState = UpperBodyState::WeaponEquipped;
+                        mCurrentWeapon = getWeaponAnimation(mWeaponType);
+                    }
+                }
                 if (!cls.getCreatureStats(mPtr).isDead())
                 {
                     mIdleState = CharState_Idle;
@@ -2684,10 +2693,68 @@ namespace MWMechanics
             return;
         }
 
+        const bool finishedWeaponAttack
+            = current.mGroup == mCurrentWeapon && mUpperBodyState >= UpperBodyState::AttackWindUp;
         mAnimQueue.pop_front();
+        if (finishedWeaponAttack)
+        {
+            mUpperBodyState = UpperBodyState::WeaponEquipped;
+            mReadyToHit = false;
+        }
         if (!mAnimQueue.empty())
             MWBase::Environment::get().getWorld()->updateNeutralAnimation(
                 mPtr, mAnimQueue.front().mGroup, std::nullopt, mAnimQueue.front().mStartKey, mAnimQueue.front().mStopKey);
+    }
+
+    void CharacterController::updateNeutralWeaponState()
+    {
+        if (!mPtr.getClass().isActor() || !mPtr.getClass().hasInventoryStore(mPtr)
+            || mUpperBodyState != UpperBodyState::WeaponEquipped || !getAttackingOrSpell()
+            || mWeaponType == ESM::Weapon::None || mWeaponType == ESM::Weapon::Spell || !mAnimQueue.empty())
+            return;
+
+        std::string_view attackType;
+        const ESM::WeaponType::Class weaponClass = getWeaponType(mWeaponType)->mWeaponClass;
+        if (weaponClass == ESM::WeaponType::Ranged || weaponClass == ESM::WeaponType::Thrown)
+            attackType = "shoot";
+        else
+        {
+            attackType = getDesiredAttackType();
+            if (attackType.empty())
+                attackType = mPtr == getPlayer() && !Settings::game().mBestAttack
+                    ? getMovementBasedAttackType()
+                    : getRandomAttackType();
+        }
+
+        if (mCurrentWeapon.empty())
+            return;
+
+        const std::string startKey = std::string(attackType) + " start";
+        const std::string stopKey = std::string(attackType) + " max attack";
+        MWBase::World* const world = MWBase::Environment::get().getWorld();
+        if (!world->getNeutralAnimationDuration(mPtr, mCurrentWeapon, startKey, stopKey))
+        {
+            setAttackingOrSpell(false);
+            return;
+        }
+
+        mAttackType = attackType;
+        mAttackStrength = -1.f;
+        mReadyToHit = false;
+        mUpperBodyState = UpperBodyState::AttackWindUp;
+        setAttackingOrSpell(false);
+
+        AnimationQueueEntry entry;
+        entry.mGroup = mCurrentWeapon;
+        entry.mLoopCount = 0;
+        entry.mTime = 0.f;
+        entry.mLooping = false;
+        entry.mScripted = false;
+        entry.mStartKey = startKey;
+        entry.mStopKey = stopKey;
+        entry.mSpeed = 1.f;
+        mAnimQueue.push_back(std::move(entry));
+        world->updateNeutralAnimation(mPtr, mCurrentWeapon, 0.f, startKey, stopKey);
     }
 
     void CharacterController::handleNeutralTextKey(std::string_view groupname, std::string_view event)
@@ -2736,6 +2803,8 @@ namespace MWMechanics
         if (!event.starts_with(prefix))
             return;
         const std::string_view action = event.substr(prefix.size());
+        if (action == mAttackType + " max attack" && !mReadyToHit)
+            prepareHit();
         int attackType = -1;
         if (action == "chop hit")
             attackType = ESM::Weapon::AT_Chop;
@@ -2811,6 +2880,7 @@ namespace MWMechanics
 
         world->queueMovement(mPtr, movement);
 
+        updateNeutralWeaponState();
         updateNeutralAnimationQueue(duration);
         updateNeutralHitAnimation();
 
