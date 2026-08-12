@@ -89,7 +89,6 @@ namespace Render
         };
 
         std::unordered_map<const void*, CellScene> mCells;
-        std::vector<const void*> mCellOrder;
         std::unordered_map<const void*, ObjectLocation> mObjects;
         std::vector<TerrainRegion> mTerrainRegions;
         std::string mActiveWorldspace;
@@ -99,9 +98,7 @@ namespace Render
         CellScene& ensureCell(const void* cell, bool exterior, int gridX, int gridY, std::string_view name,
             std::string_view worldspace)
         {
-            auto [iter, inserted] = mCells.try_emplace(cell);
-            if (inserted)
-                mCellOrder.push_back(cell);
+            auto iter = mCells.try_emplace(cell).first;
 
             CellScene& scene = iter->second;
             scene.key = cell;
@@ -281,18 +278,16 @@ namespace Render
             }
         }
 
-        // Cell insertion order is stable for the lifetime of a loaded cell.
-        // Backends use this instead of iterating the unordered index so draw
-        // order and image-comparison inputs remain deterministic.
+        // Sorting the owned cells makes backend input deterministic without
+        // maintaining a second cell-order index.
         std::vector<const CellScene*> cellsInOrder(std::string_view worldspace = {}) const
         {
             std::vector<const CellScene*> result;
-            result.reserve(mCellOrder.size());
-            for (const void* cellKey : mCellOrder)
+            result.reserve(mCells.size());
+            for (const auto& [cellKey, cell] : mCells)
             {
-                const auto found = mCells.find(cellKey);
-                if (found != mCells.end() && (worldspace.empty() || found->second.worldspace == worldspace))
-                    result.push_back(&found->second);
+                if (worldspace.empty() || cell.worldspace == worldspace)
+                    result.push_back(&cell);
             }
             std::stable_sort(result.begin(), result.end(), [](const CellScene* lhs, const CellScene* rhs) {
                 if (lhs->exterior != rhs->exterior)
@@ -373,7 +368,6 @@ namespace Render
                     ++iter;
             }
             mCells.erase(cellKey);
-            std::erase(mCellOrder, cellKey);
         }
 
         // Reset renderer-neutral world ownership when the game unloads its
@@ -382,7 +376,6 @@ namespace Render
         void clear()
         {
             mCells.clear();
-            mCellOrder.clear();
             mObjects.clear();
             mTerrainRegions.clear();
             mActiveWorldspace.clear();
