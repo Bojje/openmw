@@ -329,10 +329,11 @@ bool OMW::Engine::frame(unsigned frameNumber, float frametime)
 
     const bool reportResource = stats->collectStats("resource");
 
-    if (reportResource)
+    if (reportResource && mUnrefQueue)
         stats->setAttribute(frameNumber, "UnrefQueue", static_cast<double>(mUnrefQueue->getSize()));
 
-    mUnrefQueue->flush(*mWorkQueue);
+    if (mUnrefQueue)
+        mUnrefQueue->flush(*mWorkQueue);
 
     if (reportResource)
     {
@@ -653,8 +654,10 @@ void OMW::Engine::createWindow()
     camera->setGraphicsContext(graphicsWindow);
     camera->setViewport(0, 0, graphicsWindow->getTraits()->width, graphicsWindow->getTraits()->height);
 
-    mSelectDepthFormatOperation = new SceneUtil::SelectDepthFormatOperation();
-    mSelectColorFormatOperation = new SceneUtil::Color::SelectColorFormatOperation();
+    osg::ref_ptr<SceneUtil::SelectDepthFormatOperation> selectDepthFormatOperation
+        = new SceneUtil::SelectDepthFormatOperation();
+    osg::ref_ptr<SceneUtil::Color::SelectColorFormatOperation> selectColorFormatOperation
+        = new SceneUtil::Color::SelectColorFormatOperation();
 
     osg::ref_ptr<SceneUtil::OperationSequence> realizeOperations = new SceneUtil::OperationSequence(false);
     mViewer->setRealizeOperation(realizeOperations);
@@ -665,8 +668,8 @@ void OMW::Engine::createWindow()
     if (Debug::shouldDebugOpenGL())
         realizeOperations->add(new Debug::EnableGLDebugOperation());
 
-    realizeOperations->add(mSelectDepthFormatOperation);
-    realizeOperations->add(mSelectColorFormatOperation);
+    realizeOperations->add(selectDepthFormatOperation);
+    realizeOperations->add(selectColorFormatOperation);
 
     if (Stereo::getStereo())
     {
@@ -804,7 +807,8 @@ void OMW::Engine::prepareEngine()
     mEnvironment.setResourceSystem(*mResourceSystem);
 
     mWorkQueue = new SceneUtil::WorkQueue(Settings::cells().mPreloadNumThreads);
-    mUnrefQueue = std::make_unique<SceneUtil::UnrefQueue>();
+    if (mFrameLifecycle->backend() == Render::FrameLifecycle::Backend::Osg)
+        mUnrefQueue = std::make_unique<SceneUtil::UnrefQueue>();
 
     if (mFrameLifecycle->backend() == Render::FrameLifecycle::Backend::Osg)
     {

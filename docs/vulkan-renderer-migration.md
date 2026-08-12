@@ -409,9 +409,12 @@ window policy reusable by a Vulkan presentation owner.
 SDL cursor creation and window-icon conversion now consume neutral RGBA8 texture data. OSG image
 sampling remains at the active engine boundary, while cursor scaling, rotation, alpha, and SDL
 surface creation no longer require OSG in the reusable SDL utilities.
+The engine now keeps its OSG-only depth/color selection operations local to window setup and only
+creates the OSG `UnrefQueue` for the OSG backend; frame cleanup tolerates a backend without OSG
+resource lifetimes.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-173 files, deleting 1,667 lines and adding 8,855 lines (net `+7,188`). The larger Vulkan-only
+173 files, deleting 1,681 lines and adding 8,864 lines (net `+7,183`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.

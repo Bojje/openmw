@@ -64,16 +64,6 @@ namespace osg
     class Stats;
 }
 
-namespace SceneUtil
-{
-    class SelectDepthFormatOperation;
-
-    namespace Color
-    {
-        class SelectColorFormatOperation;
-    }
-}
-
 namespace MWState
 {
     class StateManager;
@@ -159,8 +149,6 @@ namespace OMW
         osg::ref_ptr<osg::Stats> mFrameStats;
         osg::ref_ptr<osgViewer::ScreenCaptureHandler> mScreenCaptureHandler;
         osg::ref_ptr<SceneUtil::AsyncScreenCaptureOperation> mScreenCaptureOperation;
-        osg::ref_ptr<SceneUtil::SelectDepthFormatOperation> mSelectDepthFormatOperation;
-        osg::ref_ptr<SceneUtil::Color::SelectColorFormatOperation> mSelectColorFormatOperation;
         std::string mCellName;
         std::vector<std::string> mContentFiles;
         std::vector<std::string> mGroundcoverFiles;
