@@ -380,17 +380,14 @@ namespace Render
         return result;
     }
 
-    inline void applyBindPose(DynamicMeshSubmission& dynamic)
+    inline const SkinningData* findCompatibleSkinning(const DynamicMeshSubmission& dynamic)
     {
-        if (!dynamic.boneMatrices.empty())
-            return;
-
         const auto skinned = std::find_if(dynamic.meshes.begin(), dynamic.meshes.end(),
             [](const MeshInstance& mesh) {
                 return mesh.mesh.skinning && !mesh.mesh.skinning->boneNames.empty();
             });
         if (skinned == dynamic.meshes.end())
-            return;
+            return nullptr;
 
         const bool compatible = std::all_of(dynamic.meshes.begin(), dynamic.meshes.end(),
             [&](const MeshInstance& mesh) {
@@ -398,11 +395,20 @@ namespace Render
                     || (!mesh.mesh.skinning->boneNames.empty()
                         && mesh.mesh.skinning->boneNames == skinned->mesh.skinning->boneNames);
             });
-        if (!compatible)
+        return compatible ? skinned->mesh.skinning.get() : nullptr;
+    }
+
+    inline void applyBindPose(DynamicMeshSubmission& dynamic)
+    {
+        if (!dynamic.boneMatrices.empty())
             return;
 
-        dynamic.boneMatrices.reserve(skinned->mesh.skinning->inverseBindMatrices.size());
-        for (const Mat4& inverseBind : skinned->mesh.skinning->inverseBindMatrices)
+        const SkinningData* skinning = findCompatibleSkinning(dynamic);
+        if (skinning == nullptr)
+            return;
+
+        dynamic.boneMatrices.reserve(skinning->inverseBindMatrices.size());
+        for (const Mat4& inverseBind : skinning->inverseBindMatrices)
             dynamic.boneMatrices.push_back(invertMat4(inverseBind));
     }
 

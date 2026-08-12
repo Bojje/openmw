@@ -1375,26 +1375,13 @@ namespace MWWorld
         {
             if (mPoseResolver && dynamic.boneMatrices.empty())
             {
-                const auto skinned = std::find_if(dynamic.meshes.begin(), dynamic.meshes.end(),
-                    [](const Render::MeshInstance& mesh) {
-                        return mesh.mesh.skinning && !mesh.mesh.skinning->boneNames.empty();
-                    });
-                if (skinned != dynamic.meshes.end())
+                const Render::SkinningData* skinning = Render::findCompatibleSkinning(dynamic);
+                if (skinning != nullptr)
                 {
-                    const bool compatible = std::all_of(dynamic.meshes.begin(), dynamic.meshes.end(),
-                        [&](const Render::MeshInstance& mesh) {
-                            return !mesh.mesh.skinning
-                                || (!mesh.mesh.skinning->boneNames.empty()
-                                    && mesh.mesh.skinning->boneNames == skinned->mesh.skinning->boneNames);
-                        });
-                    if (compatible)
-                    {
-                        const std::vector<Render::Mat4> pose = mPoseResolver(dynamic.object.model,
-                            dynamic.object.animationGroup, dynamic.object.animationTime,
-                            skinned->mesh.skinning->boneNames);
-                        if (pose.size() == skinned->mesh.skinning->inverseBindMatrices.size())
-                            dynamic.boneMatrices = pose;
-                    }
+                    const std::vector<Render::Mat4> pose = mPoseResolver(dynamic.object.model,
+                        dynamic.object.animationGroup, dynamic.object.animationTime, skinning->boneNames);
+                    if (pose.size() == skinning->inverseBindMatrices.size())
+                        dynamic.boneMatrices = pose;
                 }
             }
 
