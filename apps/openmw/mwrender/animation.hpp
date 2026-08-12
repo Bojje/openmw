@@ -10,7 +10,6 @@
 #include "../mwworld/ptr.hpp"
 
 #include <components/misc/strings/algorithm.hpp>
-#include <components/render/math.hpp>
 #include <components/sceneutil/animblendrules.hpp>
 #include <components/sceneutil/controller.hpp>
 #include <components/sceneutil/nodecallback.hpp>
@@ -452,11 +451,6 @@ namespace MWRender
         /// Return a node with the specified name, or nullptr if not existing.
         /// @note The matching is case-insensitive.
         const osg::Node* getNode(std::string_view name) const;
-
-        /// Export current skeleton-space bone matrices without exposing OSG
-        /// skeleton objects to the renderer-neutral scene owner. The caller
-        /// supplies names in the skinning order of a converted mesh.
-        std::vector<Render::Mat4> getNeutralBoneMatrices(std::span<const std::string_view> boneNames) const;
 
         MWWorld::MovementDirectionFlags getSupportedMovementDirections(
             std::span<const std::string_view> prefixes) const;
