@@ -198,8 +198,10 @@ helper now applies frame bone matrices, and model-local NIF plus classic externa
 controllers are sampled by the neutral resource layer without constructing an OSG scene. Unskinned dynamic meshes, skinned
 records with an explicit pose, and compatible model-local NIF poses now enter the raster draw batch
 with their neutral transforms; records without a resolved pose retain an inverse-bind-derived bind
-pose so dynamic actors remain visible. Actor `.kf` group selection, text-key timing, blending, particles, and dynamic shading
-remain outstanding.
+pose so dynamic actors remain visible. Actor `.kf` group selection and timing now feed a neutral text-key
+dispatcher for Lua callbacks, sound/soundgen events, melee-hit timing, and spell-release timing. Actor
+priority arbitration, full OSG-equivalent equipment/arrow/container events, blending, particles, and
+dynamic shading remain outstanding.
 Explicitly identified world VFX now also cross as neutral transformed mesh effects with texture
 overrides and explicit removal; magic VFX preserve the first-root override rule across the flattened
 neutral mesh list, and controller intervals are extracted from the renderer-neutral NIF
@@ -518,7 +520,7 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the frozen `openmw-vulkan-osg-reference` tag, the current checkpoint changes
-206 files, deleting 2,285 lines and adding 14,265 lines (net `+11,980`). The larger Vulkan-only
+208 files, deleting 2,285 lines and adding 14,550 lines (net `+12,265`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; the current branch continues the reduction
 work with renderer-neutral ownership and compatibility-wrapper deletion. The live no-GUI
 consumer is the first deletion checkpoint; further reduction can now target OSG
@@ -563,8 +565,10 @@ now advance from resource duration metadata and hand off to the next queued grou
 finite loop counts; looping groups now retain a wrapped neutral clock, and mechanics exports
 the queue clock at submission time so the resource pose sampler does not invent a second timeline.
 Renderer-neutral NIF/KF metadata now narrows queue completion to group-specific start/stop text keys
-when present, and pose sampling now starts from the same selected text-key segment; actor priority
-arbitration, blended controller-stack ownership, and text-key event dispatch remain outstanding.
+when present, and pose sampling now starts from the same selected text-key segment. Neutral text-key
+events now dispatch Lua callbacks, sound/soundgen events, melee-hit timing, and spell-release timing;
+actor priority arbitration, blended controller-stack ownership, and OSG-specific presentation events
+remain outstanding.
 RGBA8 conversion is now one renderer-neutral helper shared by image resources and terrain
 blendmaps, so clamping, finite-value rejection, and byte quantization cannot drift between
 resource paths. The conversion helper has direct CPU coverage.
@@ -629,7 +633,7 @@ the game unplayable rather than reduce duplication safely.
 | Inactive raster ray-tracing scaffold | Removed | Reintroduce only with a complete RT pipeline |
 | Vulkan utility/queue helper paths | Removed | Complete |
 | Parsed NIF resource cache wrapper | Removed | Complete; cache now owns shared NIF files directly |
-| NIF-to-neutral mesh conversion | Renderer-neutral NIF boundary, material data, mesh cache, skinning metadata, model-local and classic external `.kf` pose sampling, neutral animation-group handoff, dynamic mesh payloads, `SceneSubmission`, Vulkan mesh batch, and full-game neutral resolver | Add actor `.kf` priority/queue, full text-key sequence and blend ownership, image-backed texture resolution, and dynamic shading |
+| NIF-to-neutral mesh conversion | Renderer-neutral NIF boundary, material data, mesh cache, skinning metadata, model-local and classic external `.kf` pose sampling, neutral animation-group handoff, text-key extraction and selected-segment rebasing, neutral Lua/sound/melee/spell event dispatch, dynamic mesh payloads, `SceneSubmission`, Vulkan mesh batch, and full-game neutral resolver | Add actor `.kf` priority/queue, OSG-specific equipment/arrow/container events, blend ownership, image-backed texture resolution, and dynamic shading |
 | Terrain geometry and layer data | Renderer-neutral `Terrain::RenderStorage` contract with cached per-cell LOD snapshots and a Vulkan opaque/normal/parallax/blendmap/specular layer consumer; concrete `MWRender::TerrainStorage` and legacy OSG ChunkManager remain the reference data path, including explicit ESM4 specular textures | Add quadtree-scale terrain streaming and terrain image coverage |
 | Loaded-cell object identity, transforms, terrain snapshots, and paging state | Renderer-neutral `WorldScene`/`CellScene` snapshots updated by scene lifecycle; active-cell static references bypass legacy OSG paging visibility, and cell-lifecycle-cached terrain tiles flow into `SceneSubmission`; neutral movement, cell transfer, water, effect, and weather writes are now encapsulated by `MWWorld::Scene` | Consume snapshots from a backend and migrate visibility/paging policy |
 | GUI, loading screens, screenshots, and presentation | NullWindowManager for Vulkan bootstrap; OSG/MyGUI reference path | Vulkan presentation and GUI coverage, then remove the null compatibility surface |
@@ -699,8 +703,9 @@ provide a usable surface, while validation errors remain hard failures.
 - Add actors, skinning, animation, particles, weather, water, spell effects, and post-processing.
   The neutral path now samples model-local NIF and classic external `.kf` keyframe controllers,
   honors selected group start/stop segments, and carries explicit per-object animation groups and clocks;
-  the remaining animation gate is actor `.kf` priority/queue selection, full text-key sequence
-  event dispatch, blending, and controller-stack ownership.
+  the remaining animation gate is actor `.kf` priority/queue selection, OSG-specific presentation
+  events, blending, and controller-stack ownership; neutral Lua/sound/melee/spell text-key dispatch
+  is now covered for the migrated event classes.
 - Resting actors, owned-item lookup, line-of-sight, moving doors, and transformation-script movement/rotation now use active-cell state and world-model transforms instead of treating an absent OSG node as inactive.
 - Neutral focus selection and gameplay raycasts now use the renderer-neutral camera state and physics collision masks, so activation and targeting no longer require an OSG renderer.
 - The active sound listener now follows the same neutral first-person, third-person, and vanity camera state instead of being disabled with OSG.
