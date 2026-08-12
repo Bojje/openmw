@@ -451,7 +451,7 @@ The full game should not be repeatedly started for every change. The main engine
 screen, modal/video loops, and screenshot capture now delegate frame advancement, event processing,
 update traversal, and frame submission through one engine-owned frame lifecycle. The engine creates
 one OSG `ViewerFrameLifecycle` before world initialization and passes that service explicitly to
-`World` and `RenderingManager`; no second OSG lifecycle adapter is constructed by the manager.
+`World`; the legacy manager receives only screenshot render/advance callbacks and stores no frame lifecycle.
 Direct OSG frame operations remain only in that adapter, while bootstrap callbacks use the same small
 frame-owner type that can be replaced with the Vulkan presentation owner. This establishes the
 replacement point for a future Vulkan frame owner while current OSG behavior remains unchanged.

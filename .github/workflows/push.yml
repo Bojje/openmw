@@ -198,6 +198,11 @@ jobs:
           echo "RenderingManager must not inherit the renderer-neutral frame lifecycle"
           exit 1
         fi
+        if rg -n 'Render::FrameLifecycle|FrameLifecycle' \
+            apps/openmw/mwrender/renderingmanager.hpp apps/openmw/mwrender/renderingmanager.cpp; then
+          echo "RenderingManager must not retain the active renderer frame lifecycle"
+          exit 1
+        fi
         if rg -n 'getFrameLifecycle|make_unique<[^>]*FrameLifecycle' \
             apps/openmw/mwrender/renderingmanager.hpp apps/openmw/mwrender/renderingmanager.cpp; then
           echo "The renderer manager must not create or expose a duplicate frame lifecycle"

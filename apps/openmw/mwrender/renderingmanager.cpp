@@ -179,10 +179,9 @@ namespace MWRender
         ObjectPaging*& objectPagingOutput,
         osgUtil::IncrementalCompileOperation*& incrementalCompileOperationOutput,
         SceneUtil::LightManager*& lightRootOutput, SkyManager*& skyOutput, PostProcessor*& postProcessorOutput,
-        Render::FrameLifecycle& frameLifecycle)
+        std::function<void()> frameRenderer, std::function<void()> frameAdvancer)
         : mSkyBlending(Settings::fog().mSkyBlending)
         , mViewer(viewer)
-        , mFrameLifecycle(frameLifecycle)
         , mRootNode(rootNode)
         , mResourceSystem(resourceSystem)
         , mWorkQueue(workQueue)
@@ -350,9 +349,8 @@ namespace MWRender
 
         mCamera = std::make_unique<Camera>(mViewer->getCamera());
 
-        mScreenshotManager = std::make_unique<ScreenshotManager>(viewer,
-            [this] { mFrameLifecycle.renderFrame(); },
-            [this] { mFrameLifecycle.advanceFrame(mViewer->getFrameStamp()->getSimulationTime()); });
+        mScreenshotManager = std::make_unique<ScreenshotManager>(
+            viewer, std::move(frameRenderer), std::move(frameAdvancer));
 
         mViewer->setLightingMode(osgViewer::View::NO_LIGHT);
 

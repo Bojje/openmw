@@ -267,7 +267,8 @@ namespace MWWorld
         mRendering = std::make_unique<MWRender::RenderingManager>(
             viewer, rootNode, mResourceSystem, workQueue, *mNavigator, mGroundcoverStore, unrefQueue, *mTerrainStorage,
             mTerrain, mObjectPaging, incrementalCompileOperation, lightRoot, mSkyManager, mPostProcessor,
-            frameLifecycle);
+            [&frameLifecycle] { frameLifecycle.renderFrame(); },
+            [&frameLifecycle] { frameLifecycle.advanceFrame(frameLifecycle.referenceTime()); });
         mFrameLifecycle = &frameLifecycle;
         mProjectileManager = std::make_unique<ProjectileManager>(
             lightRoot->asGroup(), mResourceSystem, mRendering.get(), mPhysics.get());

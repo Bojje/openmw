@@ -4,7 +4,6 @@
 #include "objects.hpp"
 #include "rendermode.hpp"
 
-#include <components/render/frame.hpp>
 #include <components/render/scene.hpp>
 #include <components/render/terrainpaging.hpp>
 
@@ -18,6 +17,7 @@
 
 #include <deque>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <span>
 #include <string>
@@ -126,7 +126,7 @@ namespace MWRender
             ObjectPaging*& objectPagingOutput,
             osgUtil::IncrementalCompileOperation*& incrementalCompileOperationOutput,
             SceneUtil::LightManager*& lightRootOutput, SkyManager*& skyOutput, PostProcessor*& postProcessorOutput,
-            Render::FrameLifecycle& frameLifecycle);
+            std::function<void()> frameRenderer, std::function<void()> frameAdvancer);
         ~RenderingManager();
 
         /// Copy the current reference-renderer camera and environment state into
@@ -310,7 +310,6 @@ namespace MWRender
         osg::ref_ptr<IntersectionVisitorWithIgnoreList> mIntersectionVisitor;
 
         osg::ref_ptr<osgViewer::Viewer> mViewer;
-        Render::FrameLifecycle& mFrameLifecycle;
         osg::ref_ptr<osg::Group> mRootNode;
         osg::ref_ptr<SceneUtil::LightManager> mSceneRoot;
         Resource::ResourceSystem* mResourceSystem;
