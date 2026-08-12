@@ -3,8 +3,10 @@
 
 #include <filesystem>
 #include <memory>
+#include <optional>
 
 #include <components/render/frame.hpp>
+#include <components/render/texture.hpp>
 
 struct SDL_Window;
 
@@ -35,6 +37,7 @@ namespace MWRender
         void advanceFrame(double simulationTime) override;
 
         void resize();
+        std::optional<Render::TextureData> captureFrame();
 
     private:
         struct Implementation;

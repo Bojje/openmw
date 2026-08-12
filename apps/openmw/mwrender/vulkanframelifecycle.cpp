@@ -118,4 +118,13 @@ namespace MWRender
             mImplementation->renderer->resize(static_cast<uint32_t>(width), static_cast<uint32_t>(height));
 #endif
     }
+
+    std::optional<Render::TextureData> VulkanFrameLifecycle::captureFrame()
+    {
+#ifdef OPENMW_USE_VULKAN
+        return mImplementation->renderer->captureFrame();
+#else
+        return std::nullopt;
+#endif
+    }
 }

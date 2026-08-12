@@ -417,8 +417,9 @@ backend callbacks for frame events, function keys, and drawable resize. The OSG 
 viewer event-queue callbacks, leaving a future Vulkan/input owner free to provide those operations
 without linking OSG into the shared SDL input component.
 Screenshot scheduling now follows the same callback boundary: `ActionManager` no longer owns an
-OSG viewer or `ScreenCaptureHandler`; the reference engine supplies its capture action, while a
-Vulkan presentation owner can supply a native capture implementation later.
+OSG viewer or `ScreenCaptureHandler`; the reference engine supplies its capture action, while
+the Vulkan presentation owner now reads back its last submitted frame and writes an explicit PPM
+capture. Native PNG/JPEG output and savegame thumbnail integration remain presentation work.
 Gyroscope orientation correction now uses a scalar Z rotation and neutral float storage rather than
 OSG matrix/vector types, so SDL sensor input can be reused by a non-OSG backend without importing
 presentation math.
@@ -455,7 +456,7 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-186 files, deleting 1,971 lines and adding 11,179 lines (net `+9,208`). The larger Vulkan-only
+186 files, deleting 1,970 lines and adding 11,235 lines (net `+9,265`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. The live no-GUI consumer is the first deletion
 checkpoint; further reduction can now target OSG scene/resource/presentation ownership rather
@@ -621,7 +622,9 @@ real replacement consumes its responsibility and the fast tests cover the bounda
 ### 7. Port dynamic content and presentation
 
 - Add actors, skinning, animation, particles, weather, water, spell effects, and post-processing.
-- Port GUI, fonts, loading screens, cursor handling, screenshots, and video presentation.
+- Port GUI, fonts, loading screens, cursor handling, and video presentation. Vulkan now has a
+  deliberately small PPM screenshot path for visual checkpoints; native screenshot formats and
+  savegame thumbnails remain outstanding.
 - Reintroduce ray tracing only after TLAS creation and the ray-tracing pipeline are complete; do not carry an inactive RT scaffold in the raster path.
 
 ### 8. Compare and delete

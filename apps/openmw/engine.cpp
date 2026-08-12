@@ -6,6 +6,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <future>
+#include <fstream>
 #include <system_error>
 
 #include <osgGA/GUIEventAdapter>
@@ -140,6 +141,23 @@ namespace
         result.data[11] = -1.f;
         result.data[14] = farClip * nearClip / (nearClip - farClip);
         return result;
+    }
+
+    bool writeVulkanScreenshot(const Render::TextureData& image, const std::filesystem::path& path)
+    {
+        if (!image.valid())
+            return false;
+        std::ofstream output(path, std::ios::binary);
+        if (!output)
+            return false;
+        output << "P6\n" << image.width << ' ' << image.height << "\n255\n";
+        for (std::size_t pixel = 0; pixel < image.pixels.size(); pixel += 4)
+        {
+            output.put(static_cast<char>(image.pixels[pixel + 0]));
+            output.put(static_cast<char>(image.pixels[pixel + 1]));
+            output.put(static_cast<char>(image.pixels[pixel + 2]));
+        }
+        return output.good();
     }
 
     void initStatsHandler(Resource::Profiler& profiler)
@@ -591,7 +609,28 @@ void OMW::Engine::prepareVulkanEngine()
             lifecycle->resize();
         mWindowManager->windowResized(width, height);
     };
-    mInputManager = std::make_unique<MWInput::InputManager>(mWindow, std::move(inputCallbacks), [] {}, keybinderUser,
+    const auto screenshot = [this] {
+        auto* const lifecycle = dynamic_cast<MWRender::VulkanFrameLifecycle*>(mFrameLifecycle.get());
+        if (!lifecycle)
+            return;
+        const std::optional<Render::TextureData> image = lifecycle->captureFrame();
+        if (!image)
+        {
+            Log(Debug::Warning) << "Vulkan screenshot requested before a frame was presented";
+            return;
+        }
+        std::error_code error;
+        std::filesystem::create_directories(mCfgMgr.getScreenshotPath(), error);
+        const auto stamp = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now().time_since_epoch()).count();
+        const std::filesystem::path path = mCfgMgr.getScreenshotPath()
+            / ("openmw-vulkan-" + std::to_string(stamp) + ".ppm");
+        if (!writeVulkanScreenshot(*image, path))
+            Log(Debug::Warning) << "Failed to write Vulkan screenshot " << path;
+        else
+            Log(Debug::Info) << "Vulkan screenshot written to " << path;
+    };
+    mInputManager = std::make_unique<MWInput::InputManager>(mWindow, std::move(inputCallbacks), screenshot, keybinderUser,
         keybinderUserExists, userGameControllerdb, gameControllerdb, mGrab);
     mEnvironment.setInputManager(*mInputManager);
 
