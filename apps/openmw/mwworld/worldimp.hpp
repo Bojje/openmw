@@ -148,6 +148,7 @@ namespace MWWorld
         int mDaysInPrison;
         bool mPlayerTraveling;
         bool mPlayerInJail;
+        bool mNeutralFirstPerson = true;
 
         float mSpellPreloadTimer;
 

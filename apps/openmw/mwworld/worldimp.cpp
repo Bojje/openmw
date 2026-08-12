@@ -475,6 +475,7 @@ namespace MWWorld
         mLevitationEnabled = true;
         mPlayerTraveling = false;
         mPlayerInJail = false;
+        mNeutralFirstPerson = true;
         mIdsRebuilt = false;
 
         fillGlobalVariables();
@@ -2365,11 +2366,14 @@ namespace MWWorld
     {
         if (mRendering)
             mRendering->getCamera()->toggleViewMode(force);
+        else if (mWorldScene)
+            mNeutralFirstPerson = !mNeutralFirstPerson;
     }
 
     bool World::isFirstPerson() const
     {
-        return mRendering && mRendering->getCamera()->getMode() == MWRender::Camera::Mode::FirstPerson;
+        return mRendering ? mRendering->getCamera()->getMode() == MWRender::Camera::Mode::FirstPerson
+                          : mNeutralFirstPerson;
     }
 
     bool World::isPreviewModeEnabled() const

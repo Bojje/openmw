@@ -172,6 +172,8 @@ submit scene updates without the previous device-wide stall.
 Neutral cells now retain worldspace identity, and both mesh and terrain collection filter
 to the active worldspace so an unloaded or inactive worldspace cannot leak into a Vulkan
 submission.
+The neutral game camera now retains POV state and produces a bounded third-person orbit behind
+the player when POV is toggled, instead of silently remaining first-person without an OSG camera.
 The fast test suite now also contains a backend-neutral RGBA8 image comparator with
 per-channel tolerance, differing-pixel count, maximum error, and mean error metrics.
 The renderer test family also includes a runnable resource-backend check: neutral resource

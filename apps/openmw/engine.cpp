@@ -782,12 +782,20 @@ void OMW::Engine::prepareVulkanEngine()
         if (player.isEmpty())
             return;
         const ESM::Position& position = player.getRefData().getPosition();
-        const Render::Vec3 eye = { position.pos[0], position.pos[1], position.pos[2] + 124.f };
         const Render::Quat orientation = Render::makeEulerRotation(
             { position.rot[0], position.rot[1], position.rot[2] });
         const Render::Vec3 forward = rotateNeutralVector(orientation, { 0.f, 1.f, 0.f });
         const Render::Vec3 up = rotateNeutralVector(orientation, { 0.f, 0.f, 1.f });
-        sceneData.view = neutralLookAt(eye, { eye.x + forward.x, eye.y + forward.y, eye.z + forward.z }, up);
+        const Render::Vec3 playerPosition{ position.pos[0], position.pos[1], position.pos[2] };
+        const bool firstPerson = mWorld->isFirstPerson();
+        const Render::Vec3 eye = firstPerson
+            ? Render::Vec3{ playerPosition.x, playerPosition.y, playerPosition.z + 124.f }
+            : Render::Vec3{ playerPosition.x - forward.x * 180.f, playerPosition.y - forward.y * 180.f,
+                  playerPosition.z + 105.f };
+        const Render::Vec3 target = firstPerson
+            ? Render::Vec3{ eye.x + forward.x, eye.y + forward.y, eye.z + forward.z }
+            : Render::Vec3{ playerPosition.x, playerPosition.y, playerPosition.z + 90.f };
+        sceneData.view = neutralLookAt(eye, target, up);
         sceneData.viewInverse = Render::invertMat4(sceneData.view);
         sceneData.projInverse = Render::invertMat4(sceneData.projection);
     };
