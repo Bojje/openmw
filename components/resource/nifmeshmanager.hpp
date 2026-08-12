@@ -4,6 +4,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <vector>
 
 #include <components/nif/niffile.hpp>
@@ -45,6 +46,11 @@ namespace Resource
 
         /// Convert an already-loaded NIF, using the same path-keyed cache.
         std::shared_ptr<const Meshes> get(const Nif::NIFFilePtr& file);
+
+        /// Return the longest controller interval in a NIF, when one exists.
+        /// This is renderer-neutral metadata used by world-owned effects.
+        std::optional<float> getAnimationDuration(VFS::Path::NormalizedView name);
+        std::optional<float> getAnimationDuration(const Nif::NIFFilePtr& file) const;
 
         void updateCache(double referenceTime) override;
         void clearCache() override;

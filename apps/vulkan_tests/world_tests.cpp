@@ -211,7 +211,7 @@ int main()
     Render::MeshInstance aggregateMesh = {};
     aggregateMesh.mesh.vertices.resize(3);
     aggregateMesh.mesh.indices = { 0, 1, 2 };
-    if (!world.recordEffect("spark", "meshes/effect.nif", { 10.f, 11.f, 12.f }, 2.f, "textures/effect.dds", true)
+    if (!world.recordEffect("spark", "meshes/effect.nif", { 10.f, 11.f, 12.f }, 2.f, "textures/effect.dds", true, 2.f)
         || world.recordEffect("", "meshes/effect.nif", { 10.f, 11.f, 12.f }, 1.f))
         throw std::runtime_error("renderer-neutral world scene accepted an invalid or anonymous effect");
     const Render::SceneSubmission effectSubmission = Render::collectSceneSubmission(world, aggregateScene, "",
@@ -227,13 +227,26 @@ int main()
         || effectSubmission.effects.back().meshes.back().mesh.material.albedoWrapU
         || effectSubmission.effects.back().meshes.back().mesh.material.albedoWrapV
         || !effectSubmission.effects.back().object.looping
+        || effectSubmission.effects.back().object.animationDuration != 2.f
         || !effectSubmission.valid())
         throw std::runtime_error("renderer-neutral scene submission lost an identified effect");
     if (!world.removeEffect("spark") || world.removeEffect("spark"))
         throw std::runtime_error("renderer-neutral world scene failed effect removal");
-    if (!world.recordEffect("loop", "meshes/effect.nif", { 1.f, 2.f, 3.f }, 1.f, {}, true)
+    if (!world.recordEffect("loop", "meshes/effect.nif", { 1.f, 2.f, 3.f }, 1.f, {}, true, 2.f)
         || world.effectsInOrder().size() != 1 || !world.effectsInOrder().front()->looping)
         throw std::runtime_error("renderer-neutral world scene failed to retain an identified effect");
+    world.updateEffects(1.5f);
+    if (world.effectsInOrder().front()->animationTime != 1.5f)
+        throw std::runtime_error("renderer-neutral world scene failed to advance an effect");
+    world.updateEffects(1.f);
+    if (world.effectsInOrder().front()->animationTime != 0.5f)
+        throw std::runtime_error("renderer-neutral world scene failed to loop an effect");
+    if (!world.recordEffect("oneshot", "meshes/effect.nif", { 1.f, 2.f, 3.f }, 1.f, {}, false, 1.f))
+        throw std::runtime_error("renderer-neutral world scene failed to record a one-shot effect");
+    world.updateEffects(1.f);
+    if (world.effectsInOrder().size() != 1 || !world.effectsInOrder().front()->looping
+        || world.effectsInOrder().front()->animationTime != 1.5f)
+        throw std::runtime_error("renderer-neutral world scene failed to remove a completed effect");
     world.clearEffects();
     if (!world.effectsInOrder().empty())
         throw std::runtime_error("renderer-neutral world scene failed to clear effects");

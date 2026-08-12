@@ -416,6 +416,8 @@ namespace MWWorld
 
         if (mPreloader)
             mPreloader->updateCache(mFrameLifecycle.referenceTime());
+        if (mNeutralWorldScene)
+            mNeutralWorldScene->updateEffects(duration);
         preloadCells(duration);
     }
 

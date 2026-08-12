@@ -208,7 +208,11 @@ namespace Render
 
             for (const EffectMeshSubmission& effect : effects)
             {
-                if (effect.object.dynamic || effect.object.model.empty() || !effect.object.transform.valid())
+                if (effect.object.dynamic || effect.object.model.empty() || !effect.object.transform.valid()
+                    || !std::isfinite(effect.object.animationDuration) || effect.object.animationDuration < 0.f
+                    || !std::isfinite(effect.object.animationTime) || effect.object.animationTime < 0.f
+                    || (effect.object.animationDuration > 0.f
+                        && effect.object.animationTime >= effect.object.animationDuration))
                     return false;
                 for (const MeshInstance& instance : effect.meshes)
                     if (!validMeshInstance(instance, false))

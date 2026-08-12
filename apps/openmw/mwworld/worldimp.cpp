@@ -42,6 +42,7 @@
 #include <components/files/collections.hpp>
 
 #include <components/resource/bulletshape.hpp>
+#include <components/resource/nifmeshmanager.hpp>
 #include <components/resource/resourcesystem.hpp>
 
 #include <components/sceneutil/lightmanager.hpp>
@@ -3956,8 +3957,12 @@ namespace MWWorld
             mRendering->spawnEffect(model, textureOverride, worldPos, scale, isMagicVFX, useAmbientLight, effectId, loop);
         else if (mWorldScene && !effectId.empty() && mWorldScene->mNeutralWorldScene)
         {
+            std::optional<float> animationDuration;
+            if (mResourceSystem != nullptr && mResourceSystem->backend() == Resource::ResourceSystem::Backend::Neutral)
+                animationDuration = mResourceSystem->getNifMeshManager()->getAnimationDuration(model);
             mWorldScene->mNeutralWorldScene->recordEffect(effectId, model.value(),
-                { worldPos.x(), worldPos.y(), worldPos.z() }, scale, textureOverride, loop);
+                { worldPos.x(), worldPos.y(), worldPos.z() }, scale, textureOverride, loop,
+                animationDuration.value_or(0.f));
         }
     }
 

@@ -1,7 +1,10 @@
 #include "nifmeshmanager.hpp"
 
 #include <stdexcept>
+#include <algorithm>
+#include <cmath>
 
+#include <components/nif/controller.hpp>
 #include <components/nif/niffile.hpp>
 #include <components/nif/meshconverter.hpp>
 
@@ -43,6 +46,27 @@ namespace Resource
         std::lock_guard lock(mMutex);
         const auto [it, inserted] = mCache.emplace(key, CacheItem{ meshes });
         return inserted ? std::move(meshes) : it->second.mMeshes;
+    }
+
+    std::optional<float> NifMeshManager::getAnimationDuration(VFS::Path::NormalizedView name)
+    {
+        return getAnimationDuration(mNifFileManager->get(name));
+    }
+
+    std::optional<float> NifMeshManager::getAnimationDuration(const Nif::NIFFilePtr& file) const
+    {
+        if (!file)
+            return std::nullopt;
+        std::optional<float> result;
+        for (const std::unique_ptr<Nif::Record>& record : file->mRecords)
+        {
+            const auto* controller = dynamic_cast<const Nif::NiTimeController*>(record.get());
+            if (controller == nullptr || !std::isfinite(controller->mTimeStop))
+                continue;
+            const float duration = std::max(0.f, controller->mTimeStop - controller->mTimeStart);
+            result = std::max(result.value_or(0.f), duration);
+        }
+        return result;
     }
 
     void NifMeshManager::updateCache(double referenceTime)

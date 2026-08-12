@@ -63,6 +63,10 @@ namespace Render
         // presentation owner is still responsible for advancing/removing the
         // effect when animation support is available.
         bool looping = false;
+        // A zero duration means the resource did not expose a controller
+        // interval. Such effects remain explicitly removable by gameplay.
+        float animationDuration = 0.f;
+        float animationTime = 0.f;
     };
 
     // A cell snapshot is updated by the world lifecycle, not by a renderer.
@@ -190,7 +194,7 @@ namespace Render
         }
 
         bool recordEffect(std::string_view effectId, std::string_view model, const Vec3& position, float scale,
-            std::string_view textureOverride = {}, bool looping = false)
+            std::string_view textureOverride = {}, bool looping = false, float animationDuration = 0.f)
         {
             if (effectId.empty() || model.empty() || !valid(position) || !valid(scale) || scale <= 0.f)
                 return false;
@@ -203,11 +207,43 @@ namespace Render
             effect.transform.scale = { scale, scale, scale };
             effect.textureOverride = textureOverride;
             effect.looping = looping;
+            effect.animationDuration = valid(animationDuration) && animationDuration > 0.f ? animationDuration : 0.f;
             mEffects[std::string(effectId)] = std::move(effect);
             return true;
         }
 
         bool removeEffect(std::string_view effectId) { return mEffects.erase(std::string(effectId)) != 0; }
+
+        void updateEffects(float duration)
+        {
+            if (!valid(duration) || duration <= 0.f)
+                return;
+            for (auto iter = mEffects.begin(); iter != mEffects.end();)
+            {
+                WorldObject& effect = iter->second;
+                if (effect.animationDuration <= 0.f)
+                {
+                    ++iter;
+                    continue;
+                }
+
+                effect.animationTime += duration;
+                if (effect.animationTime < effect.animationDuration)
+                {
+                    ++iter;
+                    continue;
+                }
+
+                if (!effect.looping)
+                {
+                    iter = mEffects.erase(iter);
+                    continue;
+                }
+
+                effect.animationTime = std::fmod(effect.animationTime, effect.animationDuration);
+                ++iter;
+            }
+        }
 
         void clearEffects() { mEffects.clear(); }
 

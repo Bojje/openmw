@@ -3,6 +3,7 @@
 #include <stdexcept>
 
 #include <components/nif/data.hpp>
+#include <components/nif/controller.hpp>
 #include <components/nif/meshconverter.hpp>
 #include <components/nif/property.hpp>
 #include <components/nif/texture.hpp>
@@ -256,6 +257,13 @@ int main()
         throw std::runtime_error("NIF no-lighting shader material conversion lost neutral state");
 
     Resource::NifMeshManager meshManager(nullptr);
+    auto controller = std::make_unique<Nif::NiTimeController>();
+    controller->mTimeStart = 1.f;
+    controller->mTimeStop = 4.f;
+    file->mRecords.push_back(std::move(controller));
+    const std::optional<float> animationDuration = meshManager.getAnimationDuration(file);
+    if (!animationDuration || *animationDuration != 3.f)
+        throw std::runtime_error("NIF mesh manager did not expose neutral controller duration");
     const auto cached = meshManager.get(file);
     const auto cachedAgain = meshManager.get(file);
     if (cached != cachedAgain || cached->size() != 1 || cached->front().mesh.indices.size() != 3)
