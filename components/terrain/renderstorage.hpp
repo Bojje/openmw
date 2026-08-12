@@ -37,6 +37,13 @@ namespace Terrain
         virtual int getCellVertices(ESM::RefId worldspace) = 0;
         virtual int getTextureTileCount(float chunkSize, ESM::RefId worldspace) = 0;
 
+        /// Optional neutral collision samples for one exterior cell.
+        virtual std::optional<Render::TerrainHeightField> getHeightField(
+            int /*gridX*/, int /*gridY*/, ESM::RefId /*worldspace*/)
+        {
+            return std::nullopt;
+        }
+
         std::vector<Render::TerrainTile> getRenderTiles(int gridX, int gridY, ESM::RefId worldspace);
 
         // Assemble aligned square regions covering an exterior cell rectangle.

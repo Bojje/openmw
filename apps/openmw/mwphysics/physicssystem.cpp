@@ -391,10 +391,10 @@ namespace MWPhysics
     }
 
     void PhysicsSystem::addHeightField(
-        const float* heights, int x, int y, int size, int verts, float minH, float maxH, const osg::Object* holdObject)
+        std::vector<float> heights, int x, int y, int size, int verts, float minH, float maxH)
     {
         mHeightFields[std::make_pair(x, y)]
-            = std::make_unique<HeightField>(heights, x, y, size, verts, minH, maxH, holdObject, mTaskScheduler.get());
+            = std::make_unique<HeightField>(std::move(heights), x, y, size, verts, minH, maxH, mTaskScheduler.get());
     }
 
     void PhysicsSystem::removeHeightField(int x, int y)

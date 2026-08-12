@@ -3,14 +3,15 @@
 
 #include <components/bullethelpers/heightfield.hpp>
 
-#include <osg/Object>
-
 #include <BulletCollision/CollisionDispatch/btCollisionObject.h>
 #include <BulletCollision/CollisionShapes/btHeightfieldTerrainShape.h>
 
 #include <LinearMath/btTransform.h>
 
+#include <cmath>
+#include <stdexcept>
 #include <type_traits>
+#include <utility>
 
 #if BT_BULLET_VERSION < 310
 // Older Bullet versions only support `btScalar` heightfields.
@@ -52,19 +53,25 @@ namespace
 
 namespace MWPhysics
 {
-    HeightField::HeightField(const float* heights, int x, int y, int size, int verts, float minH, float maxH,
-        const osg::Object* holdObject, PhysicsTaskScheduler* scheduler)
-        : mHoldObject(holdObject)
+    HeightField::HeightField(std::vector<float> heights, int x, int y, int size, int verts, float minH, float maxH,
+        PhysicsTaskScheduler* scheduler)
+        : mHeights(std::move(heights))
 #if BT_BULLET_VERSION < 310
-        , mHeights(makeHeights(heights, verts))
+        , mBulletHeights(makeHeights(mHeights.data(), verts))
 #endif
+        , mVertexCount(static_cast<std::size_t>(verts))
+        , mMinHeight(minH)
+        , mMaxHeight(maxH)
         , mTaskScheduler(scheduler)
     {
+        if (verts <= 1 || mHeights.size() != mVertexCount * mVertexCount || !std::isfinite(minH)
+            || !std::isfinite(maxH) || minH > maxH)
+            throw std::invalid_argument("Invalid terrain heightfield sample count");
 #if BT_BULLET_VERSION < 310
         mShape = std::make_unique<btHeightfieldTerrainShape>(
-            verts, verts, getHeights(heights, mHeights), 1, minH, maxH, 2, PHY_FLOAT, false);
+            verts, verts, getHeights(mHeights.data(), mBulletHeights), 1, minH, maxH, 2, PHY_FLOAT, false);
 #else
-        mShape = std::make_unique<btHeightfieldTerrainShape>(verts, verts, heights, minH, maxH, 2, false);
+        mShape = std::make_unique<btHeightfieldTerrainShape>(verts, verts, mHeights.data(), minH, maxH, 2, false);
 #endif
         mShape->setUseDiamondSubdivision(true);
 

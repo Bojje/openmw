@@ -216,7 +216,10 @@ now depends on cached world tiles rather than the legacy OSG terrain object bein
 per-cell LOD assembly. `MWWorld::Scene` receives that contract explicitly at construction,
 so its neutral terrain paths do not call back into `RenderingManager`. The legacy
 `Terrain::Storage` derives from it and contains only the OSG-facing array, image, and height
-adapters needed by the reference renderer. `RenderStorage::getRenderTile()` consumes neutral
+adapters needed by the reference renderer. Terrain collision samples now cross that same
+contract as owned neutral heightfield data; Bullet retains the samples itself, so `Scene` no
+longer reads an OSG `LandObject` or relies on its lifetime when creating collision and navigation
+heightfields. `RenderStorage::getRenderTile()` consumes neutral
 vertices and blendmaps directly, so the Vulkan path no longer performs an OSG-buffer-to-neutral
 round trip and can depend on the contract without including OSG headers. `World` now owns the
 concrete `MWRender::TerrainStorage` lifetime and passes it explicitly to the OSG manager and

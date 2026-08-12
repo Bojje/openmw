@@ -190,8 +190,7 @@ namespace MWPhysics
         void updateRotation(const MWWorld::Ptr& ptr, osg::Quat rotate);
         void updatePosition(const MWWorld::Ptr& ptr);
 
-        void addHeightField(const float* heights, int x, int y, int size, int verts, float minH, float maxH,
-            const osg::Object* holdObject);
+        void addHeightField(std::vector<float> heights, int x, int y, int size, int verts, float minH, float maxH);
 
         void removeHeightField(int x, int y);
 

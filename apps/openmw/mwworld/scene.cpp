@@ -17,7 +17,6 @@
 #include <components/detournavigator/heightfieldshape.hpp>
 #include <components/detournavigator/navigator.hpp>
 #include <components/detournavigator/updateguard.hpp>
-#include <components/esm/esmterrain.hpp>
 #include <components/esm/records.hpp>
 #include <components/esm3/loadcell.hpp>
 #include <components/loadinglistener/loadinglistener.hpp>
@@ -505,7 +504,6 @@ namespace MWWorld
         const int cellY = cell.getCell()->getGridY();
         const MWWorld::Cell& cellVariant = *cell.getCell();
         ESM::RefId worldspace = cellVariant.getWorldSpace();
-        ESM::ExteriorCellLocation cellIndex(cellX, cellY, worldspace);
         mNeutralWorldScene.recordCell(static_cast<const void*>(&cell), cellVariant.isExterior(), cellX,
             cellY, cellVariant.getNameId(), worldspace.serializeText());
 
@@ -527,37 +525,40 @@ namespace MWWorld
 
         if (cellVariant.isExterior())
         {
-            osg::ref_ptr<const ESMTerrain::LandObject> land = mLandManager.getLand(cellIndex);
-            const ESM::LandData* data = land ? land->getData(ESM::Land::DATA_VHGT) : nullptr;
             const int verts = ESM::getLandSize(worldspace);
             const int worldsize = ESM::getCellSize(worldspace);
+            bool hasTerrainData = false;
 
-            if (data)
+            if (std::optional<Render::TerrainHeightField> heightField
+                = mTerrainStorage.getHeightField(cellX, cellY, worldspace);
+                heightField && heightField->valid())
             {
-                mPhysics->addHeightField(data->getHeights().data(), cellX, cellY, worldsize, verts,
-                    data->getMinHeight(), data->getMaxHeight(), land.get());
+                hasTerrainData = true;
+                mPhysics->addHeightField(std::move(heightField->heights), cellX, cellY, worldsize, verts,
+                    heightField->minHeight, heightField->maxHeight);
             }
             else if (!ESM::isEsm4Ext(worldspace))
             {
                 static const std::vector<float> defaultHeight(verts * verts, ESM::Land::DEFAULT_HEIGHT);
-                mPhysics->addHeightField(defaultHeight.data(), cellX, cellY, worldsize, verts,
-                    ESM::Land::DEFAULT_HEIGHT, ESM::Land::DEFAULT_HEIGHT, land.get());
+                mPhysics->addHeightField(defaultHeight, cellX, cellY, worldsize, verts,
+                    ESM::Land::DEFAULT_HEIGHT, ESM::Land::DEFAULT_HEIGHT);
             }
             if (mPhysics->getHeightField(cellX, cellY))
             {
                 const osg::Vec2i cellPosition(cellX, cellY);
                 const HeightfieldShape shape = [&]() -> HeightfieldShape {
-                    if (data == nullptr)
+                    if (!hasTerrainData)
                     {
                         return DetourNavigator::HeightfieldPlane{ static_cast<float>(ESM::Land::DEFAULT_HEIGHT) };
                     }
                     else
                     {
+                        const MWPhysics::HeightField* field = mPhysics->getHeightField(cellX, cellY);
                         DetourNavigator::HeightfieldSurface heights;
-                        heights.mHeights = data->getHeights().data();
-                        heights.mSize = static_cast<std::size_t>(data->getLandSize());
-                        heights.mMinHeight = data->getMinHeight();
-                        heights.mMaxHeight = data->getMaxHeight();
+                        heights.mHeights = field->getHeights();
+                        heights.mSize = field->getVertexCount();
+                        heights.mMinHeight = field->getMinHeight();
+                        heights.mMaxHeight = field->getMaxHeight();
                         return heights;
                     }
                 }();

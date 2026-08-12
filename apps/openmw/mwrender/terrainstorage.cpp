@@ -48,6 +48,26 @@ namespace MWRender
         }
     }
 
+    std::optional<Render::TerrainHeightField> TerrainStorage::getHeightField(
+        int gridX, int gridY, ESM::RefId worldspace)
+    {
+        const osg::ref_ptr<const ESMTerrain::LandObject> land
+            = mLandManager->getLand(ESM::ExteriorCellLocation(gridX, gridY, worldspace));
+        const ESM::LandData* data = land ? land->getData(ESM::Land::DATA_VHGT) : nullptr;
+        if (data == nullptr)
+            return std::nullopt;
+
+        const auto heights = data->getHeights();
+        Render::TerrainHeightField result;
+        result.heights.assign(heights.begin(), heights.end());
+        result.verticesPerSide = static_cast<std::uint32_t>(ESM::getLandSize(worldspace));
+        result.minHeight = data->getMinHeight();
+        result.maxHeight = data->getMaxHeight();
+        if (!result.valid())
+            return std::nullopt;
+        return result;
+    }
+
     static void BoundUnion(float& minX, float& maxX, float& minY, float& maxY, float x, float y)
     {
         if (x < minX)

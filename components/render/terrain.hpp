@@ -19,6 +19,21 @@ namespace Render
         std::array<std::uint8_t, 4> color{ 255, 255, 255, 255 };
     };
 
+    struct TerrainHeightField
+    {
+        std::vector<float> heights;
+        std::uint32_t verticesPerSide = 0;
+        float minHeight = 0.f;
+        float maxHeight = 0.f;
+
+        bool valid() const
+        {
+            return verticesPerSide > 1 && heights.size() == static_cast<std::size_t>(verticesPerSide) * verticesPerSide
+                && std::all_of(heights.begin(), heights.end(), [](float value) { return std::isfinite(value); })
+                && std::isfinite(minHeight) && std::isfinite(maxHeight) && minHeight <= maxHeight;
+        }
+    };
+
     struct TerrainLayer
     {
         std::string diffuseTexture;
