@@ -149,7 +149,10 @@ projection updates; camera-controller parity remains outstanding.
 Mechanics actor and animated-object registries no longer discard references when the active
 backend has no OSG animation owner. Their controllers now explicitly accept an optional pose
 owner, so Vulkan can run actor/object AI, collision activation, and state transitions while
-neutral bind-pose rendering remains independent of the legacy animation implementation.
+neutral bind-pose rendering remains independent of the legacy animation implementation. The
+renderer-neutral actor path also queues local movement, jump, rotation, collision, and physics
+activation without entering the OSG animation update; this closes the earlier gap where actors
+were registered for AI but could never advance through physics.
 OSG scene-node visibility writes are guarded at the mechanics boundary; this removes a hidden
 requirement that every simulated actor already have an OSG node.
 Player update logic now treats the absent OSG presentation owner as an explicit Vulkan mode, and

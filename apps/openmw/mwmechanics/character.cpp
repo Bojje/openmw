@@ -1984,7 +1984,10 @@ namespace MWMechanics
     void CharacterController::update(float duration)
     {
         if (!mAnimation)
+        {
+            updateNeutralMovement(duration);
             return;
+        }
         MWBase::World* world = MWBase::Environment::get().getWorld();
         MWBase::SoundManager* sndMgr = MWBase::Environment::get().getSoundManager();
         const MWWorld::Class& cls = mPtr.getClass();
@@ -2560,6 +2563,54 @@ namespace MWMechanics
                     sndMgr->stopSound3D(mPtr, wolfRun);
             }
         }
+    }
+
+    void CharacterController::updateNeutralMovement(float duration)
+    {
+        if (!mPtr.getClass().isActor())
+            return;
+
+        MWBase::World* world = MWBase::Environment::get().getWorld();
+        const MWWorld::Class& cls = mPtr.getClass();
+        CreatureStats& stats = cls.getCreatureStats(mPtr);
+        Movement& settings = cls.getMovementSettings(mPtr);
+
+        if (stats.wasTeleported())
+            stats.setTeleported(false);
+
+        osg::Vec3f movement(settings.asVec3());
+        const float inputLength = movement.length();
+        settings.mSpeedFactor = std::min(inputLength, 1.f);
+        if (inputLength > 0.f)
+            movement /= inputLength;
+        else
+            movement = osg::Vec3f();
+
+        const bool inWater = world->isSwimming(mPtr);
+        const bool flying = world->isFlying(mPtr);
+        const bool solid = world->isActorCollisionEnabled(mPtr);
+        if (stats.isDead() || stats.isParalyzed() || isKnockedDown() || isKnockedOut() || inWater || flying || !solid)
+            movement.z() = 0.f;
+
+        movement.x() *= cls.getCurrentSpeed(mPtr);
+        movement.y() *= cls.getCurrentSpeed(mPtr);
+
+        if (!inWater && !flying && solid && world->isOnGround(mPtr) && cls.getJump(mPtr) > 0.f
+            && movement.z() > 0.f)
+            movement.z() = cls.getJump(mPtr);
+        else
+            movement.z() = 0.f;
+
+        const osg::Vec3f rotation = cls.getRotationVector(mPtr);
+        if (rotation != osg::Vec3f())
+            world->rotateObject(mPtr, rotation, true);
+
+        world->queueMovement(mPtr, movement);
+        settings.mPosition[0] = settings.mPosition[1] = 0.f;
+        if (movement.z() == 0.f)
+            settings.mPosition[2] = 0.f;
+
+        (void)duration;
     }
 
     void CharacterController::persistAnimationState() const
