@@ -175,6 +175,8 @@ to the active worldspace so an unloaded or inactive worldspace cannot leak into 
 submission.
 The neutral game camera now retains POV state and produces a bounded third-person orbit behind
 the player when POV is toggled, instead of silently remaining first-person without an OSG camera.
+Neutral vanity mode now also owns its orbit yaw/pitch, restores the prior POV when disabled, and
+loads/saves the existing `FIRS` camera state without constructing an OSG camera.
 The fast test suite now also contains a backend-neutral RGBA8 image comparator with
 per-channel tolerance, differing-pixel count, maximum error, and mean error metrics.
 The renderer test family also includes a runnable resource-backend check: neutral resource

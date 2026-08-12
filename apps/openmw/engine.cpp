@@ -775,14 +775,20 @@ void OMW::Engine::prepareVulkanEngine()
         const ESM::Position& position = player.getRefData().getPosition();
         const Render::Quat orientation = Render::makeEulerRotation(
             { position.rot[0], position.rot[1], position.rot[2] });
-        const Render::Vec3 forward = rotateNeutralVector(orientation, { 0.f, 1.f, 0.f });
-        const Render::Vec3 up = rotateNeutralVector(orientation, { 0.f, 0.f, 1.f });
+        const bool vanity = mWorld->isNeutralVanityModeEnabled();
+        const Render::Quat cameraOrientation = vanity
+            ? Render::multiply(orientation,
+                  Render::makeEulerRotation(
+                      { mWorld->getNeutralVanityPitch(), 0.f, mWorld->getNeutralVanityYaw() }))
+            : orientation;
+        const Render::Vec3 forward = rotateNeutralVector(cameraOrientation, { 0.f, 1.f, 0.f });
+        const Render::Vec3 up = rotateNeutralVector(cameraOrientation, { 0.f, 0.f, 1.f });
         const Render::Vec3 playerPosition{ position.pos[0], position.pos[1], position.pos[2] };
         const bool firstPerson = mWorld->isFirstPerson();
         const Render::Vec3 eye = firstPerson
             ? Render::Vec3{ playerPosition.x, playerPosition.y, playerPosition.z + 124.f }
             : Render::Vec3{ playerPosition.x - forward.x * 180.f, playerPosition.y - forward.y * 180.f,
-                  playerPosition.z + 105.f };
+                  playerPosition.z + (vanity ? 90.f : 105.f) };
         const Render::Vec3 target = firstPerson
             ? Render::Vec3{ eye.x + forward.x, eye.y + forward.y, eye.z + forward.z }
             : Render::Vec3{ playerPosition.x, playerPosition.y, playerPosition.z + 90.f };

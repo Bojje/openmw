@@ -149,6 +149,10 @@ namespace MWWorld
         bool mPlayerTraveling;
         bool mPlayerInJail;
         bool mNeutralFirstPerson = true;
+        bool mNeutralVanityMode = false;
+        bool mNeutralVanityPreviousFirstPerson = true;
+        float mNeutralVanityPitch = 0.f;
+        float mNeutralVanityYaw = 0.f;
 
         float mSpellPreloadTimer;
 
@@ -209,6 +213,9 @@ namespace MWWorld
         WorldModel& getWorldModel() { return mWorldModel; }
         Scene& getWorldScene() { return *mWorldScene; }
         void updateNeutralSceneData(Render::SceneData& sceneData) const;
+        bool isNeutralVanityModeEnabled() const { return mNeutralVanityMode; }
+        float getNeutralVanityPitch() const { return mNeutralVanityPitch; }
+        float getNeutralVanityYaw() const { return mNeutralVanityYaw; }
         const GroundcoverStore& getGroundcoverStore() const { return mGroundcoverStore; }
 
         // FIXME

@@ -372,6 +372,9 @@ namespace MWWorld
         renderPlayer();
         if (mRendering)
             mRendering->getCamera()->reset();
+        mNeutralVanityMode = false;
+        mNeutralVanityPitch = 0.f;
+        mNeutralVanityYaw = 0.f;
 
         // we don't want old weather to persist on a new game
         // Note that if reset later, the initial ChangeWeather that the chargen script calls will be lost.
@@ -476,6 +479,10 @@ namespace MWWorld
         mPlayerTraveling = false;
         mPlayerInJail = false;
         mNeutralFirstPerson = true;
+        mNeutralVanityMode = false;
+        mNeutralVanityPreviousFirstPerson = true;
+        mNeutralVanityPitch = 0.f;
+        mNeutralVanityYaw = 0.f;
         mIdsRebuilt = false;
 
         fillGlobalVariables();
@@ -552,6 +559,9 @@ namespace MWWorld
             case ESM::REC_ENAB:
                 reader.getHNT(mTeleportEnabled, "TELE");
                 reader.getHNT(mLevitationEnabled, "LEVT");
+                return;
+            case ESM::REC_CAM_:
+                reader.getHNT(mNeutralFirstPerson, "FIRS");
                 return;
             case ESM::REC_RAND:
             {
@@ -2386,7 +2396,21 @@ namespace MWWorld
 
     bool World::toggleVanityMode(bool enable)
     {
-        return mRendering && mRendering->getCamera()->toggleVanityMode(enable);
+        if (mRendering)
+            return mRendering->getCamera()->toggleVanityMode(enable);
+        if (!mWorldScene)
+            return false;
+        if (enable == mNeutralVanityMode)
+            return enable;
+        if (enable)
+        {
+            mNeutralVanityPreviousFirstPerson = mNeutralFirstPerson;
+            mNeutralFirstPerson = false;
+        }
+        else
+            mNeutralFirstPerson = mNeutralVanityPreviousFirstPerson;
+        mNeutralVanityMode = enable;
+        return enable;
     }
 
     void World::disableDeferredPreviewRotation()
@@ -2409,7 +2433,14 @@ namespace MWWorld
     bool World::vanityRotateCamera(const float* rot)
     {
         if (!mRendering)
-            return false;
+        {
+            if (!mNeutralVanityMode || rot == nullptr)
+                return false;
+            constexpr float maxPitch = 1.45f;
+            mNeutralVanityPitch = std::clamp(mNeutralVanityPitch + rot[0], -maxPitch, maxPitch);
+            mNeutralVanityYaw += rot[2];
+            return true;
+        }
 
         auto* camera = mRendering->getCamera();
         if (!camera->isVanityOrPreviewModeEnabled())
