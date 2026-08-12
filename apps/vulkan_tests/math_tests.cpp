@@ -103,6 +103,16 @@ namespace
         if (scene.valid())
             throw std::runtime_error("renderer-neutral scene accepted a non-finite sky color");
     }
+
+    void testPerspective()
+    {
+        const Render::Mat4 projection = Render::perspective(2.f, 60.f, 1.f, 10.f);
+        expectNear(projection.data[0], std::sqrt(3.f) / 2.f, "perspective horizontal focal");
+        expectNear(projection.data[5], std::sqrt(3.f), "perspective vertical focal");
+        expectNear(projection.data[10], -10.f / 9.f, "perspective depth scale");
+        expectNear(projection.data[14], -10.f / 9.f, "perspective depth offset");
+        expectNear(projection.data[11], -1.f, "perspective homogeneous depth");
+    }
 }
 
 int main()
@@ -114,6 +124,7 @@ int main()
         testNormalMatrix();
         testSingularMatrices();
         testSceneDataValidation();
+        testPerspective();
         std::cout << "Vulkan math tests passed\n";
         return EXIT_SUCCESS;
     }

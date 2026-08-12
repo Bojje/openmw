@@ -1,6 +1,7 @@
 #ifndef OPENMW_COMPONENTS_RENDER_MATH_H
 #define OPENMW_COMPONENTS_RENDER_MATH_H
 
+#include <algorithm>
 #include <cmath>
 #include <cstring>
 
@@ -8,6 +9,26 @@
 
 namespace Render
 {
+    // Vulkan's current raster path uses the same non-reversed depth convention
+    // as this migration's neutral scene snapshots. Keep projection policy in
+    // the shared math boundary so frame owners and CPU tests use one formula.
+    inline Mat4 perspective(float aspect, float fieldOfView, float nearClip, float farClip)
+    {
+        constexpr float pi = 3.14159265358979323846f;
+        aspect = std::max(0.0001f, aspect);
+        fieldOfView = std::clamp(fieldOfView, 1.f, 179.f) * pi / 180.f;
+        nearClip = std::max(0.005f, nearClip);
+        farClip = std::max(nearClip + 0.005f, farClip);
+        const float focal = 1.f / std::tan(fieldOfView * 0.5f);
+        Mat4 result = {};
+        result.data[0] = focal / aspect;
+        result.data[5] = focal;
+        result.data[10] = farClip / (nearClip - farClip);
+        result.data[11] = -1.f;
+        result.data[14] = farClip * nearClip / (nearClip - farClip);
+        return result;
+    }
+
     inline Quat multiply(const Quat& lhs, const Quat& rhs)
     {
         return { lhs.w * rhs.x + lhs.x * rhs.w + lhs.y * rhs.z - lhs.z * rhs.y,

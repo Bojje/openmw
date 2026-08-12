@@ -151,21 +151,6 @@ namespace
             vector.z + rotation.w * twiceCross.z + crossSecond.z };
     }
 
-    Render::Mat4 neutralPerspective(float aspect)
-    {
-        const float fieldOfView = 75.f * static_cast<float>(M_PI) / 180.f;
-        const float focal = 1.f / std::tan(fieldOfView * 0.5f);
-        const float nearClip = 1.f;
-        const float farClip = 100000.f;
-        Render::Mat4 result = {};
-        result.data[0] = focal / aspect;
-        result.data[5] = focal;
-        result.data[10] = farClip / (nearClip - farClip);
-        result.data[11] = -1.f;
-        result.data[14] = farClip * nearClip / (nearClip - farClip);
-        return result;
-    }
-
     bool writeVulkanScreenshot(const Render::TextureData& image, const std::filesystem::path& path)
     {
         if (!image.valid())
@@ -748,8 +733,12 @@ void OMW::Engine::prepareVulkanEngine()
             SDL_Vulkan_GetDrawableSize(mWindow, &drawableWidth, &drawableHeight);
         const float aspect = static_cast<float>(std::max(1, drawableWidth))
             / static_cast<float>(std::max(1, drawableHeight));
-        sceneData.projection = neutralPerspective(aspect);
         const MWWorld::Ptr player = mWorld->getPlayerPtr();
+        const bool firstPerson = mWorld->isFirstPerson();
+        const float fieldOfView = firstPerson ? Settings::camera().mFirstPersonFieldOfView.get()
+                                              : Settings::camera().mFieldOfView.get();
+        sceneData.projection = Render::perspective(aspect, fieldOfView, Settings::camera().mNearClip.get(),
+            Settings::camera().mViewingDistance.get());
         if (player.isEmpty())
             return;
         const ESM::Position& position = player.getRefData().getPosition();
@@ -764,7 +753,6 @@ void OMW::Engine::prepareVulkanEngine()
         const Render::Vec3 forward = rotateNeutralVector(cameraOrientation, { 0.f, 1.f, 0.f });
         const Render::Vec3 up = rotateNeutralVector(cameraOrientation, { 0.f, 0.f, 1.f });
         const Render::Vec3 playerPosition{ position.pos[0], position.pos[1], position.pos[2] };
-        const bool firstPerson = mWorld->isFirstPerson();
         const Render::Vec3 eye = firstPerson
             ? Render::Vec3{ playerPosition.x, playerPosition.y, playerPosition.z + 124.f }
             : Render::Vec3{ playerPosition.x - forward.x * 180.f, playerPosition.y - forward.y * 180.f,
