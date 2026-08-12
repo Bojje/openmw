@@ -439,9 +439,6 @@ namespace MWBase
         virtual const MWRender::Animation* getAnimation(const MWWorld::ConstPtr& ptr) const = 0;
         virtual void reattachPlayerCamera() = 0;
 
-        /// \todo this does not belong here
-        virtual void screenshot(osg::Image* image, int w, int h) = 0;
-
         /// Find default position inside exterior cell specified by name
         /// \return empty RefId if exterior with given name not exists, the cell's RefId otherwise
         virtual ESM::RefId findExteriorPosition(std::string_view name, ESM::Position& pos) = 0;

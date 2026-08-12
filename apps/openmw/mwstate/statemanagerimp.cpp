@@ -48,6 +48,8 @@
 #include "../mwmechanics/actorutil.hpp"
 #include "../mwmechanics/npcstats.hpp"
 
+#include "../mwrender/renderingmanager.hpp"
+
 #include "../mwscript/globalscripts.hpp"
 
 #include "quicksavemanager.hpp"
@@ -870,7 +872,7 @@ void MWState::StateManager::writeScreenshot(std::vector<char>& imageData) const
         screenshot->scaleImage(screenshotW, screenshotH, 1);
     }
     else if (world->getRenderingManager() != nullptr)
-        world->screenshot(screenshot.get(), screenshotW, screenshotH);
+        world->getRenderingManager()->screenshot(screenshot.get(), screenshotW, screenshotH);
     else
     {
         Log(Debug::Warning) << "Unable to capture Vulkan savegame thumbnail before a frame was presented";

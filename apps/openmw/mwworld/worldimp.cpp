@@ -2532,12 +2532,6 @@ namespace MWWorld
         return mRendering->getAnimation(ptr);
     }
 
-    void World::screenshot(osg::Image* image, int w, int h)
-    {
-        if (mRendering)
-            mRendering->screenshot(image, w, h);
-    }
-
     void World::activateDoor(const MWWorld::Ptr& door)
     {
         auto state = door.getClass().getDoorState(door);

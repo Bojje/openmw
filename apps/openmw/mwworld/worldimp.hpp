@@ -556,9 +556,6 @@ namespace MWWorld
         const MWRender::Animation* getAnimation(const MWWorld::ConstPtr& ptr) const override;
         void reattachPlayerCamera() override;
 
-        /// \todo this does not belong here
-        void screenshot(osg::Image* image, int w, int h) override;
-
         /// Find center of exterior cell above land surface
         /// \return false if exterior with given name not exists, true otherwise
         ESM::RefId findExteriorPosition(std::string_view nameId, ESM::Position& pos) override;
