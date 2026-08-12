@@ -101,12 +101,6 @@ namespace
         return makeDirectNodeRotation(ptr);
     }
 
-    Render::Quat toRenderQuat(const osg::Quat& rotation)
-    {
-        return { static_cast<float>(rotation.x()), static_cast<float>(rotation.y()), static_cast<float>(rotation.z()),
-            static_cast<float>(rotation.w()) };
-    }
-
     Render::Quat makeDirectRenderRotation(const MWWorld::Ptr& ptr)
     {
         const auto& position = ptr.getRefData().getPosition();
@@ -404,7 +398,7 @@ namespace MWWorld
     {
         const auto rot = makeNodeRotation(ptr, order);
         setNodeRotation(ptr, mRendering, rot);
-        mNeutralWorldScene.updateObjectRotation(static_cast<const void*>(ptr.mRef), toRenderQuat(rot));
+        mNeutralWorldScene.updateObjectRotation(static_cast<const void*>(ptr.mRef), makeDirectRenderRotation(ptr));
         mPhysics->updateRotation(ptr, rot);
     }
 
