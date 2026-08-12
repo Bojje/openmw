@@ -165,6 +165,9 @@ to the active worldspace so an unloaded or inactive worldspace cannot leak into 
 submission.
 The fast test suite now also contains a backend-neutral RGBA8 image comparator with
 per-channel tolerance, differing-pixel count, maximum error, and mean error metrics.
+The renderer test family also includes a runnable resource-backend check: neutral resource
+initialization retains shared image/mesh services but does not construct OSG scene or keyframe
+services. This regression does not depend on the optional GoogleTest component-test download.
 The Vulkan smoke path now reads back rendered RGBA8/BGRA8 swapchain frames and compares
 consecutive captures with that comparator when a presentation-capable host is available;
 without a reference image it also runs three neutral scene checkpoints in the same process:
@@ -348,7 +351,7 @@ The engine public header no longer imports complete OSG viewer/event-handler hea
 are now included only by the implementation files that use them.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-156 files, deleting 1,361 lines and adding 8,379 lines (net `+7,018`). The larger Vulkan-only
+157 files, deleting 1,361 lines and adding 8,404 lines (net `+7,043`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.

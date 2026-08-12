@@ -63,6 +63,22 @@ if (BUILD_TESTING)
     add_test(NAME openmw-vulkan-image-tests COMMAND openmw-vulkan-image-tests)
 endif()
 
+add_executable(openmw-resource-backend-tests resource_tests.cpp)
+
+target_include_directories(openmw-resource-backend-tests
+    PRIVATE
+    ${CMAKE_SOURCE_DIR}
+)
+
+target_link_libraries(openmw-resource-backend-tests
+    PRIVATE
+    components
+)
+
+if (BUILD_TESTING)
+    add_test(NAME openmw-resource-backend-tests COMMAND openmw-resource-backend-tests)
+endif()
+
 add_executable(openmw-vulkan-terrain-tests terrain_tests.cpp)
 
 target_include_directories(openmw-vulkan-terrain-tests
