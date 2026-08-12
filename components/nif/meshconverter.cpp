@@ -82,30 +82,51 @@ namespace Nif
             if (high->first == low->first)
                 return low->second.mValue;
             const float fraction = (time - low->first) / (high->first - low->first);
-            return interpolate(low->second.mValue, high->second.mValue, fraction,
+            return interpolate(low->second, high->second, fraction, high->first - low->first,
                 map->mInterpolationType);
         }
 
-        float interpolateFloat(float lhs, float rhs, float fraction, unsigned int type)
+        float interpolateFloat(const KeyT<float>& lhs, const KeyT<float>& rhs, float fraction, float duration,
+            unsigned int type)
         {
             if (type == InterpolationType_Constant)
-                return fraction > 0.5f ? rhs : lhs;
-            return lhs + (rhs - lhs) * fraction;
+                return lhs.mValue;
+            if (type == InterpolationType_Quadratic)
+            {
+                const float fraction2 = fraction * fraction;
+                const float fraction3 = fraction2 * fraction;
+                return (2.f * fraction3 - 3.f * fraction2 + 1.f) * lhs.mValue
+                    + (fraction3 - 2.f * fraction2 + fraction) * duration * lhs.mOutTan
+                    + (-2.f * fraction3 + 3.f * fraction2) * rhs.mValue
+                    + (fraction3 - fraction2) * duration * rhs.mInTan;
+            }
+            return lhs.mValue + (rhs.mValue - lhs.mValue) * fraction;
         }
 
-        osg::Vec3f interpolateVector(osg::Vec3f lhs, osg::Vec3f rhs, float fraction, unsigned int type)
+        osg::Vec3f interpolateVector(const KeyT<osg::Vec3f>& lhs, const KeyT<osg::Vec3f>& rhs,
+            float fraction, float duration, unsigned int type)
         {
             if (type == InterpolationType_Constant)
-                return fraction > 0.5f ? rhs : lhs;
-            return lhs + (rhs - lhs) * fraction;
+                return lhs.mValue;
+            if (type == InterpolationType_Quadratic)
+            {
+                const float fraction2 = fraction * fraction;
+                const float fraction3 = fraction2 * fraction;
+                return lhs.mValue * (2.f * fraction3 - 3.f * fraction2 + 1.f)
+                    + lhs.mOutTan * ((fraction3 - 2.f * fraction2 + fraction) * duration)
+                    + rhs.mValue * (-2.f * fraction3 + 3.f * fraction2)
+                    + rhs.mInTan * ((fraction3 - fraction2) * duration);
+            }
+            return lhs.mValue + (rhs.mValue - lhs.mValue) * fraction;
         }
 
-        osg::Quat interpolateQuaternion(osg::Quat lhs, osg::Quat rhs, float fraction, unsigned int type)
+        osg::Quat interpolateQuaternion(const KeyT<osg::Quat>& lhs, const KeyT<osg::Quat>& rhs,
+            float fraction, float, unsigned int type)
         {
             if (type == InterpolationType_Constant)
-                return fraction > 0.5f ? rhs : lhs;
+                return lhs.mValue;
             osg::Quat result;
-            result.slerp(fraction, lhs, rhs);
+            result.slerp(fraction, lhs.mValue, rhs.mValue);
             return result;
         }
 

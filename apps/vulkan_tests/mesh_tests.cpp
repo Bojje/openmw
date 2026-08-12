@@ -167,7 +167,7 @@ int main()
 
     auto animatedData = std::make_unique<Nif::NiKeyframeData>();
     animatedData->mTranslations = std::make_shared<Nif::Vector3KeyMap>();
-    animatedData->mTranslations->mInterpolationType = Nif::InterpolationType_Linear;
+    animatedData->mTranslations->mInterpolationType = Nif::InterpolationType_Quadratic;
     Nif::KeyT<osg::Vec3f> firstTranslation{};
     firstTranslation.mValue = osg::Vec3f(0.f, 0.f, 0.f);
     Nif::KeyT<osg::Vec3f> secondTranslation{};
@@ -219,6 +219,9 @@ int main()
     if (animatedPose.size() != 1)
         throw std::runtime_error("NIF pose sampler did not find the requested bone");
     expectNear(animatedPose.front().data[12], 12.f, "sampled bone translation");
+    const std::vector<Render::Mat4> earlyAnimatedPose
+        = Nif::collectBonePose(Nif::FileView(*file), animatedBoneNames, 0.25f);
+    expectNear(earlyAnimatedPose.front().data[12], 10.625f, "quadratic sampled bone translation");
 
     expectNear(instances.front().mesh.material.diffuse.x, 0.25f, "material diffuse red");
     expectNear(instances.front().mesh.material.diffuse.w, 0.75f, "material alpha");
