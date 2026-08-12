@@ -523,10 +523,7 @@ add_component_dir(testing
 )
 
 add_component_dir(render
-    frame
-    scene
-    math
-    mesh
+    frame scene math mesh
 )
 
 if (OPENMW_USE_VULKAN)
@@ -604,6 +601,15 @@ endif()
 
 include_directories(${BULLET_INCLUDE_DIRS} ${CMAKE_CURRENT_BINARY_DIR})
 
+add_library(openmw_render_neutral STATIC
+    render/meshconversion.cpp
+)
+
+target_include_directories(openmw_render_neutral
+    PUBLIC
+    ${CMAKE_SOURCE_DIR}
+)
+
 if (OPENMW_USE_SYSTEM_SQLITE3)
     find_package(SQLite3 REQUIRED)
     if(NOT TARGET SQLite3::SQLite3) # CMake < 4.3
@@ -622,6 +628,8 @@ if (APPLE)
 endif()
 
 target_link_libraries(components
+    openmw_render_neutral
+
     # CMake's built-in OSG finder does not use pkgconfig, so we have to
     # manually ensure the order is correct for inter-library dependencies.
     # This only makes a difference with `-DOPENMW_USE_SYSTEM_OSG=ON -DOSG_STATIC=ON`.
@@ -669,7 +677,7 @@ target_link_libraries(components ${BULLET_LIBRARIES})
 
 if (OPENMW_USE_VULKAN)
     add_library(openmw_vulkan STATIC ${VULKAN_COMPONENT_FILES})
-    target_link_libraries(openmw_vulkan PUBLIC SDL2::SDL2 Vulkan::Vulkan)
+    target_link_libraries(openmw_vulkan PUBLIC SDL2::SDL2 Vulkan::Vulkan openmw_render_neutral)
 endif()
 
 if (USE_QT)

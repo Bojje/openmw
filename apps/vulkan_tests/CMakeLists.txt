@@ -9,6 +9,22 @@ if (BUILD_TESTING)
     add_test(NAME openmw-vulkan-math-tests COMMAND openmw-vulkan-math-tests)
 endif()
 
+add_executable(openmw-render-neutral-tests render_neutral_tests.cpp)
+
+target_include_directories(openmw-render-neutral-tests
+    PRIVATE
+    ${CMAKE_SOURCE_DIR}
+)
+
+target_link_libraries(openmw-render-neutral-tests
+    PRIVATE
+    openmw_render_neutral
+)
+
+if (BUILD_TESTING)
+    add_test(NAME openmw-render-neutral-tests COMMAND openmw-render-neutral-tests)
+endif()
+
 add_executable(openmw-render-world-tests world_tests.cpp)
 
 target_include_directories(openmw-render-world-tests
