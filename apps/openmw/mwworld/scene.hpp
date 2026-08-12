@@ -48,7 +48,6 @@ namespace DetourNavigator
 
 namespace MWRender
 {
-    class LandManager;
     class ObjectPaging;
     class SkyManager;
     class RenderingManager;
@@ -163,8 +162,7 @@ namespace MWWorld
         Scene(MWWorld::World& world, Render::FrameLifecycle& frameLifecycle,
             Render::SceneSynchronizer sceneSynchronizer, Render::BonePoseResolver bonePoseResolver,
             Render::MeshResolver meshResolver, Render::TextureResolver textureResolver, const VFS::Manager* vfs,
-            MWRender::RenderingManager* rendering, MWRender::LandManager* landManager,
-            MWRender::ObjectPaging* objectPaging,
+            MWRender::RenderingManager* rendering, MWRender::ObjectPaging* objectPaging,
             Terrain::RenderStorage& terrainStorage, std::unique_ptr<CellPreloader> preloader,
             MWPhysics::PhysicsSystem* physics,
             DetourNavigator::Navigator& navigator);

@@ -1030,8 +1030,7 @@ namespace MWWorld
     Scene::Scene(MWWorld::World& world, Render::FrameLifecycle& frameLifecycle,
         Render::SceneSynchronizer sceneSynchronizer, Render::BonePoseResolver bonePoseResolver,
         Render::MeshResolver meshResolver, Render::TextureResolver textureResolver, const VFS::Manager* vfs,
-        MWRender::RenderingManager* rendering, MWRender::LandManager* landManager,
-        MWRender::ObjectPaging* objectPaging,
+        MWRender::RenderingManager* rendering, MWRender::ObjectPaging* objectPaging,
         Terrain::RenderStorage& terrainStorage, std::unique_ptr<CellPreloader> preloader,
         MWPhysics::PhysicsSystem* physics,
         DetourNavigator::Navigator& navigator)
@@ -1060,7 +1059,7 @@ namespace MWWorld
         Terrain::RenderStorage& terrainStorage,
         MWPhysics::PhysicsSystem* physics, DetourNavigator::Navigator& navigator)
         : Scene(world, frameLifecycle, std::move(sceneSynchronizer), std::move(bonePoseResolver), std::move(meshResolver),
-            std::move(textureResolver), vfs, nullptr, nullptr, nullptr, terrainStorage, nullptr,
+            std::move(textureResolver), vfs, nullptr, nullptr, terrainStorage, nullptr,
             physics, navigator)
     {
     }

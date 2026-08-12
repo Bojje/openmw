@@ -283,6 +283,8 @@ teardown, and CI guards the manager header against regaining a value-owned neutr
 cell-test suppression restores the scene manager's current incremental-compile operation locally.
 The scene no longer stores that incremental-compile pointer or a second land-manager reference;
 both are now scoped to the legacy operations that need them.
+The `Scene` constructor no longer accepts the unused `LandManager` pass-through either; the
+OSG world bootstrap gives that dependency directly to `CellPreloader`.
 The scene constructor now accepts the legacy `RenderingManager` and `CellPreloader` as optional
 services. Neutral cell/object/terrain state remains available when they are absent, while every
 OSG paging, object, water, and preload call is guarded; the current game bootstrap still supplies
@@ -390,7 +392,7 @@ The engine public header no longer imports complete OSG viewer/event-handler hea
 are now included only by the implementation files that use them.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-160 files, deleting 1,514 lines and adding 8,652 lines (net `+7,138`). The larger Vulkan-only
+160 files, deleting 1,514 lines and adding 8,654 lines (net `+7,140`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
