@@ -230,9 +230,11 @@ Engine GUI fallback frame advancement now also reads simulation time from the ac
 `FrameLifecycle`, keeping renderer orchestration from reaching directly into an OSG frame stamp.
 The same interface now owns the engine-visible frame number: the OSG adapter reads its frame stamp,
 while the Vulkan owner advances its neutral counter with simulation-frame advancement.
+Loop termination is also delegated through the lifecycle; the OSG adapter preserves viewer shutdown
+semantics, while a Vulkan owner can use the engine quit-request path without an OSG viewer query.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-91 files, deleting 914 lines and adding 7,312 lines (net `+6,398`). The larger Vulkan-only
+91 files, deleting 915 lines and adding 7,323 lines (net `+6,408`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.

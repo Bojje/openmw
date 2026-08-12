@@ -17,6 +17,7 @@ namespace Render
         virtual bool renderFrame() = 0;
         virtual bool renderFrame(const SceneSubmission& /*submission*/) { return false; }
         virtual bool consumesSceneSubmission() const = 0;
+        virtual bool done() const = 0;
         virtual double referenceTime() const = 0;
         virtual unsigned frameNumber() const = 0;
         virtual void advanceFrame(double simulationTime) = 0;

@@ -17,6 +17,11 @@ namespace MWRender
         return true;
     }
 
+    bool ViewerFrameLifecycle::done() const
+    {
+        return mViewer.done();
+    }
+
     double ViewerFrameLifecycle::referenceTime() const
     {
         const osg::FrameStamp* frameStamp = mViewer.getFrameStamp();

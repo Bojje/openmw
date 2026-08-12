@@ -1061,7 +1061,7 @@ void OMW::Engine::go()
     MWWorld::DateTimeManager& timeManager = *mWorld->getTimeManager();
     Misc::FrameRateLimiter frameRateLimiter = Misc::makeFrameRateLimiter(mEnvironment.getFrameRateLimit());
     const std::chrono::steady_clock::duration maxSimulationInterval(std::chrono::milliseconds(200));
-    while (!mViewer->done() && !mStateManager->hasQuitRequest())
+    while (!mPreWorldFrameLifecycle->done() && !mStateManager->hasQuitRequest())
     {
         const double dt = std::chrono::duration_cast<std::chrono::duration<double>>(
                               std::min(frameRateLimiter.getLastFrameDuration(), maxSimulationInterval))

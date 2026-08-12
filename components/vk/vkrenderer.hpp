@@ -77,6 +77,7 @@ namespace Vk
             return render();
         }
         bool consumesSceneSubmission() const override { return true; }
+        bool done() const override { return false; }
         double referenceTime() const override { return mReferenceTime; }
         unsigned frameNumber() const override { return mFrameNumber; }
         void advanceFrame(double simulationTime) override
