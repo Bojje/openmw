@@ -55,7 +55,7 @@ An independent OSG-only configuration using the repository's bundled Bullet, OSG
 and RecastNavigation dependencies has also been configured with `OPENMW_USE_VULKAN=OFF`
 and rebuilt through the full `openmw` executable.
 
-Completed reduction checkpoints include removal of the incomplete full-game Vulkan bridge,
+Completed reduction checkpoints include removal of the incomplete standalone Vulkan bridge,
 the unused Vulkan mesh submission queue, inactive ray-tracing scaffolding, and unused
 buffer, descriptor, command-helper, compute, and transfer-queue paths. The current bridge
 also contains renderer-neutral scene/math data, a validated NIF triangle conversion path,
@@ -139,11 +139,10 @@ resource caches, giving a future Vulkan consumer a concrete full-game input with
 OSG objects or restoring manager-owned scene assembly. Its neutral mesh lookup cache keeps weak
 references across frame exports, avoiding repeated conversion lookups without extending resource
 lifetimes beyond the resource manager.
-The neutral camera snapshot now reads the cached camera matrices instead of querying the OSG
-viewer directly, and neutral lighting/fog values are updated at their game-state setters rather
-than re-read from OSG objects during export. `Camera` now exposes neutral `Render::Mat4` snapshots
-for this path while retaining legacy OSG getters for the reference backend. This removes another
-backend-specific type from the future Vulkan handoff.
+The OSG reference adapter exposes neutral camera matrices without requiring the Vulkan consumer to
+query the OSG viewer. The full-game Vulkan owner now supplies its own renderer-neutral camera
+snapshot from player state, including full orientation and drawable-size projection, while the
+legacy `Camera` continues to retain its OSG getters for the reference backend.
 The no-GUI Vulkan bootstrap now supplies a renderer-neutral first-person look-at and perspective
 snapshot from the player transform, including full pitch/roll orientation and resize-aware
 projection updates; camera-controller parity remains outstanding.
@@ -156,9 +155,9 @@ backend. The standalone `Vk::Renderer` also implements `Render::FrameLifecycle`,
 test exercises the same submission-consuming frame-owner contract used by the future game path.
 The submission
 boundary now validates mesh indices and terrain snapshots before Vulkan consumes them. The
-full-game Vulkan call site now exists for the no-GUI bootstrap: window/input ownership and
-static neutral scene submission are live, while dynamic-content, camera synchronization,
-image loading, and GUI services remain incomplete. NIF skinning metadata now survives conversion, and resolved dynamic
+full-game Vulkan call site now exists for the no-GUI bootstrap: window/input ownership,
+camera synchronization, neutral image loading, and static scene submission are live, while
+dynamic-content, weather, and GUI/presentation services remain incomplete. NIF skinning metadata now survives conversion, and resolved dynamic
 mesh payloads cross the neutral boundary into the Vulkan consumer. A deterministic CPU skinning
 helper now applies frame bone matrices for future animation integration. Unskinned dynamic meshes and skinned records with a
 supplied pose now enter the raster draw batch with their neutral transforms; skinned records without a pose remain outside it
@@ -451,7 +450,7 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-186 files, deleting 1,973 lines and adding 11,208 lines (net `+9,235`). The larger Vulkan-only
+186 files, deleting 1,973 lines and adding 11,226 lines (net `+9,253`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. The live no-GUI consumer is the first deletion
 checkpoint; further reduction can now target OSG scene/resource/presentation ownership rather
