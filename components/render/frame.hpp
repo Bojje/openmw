@@ -39,6 +39,7 @@ namespace Render
         /// Capture the last presented frame in renderer-neutral RGBA8 form.
         /// Backends without capture support report no image.
         virtual std::optional<TextureData> captureFrame() { return std::nullopt; }
+        virtual void captureScreenshot() {}
         virtual double referenceTime() const = 0;
         virtual unsigned frameNumber() const = 0;
         virtual void advanceFrame(double simulationTime) = 0;

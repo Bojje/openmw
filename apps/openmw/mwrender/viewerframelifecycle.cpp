@@ -272,7 +272,7 @@ namespace MWRender
         mViewer->addEventHandler(mScreenCaptureHandler);
     }
 
-    void ViewerFrameLifecycle::captureNextFrame()
+    void ViewerFrameLifecycle::captureScreenshot()
     {
         if (!mScreenCaptureHandler || !mViewer)
             return;

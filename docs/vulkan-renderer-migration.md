@@ -487,7 +487,8 @@ OSG window/context creation, icon decoding, OpenGL capability discovery, and ste
 in `ViewerFrameLifecycle`; `Engine` receives only the created SDL window and capability result. This
 removes the engine's direct OpenGL window-construction path and gives the future Vulkan lifecycle a
 real exclusive startup boundary.
-The OSG lifecycle also creates and owns the initial world scene root; `Engine` only receives a
+The frame lifecycle now owns screenshot encoding and file naming for both backends; `Engine` only
+forwards the input request. The OSG lifecycle also creates and owns the initial world scene root; `Engine` only receives a
 reference while assembling OSG-specific GUI/world services.
 The lifecycle also retains the discovered OpenGL texture-unit capability; `Engine` no longer stores
 an OSG capability field outside the active frame owner.

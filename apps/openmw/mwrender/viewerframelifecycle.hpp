@@ -60,7 +60,7 @@ namespace MWRender
         void initializeScreenCapture(osg::ref_ptr<SceneUtil::WorkQueue> workQueue,
             const std::filesystem::path& screenshotPath, const std::string& screenshotFormat,
             std::function<void(std::string)> callback);
-        void captureNextFrame();
+        void captureScreenshot() override;
         void initializeStatsHandlers(const VFS::Manager& vfs, bool writeToFile,
             const std::function<void(Resource::Profiler&)>& configureProfiler);
         void reportStats(unsigned frameNumber, std::ostream& stream) const;

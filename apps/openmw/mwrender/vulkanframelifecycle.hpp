@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <memory>
 #include <optional>
+#include <string>
 
 #include <components/render/frame.hpp>
 #include <components/render/texture.hpp>
@@ -18,7 +19,8 @@ namespace MWRender
     class VulkanFrameLifecycle final : public Render::FrameLifecycle
     {
     public:
-        VulkanFrameLifecycle(SDL_Window* window, const std::filesystem::path& shaderDirectory);
+        VulkanFrameLifecycle(SDL_Window* window, const std::filesystem::path& shaderDirectory,
+            const std::filesystem::path& screenshotPath, std::string screenshotFormat);
         ~VulkanFrameLifecycle() override;
 
         VulkanFrameLifecycle(const VulkanFrameLifecycle&) = delete;
@@ -36,10 +38,13 @@ namespace MWRender
 
         void resize() override;
         std::optional<Render::TextureData> captureFrame() override;
+        void captureScreenshot() override;
 
     private:
         struct Implementation;
         SDL_Window* mWindow;
+        std::filesystem::path mScreenshotPath;
+        std::string mScreenshotFormat;
         std::unique_ptr<Implementation> mImplementation;
     };
 }

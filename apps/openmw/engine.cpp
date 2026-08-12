@@ -33,14 +33,7 @@
 #include <components/resource/scenemanager.hpp>
 #include <components/resource/stats.hpp>
 #include <components/compiler/extensions0.hpp>
-#include <components/render/imagewriter.hpp>
 #include <components/render/texture.hpp>
-#ifdef OPENMW_NEUTRAL_JPEG
-#include <components/render/jpeg.hpp>
-#endif
-#ifdef OPENMW_NEUTRAL_PNG
-#include <components/render/png.hpp>
-#endif
 #include <components/render/math.hpp>
 
 #include <components/stereo/stereomanager.hpp>
@@ -136,49 +129,6 @@ namespace
         result.data[13] = -(up.x * eye.x + up.y * eye.y + up.z * eye.z);
         result.data[14] = f.x * eye.x + f.y * eye.y + f.z * eye.z;
         return result;
-    }
-
-    bool writeVulkanScreenshot(const Render::TextureData& image, const std::filesystem::path& path)
-    {
-        if (!image.valid())
-            return false;
-
-        if (path.extension() == ".jpg")
-        {
-#ifdef OPENMW_NEUTRAL_JPEG
-            std::vector<char> encoded;
-            if (!Render::writeJpeg(image, encoded))
-                return false;
-            std::ofstream output(path, std::ios::binary);
-            if (!output)
-                return false;
-            output.write(encoded.data(), static_cast<std::streamsize>(encoded.size()));
-            return output.good();
-#else
-            return false;
-#endif
-        }
-
-        if (path.extension() == ".png")
-        {
-#ifdef OPENMW_NEUTRAL_PNG
-            std::vector<char> encoded;
-            if (!Render::writePng(image, encoded))
-                return false;
-            std::ofstream output(path, std::ios::binary);
-            if (!output)
-                return false;
-            output.write(encoded.data(), static_cast<std::streamsize>(encoded.size()));
-            return output.good();
-#else
-            return false;
-#endif
-        }
-
-        if (path.extension() == ".tga")
-            return Render::writeTga(image, path);
-
-        return Render::writePpm(image, path);
     }
 
     void initStatsHandler(Resource::Profiler& profiler)
@@ -604,29 +554,7 @@ void OMW::Engine::prepareVulkanEngine()
         mFrameLifecycle->resize();
         mWindowManager->windowResized(width, height);
     };
-    const auto screenshot = [this] {
-        const std::optional<Render::TextureData> image = mFrameLifecycle->captureFrame();
-        if (!image)
-        {
-            Log(Debug::Warning) << "Vulkan screenshot requested before a frame was presented";
-            return;
-        }
-        std::error_code error;
-        std::filesystem::create_directories(mCfgMgr.getScreenshotPath(), error);
-        const auto stamp = std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::system_clock::now().time_since_epoch()).count();
-        const std::string screenshotFormat = Settings::general().mScreenshotFormat.get();
-        const bool jpeg = screenshotFormat == "jpg";
-        const bool png = screenshotFormat == "png";
-        const bool tga = screenshotFormat == "tga";
-        const std::filesystem::path path = mCfgMgr.getScreenshotPath()
-            / ("openmw-vulkan-" + std::to_string(stamp)
-                + (jpeg ? ".jpg" : png ? ".png" : tga ? ".tga" : ".ppm"));
-        if (!writeVulkanScreenshot(*image, path))
-            Log(Debug::Warning) << "Failed to write Vulkan screenshot " << path;
-        else
-            Log(Debug::Info) << "Vulkan screenshot written to " << path;
-    };
+    const auto screenshot = [this] { mFrameLifecycle->captureScreenshot(); };
     mInputManager = std::make_unique<MWInput::InputManager>(mWindow, std::move(inputCallbacks), screenshot, keybinderUser,
         keybinderUserExists, userGameControllerdb, gameControllerdb, mGrab);
     mEnvironment.setInputManager(*mInputManager);
@@ -904,7 +832,7 @@ void OMW::Engine::prepareEngine()
         viewer->getEventQueue()->windowResize(x, y, width, height);
     };
     mInputManager = std::make_unique<MWInput::InputManager>(mWindow, std::move(inputCallbacks), [viewerLifecycle] {
-        viewerLifecycle->captureNextFrame();
+        viewerLifecycle->captureScreenshot();
     }, keybinderUser,
         keybinderUserExists, userGameControllerdb, gameControllerdb, mGrab);
     mEnvironment.setInputManager(*mInputManager);
@@ -1062,7 +990,8 @@ void OMW::Engine::go()
         if (!mWindow)
             throw std::runtime_error(std::string("Failed to create Vulkan SDL window: ") + SDL_GetError());
 
-        mFrameLifecycle = std::make_unique<MWRender::VulkanFrameLifecycle>(mWindow, OPENMW_VULKAN_SHADER_DIR);
+        mFrameLifecycle = std::make_unique<MWRender::VulkanFrameLifecycle>(mWindow, OPENMW_VULKAN_SHADER_DIR,
+            mCfgMgr.getScreenshotPath(), Settings::general().mScreenshotFormat.get());
 #endif
     }
     else
