@@ -177,6 +177,8 @@ supplied pose now enter the raster draw batch with their neutral transforms; ski
 use an inverse-bind-derived bind pose so dynamic actors remain visible while per-frame animation updates are ported.
 Explicitly identified world VFX now also cross as neutral transformed mesh effects with texture
 overrides and explicit removal; anonymous one-shot VFX still require a lifetime/animation owner.
+Continuous magic VFX now use that neutral effect path when no OSG animation exists, and spell
+cleanup removes them through the neutral world owner instead of dereferencing a missing animation.
 Mesh submission no longer waits for the whole device or
 rebuilds one global buffer: neutral mesh data is retained on the CPU and uploaded into
 the current frame slot only after its fence is waited, so a future live frame loop can

@@ -480,14 +480,18 @@ namespace MWMechanics
                     if (!caster.isEmpty())
                     {
                         MWRender::Animation* anim = world->getAnimation(caster);
-                        anim->removeEffect(effect.mEffectId.getRefIdString());
+                        if (anim)
+                            anim->removeEffect(effect.mEffectId.getRefIdString());
+                        else
+                            world->removeEffect(effect.mEffectId.getRefIdString());
                         const ESM::Static* fx
                             = world->getStore().get<ESM::Static>().search(ESM::RefId::stringRefId("VFX_Summon_end"));
                         if (fx != nullptr)
                         {
                             const VFS::Path::Normalized fxModel
                                 = Misc::ResourceHelpers::correctMeshPath(fx->mModel.getNormalized());
-                            anim->addEffect(fxModel.value(), "");
+                            if (anim)
+                                anim->addEffect(fxModel.value(), "");
                         }
                     }
                 }
@@ -521,7 +525,10 @@ namespace MWMechanics
                         if (!caster.isEmpty())
                         {
                             MWRender::Animation* anim = world->getAnimation(caster);
-                            anim->removeEffect(effect.mEffectId.getRefIdString());
+                            if (anim)
+                                anim->removeEffect(effect.mEffectId.getRefIdString());
+                            else
+                                world->removeEffect(effect.mEffectId.getRefIdString());
                         }
                     }
                 }
@@ -1391,6 +1398,8 @@ namespace MWMechanics
             auto anim = world->getAnimation(target);
             if (anim)
                 anim->removeEffect(effect.mEffectId.getRefIdString());
+            else
+                world->removeEffect(effect.mEffectId.getRefIdString());
             // Note that we can't return REMOVED here because the effect still needs to be detectable
         }
         effect.mFlags |= applied;
@@ -1412,6 +1421,8 @@ namespace MWMechanics
             auto anim = MWBase::Environment::get().getWorld()->getAnimation(target);
             if (anim)
                 anim->removeEffect(effect.mEffectId.getRefIdString());
+            else
+                MWBase::Environment::get().getWorld()->removeEffect(effect.mEffectId.getRefIdString());
         }
     }
 

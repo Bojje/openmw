@@ -587,7 +587,15 @@ namespace MWMechanics
                     = Misc::ResourceHelpers::correctMeshPath(castStatic->mModel.getNormalized());
                 anim->addEffect(castStaticModel.value(), magicEffect.mId.getRefIdString(), loop, {},
                     magicEffect.mParticle.getOriginal());
-            }
+        }
+        else if (loop && !castStatic->mModel.empty())
+        {
+            const VFS::Path::Normalized castStaticModel
+                = Misc::ResourceHelpers::correctMeshPath(castStatic->mModel.getNormalized());
+            const osg::Vec3f position = target.getRefData().getPosition().asVec3();
+            MWBase::Environment::get().getWorld()->spawnEffect(castStaticModel, magicEffect.mParticle.getOriginal(),
+                position, 1.f, true, true, magicEffect.mId.getRefIdString(), true);
+        }
         }
     }
 }
