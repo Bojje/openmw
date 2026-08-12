@@ -281,6 +281,12 @@ int main()
     Render::MeshInstance emptyGeometry = aggregateMesh;
     emptyGeometry.mesh.vertices.clear();
     emptyGeometry.mesh.indices.clear();
+    Render::SceneSubmission malformedEmptyGeometry;
+    malformedEmptyGeometry.meshes.push_back(emptyGeometry);
+    malformedEmptyGeometry.meshes.front().transform.data[0] = std::numeric_limits<float>::quiet_NaN();
+    if (malformedEmptyGeometry.valid())
+        throw std::runtime_error("renderer-neutral validation accepted an invalid empty mesh transform");
+
     const Render::SceneSubmission emptyGeometrySubmission = Render::collectSceneSubmission(world, aggregateScene, "",
         [&](std::string_view model) -> std::vector<Render::MeshInstance> {
             if (model != "meshes/first.nif")

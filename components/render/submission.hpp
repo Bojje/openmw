@@ -29,8 +29,14 @@ namespace Render
     inline bool validMeshInstance(const MeshInstance& instance, bool allowEmptyIndices)
     {
         if (instance.mesh.indices.empty())
-            return allowEmptyIndices;
-        if (instance.mesh.vertices.empty() || !Render::valid(instance.transform)
+        {
+            if (!allowEmptyIndices || !instance.mesh.vertices.empty())
+                return false;
+        }
+        else if (instance.mesh.vertices.empty())
+            return false;
+
+        if (!Render::valid(instance.transform)
             || !Render::valid(instance.mesh.material.diffuse) || !Render::valid(instance.mesh.material.emissive)
             || !std::isfinite(instance.mesh.material.glossiness)
             || (instance.mesh.material.alphaTexture && !instance.mesh.material.alphaTexture->valid())
