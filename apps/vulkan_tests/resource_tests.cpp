@@ -60,6 +60,42 @@ namespace
             throw std::runtime_error("neutral BMP texture decoding changed pixel data");
         std::filesystem::remove_all(root, error);
     }
+
+#ifdef OPENMW_NEUTRAL_PNG
+    void testNeutralPngTexture()
+    {
+        const std::filesystem::path root = std::filesystem::temp_directory_path() / "openmw-neutral-png-test";
+        std::error_code error;
+        std::filesystem::remove_all(root, error);
+        std::filesystem::create_directories(root / "textures", error);
+        if (error)
+            throw std::runtime_error("could not create neutral PNG test directory");
+
+        // 1x1 RGBA PNG containing an opaque red pixel.
+        constexpr std::array<unsigned char, 70> png = {
+            0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
+            0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4,
+            0x89, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x44, 0x41, 0x54, 0x08, 0xd7, 0x63, 0xf8, 0xcf, 0xc0, 0xf0,
+            0x1f, 0x00, 0x05, 0x00, 0x01, 0xff, 0x89, 0x99, 0x3d, 0x1d, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45,
+            0x4e, 0x44, 0xae, 0x42, 0x60, 0x82 };
+        {
+            std::ofstream output(root / "textures/test.png", std::ios::binary);
+            output.write(reinterpret_cast<const char*>(png.data()), static_cast<std::streamsize>(png.size()));
+        }
+
+        const ToUTF8::Utf8Encoder encoder(ToUTF8::WINDOWS_1252);
+        VFS::Manager vfs;
+        Files::Collections collections(Files::PathContainer{ root });
+        VFS::registerArchives(&vfs, collections, {}, true, &encoder.getStatelessEncoder());
+        Resource::ResourceSystem resources(
+            &vfs, 1.0, &encoder.getStatelessEncoder(), Resource::ResourceSystem::Backend::Neutral);
+        const auto texture = resources.getNeutralTextureManager()->get(VFS::Path::Normalized("textures/test.png"));
+        if (!texture || texture->width != 1 || texture->height != 1
+            || texture->pixels != std::vector<std::uint8_t>({ 255, 0, 0, 255 }))
+            throw std::runtime_error("neutral PNG texture decoding changed pixel data");
+        std::filesystem::remove_all(root, error);
+    }
+#endif
 }
 
 int main()
@@ -82,4 +118,7 @@ int main()
         throw std::runtime_error("neutral resource backend omitted the texture decoder");
 
     testNeutralBmpTexture();
+#ifdef OPENMW_NEUTRAL_PNG
+    testNeutralPngTexture();
+#endif
 }

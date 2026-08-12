@@ -618,6 +618,11 @@ endif()
 
 add_library(components STATIC ${COMPONENT_FILES})
 
+if (OPENMW_USE_VULKAN)
+    target_compile_definitions(components PUBLIC OPENMW_NEUTRAL_PNG)
+    target_link_libraries(components PUBLIC PNG::PNG)
+endif()
+
 if (ANDROID)
     set_property(TARGET components PROPERTY POSITION_INDEPENDENT_CODE ON)
 endif()

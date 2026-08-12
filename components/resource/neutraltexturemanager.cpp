@@ -4,12 +4,18 @@
 #include <array>
 #include <bit>
 #include <cstdint>
+#include <cstring>
 #include <iterator>
+#include <limits>
 #include <stdexcept>
 #include <vector>
 
 #include <components/files/istreamptr.hpp>
 #include <components/vfs/manager.hpp>
+
+#ifdef OPENMW_NEUTRAL_PNG
+#include <png.h>
+#endif
 
 // Decoding stays in the neutral resource layer so Vulkan never needs an OSG image adapter.
 namespace
@@ -154,6 +160,100 @@ namespace
         return result;
     }
 
+#ifdef OPENMW_NEUTRAL_PNG
+    struct PngReadContext
+    {
+        const Bytes& data;
+        std::size_t offset = 0;
+    };
+
+    void readPngBytes(png_structp png, png_bytep output, png_size_t count)
+    {
+        auto& context = *static_cast<PngReadContext*>(png_get_io_ptr(png));
+        const std::size_t remaining = context.offset < context.data.size() ? context.data.size() - context.offset : 0;
+        if (count > remaining)
+            png_error(png, "truncated PNG data");
+        std::memcpy(output, context.data.data() + context.offset, count);
+        context.offset += count;
+    }
+
+    std::shared_ptr<const Render::TextureData> decodePng(const Bytes& data)
+    {
+        if (data.size() < 8 || png_sig_cmp(const_cast<png_bytep>(data.data()), 0, 8) != 0)
+            return {};
+
+        png_structp png = png_create_read_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
+        if (!png)
+            return {};
+        png_infop info = png_create_info_struct(png);
+        if (!info)
+        {
+            png_destroy_read_struct(&png, nullptr, nullptr);
+            return {};
+        }
+
+        if (setjmp(png_jmpbuf(png)) != 0)
+        {
+            png_destroy_read_struct(&png, &info, nullptr);
+            return {};
+        }
+
+        PngReadContext context{ data };
+        png_set_read_fn(png, &context, readPngBytes);
+        png_read_info(png, info);
+
+        const png_uint_32 width = png_get_image_width(png, info);
+        const png_uint_32 height = png_get_image_height(png, info);
+        if (width == 0 || height == 0 || width > std::numeric_limits<std::uint32_t>::max()
+            || height > std::numeric_limits<std::uint32_t>::max())
+            png_error(png, "invalid PNG dimensions");
+
+        const int colorType = png_get_color_type(png, info);
+        const int bitDepth = png_get_bit_depth(png, info);
+        if (colorType == PNG_COLOR_TYPE_PALETTE)
+            png_set_palette_to_rgb(png);
+        if (colorType == PNG_COLOR_TYPE_GRAY && bitDepth < 8)
+            png_set_expand_gray_1_2_4_to_8(png);
+        if (png_get_valid(png, info, PNG_INFO_tRNS))
+            png_set_tRNS_to_alpha(png);
+        if (bitDepth == 16)
+            png_set_strip_16(png);
+        if (colorType == PNG_COLOR_TYPE_GRAY || colorType == PNG_COLOR_TYPE_GRAY_ALPHA)
+            png_set_gray_to_rgb(png);
+        if ((colorType & PNG_COLOR_MASK_ALPHA) == 0 && !png_get_valid(png, info, PNG_INFO_tRNS))
+            png_set_add_alpha(png, 0xff, PNG_FILLER_AFTER);
+
+        png_read_update_info(png, info);
+        if (png_get_channels(png, info) != 4)
+            png_error(png, "PNG did not convert to RGBA");
+
+        const png_size_t rowBytes = png_get_rowbytes(png, info);
+        if (width > std::numeric_limits<std::size_t>::max() / height
+            || static_cast<std::size_t>(width) * height > std::numeric_limits<std::size_t>::max() / 4
+            || rowBytes < static_cast<png_size_t>(width) * 4
+            || static_cast<std::size_t>(rowBytes) > std::numeric_limits<std::size_t>::max() / height)
+            png_error(png, "PNG dimensions overflow");
+
+        const std::size_t pixelBytes = static_cast<std::size_t>(width) * height * 4;
+        std::vector<std::uint8_t> rows(static_cast<std::size_t>(rowBytes) * height);
+        std::vector<png_bytep> rowPointers(height);
+        for (png_uint_32 y = 0; y < height; ++y)
+            rowPointers[y] = rows.data() + static_cast<std::size_t>(y) * rowBytes;
+        png_read_image(png, rowPointers.data());
+
+        auto result = std::make_shared<Render::TextureData>();
+        result->width = static_cast<std::uint32_t>(width);
+        result->height = static_cast<std::uint32_t>(height);
+        result->pixels.resize(pixelBytes);
+        for (png_uint_32 y = 0; y < height; ++y)
+            std::memcpy(result->pixels.data() + static_cast<std::size_t>(y) * width * 4,
+                rows.data() + static_cast<std::size_t>(y) * rowBytes, static_cast<std::size_t>(width) * 4);
+
+        png_destroy_read_struct(&png, &info, nullptr);
+        return result;
+    }
+#endif
+
     std::shared_ptr<const Render::TextureData> decodeDds(const Bytes& data)
     {
         if (data.size() < 128 || data[0] != 'D' || data[1] != 'D' || data[2] != 'S' || data[3] != ' ')
@@ -279,6 +379,10 @@ namespace
             return decodeBmp(data);
         if (extension == "dds")
             return decodeDds(data);
+#ifdef OPENMW_NEUTRAL_PNG
+        if (extension == "png")
+            return decodePng(data);
+#endif
         return {};
     }
 }
