@@ -1,8 +1,6 @@
 #ifndef GAME_MWWORLD_SCENE_H
 #define GAME_MWWORLD_SCENE_H
 
-#include <osg/ref_ptr>
-
 #include "positioncellgrid.hpp"
 #include "ptr.hpp"
 
@@ -62,16 +60,6 @@ namespace Terrain
     class World;
 }
 
-namespace SceneUtil
-{
-    class WorkQueue;
-}
-
-namespace Resource
-{
-    class SceneManager;
-}
-
 namespace VFS
 {
     class Manager;
@@ -80,11 +68,6 @@ namespace VFS
 namespace MWPhysics
 {
     class PhysicsSystem;
-}
-
-namespace SceneUtil
-{
-    class WorkItem;
 }
 
 namespace MWWorld
@@ -131,7 +114,6 @@ namespace MWWorld
         Terrain::World* mTerrain;
         MWRender::ObjectPaging* mObjectPaging;
         Terrain::RenderStorage& mTerrainStorage;
-        SceneUtil::WorkQueue* mWorkQueue;
         DetourNavigator::Navigator& mNavigator;
         std::unique_ptr<CellPreloader> mPreloader;
         float mLowestPoint;
@@ -146,8 +128,6 @@ namespace MWWorld
         bool mNeutralTerrainRegionsDirty = true;
         mutable std::unordered_map<std::string, std::weak_ptr<const std::vector<Render::MeshInstance>>>
             mNeutralMeshCache;
-
-        std::vector<osg::ref_ptr<SceneUtil::WorkItem>> mWorkItems;
 
         std::optional<ChangeCellGridRequest> mChangeCellGridRequest;
 
@@ -188,8 +168,7 @@ namespace MWWorld
             Render::MeshResolver meshResolver, Render::TextureResolver textureResolver, const VFS::Manager* vfs,
             MWRender::RenderingManager* rendering, MWRender::LandManager* landManager,
             Terrain::World* terrain, MWRender::ObjectPaging* objectPaging,
-            Terrain::RenderStorage& terrainStorage, SceneUtil::WorkQueue* workQueue,
-            std::unique_ptr<CellPreloader> preloader,
+            Terrain::RenderStorage& terrainStorage, std::unique_ptr<CellPreloader> preloader,
             MWPhysics::PhysicsSystem* physics,
             DetourNavigator::Navigator& navigator);
 
@@ -262,7 +241,7 @@ namespace MWWorld
 
         bool isCellActive(const CellStore& cell);
 
-        void preload(const std::string& mesh, Resource::SceneManager* sceneManager, bool useAnim = false);
+        void preload(const std::string& mesh, bool useAnim = false);
 
         void testExteriorCells();
         void testInteriorCells();

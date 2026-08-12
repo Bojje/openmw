@@ -1048,8 +1048,7 @@ namespace MWWorld
         Render::MeshResolver meshResolver, Render::TextureResolver textureResolver, const VFS::Manager* vfs,
         MWRender::RenderingManager* rendering, MWRender::LandManager* landManager,
         Terrain::World* terrain, MWRender::ObjectPaging* objectPaging,
-        Terrain::RenderStorage& terrainStorage, SceneUtil::WorkQueue* workQueue,
-        std::unique_ptr<CellPreloader> preloader,
+        Terrain::RenderStorage& terrainStorage, std::unique_ptr<CellPreloader> preloader,
         MWPhysics::PhysicsSystem* physics,
         DetourNavigator::Navigator& navigator)
         : mCurrentCell(nullptr)
@@ -1066,7 +1065,6 @@ namespace MWWorld
         , mTerrain(terrain)
         , mObjectPaging(objectPaging)
         , mTerrainStorage(terrainStorage)
-        , mWorkQueue(workQueue)
         , mNavigator(navigator)
         , mPreloader(std::move(preloader))
         , mLowestPoint(std::numeric_limits<float>::max())
@@ -1079,20 +1077,12 @@ namespace MWWorld
         Terrain::RenderStorage& terrainStorage,
         MWPhysics::PhysicsSystem* physics, DetourNavigator::Navigator& navigator)
         : Scene(world, frameLifecycle, std::move(sceneSynchronizer), std::move(bonePoseResolver), std::move(meshResolver),
-            std::move(textureResolver), vfs, nullptr, nullptr, nullptr, nullptr, terrainStorage, nullptr, nullptr,
+            std::move(textureResolver), vfs, nullptr, nullptr, nullptr, nullptr, terrainStorage, nullptr,
             physics, navigator)
     {
     }
 
-    Scene::~Scene()
-    {
-        for (const osg::ref_ptr<SceneUtil::WorkItem>& v : mWorkItems)
-            v->abort();
-
-        for (const osg::ref_ptr<SceneUtil::WorkItem>& v : mWorkItems)
-            v->waitTillDone();
-
-    }
+    Scene::~Scene() = default;
 
     bool Scene::hasCellChanged() const
     {
@@ -1432,56 +1422,11 @@ namespace MWWorld
         return mActiveCells.contains(&cell);
     }
 
-    class PreloadMeshItem : public SceneUtil::WorkItem
+    void Scene::preload(const std::string& mesh, bool useAnim)
     {
-    public:
-        explicit PreloadMeshItem(VFS::Path::NormalizedView mesh, Resource::SceneManager* sceneManager)
-            : mMesh(mesh)
-            , mSceneManager(sceneManager)
-        {
-        }
-
-        void doWork() override
-        {
-            if (mAborted)
-                return;
-
-            try
-            {
-                mSceneManager->getTemplate(mMesh);
-            }
-            catch (const std::exception& e)
-            {
-                Log(Debug::Warning) << "Failed to get mesh template \"" << mMesh << "\" to preload: " << e.what();
-            }
-        }
-
-        void abort() override { mAborted = true; }
-
-    private:
-        VFS::Path::Normalized mMesh;
-        Resource::SceneManager* mSceneManager;
-        std::atomic_bool mAborted{ false };
-    };
-
-    void Scene::preload(const std::string& mesh, Resource::SceneManager* sceneManager, bool useAnim)
-    {
-        if (!sceneManager)
+        if (!mPreloader)
             return;
-
-        const VFS::Path::Normalized meshPath = useAnim
-            ? Misc::ResourceHelpers::correctActorModelPath(
-                VFS::Path::toNormalized(mesh), mVfs)
-            : VFS::Path::toNormalized(mesh);
-
-        if (sceneManager->checkLoaded(meshPath, mFrameLifecycle.referenceTime()))
-            return;
-
-        osg::ref_ptr<PreloadMeshItem> item(new PreloadMeshItem(meshPath, sceneManager));
-        mWorkQueue->addWorkItem(item);
-        const auto isDone = [](const osg::ref_ptr<SceneUtil::WorkItem>& v) { return v->isDone(); };
-        mWorkItems.erase(std::remove_if(mWorkItems.begin(), mWorkItems.end(), isDone), mWorkItems.end());
-        mWorkItems.emplace_back(std::move(item));
+        mPreloader->preloadMesh(mesh, useAnim, mFrameLifecycle.referenceTime());
     }
 
     void Scene::preloadCells(float dt)

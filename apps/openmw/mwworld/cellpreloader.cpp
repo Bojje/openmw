@@ -227,6 +227,39 @@ namespace MWWorld
         Resource::ResourceSystem* mResourceSystem;
     };
 
+    /// Worker thread item: preload one rendering mesh.
+    class PreloadMeshItem : public SceneUtil::WorkItem
+    {
+    public:
+        PreloadMeshItem(VFS::Path::Normalized mesh, Resource::SceneManager* sceneManager)
+            : mMesh(std::move(mesh))
+            , mSceneManager(sceneManager)
+        {
+        }
+
+        void doWork() override
+        {
+            if (mAborted)
+                return;
+
+            try
+            {
+                mSceneManager->getTemplate(mMesh);
+            }
+            catch (const std::exception& e)
+            {
+                Log(Debug::Warning) << "Failed to get mesh template \"" << mMesh << "\" to preload: " << e.what();
+            }
+        }
+
+        void abort() override { mAborted = true; }
+
+    private:
+        VFS::Path::Normalized mMesh;
+        Resource::SceneManager* mSceneManager;
+        std::atomic_bool mAborted{ false };
+    };
+
     CellPreloader::CellPreloader(Resource::ResourceSystem* resourceSystem,
         Resource::BulletShapeManager* bulletShapeManager, Terrain::World* terrain, MWRender::LandManager* landManager)
         : mResourceSystem(resourceSystem)
@@ -297,6 +330,28 @@ namespace MWWorld
 
         mPreloadCells.emplace(&cell, PreloadEntry(timestamp, item));
         ++mAdded;
+    }
+
+    void CellPreloader::preloadMesh(std::string_view mesh, bool useAnim, double timestamp)
+    {
+        if (!mWorkQueue || !mResourceSystem->getSceneManager())
+            return;
+
+        Resource::SceneManager* const sceneManager = mResourceSystem->getSceneManager();
+        const VFS::Manager* const vfs = sceneManager->getVFS();
+        const VFS::Path::Normalized meshPath = useAnim
+            ? Misc::ResourceHelpers::correctActorModelPath(VFS::Path::toNormalized(mesh), vfs)
+            : VFS::Path::toNormalized(mesh);
+
+        if (sceneManager->checkLoaded(meshPath, timestamp))
+            return;
+
+        mMeshPreloadItems.erase(std::remove_if(mMeshPreloadItems.begin(), mMeshPreloadItems.end(),
+                                      [](const osg::ref_ptr<SceneUtil::WorkItem>& item) { return item->isDone(); }),
+            mMeshPreloadItems.end());
+        osg::ref_ptr<PreloadMeshItem> item(new PreloadMeshItem(meshPath, sceneManager));
+        mWorkQueue->addWorkItem(item);
+        mMeshPreloadItems.emplace_back(std::move(item));
     }
 
     void CellPreloader::notifyLoaded(CellStore* cell)
@@ -463,6 +518,12 @@ namespace MWWorld
             it->second.mWorkItem->waitTillDone();
 
         mPreloadCells.clear();
+
+        for (const osg::ref_ptr<SceneUtil::WorkItem>& item : mMeshPreloadItems)
+            item->abort();
+        for (const osg::ref_ptr<SceneUtil::WorkItem>& item : mMeshPreloadItems)
+            item->waitTillDone();
+        mMeshPreloadItems.clear();
     }
 
     void CellPreloader::reportStats(unsigned int frameNumber, osg::Stats& stats) const

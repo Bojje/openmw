@@ -8,8 +8,9 @@
 #include <osg/ref_ptr>
 
 #include <map>
-#include <unordered_map>
 #include <span>
+#include <string_view>
+#include <unordered_map>
 
 namespace osg
 {
@@ -53,6 +54,9 @@ namespace MWWorld
         /// Ask a background thread to preload rendering meshes and collision shapes for objects in this cell.
         /// @note The cell itself must be in State_Loaded or State_Preloaded.
         void preload(MWWorld::CellStore& cell, double timestamp);
+
+        /// Ask a background thread to preload a standalone rendering mesh.
+        void preloadMesh(std::string_view mesh, bool useAnim, double timestamp);
 
         void notifyLoaded(MWWorld::CellStore* cell);
 
@@ -127,6 +131,7 @@ namespace MWWorld
         std::vector<PositionCellGrid> mTerrainPreloadPositions;
         osg::ref_ptr<TerrainPreloadItem> mTerrainPreloadItem;
         osg::ref_ptr<SceneUtil::WorkItem> mUpdateCacheItem;
+        std::vector<osg::ref_ptr<SceneUtil::WorkItem>> mMeshPreloadItems;
 
         std::vector<PositionCellGrid> mLoadedTerrainPositions;
         double mLoadedTerrainTimestamp;

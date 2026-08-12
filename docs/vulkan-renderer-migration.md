@@ -300,6 +300,10 @@ The neutral scene also no longer caches OSG-only preloader settings; those value
 the active legacy preloader operations, leaving the scene state smaller on the neutral path.
 The fixed legacy cell-loading threshold is local to the OSG preload calculation as well, removing
 another preloader-only field from `Scene`.
+Standalone effect-mesh preloading now lives beside cell and terrain preloading in `CellPreloader`.
+This removes the OSG work queue and asynchronous work-item ownership from `Scene`, and reduces the
+public preload call to mesh data plus animation intent; neutral scene construction no longer carries
+an OSG queue or scene-manager plumbing for a service it cannot execute.
 Object insertion now shares one world/physics/mechanics path for both backends: the optional OSG
 adapter handles only scene-graph insertion and water-ripple registration, while neutral object
 snapshots, physics shapes, looping effects, and lifecycle notifications are not skipped when OSG
@@ -380,7 +384,7 @@ The engine public header no longer imports complete OSG viewer/event-handler hea
 are now included only by the implementation files that use them.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-157 files, deleting 1,431 lines and adding 8,567 lines (net `+7,136`). The larger Vulkan-only
+158 files, deleting 1,476 lines and adding 8,597 lines (net `+7,121`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
