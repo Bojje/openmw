@@ -5,6 +5,7 @@
 #include <array>
 #include <cmath>
 #include <iterator>
+#include <limits>
 #include <string>
 #include <string_view>
 #include <unordered_set>
@@ -127,6 +128,19 @@ namespace Render
         const float cameraX = scene.viewInverse.data[12];
         const float cameraY = scene.viewInverse.data[13];
         const float cameraZ = scene.viewInverse.data[14];
+        float widthX = scene.viewInverse.data[0];
+        float widthY = scene.viewInverse.data[1];
+        const float widthLength = std::hypot(widthX, widthY);
+        if (widthLength > std::numeric_limits<float>::epsilon())
+        {
+            widthX /= widthLength;
+            widthY /= widthLength;
+        }
+        else
+        {
+            widthX = 1.f;
+            widthY = 0.f;
+        }
         std::vector<MeshInstance> result;
         result.reserve(static_cast<std::size_t>(particleCount));
 
@@ -147,16 +161,18 @@ namespace Render
             instance.mesh.material.alphaBlend = true;
             instance.mesh.material.doubleSided = true;
             instance.mesh.vertices.resize(4);
-            const std::array<Vec3, 4> positions = { Vec3{ x - halfWidth, y, z },
-                Vec3{ x + halfWidth, y, z }, Vec3{ x + halfWidth, y, z - lineLength },
-                Vec3{ x - halfWidth, y, z - lineLength } };
+            const std::array<Vec3, 4> positions = { Vec3{ x - widthX * halfWidth, y - widthY * halfWidth, z },
+                Vec3{ x + widthX * halfWidth, y + widthY * halfWidth, z },
+                Vec3{ x + widthX * halfWidth, y + widthY * halfWidth, z - lineLength },
+                Vec3{ x - widthX * halfWidth, y - widthY * halfWidth, z - lineLength } };
             for (std::size_t vertexIndex = 0; vertexIndex < positions.size(); ++vertexIndex)
             {
                 MeshVertex& vertex = instance.mesh.vertices[vertexIndex];
                 vertex.position[0] = positions[vertexIndex].x;
                 vertex.position[1] = positions[vertexIndex].y;
                 vertex.position[2] = positions[vertexIndex].z;
-                vertex.normal[1] = 1.f;
+                vertex.normal[0] = widthY;
+                vertex.normal[1] = -widthX;
                 vertex.texcoord[0] = vertexIndex == 1 || vertexIndex == 2 ? 1.f : 0.f;
                 vertex.texcoord[1] = vertexIndex >= 2 ? 1.f : 0.f;
                 vertex.color[0] = vertex.color[1] = vertex.color[2] = vertex.color[3] = 1.f;

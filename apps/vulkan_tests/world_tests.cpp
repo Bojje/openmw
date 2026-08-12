@@ -96,6 +96,20 @@ int main()
         || weatherMeshes.front().mesh.material.diffuse.w != 0.5f
         || weatherMeshes.front().mesh.vertices.size() != 4)
         throw std::runtime_error("renderer-neutral world scene failed to emit precipitation geometry");
+    world.sceneData().viewInverse.data[0] = 0.f;
+    world.sceneData().viewInverse.data[1] = 1.f;
+    world.sceneData().viewInverse.data[4] = -1.f;
+    world.sceneData().viewInverse.data[5] = 0.f;
+    const std::vector<Render::MeshInstance> rotatedWeatherMeshes
+        = Render::collectWeatherMeshes(world, world.sceneData());
+    if (rotatedWeatherMeshes.size() != 2
+        || std::abs(rotatedWeatherMeshes.front().mesh.vertices[0].position[0]
+                - rotatedWeatherMeshes.front().mesh.vertices[1].position[0])
+            > 1e-5f
+        || std::abs(rotatedWeatherMeshes.front().mesh.vertices[0].position[1]
+                - rotatedWeatherMeshes.front().mesh.vertices[1].position[1])
+            < 1e-5f)
+        throw std::runtime_error("renderer-neutral precipitation did not face the camera");
     const Render::SceneSubmission weatherSubmission = Render::collectSceneSubmission(world, world.sceneData(), "",
         [](std::string_view) { return std::vector<Render::MeshInstance>(); }, false);
     if (weatherSubmission.meshes.size() != 2 || !weatherSubmission.valid())

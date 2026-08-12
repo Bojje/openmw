@@ -185,7 +185,7 @@ The submission
 boundary now validates mesh indices and terrain snapshots before Vulkan consumes them. The
 full-game Vulkan call site now exists for the no-GUI bootstrap: window/input ownership,
 camera synchronization, neutral image loading, and static scene submission are live, while
-dynamic-content, legacy weather particle fidelity, and GUI/presentation services remain incomplete. Weather ambient, directional-light, fog, and sky-horizon values now cross the neutral frame state, and the Vulkan composite derives its background gradient from that state. Renderer-neutral precipitation state now belongs to `WorldScene` and produces deterministic alpha-blended rain geometry in the Vulkan submission; full weather particle meshes, storm orientation, and water-shader parity remain. NIF skinning metadata now survives conversion, and resolved dynamic
+dynamic-content, legacy weather particle fidelity, and GUI/presentation services remain incomplete. Weather ambient, directional-light, fog, and sky-horizon values now cross the neutral frame state, and the Vulkan composite derives its background gradient from that state. Renderer-neutral precipitation state now belongs to `WorldScene` and produces deterministic camera-facing alpha-blended rain ribbons in the Vulkan submission; full weather particle meshes, storm/wind orientation, and water-shader parity remain. NIF skinning metadata now survives conversion, and resolved dynamic
 mesh payloads cross the neutral boundary into the Vulkan consumer. A deterministic CPU skinning
 helper now applies frame bone matrices, and model-local NIF plus classic external `.kf` keyframe
 controllers are sampled by the neutral resource layer without constructing an OSG scene. Unskinned dynamic meshes, skinned
@@ -500,7 +500,7 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-206 files, deleting 2,251 lines and adding 13,835 lines (net `+11,584`). The larger Vulkan-only
+206 files, deleting 2,251 lines and adding 13,865 lines (net `+11,614`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. The live no-GUI consumer is the first deletion
 checkpoint; further reduction can now target OSG scene/resource/presentation ownership rather
