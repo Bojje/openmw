@@ -2019,22 +2019,23 @@ namespace MWWorld
     void World::setWaterHeight(const float height)
     {
         mPhysics->setWaterHeight(height);
-        mRendering->setWaterHeight(height);
+        if (mRendering)
+            mRendering->setWaterHeight(height);
     }
 
     bool World::toggleWater()
     {
-        return mRendering->toggleRenderMode(MWRender::Render_Water);
+        return mRendering && mRendering->toggleRenderMode(MWRender::Render_Water);
     }
 
     bool World::toggleWorld()
     {
-        return mRendering->toggleRenderMode(MWRender::Render_Scene);
+        return mRendering && mRendering->toggleRenderMode(MWRender::Render_Scene);
     }
 
     bool World::toggleBorders()
     {
-        return mRendering->toggleBorders();
+        return mRendering && mRendering->toggleBorders();
     }
 
     void World::PCDropped(const Ptr& item)
@@ -3167,7 +3168,8 @@ namespace MWWorld
         if (isUnderwater(MWMechanics::getPlayer().getCell(), worldPos))
         {
             MWMechanics::projectileHit(actor, Ptr(), bow, projectile, worldPos, attackStrength, attackWindUp);
-            mRendering->emitWaterRipple(worldPos);
+            if (mRendering)
+                mRendering->emitWaterRipple(worldPos);
             return;
         }
 
