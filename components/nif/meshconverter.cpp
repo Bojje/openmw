@@ -136,30 +136,16 @@ namespace Nif
             NiTransform value;
         };
 
-        SampledNodeTransform sampleKeyframeController(
-            const NiKeyframeController& controller, NiTransform defaultTransform, float time)
+        SampledNodeTransform sampleKeyframeData(const NiKeyframeData* data, float sampleTime,
+            Matrix3 defaultRotationMatrix, osg::Quat defaultRotation, osg::Vec3f defaultTranslation, float defaultScale)
         {
-            SampledNodeTransform result{ defaultTransform };
-            const NiKeyframeData* data = nullptr;
-            osg::Quat defaultRotation = result.value.mRotation.toOsgMatrix().getRotate();
-            osg::Vec3f defaultTranslation = result.value.mTranslation;
-            float defaultScale = result.value.mScale;
-            if (!controller.mInterpolator.empty()
-                && controller.mInterpolator->mRecordType == RC_NiTransformInterpolator)
-            {
-                const auto* interpolator
-                    = static_cast<const NiTransformInterpolator*>(controller.mInterpolator.getPtr());
-                data = interpolator->mData.empty() ? nullptr : interpolator->mData.getPtr();
-                defaultRotation = interpolator->mDefaultValue.mRotation;
-                defaultTranslation = interpolator->mDefaultValue.mTranslation;
-                defaultScale = interpolator->mDefaultValue.mScale;
-            }
-            else if (!controller.mData.empty())
-                data = controller.mData.getPtr();
+            SampledNodeTransform result{ NiTransform::getIdentity() };
+            result.value.mRotation = defaultRotationMatrix;
+            result.value.mTranslation = defaultTranslation;
+            result.value.mScale = defaultScale;
             if (data == nullptr)
                 return result;
 
-            const float sampleTime = controllerTime(controller, time);
             if (data->mRotations && !data->mRotations->mKeys.empty())
                 result.value.mRotation = toMatrix3(sampleKeys(data->mRotations, sampleTime, defaultRotation,
                     interpolateQuaternion));
@@ -190,6 +176,32 @@ namespace Nif
             if (data->mScales && !data->mScales->mKeys.empty())
                 result.value.mScale = sampleKeys(data->mScales, sampleTime, defaultScale, interpolateFloat);
             return result;
+        }
+
+        SampledNodeTransform sampleKeyframeController(
+            const NiKeyframeController& controller, NiTransform defaultTransform, float time)
+        {
+            SampledNodeTransform result{ defaultTransform };
+            const NiKeyframeData* data = nullptr;
+            Matrix3 defaultRotationMatrix = result.value.mRotation;
+            osg::Quat defaultRotation = result.value.mRotation.toOsgMatrix().getRotate();
+            osg::Vec3f defaultTranslation = result.value.mTranslation;
+            float defaultScale = result.value.mScale;
+            if (!controller.mInterpolator.empty()
+                && controller.mInterpolator->mRecordType == RC_NiTransformInterpolator)
+            {
+                const auto* interpolator
+                    = static_cast<const NiTransformInterpolator*>(controller.mInterpolator.getPtr());
+                data = interpolator->mData.empty() ? nullptr : interpolator->mData.getPtr();
+                defaultRotation = interpolator->mDefaultValue.mRotation;
+                defaultRotationMatrix = toMatrix3(defaultRotation);
+                defaultTranslation = interpolator->mDefaultValue.mTranslation;
+                defaultScale = interpolator->mDefaultValue.mScale;
+            }
+            else if (!controller.mData.empty())
+                data = controller.mData.getPtr();
+            return sampleKeyframeData(data, controllerTime(controller, time), defaultRotationMatrix, defaultRotation,
+                defaultTranslation, defaultScale);
         }
 
         SampledNodeTransform sampleNodeTransform(const NiAVObject& node, float time)
