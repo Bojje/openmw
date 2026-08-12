@@ -485,6 +485,7 @@ namespace Render
                     continue;
                 DynamicMeshSubmission dynamic;
                 dynamic.object = object;
+                dynamic.boneMatrices = object.boneMatrices;
                 if (object.visible)
                 {
                     const std::vector<MeshInstance> resolvedMeshes = resolveMeshes(object.model);

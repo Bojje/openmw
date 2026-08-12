@@ -92,6 +92,10 @@ namespace Render
         ObjectTransform transform;
         bool visible = true;
         bool dynamic = false;
+        // Optional frame pose supplied by the animation owner. The matrices
+        // use the skinning order of the resolved mesh and contain no backend
+        // or scene-graph types.
+        std::vector<Mat4> boneMatrices;
         // Optional texture replacement used by explicitly identified world VFX.
         std::string textureOverride;
         // World effects retain whether gameplay requested looping playback.
@@ -411,6 +415,7 @@ namespace Render
                         object->dynamic = dynamic;
                         if (!dynamic || modelChanged)
                         {
+                            object->boneMatrices.clear();
                             object->animationTime = 0.f;
                             object->animationGroup.clear();
                         }
@@ -448,6 +453,21 @@ namespace Render
             return updateObjectTransform(objectKey, [&](ObjectTransform& transform) { transform.scale = scale; });
         }
 
+        bool updateObjectPose(const void* objectKey, std::vector<Mat4> boneMatrices)
+        {
+            const auto found = mObjects.find(objectKey);
+            if (found == mObjects.end())
+                return false;
+            const auto scene = mCells.find(found->second.cell);
+            if (scene == mCells.end())
+                return false;
+            WorldObject* object = scene->second.findObject(found->second.id);
+            if (object == nullptr || !object->dynamic)
+                return false;
+            object->boneMatrices = std::move(boneMatrices);
+            return true;
+        }
+
         bool updateObjectAnimation(const void* objectKey, std::string_view group,
             std::optional<float> animationTime = std::nullopt, std::string_view startKey = {},
             std::string_view stopKey = {})
@@ -468,6 +488,7 @@ namespace Render
                 object->animationStartKey = startKey;
                 object->animationStopKey = stopKey;
                 object->animationTime = 0.f;
+                object->boneMatrices.clear();
             }
             if (animationTime && std::isfinite(*animationTime) && *animationTime >= 0.f)
                 object->animationTime = *animationTime;

@@ -13,7 +13,7 @@ namespace
     constexpr float epsilon = 1e-5f;
 
     static_assert(sizeof(Render::Mat4) == 64);
-    static_assert(sizeof(Render::SceneData) == 352);
+    static_assert(sizeof(Render::SceneData) == 368);
 
     void expectNear(float actual, float expected, const std::string& label)
     {

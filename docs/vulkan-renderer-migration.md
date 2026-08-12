@@ -76,8 +76,6 @@ loaded-cell snapshots through cached NIF meshes, filters hidden and dynamic obje
 static batch, and composes object transforms with NIF node transforms before batching;
 animated objects are explicitly retained as dynamic snapshots, but are excluded from the static
 mesh batch. The ordered `dynamicMeshes` payload provides the Vulkan consumer with retained
-poses resolved at submission time; the obsolete scene-owned pose cache and its unused update
-API have been removed so animation has one neutral resource boundary.
 visibility, transform, model, and cell ordering together with resolved mesh data. The neutral
 Vulkan bootstrap now has a model-local NIF pose producer: the resource boundary samples
 `NiKeyframeController` transforms by the converted skinning bone names and the scene owner injects
