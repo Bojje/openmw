@@ -212,6 +212,8 @@ on every frame export. Neutral terrain LOD assembly now belongs to `Terrain::Ren
 `Scene::recordNeutralCell()` now owns the renderer-neutral cell identity, groundcover, and terrain
 snapshot update as one explicit phase before legacy OSG insertion. This keeps neutral cell state
 complete even as the later OSG side effects are replaced by a Vulkan backend.
+Object snapshots follow the same ordering: active-cell neutral ownership is recorded before OSG
+object insertion, and neutral visibility is not inherited from legacy paging.
 `RenderingManager` only provides that storage to the world lifecycle; it no longer assembles
 the renderer-neutral scene submission or owns its resource callbacks. Neutral terrain collection
 now depends on cached world tiles rather than the legacy OSG terrain object being active.

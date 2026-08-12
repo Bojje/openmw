@@ -171,20 +171,19 @@ namespace
 
         ESM::RefNum refnum = ptr.getCellRef().getRefNum();
         const bool isPaged = refnum.hasContentFile() && std::binary_search(pagedRefs.begin(), pagedRefs.end(), refnum);
+        if (!model.empty())
+        {
+            // Commit renderer-neutral ownership before the legacy scene graph
+            // is touched. A paging or OSG insertion failure must not erase
+            // the Vulkan backend's active-cell snapshot; neutral visibility
+            // also deliberately does not inherit OSG paging decisions.
+            recordNeutralObject(ptr, model.view(), true, neutralWorld);
+        }
         if (!isPaged)
             ptr.getClass().insertObjectRendering(ptr, model, rendering.getObjects());
         else
             ptr.getRefData().setBaseNode(pagedNode);
         setNodeRotation(ptr, rendering, rotation);
-        if (!model.empty())
-        {
-            // OSG paging is a legacy scene-node optimization. The neutral
-            // backend owns visibility for active-cell static references, so
-            // do not hide a valid static model merely because OSG placed it
-            // in a paged node. Dynamic records remain separate until a
-            // backend can consume animation and skinning data.
-            recordNeutralObject(ptr, model.view(), true, neutralWorld);
-        }
 
         if (ptr.getClass().useAnim())
             MWBase::Environment::get().getMechanicsManager()->add(ptr);
