@@ -405,6 +405,8 @@ Projectile water-hit notification now crosses the world boundary once: the OSG-o
 service publishes an impact to `MWBase::World`, which fans it out to the active OSG and neutral
 scene owners. This removes the projectile service's direct `RenderingManager` dependency while
 preserving the reference renderer's ripple behavior.
+Water-level changes use the same fan-out rule, so a world update cannot silently update only one
+active renderer owner.
 Malformed neutral water records are
 rejected at the same submission validation boundary as invalid geometry.
 `World` now retains terrain through `Terrain::RenderStorage`; the concrete OSG terrain adapter is
@@ -622,6 +624,7 @@ the game unplayable rather than reduce duplication safely.
 | Vulkan frame-owner forwarding wrapper | Removed; `Vk::Renderer` is the engine's Vulkan `FrameLifecycle` owner | Complete |
 | Legacy `Scene` constructor forwarding wrapper | Removed; OSG now uses the canonical scene-construction contract | Complete |
 | Projectile water-impact event | World-level neutral water-ripple fan-out; projectile service no longer stores `RenderingManager` | Complete for event ownership; projectile presentation remains OSG-only |
+| Water-level event | World-level fan-out to physics, OSG water, and neutral water snapshots | Complete for owner fan-out; legacy water shading remains outstanding |
 | Vulkan mesh submission queue | Removed | Complete |
 | Inactive raster ray-tracing scaffold | Removed | Reintroduce only with a complete RT pipeline |
 | Vulkan utility/queue helper paths | Removed | Complete |

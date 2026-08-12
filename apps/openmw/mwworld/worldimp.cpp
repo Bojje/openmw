@@ -2117,10 +2117,8 @@ namespace MWWorld
         mPhysics->setWaterHeight(height);
         if (mRendering)
             mRendering->setWaterHeight(height);
-        else if (mWorldScene)
-        {
+        if (mWorldScene)
             mWorldScene->updateNeutralWaterLevel(height);
-        }
     }
 
     void World::emitWaterRipple(const Render::Vec3& position)
