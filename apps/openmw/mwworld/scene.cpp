@@ -684,7 +684,8 @@ namespace MWWorld
                 ESM::ExteriorCellLocation((*currentGridCenter)[0], (*currentGridCenter)[1], worldspace), true);
             float distance = std::max(std::abs(center.x() - pos.x), std::abs(center.y() - pos.y));
             int cellSize = ESM::getCellSize(worldspace);
-            const float maxDistance = cellSize / 2 + mCellLoadingThreshold; // 1/2 cell size + threshold
+            constexpr float cellLoadingThreshold = 1024.f;
+            const float maxDistance = cellSize / 2 + cellLoadingThreshold; // 1/2 cell size + threshold
             if (distance <= maxDistance)
                 return *currentGridCenter;
         }
@@ -1064,7 +1065,6 @@ namespace MWWorld
         , mTerrainStorage(terrainStorage)
         , mWorkQueue(workQueue)
         , mNavigator(navigator)
-        , mCellLoadingThreshold(1024.f)
         , mLowestPoint(std::numeric_limits<float>::max())
     {
         if (mRendering && landManager && mTerrain && mWorkQueue)
@@ -1577,6 +1577,7 @@ namespace MWWorld
         if (!mWorld.isCellExterior())
             return;
         const float preloadDistance = Settings::cells().mPreloadDistance;
+        constexpr float cellLoadingThreshold = 1024.f;
 
         int halfGridSizePlusOne = mHalfGridSize + 1;
 
@@ -1602,7 +1603,7 @@ namespace MWWorld
                 dist = std::min(dist,
                     std::max(std::abs(thisCellCenter.x() - predictedPos.x),
                         std::abs(thisCellCenter.y() - predictedPos.y)));
-                const float loadDist = cellSize / 2 + cellSize - mCellLoadingThreshold + preloadDistance;
+                const float loadDist = cellSize / 2 + cellSize - cellLoadingThreshold + preloadDistance;
 
                 if (dist < loadDist)
                     preloadCell(mWorld.getWorldModel().getExterior(cellIndex));

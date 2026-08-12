@@ -136,7 +136,6 @@ namespace MWWorld
         SceneUtil::WorkQueue* mWorkQueue;
         DetourNavigator::Navigator& mNavigator;
         std::unique_ptr<CellPreloader> mPreloader;
-        float mCellLoadingThreshold;
         float mLowestPoint;
 
         int mHalfGridSize = Constants::CellGridRadius;
