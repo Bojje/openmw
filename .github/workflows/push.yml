@@ -202,6 +202,14 @@ jobs:
           echo "Scene neutral terrain paths must use their injected RenderStorage contract"
           exit 1
         fi
+        if rg -n 'ESMTerrain::LandObject|mLandManager\.getLand' apps/openmw/mwworld/scene.cpp; then
+          echo "Scene terrain collision handoff must use neutral RenderStorage data"
+          exit 1
+        fi
+        if rg -n 'osg::Object|mHoldObject' apps/openmw/mwphysics/heightfield.hpp apps/openmw/mwphysics/heightfield.cpp; then
+          echo "Physics heightfields must own neutral samples instead of OSG lifetimes"
+          exit 1
+        fi
         if rg -n 'class RenderingManager[^\n]*Render::FrameLifecycle|RenderingManager[^\n]*FrameLifecycle' \
             apps/openmw/mwrender/renderingmanager.hpp; then
           echo "RenderingManager must not inherit the renderer-neutral frame lifecycle"
