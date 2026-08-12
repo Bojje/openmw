@@ -456,7 +456,7 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-186 files, deleting 1,970 lines and adding 11,235 lines (net `+9,265`). The larger Vulkan-only
+186 files, deleting 1,970 lines and adding 11,240 lines (net `+9,270`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. The live no-GUI consumer is the first deletion
 checkpoint; further reduction can now target OSG scene/resource/presentation ownership rather
