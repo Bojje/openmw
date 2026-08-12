@@ -4043,8 +4043,6 @@ namespace MWWorld
 
         if (!mFrameLifecycle->renderFrame())
             return false;
-        if (mWorldScene)
-            mWorldScene->synchronizeNeutralScene();
         return true;
     }
 

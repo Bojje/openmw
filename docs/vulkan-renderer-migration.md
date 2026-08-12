@@ -69,8 +69,7 @@ boundary, while the presentation smoke submits neutral mesh instances directly. 
 cell snapshot: the scene lifecycle records model identity, position, orientation, scale,
 visibility, cell transfer, and removal independently of the OSG node tree. Legacy-paged
 references remain in the snapshot, but active-cell static references are submitted to the neutral
-backend without inheriting OSG paging visibility. OSG still consumes the same events, but it no
-longer needs to be the only source of object transform state. The neutral world path resolves
+backend without inheriting OSG paging visibility. The OSG path remains legacy-owned; the neutral world path resolves
 loaded-cell snapshots through cached NIF meshes, filters hidden and dynamic objects from the
 static batch, and composes object transforms with NIF node transforms before batching;
 animated objects are explicitly retained as dynamic snapshots, but are excluded from the static

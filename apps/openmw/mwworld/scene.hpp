@@ -151,7 +151,6 @@ namespace MWWorld
             const DetourNavigator::UpdateGuard* navigatorUpdateGuard);
         void recordNeutralCell(CellStore& cell);
         void updateNeutralTerrainRegions();
-        void synchronizeNeutralScene();
 
     public:
         Scene(MWWorld::World& world, Render::FrameLifecycle& frameLifecycle,
