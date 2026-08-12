@@ -1662,7 +1662,8 @@ namespace MWWorld
         if (mPlayerInJail && !mGoToJail && !MWBase::Environment::get().getWindowManager()->containsMode(MWGui::GM_Jail))
             mPlayerInJail = false;
 
-        updateWeather(duration, paused);
+        if (mWeatherManager)
+            updateWeather(duration, paused);
 
         updateNavigator();
 
@@ -1672,9 +1673,11 @@ namespace MWWorld
 
         mWorldScene->update(duration);
 
-        mRendering->update(duration, paused);
+        if (mRendering)
+            mRendering->update(duration, paused);
 
-        updateSoundListener();
+        if (mRendering)
+            updateSoundListener();
 
         mSpellPreloadTimer -= duration;
         if (mSpellPreloadTimer <= 0.f)
@@ -1686,7 +1689,7 @@ namespace MWWorld
         if (mWorldScene->hasCellLoaded())
         {
             mNavigator->wait(DetourNavigator::WaitConditionType::requiredTilesPresent,
-                MWBase::Environment::get().getWindowManager()->getLoadingScreen());
+                mRendering ? MWBase::Environment::get().getWindowManager()->getLoadingScreen() : nullptr);
             mWorldScene->resetCellLoaded();
         }
     }
@@ -3413,6 +3416,9 @@ namespace MWWorld
 
     void World::updateWeather(float duration, bool paused)
     {
+        if (!mWeatherManager)
+            return;
+
         bool isExterior = isCellExterior() || isCellQuasiExterior();
         if (mPlayer->wasTeleported())
         {

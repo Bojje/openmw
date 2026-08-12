@@ -208,6 +208,11 @@ jobs:
           echo "World::adjustSky must remain safe before an OSG renderer is initialized"
           exit 1
         fi
+        if ! sed -n '/void World::updateWeather/,/^    }$/p' apps/openmw/mwworld/worldimp.cpp \
+            | rg -n 'if[[:space:]]*\(!mWeatherManager\)'; then
+          echo "World weather updates must remain safe without the OSG weather owner"
+          exit 1
+        fi
         if sed -n '/float World::getTerrainHeightAt/,/^    }$/p' apps/openmw/mwworld/worldimp.cpp \
             | rg -n 'mRendering->getTerrainHeightAt'; then
           echo "World terrain height queries must use the neutral terrain storage contract"
