@@ -3,6 +3,7 @@
 
 #include <filesystem>
 #include <functional>
+#include <iosfwd>
 #include <osg/ref_ptr>
 
 #include <components/render/frame.hpp>
@@ -49,6 +50,7 @@ namespace MWRender
         void initializeWindow(SDL_Window*& window, const std::filesystem::path& resourceDirectory);
         void initializeStatsHandlers(const VFS::Manager& vfs, bool writeToFile,
             const std::function<void(Resource::Profiler&)>& configureProfiler);
+        void reportStats(unsigned frameNumber, std::ostream& stream) const;
         int maxTextureImageUnits() const { return mMaxTextureImageUnits; }
         osg::Group* sceneRoot();
 

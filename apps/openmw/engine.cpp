@@ -130,15 +130,6 @@ namespace
         void operator()(std::string) const {}
     };
 
-    void reportStats(unsigned frameNumber, osgViewer::Viewer& viewer, std::ostream& stream)
-    {
-        viewer.getViewerStats()->report(stream, frameNumber);
-        osgViewer::Viewer::Cameras cameras;
-        viewer.getCameras(cameras);
-        for (osg::Camera* camera : cameras)
-            camera->getStats()->report(stream, frameNumber);
-    }
-
 }
 
 void OMW::Engine::executeLocalScripts()
@@ -843,7 +834,8 @@ void OMW::Engine::go()
             timeManager.setRenderingSimulationTime(timeManager.getRenderingSimulationTime() + dt);
         }
 
-        if (stats && getOsgViewer())
+        auto* const reportingLifecycle = dynamic_cast<MWRender::ViewerFrameLifecycle*>(mFrameLifecycle.get());
+        if (stats && reportingLifecycle)
         {
             // The delay is required because rendering happens in parallel to the main thread and stats from there is
             // available with delay.
@@ -854,7 +846,7 @@ void OMW::Engine::go()
                 // frames inside a simulation frame.
                 const unsigned currentFrameNumber = mFrameLifecycle->frameNumber();
                 for (unsigned i = frameNumber; i <= currentFrameNumber; ++i)
-                    reportStats(i - statsReportDelay, *getOsgViewer(), stats);
+                    reportingLifecycle->reportStats(i - statsReportDelay, stats);
             }
         }
 

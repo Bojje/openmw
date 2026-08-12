@@ -273,6 +273,15 @@ namespace MWRender
             Resource::collectStatistics(*mViewer);
     }
 
+    void ViewerFrameLifecycle::reportStats(unsigned frameNumber, std::ostream& stream) const
+    {
+        mViewer->getViewerStats()->report(stream, frameNumber);
+        osgViewer::Viewer::Cameras cameras;
+        mViewer->getCameras(cameras);
+        for (osg::Camera* camera : cameras)
+            camera->getStats()->report(stream, frameNumber);
+    }
+
     bool ViewerFrameLifecycle::renderFrame()
     {
         mViewer->eventTraversal();
