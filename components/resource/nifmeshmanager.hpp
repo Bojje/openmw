@@ -55,9 +55,11 @@ namespace Resource
         /// Sample model-local bone transforms without constructing an OSG
         /// scene. The result follows the supplied skinning bone-name order.
         std::vector<Render::Mat4> getBonePose(
-            VFS::Path::NormalizedView name, float time, std::span<const std::string> boneNames);
+            VFS::Path::NormalizedView name, float time, std::span<const std::string> boneNames,
+            std::string_view group = {});
         std::vector<Render::Mat4> getBonePose(
-            const Nif::NIFFilePtr& file, float time, std::span<const std::string> boneNames) const;
+            const Nif::NIFFilePtr& file, float time, std::span<const std::string> boneNames,
+            std::string_view group = {}) const;
 
         void updateCache(double referenceTime) override;
         void clearCache() override;

@@ -4212,6 +4212,12 @@ namespace MWWorld
             : Render::Vec4{ 0.f, 0.f, 0.f, 0.f };
     }
 
+    void World::updateNeutralAnimation(const MWWorld::Ptr& ptr, std::string_view group)
+    {
+        if (mWorldScene)
+            mWorldScene->updateObjectAnimation(ptr, group);
+    }
+
     void World::setActorActive(const MWWorld::Ptr& ptr, bool value)
     {
         if (MWPhysics::Actor* const actor = mPhysics->getActor(ptr))

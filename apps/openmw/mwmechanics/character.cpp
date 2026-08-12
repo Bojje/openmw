@@ -2578,7 +2578,8 @@ namespace MWMechanics
         if (stats.wasTeleported())
             stats.setTeleported(false);
 
-        osg::Vec3f movement(settings.asVec3());
+        const osg::Vec3f input(settings.asVec3());
+        osg::Vec3f movement(input);
         const float inputLength = movement.length();
         settings.mSpeedFactor = std::min(inputLength, 1.f);
         if (inputLength > 0.f)
@@ -2606,6 +2607,22 @@ namespace MWMechanics
             world->rotateObject(mPtr, rotation, true);
 
         world->queueMovement(mPtr, movement);
+
+        std::string animationGroup = "idle";
+        if (inputLength > 0.f)
+        {
+            const bool sneak = stats.getStance(MWMechanics::CreatureStats::Stance_Sneak) && !flying && !inWater;
+            const bool running = stats.getStance(MWMechanics::CreatureStats::Stance_Run) && !flying;
+            const std::string_view prefix = inWater ? (running ? "swimrun" : "swimwalk")
+                                                     : (sneak ? "sneak" : (running ? "run" : "walk"));
+            const std::string_view direction = input.y() >= 0.f
+                ? "forward"
+                : "back";
+            animationGroup = std::string(prefix) + std::string(direction);
+            if (std::abs(input.y()) <= 0.001f)
+                animationGroup = std::string(prefix) + (input.x() >= 0.f ? "right" : "left");
+        }
+        world->updateNeutralAnimation(mPtr, animationGroup);
         settings.mPosition[0] = settings.mPosition[1] = 0.f;
         if (movement.z() == 0.f)
             settings.mPosition[2] = 0.f;

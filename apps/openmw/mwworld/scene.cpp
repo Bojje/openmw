@@ -405,6 +405,12 @@ namespace MWWorld
         mPhysics->updateScale(ptr);
     }
 
+    void Scene::updateObjectAnimation(const Ptr& ptr, std::string_view group)
+    {
+        if (mNeutralWorldScene)
+            mNeutralWorldScene->updateObjectAnimation(static_cast<const void*>(ptr.mRef), group);
+    }
+
     void Scene::update(float duration)
     {
         if (mChangeCellGridRequest.has_value())
@@ -1326,7 +1332,7 @@ namespace MWWorld
                     continue;
 
                 const std::vector<Render::Mat4> pose = mPoseResolver(dynamic.object.model,
-                    dynamic.object.animationTime, skinned->mesh.skinning->boneNames);
+                    dynamic.object.animationGroup, dynamic.object.animationTime, skinned->mesh.skinning->boneNames);
                 if (pose.size() == skinned->mesh.skinning->inverseBindMatrices.size())
                     dynamic.boneMatrices = pose;
             }

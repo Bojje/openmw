@@ -134,7 +134,7 @@ namespace Render
     // when a model has no compatible model-local animation data; callers then
     // retain their bind-pose fallback.
     using PoseResolver = std::function<std::vector<Mat4>(
-        std::string_view model, float time, std::span<const std::string> boneNames)>;
+        std::string_view model, std::string_view group, float time, std::span<const std::string> boneNames)>;
 
     inline MeshData skinMesh(const MeshData& source, std::span<const Mat4> boneMatrices)
     {

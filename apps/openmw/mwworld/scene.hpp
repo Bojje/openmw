@@ -224,6 +224,7 @@ namespace MWWorld
 
         void updateObjectRotation(const Ptr& ptr, RotationOrder order);
         void updateObjectScale(const Ptr& ptr);
+        void updateObjectAnimation(const Ptr& ptr, std::string_view group);
 
         bool isCellActive(const CellStore& cell);
 
