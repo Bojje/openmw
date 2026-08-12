@@ -373,6 +373,18 @@ int main()
     if (Render::collectRasterDynamicMeshes(hiddenDynamicSubmission).size() != 1)
         throw std::runtime_error("renderer-neutral hidden dynamic mesh was selected for rasterization");
 
+    world.removeObject(&objectHandle);
+    world.setTerrainTiles(&firstCellHandle, {});
+    const Render::SceneSubmission removed = Render::collectSceneSubmission(world, aggregateScene, "",
+        [&](std::string_view model) {
+            if (model == "meshes/first.nif")
+                return std::vector<Render::MeshInstance>{ aggregateMesh };
+            return std::vector<Render::MeshInstance>();
+        }, true);
+    if (!removed.meshes.empty() || !removed.terrainTiles.empty() || !removed.unresolvedModels.empty()
+        || !removed.valid())
+        throw std::runtime_error("renderer-neutral scene submission retained removed static ownership");
+
     Render::SceneSubmission submission;
     submission.scene = Render::SceneData();
     submission.scene.ambientColor = { 0.2f, 0.3f, 0.4f, 1.f };

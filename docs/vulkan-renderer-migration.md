@@ -226,7 +226,7 @@ Engine GUI fallback frame advancement now also reads simulation time from the ac
 `FrameLifecycle`, keeping renderer orchestration from reaching directly into an OSG frame stamp.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-91 files, deleting 916 lines and adding 7,241 lines (net `+6,325`). The larger Vulkan-only
+91 files, deleting 916 lines and adding 7,253 lines (net `+6,337`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
@@ -344,7 +344,7 @@ real replacement consumes its responsibility and the fast tests cover the bounda
 
 - Add a small test mode or executable that starts one renderer, loads a manifest of test scenes/cameras, renders multiple checkpoints, writes images, and exits. The current renderer-mesh CPU test validates NIF conversion, cache, and material setup; the standalone smoke target submits neutral mesh/terrain data, then covers three textured scene-ownership checkpoints in one process, reads back each rendered swapchain frame, compares consecutive captures when a Vulkan surface is available, and supports optional PPM reference/capture paths.
 - Use fixed camera paths, time, weather, random seed, resolution, and content.
-- Add CPU-side tests for matrix conversion, NIF conversion, transforms, resource lookup, and scene snapshots. The current fast tests cover matrix conversion, NIF conversion, parent-child transforms, safe index handling, cache reuse, cell-object transform composition, and renderer-neutral batch layout.
+- Add CPU-side tests for matrix conversion, NIF conversion, transforms, resource lookup, and scene snapshots. The current fast tests cover matrix conversion, NIF conversion, parent-child transforms, safe index handling, cache reuse, cell-object transform composition, renderer-neutral batch layout, and static mesh/terrain removal while dynamic ownership remains.
 - Compare Vulkan output with OSG reference images using the neutral image comparator's
   tolerances and error metrics rather than exact pixel equality. Vulkan-to-Vulkan
   capture comparison is now wired into smoke; OSG reference-image execution remains
