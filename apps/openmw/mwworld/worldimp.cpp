@@ -1072,7 +1072,11 @@ namespace MWWorld
     osg::Matrixf World::getActorHeadTransform(const MWWorld::ConstPtr& actor) const
     {
         if (!mRendering)
-            return osg::Matrixf::translate(actor.getRefData().getPosition().asVec3());
+        {
+            osg::Vec3f headPosition = actor.getRefData().getPosition().asVec3();
+            headPosition.z() += 1.85f * mPhysics->getHalfExtents(actor).z();
+            return osg::Matrixf::translate(headPosition);
+        }
 
         const MWRender::Animation* anim = mRendering->getAnimation(actor);
         if (anim)
