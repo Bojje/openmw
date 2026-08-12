@@ -703,10 +703,12 @@ provide a usable surface, while validation errors remain hard failures.
 - Add actors, skinning, animation, particles, weather, water, spell effects, projectiles, and post-processing.
   The neutral path now samples model-local NIF and classic external `.kf` keyframe controllers,
   honors selected group start/stop segments, carries explicit per-object animation groups and clocks,
-  and starts neutral weapon and spell-cast queues with attack/cast timing keys, including non-biped
-  random attack group selection. Projectile collision, hit, spell, sound, save/load, and cleanup
-  behavior now also run through neutral state without an OSG scene parent. The remaining animation
-  gate is actor `.kf` priority/queue arbitration, OSG-specific presentation events, blending, and
+and starts neutral weapon and spell-cast queues with attack/cast timing keys, including non-biped
+random attack group selection. Neutral queue ownership now also reports the active front group when
+the OSG animation owner is absent, so repeated group requests and death completion do not
+prematurely clear or finish the active queue. Projectile collision, hit, spell, sound, save/load, and cleanup
+behavior now also run through neutral state without an OSG scene parent. The remaining animation
+gate is actor `.kf` priority/queue arbitration, OSG-specific presentation events, blending, and
   controller-stack ownership; neutral projectile visuals/glows and full particle presentation remain.
   Neutral Lua/sound/melee/spell text-key dispatch is now covered for the migrated event classes.
 - Resting actors, owned-item lookup, line-of-sight, moving doors, and transformation-script movement/rotation now use active-cell state and world-model transforms instead of treating an absent OSG node as inactive.
