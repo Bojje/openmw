@@ -158,7 +158,7 @@ namespace
     static osg::ref_ptr<SceneUtil::PositionAttitudeTransform> pagedNode = new SceneUtil::PositionAttitudeTransform;
 
     void addObject(const MWWorld::Ptr& ptr, const MWWorld::World& world, const std::vector<ESM::RefNum>& pagedRefs,
-        MWPhysics::PhysicsSystem& physics, MWRender::RenderingManager& rendering, Render::WorldScene& neutralWorld)
+        MWPhysics::PhysicsSystem& physics, MWRender::RenderingManager* rendering, Render::WorldScene& neutralWorld)
     {
         if (ptr.getRefData().getBaseNode() || physics.getActor(ptr))
         {
@@ -169,27 +169,30 @@ namespace
         const VFS::Path::Normalized model = getModel(ptr);
         const auto rotation = makeDirectNodeRotation(ptr);
 
-        ESM::RefNum refnum = ptr.getCellRef().getRefNum();
-        const bool isPaged = refnum.hasContentFile() && std::binary_search(pagedRefs.begin(), pagedRefs.end(), refnum);
         if (!model.empty())
         {
-            // Commit renderer-neutral ownership before the legacy scene graph
+            // Record neutral ownership before the optional legacy scene graph
             // is touched. A paging or OSG insertion failure must not erase
-            // the Vulkan backend's active-cell snapshot; neutral visibility
-            // also deliberately does not inherit OSG paging decisions.
+            // the backend's active-cell snapshot.
             recordNeutralObject(ptr, model.view(), true, neutralWorld);
         }
-        if (!isPaged)
-            ptr.getClass().insertObjectRendering(ptr, model, rendering.getObjects());
-        else
-            ptr.getRefData().setBaseNode(pagedNode);
-        setNodeRotation(ptr, rendering, rotation);
+
+        if (rendering)
+        {
+            ESM::RefNum refnum = ptr.getCellRef().getRefNum();
+            const bool isPaged = refnum.hasContentFile() && std::binary_search(pagedRefs.begin(), pagedRefs.end(), refnum);
+            if (!isPaged)
+                ptr.getClass().insertObjectRendering(ptr, model, rendering->getObjects());
+            else
+                ptr.getRefData().setBaseNode(pagedNode);
+            setNodeRotation(ptr, *rendering, rotation);
+        }
 
         if (ptr.getClass().useAnim())
             MWBase::Environment::get().getMechanicsManager()->add(ptr);
 
-        if (ptr.getClass().isActor())
-            rendering.addWaterRippleEmitter(ptr);
+        if (ptr.getClass().isActor() && rendering)
+            rendering->addWaterRippleEmitter(ptr);
 
         // Restore effect particles
         world.applyLoopingParticles(ptr);
@@ -1379,14 +1382,7 @@ namespace MWWorld
         InsertVisitor insertVisitor(cell, loadingListener);
         cell.forEach(insertVisitor);
         insertVisitor.insert([&](const MWWorld::Ptr& ptr) {
-            if (mRendering)
-                addObject(ptr, mWorld, mPagedRefs, *mPhysics, *mRendering, mNeutralWorldScene);
-            else
-            {
-                const VFS::Path::Normalized model = getModel(ptr);
-                if (!model.empty())
-                    recordNeutralObject(ptr, model.view(), true, mNeutralWorldScene);
-            }
+            addObject(ptr, mWorld, mPagedRefs, *mPhysics, mRendering, mNeutralWorldScene);
         });
         insertVisitor.insert([&](const MWWorld::Ptr& ptr) {
             addObject(ptr, mWorld, *mPhysics, mLowestPoint, isInterior, mNavigator, navigatorUpdateGuard);
@@ -1398,14 +1394,7 @@ namespace MWWorld
         const bool isInterior = mCurrentCell && !mCurrentCell->isExterior();
         try
         {
-            if (mRendering)
-                addObject(ptr, mWorld, mPagedRefs, *mPhysics, *mRendering, mNeutralWorldScene);
-            else
-            {
-                const VFS::Path::Normalized model = getModel(ptr);
-                if (!model.empty())
-                    recordNeutralObject(ptr, model.view(), true, mNeutralWorldScene);
-            }
+            addObject(ptr, mWorld, mPagedRefs, *mPhysics, mRendering, mNeutralWorldScene);
             addObject(ptr, mWorld, *mPhysics, mLowestPoint, isInterior, mNavigator);
             mWorld.scaleObject(ptr, ptr.getCellRef().getScale());
         }

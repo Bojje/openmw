@@ -271,6 +271,10 @@ The scene constructor now accepts the legacy `RenderingManager` and `CellPreload
 services. Neutral cell/object/terrain state remains available when they are absent, while every
 OSG paging, object, water, and preload call is guarded; the current game bootstrap still supplies
 both services through the OSG-only initialization path.
+Object insertion now shares one world/physics/mechanics path for both backends: the optional OSG
+adapter handles only scene-graph insertion and water-ripple registration, while neutral object
+snapshots, physics shapes, looping effects, and lifecycle notifications are not skipped when OSG
+is absent. The duplicated neutral/OSG insertion branches were removed.
 Cell-transition loading screens, window-manager cell notifications, actor watching, fades, and
 postprocessor flags now follow the same legacy-service guard, so the neutral bootstrap does not
 silently re-enter the OSG/UI path during cell changes.
@@ -297,7 +301,7 @@ The engine public header no longer imports complete OSG viewer/event-handler hea
 are now included only by the implementation files that use them.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-154 files, deleting 1,231 lines and adding 8,012 lines (net `+6,781`). The larger Vulkan-only
+154 files, deleting 1,237 lines and adding 8,011 lines (net `+6,774`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
