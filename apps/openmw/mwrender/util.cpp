@@ -1,6 +1,7 @@
 #include "util.hpp"
 
 #include <osg/Node>
+#include <osg/Texture2D>
 #include <osg/ValueObject>
 
 #include <components/misc/resourcehelpers.hpp>

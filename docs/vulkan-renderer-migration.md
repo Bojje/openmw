@@ -25,6 +25,8 @@ NIF parsing, material extraction, and scene-graph RTTI remain in the legacy adap
 which now only translates source arrays into the neutral vertex-source contract.
 The NIF mesh cache header depends on the NIF file and neutral mesh contracts directly;
 the converter API is now an implementation dependency of the cache consumer only.
+The legacy image manager no longer exports an unused `osg::Texture2D` include; texture construction
+includes are now owned by the OSG call sites that actually construct them.
 Terrain preload requests now use a renderer-neutral position and integer cell bounds;
 the legacy terrain adapter performs the only conversion back to OSG vectors at the worker boundary.
 Scene cell-grid policy now keeps its center and bounds as plain integer arrays as well;
@@ -246,7 +248,7 @@ The engine public header no longer imports complete OSG viewer/event-handler hea
 are now included only by the implementation files that use them.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-94 files, deleting 947 lines and adding 7,393 lines (net `+6,446`). The larger Vulkan-only
+95 files, deleting 948 lines and adding 7,396 lines (net `+6,448`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
