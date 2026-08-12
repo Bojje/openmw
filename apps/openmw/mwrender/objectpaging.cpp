@@ -1043,6 +1043,7 @@ namespace MWRender
 
     void ObjectPaging::clear()
     {
+        mPagedRefs.clear();
         std::lock_guard<std::mutex> lock(mRefTrackerMutex);
         mRefTrackerNew.mDisabled.clear();
         mRefTrackerNew.mBlacklist.clear();
@@ -1099,11 +1100,25 @@ namespace MWRender
 
     void ObjectPaging::getPagedRefnums(const osg::Vec4i& activeGrid, std::vector<ESM::RefNum>& out)
     {
-        GetRefnumsFunctor grf(out);
+        mPagedRefs.clear();
+        GetRefnumsFunctor grf(mPagedRefs);
         grf.mActiveGrid = activeGrid;
         mCache->call(grf);
-        std::sort(out.begin(), out.end());
-        out.erase(std::unique(out.begin(), out.end()), out.end());
+        std::sort(mPagedRefs.begin(), mPagedRefs.end());
+        mPagedRefs.erase(std::unique(mPagedRefs.begin(), mPagedRefs.end()), mPagedRefs.end());
+        out = mPagedRefs;
+    }
+
+    bool ObjectPaging::isPagedRef(ESM::RefNum refnum) const
+    {
+        return std::binary_search(mPagedRefs.begin(), mPagedRefs.end(), refnum);
+    }
+
+    void ObjectPaging::removePagedRef(ESM::RefNum refnum)
+    {
+        const auto it = std::lower_bound(mPagedRefs.begin(), mPagedRefs.end(), refnum);
+        if (it != mPagedRefs.end() && *it == refnum)
+            mPagedRefs.erase(it);
     }
 
     void ObjectPaging::reportStats(unsigned int frameNumber, osg::Stats* stats) const

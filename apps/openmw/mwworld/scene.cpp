@@ -157,7 +157,7 @@ namespace
     // TODO: find a more clever way to make paging exclusion more reliable?
     static osg::ref_ptr<SceneUtil::PositionAttitudeTransform> pagedNode = new SceneUtil::PositionAttitudeTransform;
 
-    void addObject(const MWWorld::Ptr& ptr, const MWWorld::World& world, const std::vector<ESM::RefNum>& pagedRefs,
+    void addObject(const MWWorld::Ptr& ptr, const MWWorld::World& world, MWRender::ObjectPaging* objectPaging,
         MWPhysics::PhysicsSystem& physics, MWRender::RenderingManager* rendering, Render::WorldScene& neutralWorld)
     {
         if (ptr.getRefData().getBaseNode() || physics.getActor(ptr))
@@ -180,7 +180,7 @@ namespace
         if (rendering)
         {
             ESM::RefNum refnum = ptr.getCellRef().getRefNum();
-            const bool isPaged = refnum.hasContentFile() && std::binary_search(pagedRefs.begin(), pagedRefs.end(), refnum);
+            const bool isPaged = objectPaging && refnum.hasContentFile() && objectPaging->isPagedRef(refnum);
             if (!isPaged)
                 ptr.getClass().insertObjectRendering(ptr, model, rendering->getObjects());
             else
@@ -340,15 +340,6 @@ namespace
         return false;
     }
 
-    bool removeFromSorted(ESM::RefNum refNum, std::vector<ESM::RefNum>& pagedRefs)
-    {
-        const auto it = std::lower_bound(pagedRefs.begin(), pagedRefs.end(), refNum);
-        if (it == pagedRefs.end() || *it != refNum)
-            return false;
-        pagedRefs.erase(it);
-        return true;
-    }
-
     template <class Function>
     void iterateOverCellsAround(int cellX, int cellY, int range, Function&& f)
     {
@@ -381,8 +372,9 @@ namespace MWWorld
             return;
 
         ESM::RefNum refnum = ptr.getCellRef().getRefNum();
-        if (refnum.hasContentFile() && removeFromSorted(refnum, mPagedRefs))
+        if (mObjectPaging && refnum.hasContentFile() && mObjectPaging->isPagedRef(refnum))
         {
+            mObjectPaging->removePagedRef(refnum);
             if (!ptr.getRefData().getBaseNode())
                 return;
             const VFS::Path::Normalized model = getModel(ptr);
@@ -391,11 +383,6 @@ namespace MWWorld
             recordNeutralObject(ptr, model.view(), true, mNeutralWorldScene);
             reloadTerrain();
         }
-    }
-
-    bool Scene::isPagedRef(const Ptr& ptr) const
-    {
-        return ptr.getRefData().getBaseNode() == pagedNode.get();
     }
 
     void Scene::updateObjectRotation(const Ptr& ptr, RotationOrder order)
@@ -787,9 +774,11 @@ namespace MWWorld
         if (mPreloader && !mPreloader->isTerrainLoaded(
                 makeTerrainPreloadPosition(pos, newGrid), mFrameLifecycle.referenceTime()))
             preloadTerrain(pos, playerCellIndex.mWorldspace, true);
-        mPagedRefs.clear();
         if (mObjectPaging && mRendering)
-            mObjectPaging->getPagedRefnums(osg::Vec4i(newGrid[0], newGrid[1], newGrid[2], newGrid[3]), mPagedRefs);
+        {
+            std::vector<ESM::RefNum> ignored;
+            mObjectPaging->getPagedRefnums(osg::Vec4i(newGrid[0], newGrid[1], newGrid[2], newGrid[3]), ignored);
+        }
 
         addPostponedPhysicsObjects();
 
@@ -1139,7 +1128,6 @@ namespace MWWorld
             cell.getCell()->getWorldSpace(), std::nullopt, position.asVec3(), navigatorUpdateGuard.get());
 
         // Load cell.
-        mPagedRefs.clear();
         loadCell(cell, loadingListener, changeEvent, navigatorUpdateGuard.get());
 
         navigatorUpdateGuard.reset();
@@ -1364,7 +1352,7 @@ namespace MWWorld
         InsertVisitor insertVisitor(cell, loadingListener);
         cell.forEach(insertVisitor);
         insertVisitor.insert([&](const MWWorld::Ptr& ptr) {
-            addObject(ptr, mWorld, mPagedRefs, *mPhysics, mRendering, mNeutralWorldScene);
+            addObject(ptr, mWorld, mObjectPaging, *mPhysics, mRendering, mNeutralWorldScene);
         });
         insertVisitor.insert([&](const MWWorld::Ptr& ptr) {
             addObject(ptr, mWorld, *mPhysics, mLowestPoint, isInterior, mNavigator, navigatorUpdateGuard);
@@ -1376,7 +1364,7 @@ namespace MWWorld
         const bool isInterior = mCurrentCell && !mCurrentCell->isExterior();
         try
         {
-            addObject(ptr, mWorld, mPagedRefs, *mPhysics, mRendering, mNeutralWorldScene);
+            addObject(ptr, mWorld, mObjectPaging, *mPhysics, mRendering, mNeutralWorldScene);
             addObject(ptr, mWorld, *mPhysics, mLowestPoint, isInterior, mNavigator);
             mWorld.scaleObject(ptr, ptr.getCellRef().getScale());
         }

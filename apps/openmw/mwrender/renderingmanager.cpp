@@ -1002,10 +1002,9 @@ namespace MWRender
         mIntersectionVisitor->setIgnoreList(ignoreList);
         mIntersectionVisitor->setContainsPagedRefs(false);
 
-        MWWorld::Scene* worldScene = MWBase::Environment::get().getWorldScene();
         for (const auto& ptr : ignoreList)
         {
-            if (worldScene->isPagedRef(ptr))
+            if (mObjectPaging && mObjectPaging->isPagedRef(ptr.getCellRef().getRefNum()))
             {
                 mIntersectionVisitor->setContainsPagedRefs(true);
                 intersector->setIntersectionLimit(osgUtil::LineSegmentIntersector::NO_LIMIT);
@@ -1510,8 +1509,7 @@ namespace MWRender
         osg::ref_ptr<SceneUtil::PositionAttitudeTransform> rootNode = ptr.getRefData().getBaseNode();
 
         // Recalculate bounds on the ptr's template when the object is not loaded or is loaded but paged
-        MWWorld::Scene* worldScene = MWBase::Environment::get().getWorldScene();
-        if (!rootNode || worldScene->isPagedRef(ptr))
+        if (!rootNode || (mObjectPaging && mObjectPaging->isPagedRef(ptr.getCellRef().getRefNum())))
         {
             const VFS::Path::Normalized model(ptr.getClass().getCorrectedModel(ptr));
 

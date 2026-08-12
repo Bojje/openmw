@@ -122,8 +122,6 @@ namespace MWWorld
 
         Render::Vec3 mLastPlayerPos{};
 
-        std::vector<ESM::RefNum> mPagedRefs;
-
         Render::WorldScene mNeutralWorldScene;
         bool mNeutralTerrainRegionsDirty = true;
         mutable std::unordered_map<std::string, std::weak_ptr<const std::vector<Render::MeshInstance>>>
@@ -233,8 +231,6 @@ namespace MWWorld
         void addPostponedPhysicsObjects();
 
         void removeFromPagedRefs(const Ptr& ptr);
-
-        bool isPagedRef(const Ptr& ptr) const;
 
         void updateObjectRotation(const Ptr& ptr, RotationOrder order);
         void updateObjectScale(const Ptr& ptr);

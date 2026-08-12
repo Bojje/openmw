@@ -8,6 +8,7 @@
 #include <mutex>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 namespace Resource
 {
@@ -48,9 +49,12 @@ namespace MWRender
         void reportStats(unsigned int frameNumber, osg::Stats* stats) const override;
 
         void getPagedRefnums(const osg::Vec4i& activeGrid, std::vector<ESM::RefNum>& out);
+        bool isPagedRef(ESM::RefNum refnum) const;
+        void removePagedRef(ESM::RefNum refnum);
 
     private:
         Resource::SceneManager* mSceneManager;
+        std::vector<ESM::RefNum> mPagedRefs;
         bool mActiveGrid;
         bool mDebugBatches;
         float mMergeFactor;
