@@ -695,20 +695,11 @@ void OMW::Engine::prepareVulkanEngine()
             return resourceSystem->getNifMeshManager()->get(path);
         return std::make_shared<const std::vector<Render::MeshInstance>>();
     };
-    auto fallbackTexture = std::make_shared<Render::TextureData>();
-    fallbackTexture->width = 1;
-    fallbackTexture->height = 1;
-    fallbackTexture->pixels = { 255, 255, 255, 255 };
     Resource::NeutralTextureManager* const textureManager = mResourceSystem->getNeutralTextureManager();
-    const Render::TextureResolver textureResolver = [textureManager, fallbackTexture](std::string_view name) {
-        if (!name.empty())
-        {
-            const std::shared_ptr<const Render::TextureData> texture
-                = textureManager->get(VFS::Path::Normalized(name));
-            if (texture)
-                return texture;
-        }
-        return std::shared_ptr<const Render::TextureData>(fallbackTexture);
+    const Render::TextureResolver textureResolver = [textureManager](std::string_view name) {
+        if (name.empty())
+            return std::shared_ptr<const Render::TextureData>();
+        return textureManager->get(VFS::Path::Normalized(name));
     };
     const Render::SceneSynchronizer sceneSynchronizer = [this](Render::SceneData& sceneData) {
         int drawableWidth = Settings::video().mResolutionX.get();

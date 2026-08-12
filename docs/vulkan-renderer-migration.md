@@ -16,8 +16,8 @@ The experiment is currently isolated on the `openmw-vulkan` branch. The default 
 OSG-backed, while `OPENMW_USE_VULKAN=ON` now builds the Vulkan game backend and migration
 tests; `openmw --vulkan` selects one Vulkan frame owner at startup. The experimental game
 path creates a Vulkan SDL window, neutral resource services, a neutral world scene, and a
-single Vulkan submission consumer. It is intentionally no-GUI and uses a temporary white
-texture resolver while neutral image loading is implemented. Vulkan translation units now
+single Vulkan submission consumer. It is intentionally no-GUI and rejects unsupported
+textures at the neutral submission boundary while neutral image coverage is expanded. Vulkan translation units now
 live in a separate `openmw_vulkan` library instead of the shared `components` archive.
 Renderer-neutral mesh vertex normalization, index conversion, triangle-strip topology, and tangent generation now live in a separate
 `openmw_render_neutral` library, which is consumed by both the legacy NIF adapter and
@@ -93,7 +93,8 @@ neutral emissive channel. Resource images can now cross into neutral RGBA8 data,
 and authored BSLighting double-sided flags now select the matching Vulkan no-cull pipeline.
 The neutral resource backend now owns a VFS-backed RGBA8 texture cache with TGA, BMP, and
 common DDS/DXT decoding; the live Vulkan bootstrap uses it for real static-world texture
-paths and keeps the white texture only as an explicit unsupported-resource fallback.
+paths; unsupported formats now fail the submission with their exact resource path instead of
+silently becoming white.
 Classic and BS shader texture wrap flags now select per-resource repeat/clamp sampler variants.
 The standalone Vulkan renderer uploads/caches indexed albedo textures and samples them
 in the G-buffer (currently bounded to a 64-entry table). Vulkan now consumes neutral
@@ -456,7 +457,7 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-186 files, deleting 1,970 lines and adding 11,240 lines (net `+9,270`). The larger Vulkan-only
+186 files, deleting 1,971 lines and adding 11,233 lines (net `+9,262`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. The live no-GUI consumer is the first deletion
 checkpoint; further reduction can now target OSG scene/resource/presentation ownership rather
@@ -610,14 +611,14 @@ real replacement consumes its responsibility and the fast tests cover the bounda
 
 ### 6. Port static world rendering
 
-- Wire NIF loading and `MeshConverter` into resource management. The NIF converter now has a tested tree traversal and material boundary, `NifMeshManager` caches converted instances, and `MWWorld::Scene` can collect a `SceneSubmission` containing static meshes and loaded exterior terrain without exposing OSG objects. The live Vulkan bootstrap consumes that submission; its temporary white texture resolver is the next replacement target.
+- Wire NIF loading and `MeshConverter` into resource management. The NIF converter now has a tested tree traversal and material boundary, `NifMeshManager` caches converted instances, and `MWWorld::Scene` can collect a `SceneSubmission` containing static meshes and loaded exterior terrain without exposing OSG objects. The live Vulkan bootstrap consumes that submission; unsupported texture resources now fail at the exact neutral submission boundary instead of falling back to white.
 - Implement model caching, cell add/remove, transforms, textures, materials, terrain,
   interiors, and static objects. The terrain adapter now feeds opaque and ordered
   blendmap/multi-layer Vulkan mesh consumers with normal-map sampling, height-based
   parallax, diffuse-alpha specular data, and explicit ESM4 specular textures; quadtree-scale
   terrain streaming and full terrain image coverage remain.
-- Reach a static playable scene without OSG rendering, then replace the temporary texture
-  resolver with neutral image decoding and establish camera synchronization.
+- Reach a static playable scene without OSG rendering, then expand neutral image coverage and
+  establish camera synchronization.
 
 ### 7. Port dynamic content and presentation
 
