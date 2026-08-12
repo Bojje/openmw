@@ -437,7 +437,8 @@ namespace MWWorld
             mWeatherManager->clear();
         if (mRendering)
             mRendering->clear();
-        mProjectileManager->clear();
+        if (mProjectileManager)
+            mProjectileManager->clear();
         mLocalScripts.clear();
 
         mWorldScene->clear();
@@ -466,7 +467,8 @@ namespace MWWorld
     size_t World::countSavedGameRecords() const
     {
         return mWorldModel.countSavedGameRecords() + mStore.countSavedGameRecords()
-            + mGlobalVariables.countSavedGameRecords() + mProjectileManager->countSavedGameRecords()
+            + mGlobalVariables.countSavedGameRecords()
+            + (mProjectileManager ? mProjectileManager->countSavedGameRecords() : 0)
             + 1 // player record
             + 1 // weather record
             + 1 // levitation/teleport enabled state
@@ -496,8 +498,10 @@ namespace MWWorld
         mWorldModel.write(writer, progress); // the player's cell needs to be loaded before the player
         mPlayer->write(writer, progress);
         mGlobalVariables.write(writer, progress);
-        mWeatherManager->write(writer, progress);
-        mProjectileManager->write(writer, progress);
+        if (mWeatherManager)
+            mWeatherManager->write(writer, progress);
+        if (mProjectileManager)
+            mProjectileManager->write(writer, progress);
 
         writer.startRecord(ESM::REC_ENAB);
         writer.writeHNT("TELE", mTeleportEnabled);
@@ -548,7 +552,8 @@ namespace MWWorld
                 break;
             default:
                 if (!mStore.readRecord(reader, type) && !mGlobalVariables.readRecord(reader, type)
-                    && !mWeatherManager->readRecord(reader, type) && !mProjectileManager->readRecord(reader, type))
+                    && (!mWeatherManager || !mWeatherManager->readRecord(reader, type))
+                    && (!mProjectileManager || !mProjectileManager->readRecord(reader, type)))
                 {
                     throw std::runtime_error("unknown record in saved game");
                 }
@@ -575,7 +580,8 @@ namespace MWWorld
     {
         // Must be cleared before mRendering is destroyed
         if (mProjectileManager)
-            mProjectileManager->clear();
+            if (mProjectileManager)
+                mProjectileManager->clear();
 
         if (Settings::navigator().mWaitForAllJobsOnExit && mNavigator != nullptr)
         {
@@ -888,7 +894,8 @@ namespace MWWorld
         {
             if (mRendering)
                 mRendering->notifyWorldSpaceChanged();
-            mProjectileManager->clear();
+            if (mProjectileManager)
+                mProjectileManager->clear();
             mDiscardMovements = true;
         }
     }
@@ -936,7 +943,8 @@ namespace MWWorld
         if (changeEvent && mCurrentWorldSpace != cellName)
         {
             // changed worldspace
-            mProjectileManager->clear();
+            if (mProjectileManager)
+                mProjectileManager->clear();
             if (mRendering)
                 mRendering->notifyWorldSpaceChanged();
 
@@ -1487,9 +1495,11 @@ namespace MWWorld
     void World::doPhysics(float duration, osg::Timer_t frameStart, unsigned int frameNumber, osg::Stats& stats)
     {
         processDoors(duration);
-        mProjectileManager->update(duration);
+        if (mProjectileManager)
+            mProjectileManager->update(duration);
         mPhysics->stepSimulation(duration, mDiscardMovements, frameStart, frameNumber, stats);
-        mProjectileManager->processHits();
+        if (mProjectileManager)
+            mProjectileManager->processHits();
         mDiscardMovements = false;
         mPhysics->moveActors();
     }
@@ -2344,7 +2354,8 @@ namespace MWWorld
         mStore.rebuildIdsIndex();
         mStore.validateDynamic();
         mTimeManager->setup(mGlobalVariables);
-        mProjectileManager->saveLoaded(reader);
+        if (mProjectileManager)
+            mProjectileManager->saveLoaded(reader);
     }
 
     void World::setupPlayer()
@@ -3147,19 +3158,22 @@ namespace MWWorld
             return;
         }
 
-        mProjectileManager->launchProjectile(
-            actor, projectile, worldPos, orient, bow, speed, attackStrength, attackWindUp);
+        if (mProjectileManager)
+            mProjectileManager->launchProjectile(
+                actor, projectile, worldPos, orient, bow, speed, attackStrength, attackWindUp);
     }
 
     void World::launchMagicBolt(
         const ESM::RefId& spellId, const MWWorld::Ptr& caster, const osg::Vec3f& fallbackDirection, ESM::RefNum item)
     {
-        mProjectileManager->launchMagicBolt(spellId, caster, fallbackDirection, item);
+        if (mProjectileManager)
+            mProjectileManager->launchMagicBolt(spellId, caster, fallbackDirection, item);
     }
 
     void World::updateProjectilesCasters()
     {
-        mProjectileManager->updateCasters();
+        if (mProjectileManager)
+            mProjectileManager->updateCasters();
     }
 
     void World::applyLoopingParticles(const MWWorld::Ptr& ptr) const

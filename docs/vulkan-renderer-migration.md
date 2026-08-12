@@ -291,6 +291,9 @@ Scripted world rotation now follows the same neutral transform path, and animati
 return safe neutral fallbacks when no OSG presentation owner exists.
 World clearing, time advancement, sky state, and cell transfer now guard optional weather, paging,
 and sky services; those simulation state changes no longer require an OSG renderer instance.
+Projectile bookkeeping is likewise optional at the neutral simulation boundary; physics can advance
+and the world can load, save, clear, and shut down without constructing the OSG projectile presenter.
+Projectile visuals and presentation-specific effects remain a later dynamic-content milestone.
 Cell-transition loading screens, window-manager cell notifications, actor watching, fades, and
 postprocessor flags now follow the same legacy-service guard, so the neutral bootstrap does not
 silently re-enter the OSG/UI path during cell changes.
@@ -317,7 +320,7 @@ The engine public header no longer imports complete OSG viewer/event-handler hea
 are now included only by the implementation files that use them.
 
 Against the current `origin/openmw-vulkan` base, the current checkpoint changes
-154 files, deleting 1,273 lines and adding 8,113 lines (net `+6,840`). The larger Vulkan-only
+154 files, deleting 1,288 lines and adding 8,145 lines (net `+6,857`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; this PR is currently a groundwork expansion,
 not the speculative 10k-line reduction. Further deletion must wait for a live Vulkan
 consumer to replace the remaining OSG-owned responsibilities.
