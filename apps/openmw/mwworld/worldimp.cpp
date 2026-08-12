@@ -239,14 +239,9 @@ namespace MWWorld
         mSwimHeightScale = mStore.get<ESM::GameSetting>().find("fSwimHeightScale")->mValue.getFloat();
     }
 
-    void World::init(Debug::Level maxRecastLogLevel, osgViewer::Viewer* viewer, Render::FrameLifecycle& frameLifecycle,
-        osg::ref_ptr<osg::Group> rootNode, SceneUtil::WorkQueue* workQueue, SceneUtil::UnrefQueue& unrefQueue)
+    void World::initSimulation(Debug::Level maxRecastLogLevel)
     {
-        if (frameLifecycle.backend() != Render::FrameLifecycle::Backend::Osg)
-            throw std::invalid_argument("The current World initialization path requires the OSG renderer backend");
-
         mPhysics = std::make_unique<MWPhysics::PhysicsSystem>(mResourceSystem);
-        mPhysics->enableDebugRendering(rootNode);
 
         if (Settings::navigator().mEnable)
         {
@@ -258,6 +253,17 @@ namespace MWWorld
         {
             mNavigator = DetourNavigator::makeNavigatorStub();
         }
+    }
+
+    void World::initOsgRenderer(osgViewer::Viewer* viewer, Render::FrameLifecycle& frameLifecycle,
+        osg::ref_ptr<osg::Group> rootNode, SceneUtil::WorkQueue* workQueue, SceneUtil::UnrefQueue& unrefQueue)
+    {
+        if (frameLifecycle.backend() != Render::FrameLifecycle::Backend::Osg)
+            throw std::invalid_argument("The OSG world renderer requires an OSG frame owner");
+        if (!mPhysics || !mNavigator)
+            throw std::logic_error("World simulation must be initialized before its renderer");
+
+        mPhysics->enableDebugRendering(rootNode);
 
         const std::string& normalMapPattern = Settings::shaders().mNormalMapPattern;
         const std::string& heightMapPattern = Settings::shaders().mNormalHeightMapPattern;

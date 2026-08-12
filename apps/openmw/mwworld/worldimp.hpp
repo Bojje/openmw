@@ -219,8 +219,13 @@ namespace MWWorld
             const std::vector<std::string>& groundcoverFiles, ToUTF8::Utf8Encoder* encoder,
             Loading::Listener* listener);
 
-        // Must be called after `loadData`.
-        void init(Debug::Level maxRecastLogLevel, osgViewer::Viewer* viewer, Render::FrameLifecycle& frameLifecycle,
+        // Must be called after `loadData`. This phase only creates simulation
+        // services and does not require an OSG scene node.
+        void initSimulation(Debug::Level maxRecastLogLevel);
+
+        // OSG reference-renderer setup. A future backend must provide its own
+        // renderer services after initSimulation instead of calling this.
+        void initOsgRenderer(osgViewer::Viewer* viewer, Render::FrameLifecycle& frameLifecycle,
             osg::ref_ptr<osg::Group> rootNode, SceneUtil::WorkQueue* workQueue, SceneUtil::UnrefQueue& unrefQueue);
 
         virtual ~World();

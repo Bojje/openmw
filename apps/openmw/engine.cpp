@@ -939,8 +939,8 @@ void OMW::Engine::prepareEngine()
     }
     listener->loadingOff();
 
-    mWorld->init(mMaxRecastLogLevel, mViewer, *mFrameLifecycle, std::move(rootNode), mWorkQueue.get(),
-        *mUnrefQueue);
+    mWorld->initSimulation(mMaxRecastLogLevel);
+    mWorld->initOsgRenderer(mViewer, *mFrameLifecycle, std::move(rootNode), mWorkQueue.get(), *mUnrefQueue);
     mEnvironment.setWorldScene(mWorld->getWorldScene());
     mWorld->setupPlayer();
     mWorld->setRandomSeed(mRandomSeed);

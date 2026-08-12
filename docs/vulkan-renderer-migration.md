@@ -243,6 +243,10 @@ Physics simulation construction is now independent of an OSG parent node; collis
 geometry is an explicit optional OSG setup step. A Vulkan owner can therefore construct the
 simulation core without creating an OSG scene node, while the reference path retains collision
 visualization unchanged.
+`World` initialization now follows the same ownership split: `initSimulation()` creates
+physics/navigation services, and `initOsgRenderer()` creates the OSG terrain, scene graph,
+legacy manager, and OSG-backed neutral resource callbacks. The engine calls these phases
+explicitly, leaving a concrete insertion point for a Vulkan renderer-services phase.
 The non-owning manager update handle is private to the `Scene` owner, detached during `Scene`
 teardown, and CI guards the manager header against regaining a value-owned neutral frame state.
 Engine GUI fallback frame advancement now also reads simulation time from the active
