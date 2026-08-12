@@ -2610,8 +2610,8 @@ namespace MWMechanics
             return;
 
         AnimationQueueEntry& current = mAnimQueue.front();
-        const std::optional<float> animationDuration
-            = MWBase::Environment::get().getWorld()->getNeutralAnimationDuration(mPtr);
+        const std::optional<float> animationDuration = MWBase::Environment::get().getWorld()->getNeutralAnimationDuration(
+            mPtr, current.mGroup, current.mStartKey, current.mStopKey);
         if (!animationDuration || *animationDuration <= 0.f)
             return;
 

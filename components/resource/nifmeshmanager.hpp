@@ -51,6 +51,10 @@ namespace Resource
         /// This is renderer-neutral metadata used by world-owned effects.
         std::optional<float> getAnimationDuration(VFS::Path::NormalizedView name);
         std::optional<float> getAnimationDuration(const Nif::NIFFilePtr& file) const;
+        std::optional<float> getAnimationDuration(VFS::Path::NormalizedView name, std::string_view group,
+            std::string_view startKey, std::string_view stopKey);
+        std::optional<float> getAnimationDuration(const Nif::NIFFilePtr& file, std::string_view group,
+            std::string_view startKey, std::string_view stopKey) const;
 
         /// Sample model-local bone transforms without constructing an OSG
         /// scene. The result follows the supplied skinning bone-name order.

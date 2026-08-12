@@ -2,6 +2,7 @@
 #define OPENMW_COMPONENTS_NIF_MESHCONVERTER_H
 
 #include <vector>
+#include <optional>
 #include <span>
 #include <string>
 
@@ -22,6 +23,9 @@ namespace Nif
     /// the current bone matrices passed to Render::skinMesh.
     std::vector<Render::Mat4> collectBonePose(
         FileView file, std::span<const std::string> boneNames, float time, std::string_view group = {});
+
+    /// Find the first matching renderer-neutral animation text key.
+    std::optional<float> findTextKeyTime(FileView file, std::string_view textKey);
 }
 
 #endif

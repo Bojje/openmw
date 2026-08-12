@@ -4200,7 +4200,8 @@ namespace MWWorld
             mWorldScene->updateObjectAnimation(ptr, group, animationTime);
     }
 
-    std::optional<float> World::getNeutralAnimationDuration(const MWWorld::Ptr& ptr) const
+    std::optional<float> World::getNeutralAnimationDuration(
+        const MWWorld::Ptr& ptr, std::string_view group, std::string_view startKey, std::string_view stopKey) const
     {
         if (mResourceSystem == nullptr || mResourceSystem->backend() != Resource::ResourceSystem::Backend::Neutral)
             return std::nullopt;
@@ -4209,7 +4210,8 @@ namespace MWWorld
         if (model.empty())
             return std::nullopt;
 
-        std::optional<float> duration = mResourceSystem->getNifMeshManager()->getAnimationDuration(model);
+        std::optional<float> duration = mResourceSystem->getNifMeshManager()->getAnimationDuration(
+            model, group, startKey, stopKey);
         if (duration && *duration > 0.f)
             return duration;
 
@@ -4218,7 +4220,7 @@ namespace MWWorld
         if (!mResourceSystem->getVFS()->exists(keyframes))
             return duration;
         return mResourceSystem->getNifMeshManager()->getAnimationDuration(
-            mResourceSystem->getNifFileManager()->get(keyframes));
+            mResourceSystem->getNifFileManager()->get(keyframes), group, startKey, stopKey);
     }
 
     void World::setActorActive(const MWWorld::Ptr& ptr, bool value)

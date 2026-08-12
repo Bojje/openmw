@@ -253,6 +253,62 @@ namespace Nif
             return 0.f;
         }
 
+        bool matchesTextKey(std::string_view text, std::string_view requested)
+        {
+            std::string normalized(text);
+            const std::size_t first = normalized.find_first_not_of(" \t\r\n");
+            const std::size_t last = normalized.find_last_not_of(" \t\r\n");
+            if (first == std::string::npos)
+                return false;
+            normalized = normalized.substr(first, last - first + 1);
+            return Misc::StringUtils::lowerCase(normalized).starts_with(
+                Misc::StringUtils::lowerCase(requested));
+        }
+
+        std::optional<float> findTextKeyTime(const ExtraList& extras, std::string_view requested)
+        {
+            for (const ExtraPtr& extra : extras)
+            {
+                if (extra.empty() || extra->mRecordType != RC_NiTextKeyExtraData)
+                    continue;
+                const auto* textKeys = static_cast<const NiTextKeyExtraData*>(extra.getPtr());
+                for (const NiTextKeyExtraData::TextKey& key : textKeys->mList)
+                    if (std::isfinite(key.mTime) && matchesTextKey(key.mText, requested))
+                        return key.mTime;
+            }
+            return std::nullopt;
+        }
+
+        std::optional<float> findTextKeyTime(const Record& record, std::string_view requested)
+        {
+            if (const auto* object = dynamic_cast<const NiObjectNET*>(&record))
+            {
+                if (const auto time = findTextKeyTime(object->getExtraList(), requested))
+                    return time;
+            }
+            if (const auto* sequence = dynamic_cast<const NiSequence*>(&record))
+            {
+                if (!sequence->mTextKeys.empty())
+                {
+                    const ExtraList extras{ sequence->mTextKeys };
+                    if (const auto time = findTextKeyTime(extras, requested))
+                        return time;
+                }
+            }
+            if (const auto* node = dynamic_cast<const NiNode*>(&record))
+            {
+                for (const NiAVObjectPtr& child : node->mChildren)
+                    if (!child.empty())
+                        if (const auto time = findTextKeyTime(*child.getPtr(), requested))
+                            return time;
+                for (const NiAVObjectPtr& effect : node->mEffects)
+                    if (!effect.empty())
+                        if (const auto time = findTextKeyTime(*effect.getPtr(), requested))
+                            return time;
+            }
+            return std::nullopt;
+        }
+
         void collectSequenceTransforms(const NiSequenceStreamHelper& sequence, float time, std::string_view group,
             std::unordered_map<std::string, Render::Mat4>& transforms)
         {
@@ -653,5 +709,14 @@ namespace Nif
             result.push_back(found->second);
         }
         return result;
+    }
+
+    std::optional<float> findTextKeyTime(FileView file, std::string_view textKey)
+    {
+        for (std::size_t i = 0; i < file.numRoots(); ++i)
+            if (const Record* root = file.getRoot(i))
+                if (const auto time = findTextKeyTime(*root, textKey))
+                    return time;
+        return std::nullopt;
     }
 }

@@ -554,7 +554,9 @@ while actor priority and blended animation remain to be ported. Neutral one-shot
 now advance from resource duration metadata and hand off to the next queued group, including
 finite loop counts; looping groups now retain a wrapped neutral clock, and mechanics exports
 the queue clock at submission time so the resource pose sampler does not invent a second timeline.
-Full text-key timing and controller-stack ownership remain outstanding.
+Renderer-neutral NIF/KF metadata now narrows queue completion to group-specific start/stop text keys
+when present; actor priority arbitration, blended controller-stack ownership, and text-key event dispatch
+remain outstanding.
 RGBA8 conversion is now one renderer-neutral helper shared by image resources and terrain
 blendmaps, so clamping, finite-value rejection, and byte quantization cannot drift between
 resource paths. The conversion helper has direct CPU coverage.

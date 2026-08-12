@@ -227,6 +227,7 @@ int main()
     Nif::NiTextKeyExtraData sequenceTextKeys;
     sequenceTextKeys.mRecordType = Nif::RC_NiTextKeyExtraData;
     sequenceTextKeys.mList.push_back({ 0.25f, "Idle: Start" });
+    sequenceTextKeys.mList.push_back({ 0.75f, "Idle: Stop" });
     Nif::NiStringExtraData sequenceBoneName;
     sequenceBoneName.mRecordType = Nif::RC_NiStringExtraData;
     sequenceBoneName.mData = "Root Bone";
@@ -246,6 +247,7 @@ int main()
     sequence.mExtraList = { &sequenceTextKeys, &sequenceBoneName };
     auto kfFile = std::make_shared<Nif::NIFFile>(VFS::Path::Normalized("synthetic.kf"));
     kfFile->mRoots.push_back(&sequence);
+    kfFile->mRecords.push_back(std::move(sequenceController));
     const std::vector<Render::Mat4> externalPose
         = Nif::collectBonePose(Nif::FileView(*kfFile), animatedBoneNames, 0.25f);
     if (externalPose.size() != 1)
@@ -254,7 +256,6 @@ int main()
     const std::vector<Render::Mat4> groupedExternalPose
         = Nif::collectBonePose(Nif::FileView(*kfFile), animatedBoneNames, 0.25f, "idle");
     expectNear(groupedExternalPose.front().data[12], 2.f, "sampled grouped external KF translation");
-
     expectNear(instances.front().mesh.material.diffuse.x, 0.25f, "material diffuse red");
     expectNear(instances.front().mesh.material.diffuse.w, 0.75f, "material alpha");
     expectNear(instances.front().mesh.material.emissive.z, 0.6f, "material emissive");
@@ -326,6 +327,9 @@ int main()
         throw std::runtime_error("NIF no-lighting shader material conversion lost neutral state");
 
     Resource::NifMeshManager meshManager(nullptr);
+    const std::optional<float> groupedDuration = meshManager.getAnimationDuration(kfFile, "idle", "start", "stop");
+    if (!groupedDuration || *groupedDuration != 0.5f)
+        throw std::runtime_error("neutral KF text-key duration was not resolved");
     auto controller = std::make_unique<Nif::NiTimeController>();
     controller->mTimeStart = 1.f;
     controller->mTimeStop = 4.f;

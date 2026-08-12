@@ -69,6 +69,28 @@ namespace Resource
         return result;
     }
 
+    std::optional<float> NifMeshManager::getAnimationDuration(
+        VFS::Path::NormalizedView name, std::string_view group, std::string_view startKey, std::string_view stopKey)
+    {
+        return getAnimationDuration(mNifFileManager->get(name), group, startKey, stopKey);
+    }
+
+    std::optional<float> NifMeshManager::getAnimationDuration(const Nif::NIFFilePtr& file, std::string_view group,
+        std::string_view startKey, std::string_view stopKey) const
+    {
+        const std::optional<float> duration = getAnimationDuration(file);
+        if (!duration || group.empty() || startKey.empty() || stopKey.empty())
+            return duration;
+
+        const std::string start = std::string(group) + ": " + std::string(startKey);
+        const std::string stop = std::string(group) + ": " + std::string(stopKey);
+        const std::optional<float> startTime = Nif::findTextKeyTime(Nif::FileView(*file), start);
+        const std::optional<float> stopTime = Nif::findTextKeyTime(Nif::FileView(*file), stop);
+        if (!startTime || !stopTime || *stopTime <= *startTime)
+            return duration;
+        return *stopTime - *startTime;
+    }
+
     std::vector<Render::Mat4> NifMeshManager::getBonePose(
         VFS::Path::NormalizedView name, float time, std::span<const std::string> boneNames, std::string_view group)
     {

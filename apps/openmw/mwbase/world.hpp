@@ -217,7 +217,11 @@ namespace MWBase
         {
             (void)animationTime;
         }
-        virtual std::optional<float> getNeutralAnimationDuration(const MWWorld::Ptr&) const { return std::nullopt; }
+        virtual std::optional<float> getNeutralAnimationDuration(const MWWorld::Ptr&, std::string_view group = {},
+            std::string_view startKey = {}, std::string_view stopKey = {}) const
+        {
+            return std::nullopt;
+        }
 
         virtual MWWorld::TimeStamp getTimeStamp() const = 0;
         ///< Return current in-game time and number of day since new game start.
