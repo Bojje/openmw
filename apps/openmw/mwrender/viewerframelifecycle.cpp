@@ -85,7 +85,7 @@ namespace MWRender
         return mSceneRoot.get();
     }
 
-    int ViewerFrameLifecycle::initializeWindow(SDL_Window*& window, const std::filesystem::path& resourceDirectory)
+    void ViewerFrameLifecycle::initializeWindow(SDL_Window*& window, const std::filesystem::path& resourceDirectory)
     {
         const int screen = Settings::video().mScreen;
         const int width = Settings::video().mResolutionX;
@@ -255,7 +255,7 @@ namespace MWRender
         mViewer->realize();
         mViewer->getEventQueue()->getCurrentEventState()->setWindowRectangle(
             0, 0, graphicsWindow->getTraits()->width, graphicsWindow->getTraits()->height);
-        return identifyOp->getMaxTextureImageUnits();
+        mMaxTextureImageUnits = identifyOp->getMaxTextureImageUnits();
     }
 
     bool ViewerFrameLifecycle::renderFrame()

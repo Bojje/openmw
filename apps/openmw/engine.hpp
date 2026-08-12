@@ -180,7 +180,6 @@ namespace OMW
         bool mValidateNeutralScene;
 
         Files::ConfigurationManager& mCfgMgr;
-        int mGlMaxTextureImageUnits;
 
         // not implemented
         Engine(const Engine&);

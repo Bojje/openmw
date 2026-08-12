@@ -374,7 +374,6 @@ OMW::Engine::Engine(Files::ConfigurationManager& configurationManager)
     , mNewGame(false)
     , mValidateNeutralScene(std::getenv("OPENMW_VALIDATE_NEUTRAL_SCENE") != nullptr)
     , mCfgMgr(configurationManager)
-    , mGlMaxTextureImageUnits(0)
 {
 #if SDL_VERSION_ATLEAST(2, 24, 0)
     SDL_SetHint(SDL_HINT_MAC_OPENGL_ASYNC_DISPATCH, "1");
@@ -505,7 +504,7 @@ void OMW::Engine::prepareEngine()
     if (!viewerLifecycle)
         throw std::logic_error("OSG engine setup requires the OSG frame lifecycle");
     osg::ref_ptr<osg::Group> rootNode = viewerLifecycle->sceneRoot();
-    mGlMaxTextureImageUnits = viewerLifecycle->initializeWindow(mWindow, mResDir);
+    viewerLifecycle->initializeWindow(mWindow, mResDir);
 
     mVFS = std::make_unique<VFS::Manager>();
 
@@ -518,7 +517,7 @@ void OMW::Engine::prepareEngine()
             : Resource::ResourceSystem::Backend::Neutral);
     if (Resource::SceneManager* const sceneManager = mResourceSystem->getSceneManager())
     {
-        sceneManager->getShaderManager().setMaxTextureUnits(mGlMaxTextureImageUnits);
+        sceneManager->getShaderManager().setMaxTextureUnits(viewerLifecycle->maxTextureImageUnits());
         sceneManager->setUnRefImageDataAfterApply(false); // keep to Off for now to allow better state sharing
         sceneManager->setFilterSettings(Settings::general().mTextureMagFilter, Settings::general().mTextureMinFilter,
             Settings::general().mTextureMipmap, static_cast<float>(Settings::general().mAnisotropy));
