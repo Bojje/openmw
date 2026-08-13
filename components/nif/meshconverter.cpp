@@ -69,6 +69,40 @@ namespace Nif
             }
         }
 
+        float controllerSequenceTime(const NiControllerSequence& sequence, float value)
+        {
+            const float time = sequence.mFrequency * value + sequence.mPhase;
+            const float start = sequence.mStartTime;
+            const float stop = sequence.mStopTime;
+            if (!std::isfinite(time) || !std::isfinite(start) || !std::isfinite(stop) || stop <= start)
+                return start;
+
+            const float directedTime = sequence.mPlayBackwards ? start + stop - time : time;
+            if (directedTime >= start && directedTime <= stop)
+                return directedTime;
+
+            const float delta = stop - start;
+            switch (sequence.mExtrapolationMode)
+            {
+                case NiTimeController::ExtrapolationMode::Cycle:
+                {
+                    const float cycles = (directedTime - start) / delta;
+                    return start + (cycles - std::floor(cycles)) * delta;
+                }
+                case NiTimeController::ExtrapolationMode::Reverse:
+                {
+                    const float cycles = (directedTime - start) / delta;
+                    const float remainder = (cycles - std::floor(cycles)) * delta;
+                    return (static_cast<int>(std::fabs(std::floor(cycles))) % 2) == 0
+                        ? start + remainder
+                        : stop - remainder;
+                }
+                case NiTimeController::ExtrapolationMode::Constant:
+                default:
+                    return std::clamp(directedTime, start, stop);
+            }
+        }
+
         template <class Map, class Interpolate>
         typename Map::ValueType sampleKeys(const std::shared_ptr<Map>& map, float time,
             typename Map::ValueType defaultValue, Interpolate&& interpolate)
@@ -501,6 +535,8 @@ namespace Nif
                     stop && *stop >= segmentStart)
                     sampleTime = std::min(sampleTime, *stop);
             }
+            if (const auto* controllerSequence = dynamic_cast<const NiControllerSequence*>(&sequence))
+                sampleTime = controllerSequenceTime(*controllerSequence, sampleTime);
 
             for (const ControlledBlock& block : sequence.mControlledBlocks)
             {

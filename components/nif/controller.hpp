@@ -52,7 +52,7 @@ namespace Nif
         NiTimeController::ExtrapolationMode mExtrapolationMode{ NiTimeController::ExtrapolationMode::Constant };
         float mFrequency{ 1.f };
         float mPhase{ 1.f };
-        float mStartTime, mStopTime;
+        float mStartTime{ 0.f }, mStopTime{ 0.f };
         bool mPlayBackwards{ false };
         NiControllerManagerPtr mManager;
         NiStringPalettePtr mStringPalette;

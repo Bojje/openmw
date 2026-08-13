@@ -363,6 +363,49 @@ int main()
     if (controllerSequencePose.size() != 1)
         throw std::runtime_error("neutral controller sequence did not produce a bone pose");
     expectNear(controllerSequencePose.front().data[12], 4.f, "blended controller sequence translation");
+
+    auto sequenceTimeInterpolator = std::make_unique<Nif::NiTransformInterpolator>();
+    sequenceTimeInterpolator->mRecordType = Nif::RC_NiTransformInterpolator;
+    sequenceTimeInterpolator->mDefaultValue = Nif::NiQuatTransform::getIdentity();
+    sequenceTimeInterpolator->mData = animatedData.get();
+    Nif::ControlledBlock sequenceTimeBlock;
+    sequenceTimeBlock.mTargetName = "Root Bone";
+    sequenceTimeBlock.mInterpolator = sequenceTimeInterpolator.get();
+    sequenceTimeBlock.mController = nullptr;
+    sequenceTimeBlock.mBlendInterpolator = nullptr;
+    auto timedControllerSequence = std::make_unique<Nif::NiControllerSequence>();
+    timedControllerSequence->mRecordType = Nif::RC_NiControllerSequence;
+    timedControllerSequence->mName = "idle";
+    timedControllerSequence->mTextKeys = nullptr;
+    timedControllerSequence->mFrequency = 1.f;
+    timedControllerSequence->mPhase = 0.f;
+    timedControllerSequence->mStartTime = 0.f;
+    timedControllerSequence->mStopTime = 1.f;
+    timedControllerSequence->mExtrapolationMode = Nif::NiTimeController::ExtrapolationMode::Cycle;
+    timedControllerSequence->mControlledBlocks.push_back(sequenceTimeBlock);
+    auto* timedSequence = timedControllerSequence.get();
+    auto timedControllerSequenceFile
+        = std::make_shared<Nif::NIFFile>(VFS::Path::Normalized("synthetic-controller-time.kf"));
+    timedControllerSequenceFile->mRoots.push_back(timedControllerSequence.get());
+    timedControllerSequenceFile->mRecords.push_back(std::move(sequenceTimeInterpolator));
+    timedControllerSequenceFile->mRecords.push_back(std::move(timedControllerSequence));
+    const std::vector<Render::Mat4> cycledControllerSequencePose
+        = Nif::collectBonePose(Nif::FileView(*timedControllerSequenceFile), animatedBoneNames, 1.25f, "idle");
+    if (cycledControllerSequencePose.size() != 1)
+        throw std::runtime_error("neutral controller sequence cycle did not produce a bone pose");
+    expectNear(cycledControllerSequencePose.front().data[12], 0.625f,
+        "cycled controller sequence time");
+    timedSequence->mExtrapolationMode = Nif::NiTimeController::ExtrapolationMode::Reverse;
+    const std::vector<Render::Mat4> reversedControllerSequencePose
+        = Nif::collectBonePose(Nif::FileView(*timedControllerSequenceFile), animatedBoneNames, 1.25f, "idle");
+    expectNear(reversedControllerSequencePose.front().data[12], 3.375f,
+        "reversed controller sequence time");
+    timedSequence->mExtrapolationMode = Nif::NiTimeController::ExtrapolationMode::Constant;
+    timedSequence->mPlayBackwards = true;
+    const std::vector<Render::Mat4> backwardsControllerSequencePose
+        = Nif::collectBonePose(Nif::FileView(*timedControllerSequenceFile), animatedBoneNames, 0.25f, "idle");
+    expectNear(backwardsControllerSequencePose.front().data[12], 3.375f,
+        "backwards controller sequence time");
     expectNear(instances.front().mesh.material.diffuse.x, 0.25f, "material diffuse red");
     expectNear(instances.front().mesh.material.diffuse.w, 0.75f, "material alpha");
     expectNear(instances.front().mesh.material.emissive.z, 0.6f, "material emissive");
