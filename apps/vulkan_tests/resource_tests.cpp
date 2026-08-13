@@ -119,6 +119,23 @@ namespace
         dds[137] = 128;
         dds[130] = 1; // The first pixel uses BC4 palette entry 1.
         dds[138] = 1;
+        auto dxt2 = std::vector<std::uint8_t>(144, 0);
+        dxt2[0] = 'D';
+        dxt2[1] = 'D';
+        dxt2[2] = 'S';
+        dxt2[3] = ' ';
+        write32(dxt2, 4, 124);
+        write32(dxt2, 12, 4);
+        write32(dxt2, 16, 4);
+        write32(dxt2, 76, 32);
+        write32(dxt2, 84, 0x32545844); // DXT2, the premultiplied DXT3 alias.
+        std::fill(dxt2.begin() + 128, dxt2.begin() + 136, 0xff);
+        dxt2[136] = 0x00;
+        dxt2[137] = 0xf8; // RGB565 red.
+        dxt2[138] = 0x00;
+        dxt2[139] = 0x07; // RGB565 green.
+        auto dxt4 = dxt2;
+        write32(dxt4, 84, 0x34545844); // DXT4, the premultiplied DXT5 alias.
         std::vector<std::uint8_t> tga(20, 0);
         tga[2] = 2;
         tga[12] = 1;
@@ -161,6 +178,14 @@ namespace
         {
             std::ofstream output(root / "textures/normal.dds", std::ios::binary);
             output.write(reinterpret_cast<const char*>(dds.data()), static_cast<std::streamsize>(dds.size()));
+        }
+        {
+            std::ofstream output(root / "textures/dxt2.dds", std::ios::binary);
+            output.write(reinterpret_cast<const char*>(dxt2.data()), static_cast<std::streamsize>(dxt2.size()));
+        }
+        {
+            std::ofstream output(root / "textures/dxt4.dds", std::ios::binary);
+            output.write(reinterpret_cast<const char*>(dxt4.data()), static_cast<std::streamsize>(dxt4.size()));
         }
         {
             std::ofstream output(root / "textures/test.tga", std::ios::binary);
@@ -209,6 +234,20 @@ namespace
             || normal->pixels[1] > 130 || normal->pixels[2] < 235 || normal->pixels[2] > 240
             || normal->pixels[3] != 255 || normal->pixels[4] < 62 || normal->pixels[4] > 66)
             throw std::runtime_error("neutral BC5 texture decoding did not reconstruct a normal");
+        const auto dxt2Texture = resources.getNeutralTextureManager()->get(VFS::Path::Normalized("textures/dxt2.dds"));
+        bool dxt2IsRed = dxt2Texture && dxt2Texture->width == 4 && dxt2Texture->height == 4
+            && dxt2Texture->pixels.size() == 4 * 4 * 4;
+        if (dxt2IsRed)
+            for (std::size_t pixel = 0; pixel < 16; ++pixel)
+                dxt2IsRed = dxt2Texture->pixels[pixel * 4] == 255 && dxt2Texture->pixels[pixel * 4 + 1] == 0
+                    && dxt2Texture->pixels[pixel * 4 + 2] == 0 && dxt2Texture->pixels[pixel * 4 + 3] == 255;
+        if (!dxt2IsRed)
+            throw std::runtime_error("neutral DXT2 texture decoding did not preserve premultiplied DXT3 data");
+        const auto dxt4Texture = resources.getNeutralTextureManager()->get(VFS::Path::Normalized("textures/dxt4.dds"));
+        if (!dxt4Texture || dxt4Texture->width != 4 || dxt4Texture->height != 4
+            || dxt4Texture->pixels[0] != 255 || dxt4Texture->pixels[1] != 0 || dxt4Texture->pixels[2] != 0
+            || dxt4Texture->pixels[3] != 255)
+            throw std::runtime_error("neutral DXT4 texture decoding did not preserve premultiplied DXT5 data");
         const auto correctedTexture
             = resources.getNeutralTextureManager()->get(VFS::Path::Normalized("textures/normal.tga"));
         if (!correctedTexture || correctedTexture != normal)

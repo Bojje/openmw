@@ -654,7 +654,8 @@ namespace
                 static_cast<std::uint8_t>(((color >> 5) & 63) * 255 / 63),
                 static_cast<std::uint8_t>((color & 31) * 255 / 31) };
         };
-        if (fourCC == 0x31545844 || fourCC == 0x33545844 || fourCC == 0x35545844)
+        if (fourCC == 0x31545844 || fourCC == 0x32545844 || fourCC == 0x33545844 || fourCC == 0x34545844
+            || fourCC == 0x35545844)
         {
             const std::size_t blockBytes = fourCC == 0x31545844 ? 8 : 16;
             const std::size_t blocksX = width / 4 + (width % 4 != 0);
@@ -690,12 +691,12 @@ namespace
                     else
                         colors[3] = { 0, 0, 0, 0 };
                     std::array<std::uint8_t, 8> alphaValues = {};
-                    if (fourCC == 0x33545844)
+                    if (fourCC == 0x32545844 || fourCC == 0x33545844)
                     {
                         // DXT3 stores one four-bit alpha value per pixel in the
                         // first eight bytes of the block.
                     }
-                    else if (fourCC == 0x35545844)
+                    else if (fourCC == 0x34545844 || fourCC == 0x35545844)
                     {
                         alphaValues[0] = data[cursor + 0];
                         alphaValues[1] = data[cursor + 1];
@@ -714,7 +715,7 @@ namespace
                     }
                     const std::uint32_t colorBits = read32(data, colorOffset + 4);
                     std::uint64_t alphaBits48 = 0;
-                    if (fourCC == 0x35545844)
+                    if (fourCC == 0x34545844 || fourCC == 0x35545844)
                         for (unsigned byte = 0; byte < 6; ++byte)
                             alphaBits48 |= static_cast<std::uint64_t>(data[cursor + 2 + byte]) << (8 * byte);
                     for (unsigned y = 0; y < 4; ++y)
@@ -741,7 +742,7 @@ namespace
         const std::uint32_t greenMask = read32(data, 96);
         const std::uint32_t blueMask = read32(data, 100);
         const std::uint32_t alphaMask = read32(data, 104);
-        if (bits != 24 && bits != 32)
+        if (bits != 16 && bits != 24 && bits != 32)
             return {};
         const std::size_t pixelBytes = bits / 8;
         if (pixelBytes > 0 && static_cast<std::size_t>(width) * height > (data.size() - 128) / pixelBytes)
@@ -754,8 +755,7 @@ namespace
             for (std::uint32_t x = 0; x < width; ++x)
             {
                 const std::size_t offset = 128 + (static_cast<std::size_t>(y) * width + x) * pixelBytes;
-                const std::uint32_t value = bits == 32 ? read32(data, offset)
-                                                       : read32(Bytes{ data[offset], data[offset + 1], data[offset + 2], 0 }, 0);
+                const std::uint32_t value = bits == 16 ? read16(data, offset) : read32(data, offset);
                 setPixel(*result, x, y, expandChannel(value, redMask), expandChannel(value, greenMask),
                     expandChannel(value, blueMask), alphaMask ? expandChannel(value, alphaMask) : 255);
             }

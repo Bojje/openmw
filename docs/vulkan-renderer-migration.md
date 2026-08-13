@@ -237,7 +237,8 @@ The neutral game camera now retains POV state and produces a bounded third-perso
 the player when POV is toggled, instead of silently remaining first-person without an OSG camera.
 Neutral vanity mode now also owns its orbit yaw/pitch, restores the prior POV when disabled, and
 loads/saves the existing `FIRS` camera state without constructing an OSG camera.
-The fast test suite now also contains a backend-neutral RGBA8 image comparator with
+The neutral image boundary now accepts the legacy premultiplied DXT2/DXT4 aliases in addition to DXT1/DXT3/DXT5,
+so those common DDS variants no longer require an OSG image fallback. The fast test suite now also contains a backend-neutral RGBA8 image comparator with
 per-channel tolerance, differing-pixel count, maximum error, and mean error metrics.
 The renderer test family also includes a runnable resource-backend check: neutral resource
 initialization retains shared image/mesh services but does not construct OSG scene or keyframe
@@ -541,7 +542,7 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the frozen `openmw-vulkan-osg-reference` tag, the current checkpoint changes
-208 code files excluding this ledger, deleting 2,291 lines and adding 15,905 lines (net `+13,614`). The larger Vulkan-only
+208 code files excluding this ledger, deleting 2,291 lines and adding 15,944 lines (net `+13,653`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; the current branch continues the reduction
 work with renderer-neutral ownership and compatibility-wrapper deletion. The live no-GUI
 consumer is the first deletion checkpoint; further reduction can now target OSG
