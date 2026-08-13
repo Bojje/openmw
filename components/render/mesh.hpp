@@ -61,6 +61,7 @@ namespace Render
         bool terrainNormalMap = false;
         bool terrainParallax = false;
         bool terrainSpecular = false;
+        bool ambientOverride = false;
         std::shared_ptr<const TextureData> alphaTexture;
     };
 

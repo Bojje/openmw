@@ -325,7 +325,7 @@ int main()
     effectSkinning->inverseBindMatrices = { Render::identityMat4() };
     secondEffectMesh.mesh.skinning = std::move(effectSkinning);
     if (!world.recordEffect("spark", "meshes/effect.nif", { 10.f, 11.f, 12.f }, 2.f, "textures/effect.dds", true, 2.f,
-            true)
+            true, true)
         || world.recordEffect("", "meshes/effect.nif", { 10.f, 11.f, 12.f }, 1.f))
         throw std::runtime_error("renderer-neutral world scene accepted an invalid or anonymous effect");
     const Render::SceneSubmission effectSubmission = Render::collectSceneSubmission(world, aggregateScene, "",
@@ -350,6 +350,9 @@ int main()
         || !effectSubmission.effects.back().object.animationLooping
         || effectSubmission.effects.back().object.animationDuration != 2.f
         || !effectSubmission.effects.back().object.magicVfx
+        || !effectSubmission.effects.back().object.ambientOverride
+        || !effectSubmission.effects.back().meshes.front().mesh.material.ambientOverride
+        || !effectSubmission.effects.back().meshes.back().mesh.material.ambientOverride
         || !effectSubmission.valid())
         throw std::runtime_error("renderer-neutral scene submission lost an identified effect");
     const Render::SceneSubmission deferredEffectSubmission = Render::collectSceneSubmission(world, aggregateScene, "",

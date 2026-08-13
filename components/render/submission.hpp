@@ -281,6 +281,7 @@ namespace Render
                     instance.mesh.material.albedoWrapV = false;
                     textureOverrideApplied = true;
                 }
+                instance.mesh.material.ambientOverride = effect->ambientOverride;
                 submission.meshes.push_back(std::move(instance));
             }
             result.push_back(std::move(submission));

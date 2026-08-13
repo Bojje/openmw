@@ -63,10 +63,11 @@ void main() {
     float roughness = clamp(materialSample.r, 0.05, 1.0);
     bool terrainSpecular = materialSample.b > 1.5 && materialSample.b < 2.5;
     bool waterSurface = abs(materialSample.b - 2.5) < 0.01;
-    bool objectSpecular = materialSample.b > 2.5;
-    float ao = clamp(materialSample.b, 0.0, 1.0);
+    bool objectSpecular = materialSample.b > 2.5 && materialSample.b < 3.5;
+    bool ambientOverride = materialSample.b > 3.5;
+    float ao = ambientOverride ? 1.0 : clamp(materialSample.b, 0.0, 1.0);
     float emission = max(materialSample.a, 0.0);
-    vec3 ambient = albedo * scene.ambientColor.rgb * ao;
+    vec3 ambient = albedo * (ambientOverride ? vec3(1.0) : scene.ambientColor.rgb * ao);
     vec3 diffuse = albedo * sunCol * NdotL * shadow;
     if (scene.effectTime.y > 0.5)
         diffuse *= 0.35;

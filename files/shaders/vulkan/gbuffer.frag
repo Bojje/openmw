@@ -111,4 +111,6 @@ void main() {
         outMaterial.b = 3.0;
     if ((fragMaterialFlags & 16u) != 0u)
         outMaterial.b = 2.5;
+    if ((fragMaterialFlags & 32u) != 0u)
+        outMaterial.b = 4.0;
 }

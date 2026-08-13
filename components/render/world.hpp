@@ -127,6 +127,8 @@ namespace Render
         // Magic VFX use the legacy first-root texture replacement rule when
         // their flattened neutral mesh list is submitted.
         bool magicVfx = false;
+        // Legacy VFX may override the scene ambient term with white light.
+        bool ambientOverride = false;
         float opacity = 1.f;
         bool active = true;
         std::vector<Attachment> attachments;
@@ -289,7 +291,7 @@ namespace Render
 
         bool recordEffect(std::string_view effectId, std::string_view model, const Vec3& position, float scale,
             std::string_view textureOverride = {}, bool looping = false, float animationDuration = 0.f,
-            bool magicVfx = false)
+            bool magicVfx = false, bool ambientOverride = false)
         {
             if (effectId.empty() || model.empty() || !valid(position) || !valid(scale) || scale <= 0.f)
                 return false;
@@ -305,6 +307,7 @@ namespace Render
             effect.animationLooping = looping;
             effect.animationDuration = valid(animationDuration) && animationDuration > 0.f ? animationDuration : 0.f;
             effect.magicVfx = magicVfx;
+            effect.ambientOverride = ambientOverride;
             mEffects[std::string(effectId)] = std::move(effect);
             return true;
         }
