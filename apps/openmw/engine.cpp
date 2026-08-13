@@ -707,17 +707,34 @@ void OMW::Engine::prepareVulkanEngine()
         const VFS::Path::Normalized path(model);
         if (path.extension().value() != "nif")
             return std::vector<Render::Mat4>();
+        VFS::Path::Normalized kfPath(path);
+        kfPath.changeExtension(VFS::Path::ExtensionView("kf"));
+        const bool hasExternalAnimation = resourceSystem->getVFS()->exists(kfPath);
+        const bool hasLocalAnimation
+            = resourceSystem->getNifMeshManager()->getAnimationDuration(path).has_value();
+
+        const auto sampleExternalAnimation = [&] {
+            return resourceSystem->getNifMeshManager()->getBonePose(
+                resourceSystem->getNifFileManager()->get(kfPath), time, boneNames, group, startKey, stopKey);
+        };
+
+        // A static NIF still contains its complete bind-pose node hierarchy. Prefer the
+        // sibling actor animation in that case, otherwise the bind pose masks the .kf.
+        if (hasExternalAnimation && !hasLocalAnimation)
+        {
+            std::vector<Render::Mat4> pose = sampleExternalAnimation();
+            if (!pose.empty())
+                return pose;
+        }
+
         std::vector<Render::Mat4> pose
             = resourceSystem->getNifMeshManager()->getBonePose(path, time, boneNames, group, startKey, stopKey);
         if (!pose.empty())
             return pose;
 
-        VFS::Path::Normalized kfPath(path);
-        kfPath.changeExtension(VFS::Path::ExtensionView("kf"));
-        if (!resourceSystem->getVFS()->exists(kfPath))
-            return pose;
-        return resourceSystem->getNifMeshManager()->getBonePose(
-            resourceSystem->getNifFileManager()->get(kfPath), time, boneNames, group, startKey, stopKey);
+        if (hasExternalAnimation)
+            return sampleExternalAnimation();
+        return pose;
     };
     const Render::SceneSynchronizer sceneSynchronizer = [this](Render::SceneData& sceneData) {
         mWorld->updateNeutralSceneData(sceneData);
