@@ -36,6 +36,7 @@ namespace Render
             vertex.emissive[1] = 0.f;
             vertex.emissive[2] = 0.f;
             vertex.emissive[3] = 1.f;
+            vertex.specular[0] = vertex.specular[1] = vertex.specular[2] = vertex.specular[3] = 1.f;
             vertex.tangent[0] = 1.f;
             vertex.tangent[1] = 0.f;
             vertex.tangent[2] = 0.f;

@@ -12,6 +12,7 @@ layout(location = 8) in uvec4 inTextureLayers;
 layout(location = 9) in vec2 inDarkTexCoord;
 layout(location = 10) in vec2 inDetailTexCoord;
 layout(location = 11) in vec2 inDecalTexCoord;
+layout(location = 12) in vec4 inSpecular;
 
 layout(push_constant) uniform PushConstants {
     mat4 model;
@@ -50,6 +51,7 @@ layout(location = 15) flat out uvec4 fragTextureLayers;
 layout(location = 16) out vec2 fragDarkTexCoord;
 layout(location = 17) out vec2 fragDetailTexCoord;
 layout(location = 18) out vec2 fragDecalTexCoord;
+layout(location = 19) out vec4 fragSpecular;
 
 void main() {
     vec4 worldPos = push.model * vec4(inPosition, 1.0);
@@ -80,6 +82,7 @@ void main() {
     fragDarkTexCoord = inDarkTexCoord;
     fragDetailTexCoord = inDetailTexCoord;
     fragDecalTexCoord = inDecalTexCoord;
+    fragSpecular = inSpecular;
     fragAlphaTexCoord = inBlendTexCoord;
     fragTangent = vec4(normalize(mat3(push.model) * inTangent.xyz), inTangent.w);
     gl_Position = camera.projection * camera.view * worldPos;

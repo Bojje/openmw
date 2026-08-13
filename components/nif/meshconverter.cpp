@@ -792,6 +792,12 @@ namespace Nif
                     result.emissive = { lighting->mEmissive.x() * lighting->mEmissiveMult,
                         lighting->mEmissive.y() * lighting->mEmissiveMult,
                         lighting->mEmissive.z() * lighting->mEmissiveMult, 1.f };
+                    if (std::isfinite(lighting->mSpecular.x()) && std::isfinite(lighting->mSpecular.y())
+                        && std::isfinite(lighting->mSpecular.z()))
+                    {
+                        result.specular = { std::max(0.f, lighting->mSpecular.x()),
+                            std::max(0.f, lighting->mSpecular.y()), std::max(0.f, lighting->mSpecular.z()), 1.f };
+                    }
                     result.glossiness = lighting->mGlossiness;
                     if (std::isfinite(lighting->mSpecStrength))
                     {

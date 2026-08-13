@@ -53,7 +53,7 @@ int main()
 
     skinning->vertices.front().weights[0] = 1.f;
     Render::MeshData skinnedMesh;
-    skinnedMesh.vertices.push_back({ { 1.f, 0.f, 0.f }, { 0.f, 0.f, 1.f }, {}, {}, {}, {}, {}, {} });
+    skinnedMesh.vertices.push_back({ { 1.f, 0.f, 0.f }, { 0.f, 0.f, 1.f }, {}, {}, {}, {}, {}, {}, {}, {} });
     skinnedMesh.skinning = std::make_shared<const Render::SkinningData>(*skinning);
     Render::Mat4 bone = identity;
     bone.data[12] = 2.f;
@@ -364,6 +364,7 @@ int main()
     lighting->mAlpha = 0.75f;
     lighting->mEmissive = { 0.1f, 0.2f, 0.3f };
     lighting->mEmissiveMult = 2.f;
+    lighting->mSpecular = { 0.2f, 0.4f, 0.8f };
     lighting->mGlossiness = 42.f;
     lighting->mSpecStrength = 0.65f;
     lighting->mTextureSet = Nif::BSShaderTextureSetPtr(nullptr);
@@ -452,6 +453,9 @@ int main()
         || instances.front().mesh.material.specularTexture != "textures/synthetic_gloss.dds"
         || !instances.front().mesh.material.specularMaterial
         || std::abs(instances.front().mesh.material.specularStrength - 0.65f) > 1e-5f
+        || std::abs(instances.front().mesh.material.specular.x - 0.2f) > 1e-5f
+        || std::abs(instances.front().mesh.material.specular.y - 0.4f) > 1e-5f
+        || std::abs(instances.front().mesh.material.specular.z - 0.8f) > 1e-5f
         || std::abs(instances.front().mesh.material.emissiveLumaBias[0] - 0.6f) > 1e-5f
         || std::abs(instances.front().mesh.material.emissiveLumaBias[1] - 0.2f) > 1e-5f
         || !instances.front().mesh.material.normalMap
@@ -806,6 +810,8 @@ int main()
     expectNear(batch.vertices.front().material[0], 1.f - 42.f / 128.f, "batched material roughness");
     expectNear(batch.vertices.front().material[1], 0.65f, "batched material specular strength");
     expectNear(batch.vertices.front().material[2], 3.f, "batched material shading mode");
+    expectNear(batch.vertices.front().specular[0], 0.2f, "batched material specular red");
+    expectNear(batch.vertices.front().specular[2], 0.8f, "batched material specular blue");
     expectNear(batch.vertices.front().material[3], 0.6f, "batched material emission");
     expectNear(batch.vertices.front().emissive[0], 0.2f, "batched emissive red");
     expectNear(batch.vertices.front().emissive[2], 0.6f, "batched emissive blue");

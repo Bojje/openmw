@@ -19,6 +19,7 @@ layout(location = 15) flat in uvec4 fragTextureLayers;
 layout(location = 16) in vec2 fragDarkTexCoord;
 layout(location = 17) in vec2 fragDetailTexCoord;
 layout(location = 18) in vec2 fragDecalTexCoord;
+layout(location = 19) in vec4 fragSpecular;
 
 layout(set = 0, binding = 1) uniform sampler2D albedoTextures[64];
 layout(set = 0, binding = 2) uniform sampler2D alphaTextures[64];
@@ -96,6 +97,7 @@ void main() {
         : texture(specularTextures[fragSpecularTextureIndex], terrainTexCoord).rgb;
     if (fragMaterial.b > 1.5 && fragSpecularTextureIndex == 0u)
         specularSample = albedoSample.rgb;
+    specularSample *= fragSpecular.rgb;
 
     if ((fragMaterialFlags & 2u) != 0u)
         albedo.a *= texture(alphaTextures[fragAlphaTextureIndex], fragAlphaTexCoord).a;

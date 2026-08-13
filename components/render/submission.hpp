@@ -41,6 +41,7 @@ namespace Render
 
         if (!Render::valid(instance.transform)
             || !Render::valid(instance.mesh.material.diffuse) || !Render::valid(instance.mesh.material.emissive)
+            || !Render::valid(instance.mesh.material.specular)
             || !std::isfinite(instance.mesh.material.glossiness)
             || !std::isfinite(instance.mesh.material.specularStrength)
             || instance.mesh.material.specularStrength < 0.f
@@ -75,6 +76,9 @@ namespace Render
                 if (!std::isfinite(value))
                     return false;
             for (const float value : vertex.emissive)
+                if (!std::isfinite(value))
+                    return false;
+            for (const float value : vertex.specular)
                 if (!std::isfinite(value))
                     return false;
         }

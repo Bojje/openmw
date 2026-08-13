@@ -102,8 +102,8 @@ through a Bethesda shader property rather than a classic NIF property. Classic N
 slots and Bethesda shader glow textures now cross the same boundary and contribute to the
 neutral emissive channel. Resource images can now cross into neutral RGBA8 data,
 and authored BSLighting double-sided flags now select the matching Vulkan no-cull pipeline.
-Authored BSLighting specular strength now crosses the neutral material channel and controls
-Vulkan composite specular intensity; animation-specific and remaining full material shading
+Authored BSLighting specular strength and color now cross the neutral material channel and control
+Vulkan composite specular intensity and tint; animation-specific and remaining full material shading
 still require follow-up parity work.
 The neutral resource backend now owns a VFS-backed RGBA8 texture cache with true-color and 1/4/8-bit indexed BMP,
 indexed TGA,
@@ -229,7 +229,7 @@ neutral NPCs now also publish their selected head, hair, race body-part, and equ
 bone attachments; weapon/shield presentation now carries animated-emissive state through the neutral
 material boundary; legacy dark/detail/decal texture composition now reaches the Vulkan material path,
 while exact enchanted caustic layering, full particle emission/spawn, unsupported collider types,
-and dynamic shading remain outstanding.
+and the remaining dynamic shading model remain outstanding.
 Neutral arrow release and container timing/GUI events now have renderer-neutral paths.
 Neutral actor idle and movement selection now honors weapon-specific short groups when those groups are actually
 present, and grouped duration queries reject unrelated controller files instead of falsely selecting a missing group.
@@ -573,7 +573,7 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the frozen `openmw-vulkan-osg-reference` tag, the current checkpoint changes
-214 code files excluding this ledger, deleting 2,490 lines and adding 18,904 lines (net `+16,414`). The larger Vulkan-only
+214 code files excluding this ledger, deleting 2,490 lines and adding 18,941 lines (net `+16,451`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; the current branch continues the reduction
 work with renderer-neutral ownership and compatibility-wrapper deletion. The live no-GUI
 consumer is the first deletion checkpoint; further reduction can now target OSG

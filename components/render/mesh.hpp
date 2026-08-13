@@ -45,6 +45,7 @@ namespace Render
         std::string specularTexture;
         Vec4 diffuse{ 1.f, 1.f, 1.f, 1.f };
         Vec4 emissive{};
+        Vec4 specular{ 1.f, 1.f, 1.f, 1.f };
         float glossiness = 0.f;
         float specularStrength = 1.f;
         bool specularMaterial = false;
@@ -150,9 +151,10 @@ namespace Render
         // the backend does not need a renderer-specific material transform
         // table or a larger per-draw push-constant block.
         std::array<float, 6> textureLayerCoords{};
+        float specular[4];
     };
 
-    static_assert(sizeof(MeshVertex) == sizeof(float) * 36);
+    static_assert(sizeof(MeshVertex) == sizeof(float) * 40);
 
     struct ParticleState
     {
@@ -865,6 +867,10 @@ namespace Render
                 vertex.emissive[1] = mesh.mesh.material.emissive.y;
                 vertex.emissive[2] = mesh.mesh.material.emissive.z;
                 vertex.emissive[3] = mesh.mesh.material.emissive.w;
+                vertex.specular[0] = mesh.mesh.material.specular.x;
+                vertex.specular[1] = mesh.mesh.material.specular.y;
+                vertex.specular[2] = mesh.mesh.material.specular.z;
+                vertex.specular[3] = mesh.mesh.material.specular.w;
                 result.vertices.push_back(vertex);
             }
             result.draws.push_back(draw);
