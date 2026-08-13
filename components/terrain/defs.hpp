@@ -22,7 +22,7 @@ namespace Terrain
         bool mParallax = false; // Height info in normal map alpha channel?
         bool mSpecular = false; // Specular info in diffuse map alpha channel?
 
-        bool requiresShaders() const { return !mNormalMap.empty() || mSpecular; }
+        bool requiresShaders() const { return !mNormalMap.empty() || !mSpecularMap.empty() || mSpecular; }
     };
 
 }

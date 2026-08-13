@@ -52,7 +52,9 @@ namespace
             layer.mNormalMap = VFS::Path::Normalized("textures/grass_n.dds");
             layer.mSpecularMap = VFS::Path::Normalized("textures/grass_spec.dds");
             layer.mParallax = true;
-            layer.mSpecular = true;
+            // Keep the packed-alpha flag off: the explicit map must be enough
+            // to select the terrain specular path.
+            layer.mSpecular = false;
             layers.push_back(std::move(layer));
         }
 
@@ -77,6 +79,10 @@ int main()
         Terrain::LayerInfo defaultLayer;
         expect(!defaultLayer.mParallax && !defaultLayer.mSpecular,
             "terrain layer feature flags must default to disabled");
+        Terrain::LayerInfo explicitSpecularLayer;
+        explicitSpecularLayer.mSpecularMap = VFS::Path::Normalized("textures/grass_spec.dds");
+        expect(explicitSpecularLayer.requiresShaders(),
+            "an explicit terrain specular map must select the shader path");
 
         Render::TerrainHeightField heightField;
         heightField.verticesPerSide = 2;
@@ -115,7 +121,7 @@ int main()
         expect(tile->layers.size() == 1 && tile->layers[0].diffuseTexture == "textures/grass.dds"
                 && tile->layers[0].normalTexture == "textures/grass_n.dds"
                 && tile->layers[0].specularTexture == "textures/grass_spec.dds" && tile->layers[0].parallax
-                && tile->layers[0].specular,
+                && !tile->layers[0].specular,
             "terrain layer metadata was not converted");
         expect(tile->layers[0].blendmap.valid() && tile->layers[0].blendmap.pixels[3] == 191,
             "terrain blendmap was not converted to RGBA8");
