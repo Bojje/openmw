@@ -119,6 +119,7 @@ namespace Render
         std::string animationGroup;
         std::string animationStartKey;
         std::string animationStopKey;
+        bool animationLooping = false;
         // Magic VFX use the legacy first-root texture replacement rule when
         // their flattened neutral mesh list is submitted.
         bool magicVfx = false;
@@ -439,6 +440,7 @@ namespace Render
                             object->boneMatrices.clear();
                             object->animationTime = 0.f;
                             object->animationGroup.clear();
+                            object->animationLooping = false;
                             object->attachments.clear();
                         }
                         return;
@@ -523,7 +525,7 @@ namespace Render
 
         bool updateObjectAnimation(const void* objectKey, std::string_view group,
             std::optional<float> animationTime = std::nullopt, std::string_view startKey = {},
-            std::string_view stopKey = {})
+            std::string_view stopKey = {}, bool looping = false)
         {
             const auto found = mObjects.find(objectKey);
             if (found == mObjects.end())
@@ -540,9 +542,12 @@ namespace Render
                 object->animationGroup = group;
                 object->animationStartKey = startKey;
                 object->animationStopKey = stopKey;
+                object->animationLooping = looping;
                 object->animationTime = 0.f;
                 object->boneMatrices.clear();
             }
+            else
+                object->animationLooping = looping;
             if (animationTime && std::isfinite(*animationTime) && *animationTime >= 0.f)
                 object->animationTime = *animationTime;
             return true;
@@ -595,7 +600,7 @@ namespace Render
                 return false;
             const WorldObject* const object = scene->second.findObject(found->second.id);
             return object != nullptr && object->dynamic && object->animationGroup == group
-                && object->animationTime < duration;
+                && (object->animationLooping || object->animationTime < duration);
         }
 
         // Sorting the owned cells makes backend input deterministic without

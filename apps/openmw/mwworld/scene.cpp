@@ -407,11 +407,11 @@ namespace MWWorld
     }
 
     void Scene::updateObjectAnimation(const Ptr& ptr, std::string_view group, std::optional<float> animationTime,
-        std::string_view startKey, std::string_view stopKey)
+        std::string_view startKey, std::string_view stopKey, bool looping)
     {
         if (mNeutralWorldScene)
             mNeutralWorldScene->updateObjectAnimation(
-                static_cast<const void*>(ptr.mRef), group, animationTime, startKey, stopKey);
+                static_cast<const void*>(ptr.mRef), group, animationTime, startKey, stopKey, looping);
     }
 
     void Scene::updateNeutralObjectAttachment(
@@ -1407,8 +1407,8 @@ namespace MWWorld
             if (mPoseResolver && skinning != nullptr)
             {
                 const std::vector<Render::Mat4> pose = mPoseResolver(effect.object.model,
-                    effect.object.animationGroup, effect.object.animationTime, effect.object.animationStartKey,
-                    effect.object.animationStopKey, skinning->boneNames);
+                    effect.object.animationGroup, effect.object.animationTime, false,
+                    effect.object.animationStartKey, effect.object.animationStopKey, skinning->boneNames);
                 if (pose.size() == skinning->inverseBindMatrices.size())
                 {
                     for (Render::MeshInstance& mesh : effect.meshes)
@@ -1430,8 +1430,8 @@ namespace MWWorld
                 if (skinning != nullptr)
                 {
                     const std::vector<Render::Mat4> pose = mPoseResolver(dynamic.object.model,
-                        dynamic.object.animationGroup, dynamic.object.animationTime, dynamic.object.animationStartKey,
-                        dynamic.object.animationStopKey, skinning->boneNames);
+                        dynamic.object.animationGroup, dynamic.object.animationTime, dynamic.object.animationLooping,
+                        dynamic.object.animationStartKey, dynamic.object.animationStopKey, skinning->boneNames);
                     if (pose.size() == skinning->inverseBindMatrices.size())
                         dynamic.boneMatrices = pose;
                 }

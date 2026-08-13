@@ -3284,7 +3284,9 @@ namespace MWMechanics
             startKey = "loop stop";
             stopKey = "stop";
         }
-        world->updateNeutralAnimation(mPtr, animationGroup, animationTime, startKey, stopKey);
+        const bool looping = mCurrentDeath.empty() && mCurrentHit.empty() && mAnimQueue.empty()
+            && mJumpState != JumpState_Landing;
+        world->updateNeutralAnimation(mPtr, animationGroup, animationTime, startKey, stopKey, looping);
         settings.mPosition[0] = settings.mPosition[1] = 0.f;
         if (movement.z() == 0.f)
             settings.mPosition[2] = 0.f;

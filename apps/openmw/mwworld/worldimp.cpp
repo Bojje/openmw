@@ -4237,10 +4237,10 @@ namespace MWWorld
 
     void World::updateNeutralAnimation(
         const MWWorld::Ptr& ptr, std::string_view group, std::optional<float> animationTime,
-        std::string_view startKey, std::string_view stopKey)
+        std::string_view startKey, std::string_view stopKey, bool looping)
     {
         if (mWorldScene)
-            mWorldScene->updateObjectAnimation(ptr, group, animationTime, startKey, stopKey);
+            mWorldScene->updateObjectAnimation(ptr, group, animationTime, startKey, stopKey, looping);
     }
 
     void World::updateNeutralObjectAttachment(const MWWorld::Ptr& ptr, std::string_view attachmentId,

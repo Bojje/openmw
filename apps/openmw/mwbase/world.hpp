@@ -224,9 +224,10 @@ namespace MWBase
         // default no-op; Vulkan publishes the selected group to its snapshot.
         virtual void updateNeutralAnimation(
             const MWWorld::Ptr&, std::string_view, std::optional<float> animationTime = std::nullopt,
-            std::string_view startKey = {}, std::string_view stopKey = {})
+            std::string_view startKey = {}, std::string_view stopKey = {}, bool looping = false)
         {
             (void)animationTime;
+            (void)looping;
         }
         virtual void updateNeutralObjectAttachment(const MWWorld::Ptr&, std::string_view, std::string_view,
             std::string_view, bool)

@@ -182,13 +182,18 @@ int main()
     world.updateEffects(0.25f);
     if (world.findCell(&firstCellHandle)->objects.front().animationTime != 0.25f)
         throw std::runtime_error("renderer-neutral world scene did not advance dynamic animation time");
-    if (!world.updateObjectAnimation(&dynamicObjectHandle, "walkforward")
+    if (!world.updateObjectAnimation(&dynamicObjectHandle, "walkforward", std::nullopt, {}, {}, true)
         || world.findCell(&firstCellHandle)->objects.front().animationGroup != "walkforward"
-        || world.findCell(&firstCellHandle)->objects.front().animationTime != 0.f)
+        || world.findCell(&firstCellHandle)->objects.front().animationTime != 0.f
+        || !world.findCell(&firstCellHandle)->objects.front().animationLooping)
         throw std::runtime_error("renderer-neutral world scene failed animation-group ownership");
     world.updateEffects(0.5f);
     if (world.findCell(&firstCellHandle)->objects.front().animationTime != 0.5f)
         throw std::runtime_error("renderer-neutral world scene did not advance selected animation time");
+    world.updateEffects(2.f);
+    if (!world.isObjectAnimationPlaying(&dynamicObjectHandle, "walkforward", 2.f)
+        || world.findCell(&firstCellHandle)->objects.front().animationTime != 2.5f)
+        throw std::runtime_error("renderer-neutral world scene did not retain a looping animation");
     if (!world.updateObjectAnimation(&dynamicObjectHandle, "walkforward", 1.25f, "loop start", "loop stop")
         || world.findCell(&firstCellHandle)->objects.front().animationTime != 1.25f
         || world.findCell(&firstCellHandle)->objects.front().animationStartKey != "loop start"

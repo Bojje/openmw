@@ -21,6 +21,7 @@
 
 #include <components/debug/debuglog.hpp>
 #include <components/misc/rng.hpp>
+#include <components/misc/strings/algorithm.hpp>
 #include <components/misc/strings/format.hpp>
 
 #include <components/vfs/manager.hpp>
@@ -702,7 +703,7 @@ void OMW::Engine::prepareVulkanEngine()
     };
     const Render::PoseResolver poseResolver = [resourceSystem = mResourceSystem.get()](
                                                  std::string_view model, std::string_view group, float time,
-                                                 std::string_view startKey, std::string_view stopKey,
+                                                 bool looping, std::string_view startKey, std::string_view stopKey,
                                                  std::span<const std::string> boneNames) {
         const VFS::Path::Normalized path(model);
         if (path.extension().value() != "nif")
@@ -713,9 +714,51 @@ void OMW::Engine::prepareVulkanEngine()
         const Nif::NIFFilePtr localFile = resourceSystem->getNifFileManager()->get(path);
         const bool hasLocalAnimation = resourceSystem->getNifMeshManager()->getAnimationDuration(localFile).has_value();
 
-        const auto sampleExternalAnimation = [&] {
+        const auto sampleAnimation = [&](const Nif::NIFFilePtr& file) {
+            if (!file)
+                return std::vector<Render::Mat4>();
+
+            float sampleTime = time;
+            std::string sampleStartKey(startKey);
+            std::string sampleStopKey(stopKey);
+            if (looping && sampleStartKey.empty() && sampleStopKey.empty() && !group.empty())
+            {
+                const std::vector<Render::AnimationTextKey> keys
+                    = resourceSystem->getNifMeshManager()->getAnimationTextKeys(file, group);
+                const auto hasKey = [&](std::string_view key) {
+                    const std::string requested = std::string(group) + ": " + std::string(key);
+                    return std::any_of(keys.begin(), keys.end(), [&](const Render::AnimationTextKey& candidate) {
+                        return Misc::StringUtils::ciEqual(candidate.event, requested);
+                    });
+                };
+                if (hasKey("loop start") && hasKey("loop stop"))
+                {
+                    sampleStartKey = "loop start";
+                    sampleStopKey = "loop stop";
+                }
+                else if (hasKey("start") && hasKey("stop"))
+                {
+                    sampleStartKey = "start";
+                    sampleStopKey = "stop";
+                }
+            }
+
+            if (looping && std::isfinite(sampleTime))
+            {
+                const std::optional<float> duration
+                    = !sampleStartKey.empty() && !sampleStopKey.empty()
+                    ? resourceSystem->getNifMeshManager()->getAnimationDuration(
+                          file, group, sampleStartKey, sampleStopKey)
+                    : resourceSystem->getNifMeshManager()->getAnimationDuration(file);
+                if (duration && *duration > 0.f)
+                    sampleTime = std::fmod(std::max(0.f, sampleTime), *duration);
+            }
+
             return resourceSystem->getNifMeshManager()->getBonePose(
-                resourceSystem->getNifFileManager()->get(kfPath), time, boneNames, group, startKey, stopKey);
+                file, sampleTime, boneNames, group, sampleStartKey, sampleStopKey);
+        };
+        const auto sampleExternalAnimation = [&] {
+            return sampleAnimation(resourceSystem->getNifFileManager()->get(kfPath));
         };
 
         // A static NIF still contains its complete bind-pose node hierarchy. Prefer the
@@ -727,8 +770,7 @@ void OMW::Engine::prepareVulkanEngine()
                 return pose;
         }
 
-        std::vector<Render::Mat4> pose
-            = resourceSystem->getNifMeshManager()->getBonePose(localFile, time, boneNames, group, startKey, stopKey);
+        std::vector<Render::Mat4> pose = sampleAnimation(localFile);
         if (!pose.empty())
             return pose;
 
