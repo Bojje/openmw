@@ -371,15 +371,30 @@ int main()
     expectNear(batch.vertices.front().material[3], 0.6f, "batched material emission");
     expectNear(batch.draws[1].transform.data[12], 12.0f, "batched mesh translation");
 
-    Render::WorldObject object{ 1, "synthetic.nif", {}, true, false, {}, {}, {}, {}, {}, {}, {}, {}, {}, {} };
+    Render::WorldObject object;
+    object.id = 1;
+    object.model = "synthetic.nif";
+    object.visible = true;
+    object.dynamic = false;
     object.transform.position.x = 5.0f;
     const Render::MeshInstance transformed = Render::transformMeshInstance(object, instances.front());
     expectNear(transformed.transform.data[12], 17.0f, "cell object translation");
 
     Render::CellScene scene;
-    scene.objects.push_back({ 2, "hidden.nif", {}, false, false, {}, {}, {}, {}, {}, {}, {}, {}, {}, {} });
-    scene.objects.push_back({ 3, "synthetic.nif", {}, true, false, {}, {}, {}, {}, {}, {}, {}, {}, {}, {} });
-    scene.objects.push_back({ 4, "animated.nif", {}, true, true, {}, {}, {}, {}, {}, {}, {}, {}, {}, {} });
+    Render::WorldObject hidden;
+    hidden.id = 2;
+    hidden.model = "hidden.nif";
+    hidden.visible = false;
+    scene.objects.push_back(std::move(hidden));
+    Render::WorldObject visible;
+    visible.id = 3;
+    visible.model = "synthetic.nif";
+    scene.objects.push_back(std::move(visible));
+    Render::WorldObject animated;
+    animated.id = 4;
+    animated.model = "animated.nif";
+    animated.dynamic = true;
+    scene.objects.push_back(std::move(animated));
     const std::vector<Render::MeshInstance> visibleMeshes = Render::collectCellMeshes(
         scene, [&](std::string_view model) -> const Resource::NifMeshManager::Meshes& {
             if (model != "synthetic.nif")
