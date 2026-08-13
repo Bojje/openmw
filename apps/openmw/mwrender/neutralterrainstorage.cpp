@@ -43,14 +43,6 @@ namespace MWRender
             return result;
         }
 
-        void includeCell(float& minX, float& maxX, float& minY, float& maxY, float x, float y)
-        {
-            minX = std::min(minX, x);
-            maxX = std::max(maxX, x);
-            minY = std::min(minY, y);
-            maxY = std::max(maxY, y);
-        }
-
         std::array<float, 3> normalize(std::array<float, 3> value)
         {
             const float length = std::sqrt(value[0] * value[0] + value[1] * value[1] + value[2] * value[2]);
@@ -137,31 +129,6 @@ namespace MWRender
 
         const ESM::Land* land = mStore.get<ESM::Land>().search(gridX, gridY);
         return land ? std::make_unique<ESM::LandData>(*land, dataFlags) : nullptr;
-    }
-
-    void NeutralTerrainStorage::getBounds(
-        float& minX, float& maxX, float& minY, float& maxY, ESM::RefId worldspace)
-    {
-        worldspace = resolveLandWorldspace(worldspace);
-        minX = 0.f;
-        maxX = 0.f;
-        minY = 0.f;
-        maxY = 0.f;
-
-        if (ESM::isEsm4Ext(worldspace))
-        {
-            for (const auto& [cell, land] : mStore.get<ESM4::Land>().getLands())
-                if (cell.mWorldspace == worldspace)
-                    includeCell(minX, maxX, minY, maxY, static_cast<float>(cell.mX), static_cast<float>(cell.mY));
-        }
-        else
-        {
-            for (auto it = mStore.get<ESM::Land>().begin(); it != mStore.get<ESM::Land>().end(); ++it)
-                includeCell(minX, maxX, minY, maxY, static_cast<float>(it->mX), static_cast<float>(it->mY));
-        }
-
-        maxX += 1.f;
-        maxY += 1.f;
     }
 
     void NeutralTerrainStorage::fillRenderVertexBuffers(int lodLevel, float size,

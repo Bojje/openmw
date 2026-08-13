@@ -24,8 +24,6 @@ namespace Terrain
     public:
         virtual ~RenderStorage() = default;
 
-        virtual void getBounds(float& minX, float& maxX, float& minY, float& maxY, ESM::RefId worldspace) = 0;
-
         virtual void fillRenderVertexBuffers(int lodLevel, float size, const std::array<float, 2>& center,
             ESM::RefId worldspace, std::vector<Render::TerrainVertex>& vertices)
             = 0;

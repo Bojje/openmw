@@ -42,8 +42,6 @@ namespace MWRender
             bool autoUseSpecularMaps = false);
         ~NeutralTerrainStorage() override;
 
-        void getBounds(float& minX, float& maxX, float& minY, float& maxY, ESM::RefId worldspace) override;
-
         void fillRenderVertexBuffers(int lodLevel, float size, const std::array<float, 2>& center,
             ESM::RefId worldspace, std::vector<Render::TerrainVertex>& vertices) override;
 
