@@ -796,8 +796,8 @@ resolves attachments only when a compatible actor pose is available, and attachm
 actor-model replacement.
 The renderer-neutral boundary now also owns NPC race/gender body-part selection and the shared torso/left-arm/right-arm
 bone classification. Neutral scene recording no longer reaches through `MWRender::NpcAnimation` for body-part data;
-the OSG compatibility animation path consumes the same selector, eliminating a duplicated renderer ownership boundary
-before per-bone arbitration is moved fully into neutral playback.
+the OSG compatibility animation path consumes the same selector, eliminating a duplicated renderer ownership boundary.
+Neutral dynamic playback now also applies independently clocked per-bone overlay layers by shared mask and priority.
   Neutral Lua/sound/melee/spell text-key dispatch is now covered for the migrated event classes.
 - Resting actors, owned-item lookup, line-of-sight, moving doors, and transformation-script movement/rotation now use active-cell state and world-model transforms instead of treating an absent OSG node as inactive.
 - Neutral focus selection and gameplay raycasts now use the renderer-neutral camera state and physics collision masks, so activation and targeting no longer require an OSG renderer.
