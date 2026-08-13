@@ -712,7 +712,7 @@ void OMW::Engine::prepareVulkanEngine()
         kfPath.changeExtension(VFS::Path::ExtensionView("kf"));
         const bool hasExternalAnimation = resourceSystem->getVFS()->exists(kfPath);
         const Nif::NIFFilePtr localFile = resourceSystem->getNifFileManager()->get(path);
-        const bool hasLocalAnimation = resourceSystem->getNifMeshManager()->getAnimationDuration(localFile).has_value();
+        const bool hasLocalAnimation = resourceSystem->getNifMeshManager()->hasAnimationGroup(localFile, group);
 
         const auto sampleAnimation = [&](const Nif::NIFFilePtr& file) {
             if (!file)

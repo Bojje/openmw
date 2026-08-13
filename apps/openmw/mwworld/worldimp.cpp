@@ -4300,7 +4300,7 @@ namespace MWWorld
         keyframes.changeExtension(VFS::Path::ExtensionView("kf"));
         const bool hasExternalAnimation = mResourceSystem->getVFS()->exists(keyframes);
         const Nif::NIFFilePtr localFile = mResourceSystem->getNifFileManager()->get(model);
-        const bool hasLocalAnimation = mResourceSystem->getNifMeshManager()->getAnimationDuration(localFile).has_value();
+        const bool hasLocalAnimation = mResourceSystem->getNifMeshManager()->hasAnimationGroup(localFile, group);
         const auto sampleExternalDuration = [&] {
             return mResourceSystem->getNifMeshManager()->getAnimationDuration(
                 mResourceSystem->getNifFileManager()->get(keyframes), group, startKey, stopKey);
@@ -4343,7 +4343,7 @@ namespace MWWorld
         keyframes.changeExtension(VFS::Path::ExtensionView("kf"));
         const bool hasExternalAnimation = mResourceSystem->getVFS()->exists(keyframes);
         const Nif::NIFFilePtr localFile = mResourceSystem->getNifFileManager()->get(model);
-        const bool hasLocalAnimation = mResourceSystem->getNifMeshManager()->getAnimationDuration(localFile).has_value();
+        const bool hasLocalAnimation = mResourceSystem->getNifMeshManager()->hasAnimationGroup(localFile, group);
         const auto sampleExternalTextKeys = [&] {
             return mResourceSystem->getNifMeshManager()->getAnimationTextKeys(
                 mResourceSystem->getNifFileManager()->get(keyframes), group, startKey, stopKey);

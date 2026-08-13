@@ -69,6 +69,15 @@ namespace Resource
         return result;
     }
 
+    bool NifMeshManager::hasAnimationGroup(const Nif::NIFFilePtr& file, std::string_view group) const
+    {
+        if (!file)
+            return false;
+        if (group.empty())
+            return getAnimationDuration(file).has_value();
+        return !getAnimationTextKeys(file, group).empty();
+    }
+
     std::optional<float> NifMeshManager::getAnimationDuration(
         VFS::Path::NormalizedView name, std::string_view group, std::string_view startKey, std::string_view stopKey)
     {

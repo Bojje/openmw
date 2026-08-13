@@ -525,7 +525,7 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the frozen `openmw-vulkan-osg-reference` tag, the current checkpoint changes
-208 code files excluding this ledger, deleting 2,284 lines and adding 15,110 lines (net `+12,826`). The larger Vulkan-only
+208 code files excluding this ledger, deleting 2,284 lines and adding 15,125 lines (net `+12,841`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; the current branch continues the reduction
 work with renderer-neutral ownership and compatibility-wrapper deletion. The live no-GUI
 consumer is the first deletion checkpoint; further reduction can now target OSG
@@ -571,6 +571,8 @@ preferring a sibling `.kf` for static NIF skeletons while retaining local-contro
 pose, duration, and text-key metadata; actor priority and blended animation remain to be ported.
 The neutral pose sampler now preserves later-source-wins precedence for duplicate bone names, matching
 legacy animation-source ordering and preventing a lower-priority actor/KF source from masking a later one.
+Local-versus-sibling animation selection is also group-aware: unrelated local NIF controllers no longer
+mask a requested actor `.kf` group when that group is present only in the external source.
 Neutral one-shot animation queues
 now advance from resource duration metadata and hand off to the next queued group, including
 finite loop counts; looping groups now retain a wrapped neutral clock, and mechanics exports
