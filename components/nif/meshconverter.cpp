@@ -39,59 +39,24 @@ namespace Nif
             return result;
         }
 
-        float controllerTime(const NiTimeController& controller, float value)
+        float extrapolateControllerTime(float time, float start, float stop, NiTimeController::ExtrapolationMode mode)
         {
-            const float time = controller.mFrequency * value + controller.mPhase;
-            if (time >= controller.mTimeStart && time <= controller.mTimeStop)
-                return time;
-
-            const float delta = controller.mTimeStop - controller.mTimeStart;
-            if (delta <= 0.f)
-                return controller.mTimeStart;
-            switch (controller.extrapolationMode())
-            {
-                case NiTimeController::ExtrapolationMode::Cycle:
-                {
-                    const float cycles = (time - controller.mTimeStart) / delta;
-                    return controller.mTimeStart + (cycles - std::floor(cycles)) * delta;
-                }
-                case NiTimeController::ExtrapolationMode::Reverse:
-                {
-                    const float cycles = (time - controller.mTimeStart) / delta;
-                    const float remainder = (cycles - std::floor(cycles)) * delta;
-                    return (static_cast<int>(std::fabs(std::floor(cycles))) % 2) == 0
-                        ? controller.mTimeStart + remainder
-                        : controller.mTimeStop - remainder;
-                }
-                case NiTimeController::ExtrapolationMode::Constant:
-                default:
-                    return std::clamp(time, controller.mTimeStart, controller.mTimeStop);
-            }
-        }
-
-        float controllerSequenceTime(const NiControllerSequence& sequence, float value)
-        {
-            const float time = sequence.mFrequency * value + sequence.mPhase;
-            const float start = sequence.mStartTime;
-            const float stop = sequence.mStopTime;
             if (!std::isfinite(time) || !std::isfinite(start) || !std::isfinite(stop) || stop <= start)
                 return start;
-
-            const float directedTime = sequence.mPlayBackwards ? start + stop - time : time;
-            if (directedTime >= start && directedTime <= stop)
-                return directedTime;
+            if (time >= start && time <= stop)
+                return time;
 
             const float delta = stop - start;
-            switch (sequence.mExtrapolationMode)
+            switch (mode)
             {
                 case NiTimeController::ExtrapolationMode::Cycle:
                 {
-                    const float cycles = (directedTime - start) / delta;
+                    const float cycles = (time - start) / delta;
                     return start + (cycles - std::floor(cycles)) * delta;
                 }
                 case NiTimeController::ExtrapolationMode::Reverse:
                 {
-                    const float cycles = (directedTime - start) / delta;
+                    const float cycles = (time - start) / delta;
                     const float remainder = (cycles - std::floor(cycles)) * delta;
                     return (static_cast<int>(std::fabs(std::floor(cycles))) % 2) == 0
                         ? start + remainder
@@ -99,8 +64,23 @@ namespace Nif
                 }
                 case NiTimeController::ExtrapolationMode::Constant:
                 default:
-                    return std::clamp(directedTime, start, stop);
+                    return std::clamp(time, start, stop);
             }
+        }
+
+        float controllerTime(const NiTimeController& controller, float value)
+        {
+            return extrapolateControllerTime(controller.mFrequency * value + controller.mPhase,
+                controller.mTimeStart, controller.mTimeStop, controller.extrapolationMode());
+        }
+
+        float controllerSequenceTime(const NiControllerSequence& sequence, float value)
+        {
+            const float time = sequence.mFrequency * value + sequence.mPhase;
+            const float start = sequence.mStartTime;
+            const float stop = sequence.mStopTime;
+            const float directedTime = sequence.mPlayBackwards ? start + stop - time : time;
+            return extrapolateControllerTime(directedTime, start, stop, sequence.mExtrapolationMode);
         }
 
         template <class Map, class Interpolate>
