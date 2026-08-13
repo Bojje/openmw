@@ -355,11 +355,7 @@ namespace MWRender
             Misc::StringUtils::replaceLast(specular, ".", mSpecularMapPattern + ".");
             VFS::Path::Normalized specularPath(std::move(specular));
             if (mVfs.exists(specularPath))
-            {
                 info.mSpecularMap = specularPath;
-                info.mDiffuseMap = specularPath;
-                info.mSpecular = true;
-            }
         }
         mLayerInfo.emplace(texture, info);
         return info;
