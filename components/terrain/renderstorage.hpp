@@ -56,7 +56,8 @@ namespace Terrain
         // reference adapter has no neutral cache and keeps the default no-op.
         virtual void clearCache() {}
 
-        /// Prewarm backend-owned terrain payloads for inclusive cell bounds.
+        /// Prewarm backend-owned terrain payloads for half-open cell bounds:
+        /// [minX, minY, maxX, maxY).
         /// The reference adapter keeps its existing asynchronous preloader;
         /// neutral backends may decode these cells synchronously or schedule
         /// them independently.

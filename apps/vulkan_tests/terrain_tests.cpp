@@ -18,6 +18,7 @@ namespace
         bool mOpaqueOnly = false;
         bool mEmpty = false;
         int mPreloadCalls = 0;
+        std::array<int, 4> mLastPreloadBounds{};
 
         void getBounds(float&, float&, float&, float&, ESM::RefId) override {}
 
@@ -69,6 +70,8 @@ namespace
         void preloadCells(std::span<const std::array<int, 4>> bounds, ESM::RefId) override
         {
             mPreloadCalls += static_cast<int>(bounds.size());
+            if (!bounds.empty())
+                mLastPreloadBounds = bounds.back();
         }
     };
 
@@ -139,7 +142,8 @@ int main()
             "terrain tile metadata was not preserved");
         const std::array<int, 4> preloadBounds{ -1, -2, 2, 3 };
         neutralStorage.preloadCells(std::span(&preloadBounds, 1), ESM::RefId());
-        expect(storage.mPreloadCalls == 1, "neutral terrain preload contract did not reach the backend");
+        expect(storage.mPreloadCalls == 1 && storage.mLastPreloadBounds == preloadBounds,
+            "neutral terrain preload contract did not preserve half-open bounds");
         expect(tile->verticesPerSide == 2 && tile->vertices.size() == 4 && tile->indices.size() == 6
                 && tile->indices[0] == 0 && tile->indices[5] == 3 && tile->vertices[1].position[0] == 1.f
                 && tile->vertices[2].color[2] == 255,
