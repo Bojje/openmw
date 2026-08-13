@@ -15,12 +15,16 @@ layout(location = 11) flat in uint fragEmissiveTextureIndex;
 layout(location = 12) flat in uint fragSpecularTextureIndex;
 layout(location = 13) in vec4 fragEmissive;
 layout(location = 14) flat in vec2 fragEmissiveLumaBias;
+layout(location = 15) flat in uvec4 fragTextureLayers;
 
 layout(set = 0, binding = 1) uniform sampler2D albedoTextures[64];
 layout(set = 0, binding = 2) uniform sampler2D alphaTextures[64];
 layout(set = 0, binding = 3) uniform sampler2D normalTextures[64];
 layout(set = 0, binding = 4) uniform sampler2D emissiveTextures[64];
 layout(set = 0, binding = 5) uniform sampler2D specularTextures[64];
+layout(set = 0, binding = 6) uniform sampler2D darkTextures[64];
+layout(set = 0, binding = 7) uniform sampler2D detailTextures[64];
+layout(set = 0, binding = 8) uniform sampler2D decalTextures[64];
 
 layout(set = 0, binding = 0) uniform CameraUBO {
     mat4 view;
@@ -76,6 +80,11 @@ void main() {
 
     vec4 albedoSample = texture(albedoTextures[fragAlbedoTextureIndex], terrainTexCoord);
     vec4 albedo = fragColor * albedoSample;
+    if (fragTextureLayers.x != 0u)
+    {
+        vec4 darkSample = texture(darkTextures[fragTextureLayers.x], terrainTexCoord);
+        albedo *= darkSample;
+    }
     vec3 emissiveSample = fragEmissiveTextureIndex == 0u
         ? vec3(0.0)
         : texture(emissiveTextures[fragEmissiveTextureIndex], terrainTexCoord).rgb;
@@ -93,6 +102,14 @@ void main() {
         uint threshold = (fragMaterialFlags >> 8u) & 255u;
         if (albedo.a < float(threshold) / 255.0)
             discard;
+    }
+
+    if (fragTextureLayers.y != 0u)
+        albedo.rgb *= texture(detailTextures[fragTextureLayers.y], terrainTexCoord).rgb * 2.0;
+    if (fragTextureLayers.z != 0u)
+    {
+        vec4 decalSample = texture(decalTextures[fragTextureLayers.z], terrainTexCoord);
+        albedo.rgb = mix(albedo.rgb, decalSample.rgb, decalSample.a * fragColor.a);
     }
 
     outAlbedo = albedo;

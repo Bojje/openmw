@@ -293,10 +293,16 @@ int main()
     Nif::NiSourceTexture glossTexture;
     glossTexture.mFile = "textures\\synthetic_gloss.dds";
     Nif::NiTexturingProperty texturing;
-    texturing.mTextures.resize(Nif::NiTexturingProperty::BumpTexture + 1);
+    texturing.mTextures.resize(Nif::NiTexturingProperty::DecalTexture + 1);
     texturing.mTextures.front().mEnabled = true;
     texturing.mTextures.front().mSourceTexture = &texture;
     texturing.mTextures.front().mClamp = 0;
+    texturing.mTextures[Nif::NiTexturingProperty::DarkTexture].mEnabled = true;
+    texturing.mTextures[Nif::NiTexturingProperty::DarkTexture].mSourceTexture = &texture;
+    texturing.mTextures[Nif::NiTexturingProperty::DarkTexture].mClamp = 1;
+    texturing.mTextures[Nif::NiTexturingProperty::DetailTexture].mEnabled = true;
+    texturing.mTextures[Nif::NiTexturingProperty::DetailTexture].mSourceTexture = &normalTexture;
+    texturing.mTextures[Nif::NiTexturingProperty::DetailTexture].mClamp = 2;
     texturing.mTextures[Nif::NiTexturingProperty::BumpTexture].mEnabled = true;
     texturing.mTextures[Nif::NiTexturingProperty::BumpTexture].mSourceTexture = &normalTexture;
     texturing.mTextures[Nif::NiTexturingProperty::BumpTexture].mClamp = 1;
@@ -307,6 +313,9 @@ int main()
     texturing.mTextures[Nif::NiTexturingProperty::GlossTexture].mEnabled = true;
     texturing.mTextures[Nif::NiTexturingProperty::GlossTexture].mSourceTexture = &glossTexture;
     texturing.mTextures[Nif::NiTexturingProperty::GlossTexture].mClamp = 1;
+    texturing.mTextures[Nif::NiTexturingProperty::DecalTexture].mEnabled = true;
+    texturing.mTextures[Nif::NiTexturingProperty::DecalTexture].mSourceTexture = &glowTexture;
+    texturing.mTextures[Nif::NiTexturingProperty::DecalTexture].mClamp = 0;
     Nif::NiMaterialProperty material;
     material.mDiffuse = { 0.25f, 0.5f, 0.75f };
     material.mAlpha = 0.75f;
@@ -397,6 +406,9 @@ int main()
         throw std::runtime_error("NIF scene traversal did not collect a mesh instance");
     expectNear(instances.front().transform.data[12], 12.0f, "composed mesh translation");
     if (instances.front().mesh.material.albedoTexture != "textures/synthetic.dds"
+        || instances.front().mesh.material.darkTexture != "textures/synthetic.dds"
+        || instances.front().mesh.material.detailTexture != "textures/synthetic_n.dds"
+        || instances.front().mesh.material.decalTexture != "textures/synthetic_glow.dds"
         || instances.front().mesh.material.normalTexture != "textures/synthetic_n.dds"
         || instances.front().mesh.material.emissiveTexture != "textures/synthetic_glow.dds"
         || instances.front().mesh.material.specularTexture != "textures/synthetic_gloss.dds"
@@ -407,6 +419,9 @@ int main()
         || instances.front().mesh.material.alphaTestThreshold != 128
         || !instances.front().mesh.material.doubleSided
         || instances.front().mesh.material.albedoWrapU || instances.front().mesh.material.albedoWrapV
+        || instances.front().mesh.material.darkWrapU || !instances.front().mesh.material.darkWrapV
+        || !instances.front().mesh.material.detailWrapU || instances.front().mesh.material.detailWrapV
+        || instances.front().mesh.material.decalWrapU || instances.front().mesh.material.decalWrapV
         || instances.front().mesh.material.normalWrapU || !instances.front().mesh.material.normalWrapV)
         throw std::runtime_error("NIF material conversion lost texture or alpha state");
     if (!instances.front().mesh.skinning || !instances.front().mesh.skinning->valid(3)

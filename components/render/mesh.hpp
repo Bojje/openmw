@@ -37,6 +37,9 @@ namespace Render
     struct MeshMaterial
     {
         std::string albedoTexture;
+        std::string darkTexture;
+        std::string detailTexture;
+        std::string decalTexture;
         std::string normalTexture;
         std::string emissiveTexture;
         std::string specularTexture;
@@ -48,6 +51,12 @@ namespace Render
         bool doubleSided = false;
         bool albedoWrapU = true;
         bool albedoWrapV = true;
+        bool darkWrapU = true;
+        bool darkWrapV = true;
+        bool detailWrapU = true;
+        bool detailWrapV = true;
+        bool decalWrapU = true;
+        bool decalWrapV = true;
         bool normalWrapU = true;
         bool normalWrapV = true;
         bool emissiveWrapU = true;
@@ -133,9 +142,10 @@ namespace Render
         float material[4];
         float tangent[4];
         float emissive[4];
+        std::array<std::uint32_t, 4> textureLayers{};
     };
 
-    static_assert(sizeof(MeshVertex) == sizeof(float) * 26);
+    static_assert(sizeof(MeshVertex) == sizeof(float) * 30);
 
     struct ParticleState
     {

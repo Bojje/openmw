@@ -760,6 +760,9 @@ namespace Vk
             writeSceneTextureDescriptor(frameIndex, 3, textureIndex, view);
             writeSceneTextureDescriptor(frameIndex, 4, textureIndex, view);
             writeSceneTextureDescriptor(frameIndex, 5, textureIndex, view);
+            writeSceneTextureDescriptor(frameIndex, 6, textureIndex, view);
+            writeSceneTextureDescriptor(frameIndex, 7, textureIndex, view);
+            writeSceneTextureDescriptor(frameIndex, 8, textureIndex, view);
         }
     }
 
@@ -770,7 +773,7 @@ namespace Vk
         // Scene layout (set 0 for G-buffer pass): camera UBO and indexed
         // albedo, alpha, normal, emissive, and specular textures.
         {
-            std::array<VkDescriptorSetLayoutBinding, 6> bindings = {};
+            std::array<VkDescriptorSetLayoutBinding, 9> bindings = {};
             bindings[0].binding = 0;
             bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
             bindings[0].descriptorCount = 1;
@@ -800,6 +803,14 @@ namespace Vk
             bindings[5].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
             bindings[5].descriptorCount = maxTextures;
             bindings[5].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+            for (uint32_t binding = 6; binding <= 8; ++binding)
+            {
+                bindings[binding].binding = binding;
+                bindings[binding].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+                bindings[binding].descriptorCount = maxTextures;
+                bindings[binding].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+            }
 
             VkDescriptorSetLayoutCreateInfo layoutInfo = {};
             layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -871,7 +882,7 @@ namespace Vk
     {
         std::vector<VkDescriptorPoolSize> poolSizes = {
             { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, maxFramesInFlight * 2 },
-            { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, maxTextures * maxFramesInFlight * 5 + maxFramesInFlight * 6 },
+            { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, maxTextures * maxFramesInFlight * 8 + maxFramesInFlight * 6 },
         };
 
         const uint32_t maxSets = maxFramesInFlight * 2;
@@ -1056,7 +1067,7 @@ namespace Vk
             bindingDesc[0].stride = sizeof(Render::MeshVertex);
             bindingDesc[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
-            std::array<VkVertexInputAttributeDescription, 8> attrDesc = {};
+            std::array<VkVertexInputAttributeDescription, 9> attrDesc = {};
             attrDesc[0] = { 0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0 };
             attrDesc[1] = { 1, 0, VK_FORMAT_R32G32B32_SFLOAT, sizeof(float) * 3 };
             attrDesc[2] = { 2, 0, VK_FORMAT_R32G32_SFLOAT, sizeof(float) * 6 };
@@ -1065,6 +1076,7 @@ namespace Vk
             attrDesc[5] = { 5, 0, VK_FORMAT_R32G32_SFLOAT, sizeof(float) * 8 };
             attrDesc[6] = { 6, 0, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(float) * 18 };
             attrDesc[7] = { 7, 0, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(float) * 22 };
+            attrDesc[8] = { 8, 0, VK_FORMAT_R32G32B32A32_UINT, sizeof(float) * 26 };
 
             VkPipelineVertexInputStateCreateInfo vertexInput = {};
             vertexInput.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -1671,11 +1683,17 @@ namespace Vk
         Render::MeshBatch batch = Render::batchMeshes(meshes);
         std::vector<uint32_t> textureIndices;
         std::vector<uint32_t> alphaTextureIndices;
+        std::vector<uint32_t> darkTextureIndices;
+        std::vector<uint32_t> detailTextureIndices;
+        std::vector<uint32_t> decalTextureIndices;
         std::vector<uint32_t> normalTextureIndices;
         std::vector<uint32_t> emissiveTextureIndices;
         std::vector<uint32_t> specularTextureIndices;
         textureIndices.reserve(batch.draws.size());
         alphaTextureIndices.reserve(batch.draws.size());
+        darkTextureIndices.reserve(batch.draws.size());
+        detailTextureIndices.reserve(batch.draws.size());
+        decalTextureIndices.reserve(batch.draws.size());
         normalTextureIndices.reserve(batch.draws.size());
         emissiveTextureIndices.reserve(batch.draws.size());
         specularTextureIndices.reserve(batch.draws.size());
@@ -1706,6 +1724,12 @@ namespace Vk
         {
             textureIndices.push_back(
                 resolveTexture(draw.material.albedoTexture, draw.material.albedoWrapU, draw.material.albedoWrapV));
+            darkTextureIndices.push_back(
+                resolveTexture(draw.material.darkTexture, draw.material.darkWrapU, draw.material.darkWrapV));
+            detailTextureIndices.push_back(
+                resolveTexture(draw.material.detailTexture, draw.material.detailWrapU, draw.material.detailWrapV));
+            decalTextureIndices.push_back(
+                resolveTexture(draw.material.decalTexture, draw.material.decalWrapU, draw.material.decalWrapV));
             const bool wantsNormalMap = draw.material.normalMap || draw.material.terrainNormalMap;
             const uint32_t normalTextureIndex = wantsNormalMap
                 ? resolveTexture(draw.material.normalTexture, draw.material.normalWrapU, draw.material.normalWrapV)
@@ -1754,6 +1778,18 @@ namespace Vk
                 = createTextureResource(*draw.material.alphaTexture, TextureResource::SamplerMode::Clamp);
             mTextureIndices.emplace(key, alphaTextureIndex);
             alphaTextureIndices.push_back(alphaTextureIndex);
+        }
+
+        for (std::size_t drawIndex = 0; drawIndex < batch.draws.size(); ++drawIndex)
+        {
+            const std::size_t firstVertex = static_cast<std::size_t>(batch.draws[drawIndex].vertexOffset);
+            const std::size_t lastVertex = drawIndex + 1 < batch.draws.size()
+                ? static_cast<std::size_t>(batch.draws[drawIndex + 1].vertexOffset)
+                : batch.vertices.size();
+            const std::array<std::uint32_t, 4> layers = { darkTextureIndices[drawIndex],
+                detailTextureIndices[drawIndex], decalTextureIndices[drawIndex], 0 };
+            for (std::size_t vertex = firstVertex; vertex < lastVertex; ++vertex)
+                batch.vertices[vertex].textureLayers = layers;
         }
 
         mMeshDraws = std::move(batch.draws);

@@ -689,6 +689,15 @@ namespace Nif
 
                 if (const auto* texturing = dynamic_cast<const NiTexturingProperty*>(property.getPtr()))
                 {
+                    const auto setTexture = [](const NiTexturingProperty::Texture& texture, std::string& path,
+                                                   bool& wrapU, bool& wrapV) {
+                        if (texture.mEnabled && !texture.mSourceTexture.empty())
+                        {
+                            path = VFS::Path::toNormalized(texture.mSourceTexture->mFile).value();
+                            wrapU = texture.wrapS();
+                            wrapV = texture.wrapT();
+                        }
+                    };
                     if (texturing->mTextures.size() > NiTexturingProperty::BaseTexture)
                     {
                         const NiTexturingProperty::Texture& texture
@@ -700,6 +709,15 @@ namespace Nif
                             result.albedoWrapV = texture.wrapT();
                         }
                     }
+                    if (texturing->mTextures.size() > NiTexturingProperty::DarkTexture)
+                        setTexture(texturing->mTextures[NiTexturingProperty::DarkTexture], result.darkTexture,
+                            result.darkWrapU, result.darkWrapV);
+                    if (texturing->mTextures.size() > NiTexturingProperty::DetailTexture)
+                        setTexture(texturing->mTextures[NiTexturingProperty::DetailTexture], result.detailTexture,
+                            result.detailWrapU, result.detailWrapV);
+                    if (texturing->mTextures.size() > NiTexturingProperty::DecalTexture)
+                        setTexture(texturing->mTextures[NiTexturingProperty::DecalTexture], result.decalTexture,
+                            result.decalWrapU, result.decalWrapV);
                     if (texturing->mTextures.size() > NiTexturingProperty::BumpTexture)
                     {
                         const NiTexturingProperty::Texture& texture
