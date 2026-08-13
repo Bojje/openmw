@@ -46,6 +46,8 @@ namespace Render
         Vec4 diffuse{ 1.f, 1.f, 1.f, 1.f };
         Vec4 emissive{};
         float glossiness = 0.f;
+        float specularStrength = 1.f;
+        bool specularMaterial = false;
         bool alphaBlend = false;
         bool alphaTest = false;
         bool doubleSided = false;
@@ -846,8 +848,12 @@ namespace Render
                 else
                 {
                     vertex.material[0] = std::clamp(1.f - mesh.mesh.material.glossiness / 128.f, 0.f, 1.f);
-                    vertex.material[1] = 0.f;
-                    vertex.material[2] = mesh.mesh.material.terrainSpecular ? 2.f : 1.f;
+                    vertex.material[1] = (mesh.mesh.material.terrainSpecular || mesh.mesh.material.specularMaterial)
+                        ? std::clamp(mesh.mesh.material.specularStrength, 0.f, 8.f)
+                        : 0.f;
+                    vertex.material[2] = mesh.mesh.material.terrainSpecular
+                        ? 2.f
+                        : (mesh.mesh.material.specularMaterial ? 3.f : 1.f);
                     vertex.material[3] = std::max({ mesh.mesh.material.emissive.x, mesh.mesh.material.emissive.y,
                         mesh.mesh.material.emissive.z });
                 }

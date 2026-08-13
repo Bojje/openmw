@@ -361,6 +361,7 @@ int main()
     lighting->mEmissive = { 0.1f, 0.2f, 0.3f };
     lighting->mEmissiveMult = 2.f;
     lighting->mGlossiness = 42.f;
+    lighting->mSpecStrength = 0.65f;
     lighting->mTextureSet = Nif::BSShaderTextureSetPtr(nullptr);
     Nif::NiAlphaProperty alpha;
     alpha.mFlags = Nif::NiAlphaProperty::Flag_Blending | Nif::NiAlphaProperty::Flag_Testing;
@@ -445,6 +446,8 @@ int main()
         || instances.front().mesh.material.normalTexture != "textures/synthetic_n.dds"
         || instances.front().mesh.material.emissiveTexture != "textures/synthetic_glow.dds"
         || instances.front().mesh.material.specularTexture != "textures/synthetic_gloss.dds"
+        || !instances.front().mesh.material.specularMaterial
+        || std::abs(instances.front().mesh.material.specularStrength - 0.65f) > 1e-5f
         || std::abs(instances.front().mesh.material.emissiveLumaBias[0] - 0.6f) > 1e-5f
         || std::abs(instances.front().mesh.material.emissiveLumaBias[1] - 0.2f) > 1e-5f
         || !instances.front().mesh.material.normalMap
@@ -797,6 +800,8 @@ int main()
     expectNear(batch.vertices.front().color[0], 0.25f, "batched material diffuse red");
     expectNear(batch.vertices.front().color[3], 0.75f, "batched material alpha");
     expectNear(batch.vertices.front().material[0], 1.f - 42.f / 128.f, "batched material roughness");
+    expectNear(batch.vertices.front().material[1], 0.65f, "batched material specular strength");
+    expectNear(batch.vertices.front().material[2], 3.f, "batched material shading mode");
     expectNear(batch.vertices.front().material[3], 0.6f, "batched material emission");
     expectNear(batch.vertices.front().emissive[0], 0.2f, "batched emissive red");
     expectNear(batch.vertices.front().emissive[2], 0.6f, "batched emissive blue");

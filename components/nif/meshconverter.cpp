@@ -793,6 +793,11 @@ namespace Nif
                         lighting->mEmissive.y() * lighting->mEmissiveMult,
                         lighting->mEmissive.z() * lighting->mEmissiveMult, 1.f };
                     result.glossiness = lighting->mGlossiness;
+                    if (std::isfinite(lighting->mSpecStrength))
+                    {
+                        result.specularStrength = std::max(0.f, lighting->mSpecStrength);
+                        result.specularMaterial = true;
+                    }
                 }
                 else if (const auto* ppLighting = dynamic_cast<const BSShaderPPLightingProperty*>(shader))
                 {

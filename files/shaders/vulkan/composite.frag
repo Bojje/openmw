@@ -118,7 +118,7 @@ void main() {
         pointSpecular += pointLightColor * pointHighlight * attenuation;
     }
 
-    float specularStrength = objectSpecular ? 1.0
+    float specularStrength = objectSpecular ? materialSample.g
         : terrainSpecular ? materialSample.g : 0.3 * (1.0 - roughness);
     vec3 H = normalize(L + V);
     float spec = pow(max(dot(N, H), 0.0), mix(128.0, 1.0, roughness));
