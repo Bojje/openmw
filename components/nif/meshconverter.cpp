@@ -83,6 +83,11 @@ namespace Nif
             return extrapolateControllerTime(directedTime, start, stop, sequence.mExtrapolationMode);
         }
 
+        std::string normalizedBoneName(std::string_view name)
+        {
+            return Misc::StringUtils::lowerCase(std::string(name));
+        }
+
         template <class Map, class Interpolate>
         typename Map::ValueType sampleKeys(const std::shared_ptr<Map>& map, float time,
             typename Map::ValueType defaultValue, Interpolate&& interpolate)
@@ -335,7 +340,7 @@ namespace Nif
                 // Later animation sources are higher priority in the legacy
                 // controller stack, so a later occurrence replaces an older
                 // transform for the same bone name.
-                transforms.insert_or_assign(object.mName, transform);
+                transforms.insert_or_assign(normalizedBoneName(object.mName), transform);
             if (const auto* node = dynamic_cast<const NiNode*>(&object))
                 for (const auto& child : node->mChildren)
                     if (!child.empty())
@@ -505,12 +510,13 @@ namespace Nif
                 const auto* keyframe = static_cast<const NiKeyframeController*>(controller);
                 const NiTransform sampled
                     = sampleKeyframeController(*keyframe, NiTransform::getIdentity(), sampleTime).value;
-                const auto priority = sequencePriorities.find(name->mData);
+                const std::string boneName = normalizedBoneName(name->mData);
+                const auto priority = sequencePriorities.find(boneName);
                 if (priority == sequencePriorities.end() || priority->second <= 0)
                 {
-                    sequencePriorities.insert_or_assign(name->mData, 0);
-                    weightedSequences.erase(name->mData);
-                    transforms.insert_or_assign(name->mData, toRenderMatrix(sampled));
+                    sequencePriorities.insert_or_assign(boneName, 0);
+                    weightedSequences.erase(boneName);
+                    transforms.insert_or_assign(boneName, toRenderMatrix(sampled));
                 }
             }
         }
@@ -548,6 +554,7 @@ namespace Nif
             {
                 if (block.mTargetName.empty())
                     continue;
+                const std::string targetName = normalizedBoneName(block.mTargetName);
                 const float controllerSampleTime = block.mController.empty()
                     ? sampleTime
                     : controllerTime(*block.mController.getPtr(), sampleTime);
@@ -559,35 +566,35 @@ namespace Nif
                 if (sampled)
                 {
                     const int priority = static_cast<int>(block.mPriority);
-                    const auto previous = sequencePriorities.find(block.mTargetName);
+                    const auto previous = sequencePriorities.find(targetName);
                     if (previous != sequencePriorities.end() && priority < previous->second)
                         continue;
 
                     if (previous == sequencePriorities.end() || priority > previous->second)
                     {
-                        sequencePriorities.insert_or_assign(block.mTargetName, priority);
+                        sequencePriorities.insert_or_assign(targetName, priority);
                         if (controllerSequence != nullptr)
-                            weightedSequences.insert_or_assign(block.mTargetName,
+                            weightedSequences.insert_or_assign(targetName,
                                 SequenceTransformState{ *sampled, sequenceWeight });
                         else
-                            weightedSequences.erase(block.mTargetName);
-                        transforms.insert_or_assign(block.mTargetName, toRenderMatrix(*sampled));
+                            weightedSequences.erase(targetName);
+                        transforms.insert_or_assign(targetName, toRenderMatrix(*sampled));
                         continue;
                     }
 
-                    const auto weighted = weightedSequences.find(block.mTargetName);
+                    const auto weighted = weightedSequences.find(targetName);
                     if (controllerSequence != nullptr && weighted != weightedSequences.end()
                         && (weighted->second.weight != 1.f || sequenceWeight != 1.f))
                     {
                         const NiQuatTransform blended
                             = blendSequenceTransforms(weighted->second, *sampled, sequenceWeight);
                         weighted->second = { blended, weighted->second.weight + sequenceWeight };
-                        transforms.insert_or_assign(block.mTargetName, toRenderMatrix(blended));
+                        transforms.insert_or_assign(targetName, toRenderMatrix(blended));
                     }
                     else
                     {
-                        weightedSequences.erase(block.mTargetName);
-                        transforms.insert_or_assign(block.mTargetName, toRenderMatrix(*sampled));
+                        weightedSequences.erase(targetName);
+                        transforms.insert_or_assign(targetName, toRenderMatrix(*sampled));
                     }
                 }
             }
@@ -1013,7 +1020,7 @@ namespace Nif
         result.reserve(boneNames.size());
         for (const std::string& name : boneNames)
         {
-            const auto found = transforms.find(name);
+            const auto found = transforms.find(normalizedBoneName(name));
             if (found == transforms.end())
                 return {};
             result.push_back(found->second);

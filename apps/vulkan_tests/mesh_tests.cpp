@@ -384,6 +384,12 @@ int main()
     if (controllerSequencePose.size() != 1)
         throw std::runtime_error("neutral controller sequence did not produce a bone pose");
     expectNear(controllerSequencePose.front().data[12], 5.f, "weighted controller sequence translation");
+    const std::array<std::string, 1> lowerCaseBoneNames{ "root bone" };
+    const std::vector<Render::Mat4> caseInsensitiveControllerPose
+        = Nif::collectBonePose(Nif::FileView(*controllerSequenceFile), lowerCaseBoneNames, 0.25f, "idle");
+    if (caseInsensitiveControllerPose.size() != 1)
+        throw std::runtime_error("neutral controller sequence did not match bone names case-insensitively");
+    expectNear(caseInsensitiveControllerPose.front().data[12], 5.f, "case-insensitive controller bone lookup");
 
     auto sequenceTimeInterpolator = std::make_unique<Nif::NiTransformInterpolator>();
     sequenceTimeInterpolator->mRecordType = Nif::RC_NiTransformInterpolator;
