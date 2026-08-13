@@ -3491,6 +3491,11 @@ namespace MWMechanics
         {
             if (!MWBase::Environment::get().getWorld()->getNeutralAnimationDuration(mPtr, groupname))
                 return false;
+            // Scripted animations have priority over ordinary animation
+            // requests in the legacy controller. Preserve that rule while
+            // the neutral path owns the queue without an OSG animation graph.
+            if (isScriptedAnimPlaying() && !scripted)
+                return true;
             // Keep one neutral animation request alive when the legacy
             // scene-graph owner is absent. The neutral resource boundary
             // falls back to bind pose if the group is unavailable.
