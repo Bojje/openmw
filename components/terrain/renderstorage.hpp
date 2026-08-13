@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <optional>
 #include <set>
+#include <span>
 #include <utility>
 #include <vector>
 
@@ -54,6 +55,12 @@ namespace Terrain
         // Drop backend-owned decoded terrain payloads at a world reset. The
         // reference adapter has no neutral cache and keeps the default no-op.
         virtual void clearCache() {}
+
+        /// Prewarm backend-owned terrain payloads for inclusive cell bounds.
+        /// The reference adapter keeps its existing asynchronous preloader;
+        /// neutral backends may decode these cells synchronously or schedule
+        /// them independently.
+        virtual void preloadCells(std::span<const std::array<int, 4>> /*bounds*/, ESM::RefId /*worldspace*/) {}
 
         std::vector<Render::TerrainTile> getRenderTiles(int gridX, int gridY, ESM::RefId worldspace);
 

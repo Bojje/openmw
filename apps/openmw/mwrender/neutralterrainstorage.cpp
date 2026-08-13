@@ -87,6 +87,20 @@ namespace MWRender
         mCellCache.clear();
     }
 
+    void NeutralTerrainStorage::preloadCells(std::span<const std::array<int, 4>> bounds, ESM::RefId worldspace)
+    {
+        for (const std::array<int, 4>& range : bounds)
+        {
+            const int minX = std::min(range[0], range[2]);
+            const int maxX = std::max(range[0], range[2]);
+            const int minY = std::min(range[1], range[3]);
+            const int maxY = std::max(range[1], range[3]);
+            for (int y = minY; y < maxY; ++y)
+                for (int x = minX; x < maxX; ++x)
+                    getCell(x, y, worldspace);
+        }
+    }
+
     ESM::RefId NeutralTerrainStorage::resolveLandWorldspace(ESM::RefId worldspace) const
     {
         if (!ESM::isEsm4Ext(worldspace))

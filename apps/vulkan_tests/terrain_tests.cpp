@@ -17,6 +17,7 @@ namespace
     public:
         bool mOpaqueOnly = false;
         bool mEmpty = false;
+        int mPreloadCalls = 0;
 
         void getBounds(float&, float&, float&, float&, ESM::RefId) override {}
 
@@ -64,6 +65,11 @@ namespace
         float getCellWorldSize(ESM::RefId) override { return 1.f; }
         int getCellVertices(ESM::RefId) override { return 3; }
         int getTextureTileCount(float, ESM::RefId) override { return 1; }
+
+        void preloadCells(std::span<const std::array<int, 4>> bounds, ESM::RefId) override
+        {
+            mPreloadCalls += static_cast<int>(bounds.size());
+        }
     };
 
     void expect(bool condition, const char* message)
@@ -131,6 +137,9 @@ int main()
         expect(tile->lod == 2 && tile->size == 4.f && tile->center[0] == 3.f && tile->center[1] == -2.f
                 && tile->cellWorldSize == 1.f,
             "terrain tile metadata was not preserved");
+        const std::array<int, 4> preloadBounds{ -1, -2, 2, 3 };
+        neutralStorage.preloadCells(std::span(&preloadBounds, 1), ESM::RefId());
+        expect(storage.mPreloadCalls == 1, "neutral terrain preload contract did not reach the backend");
         expect(tile->verticesPerSide == 2 && tile->vertices.size() == 4 && tile->indices.size() == 6
                 && tile->indices[0] == 0 && tile->indices[5] == 3 && tile->vertices[1].position[0] == 1.f
                 && tile->vertices[2].color[2] == 255,

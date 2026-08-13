@@ -58,6 +58,7 @@ namespace MWRender
         std::optional<Render::TerrainHeightField> getHeightField(
             int gridX, int gridY, ESM::RefId worldspace) override;
         void clearCache() override;
+        void preloadCells(std::span<const std::array<int, 4>> bounds, ESM::RefId worldspace) override;
 
     private:
         using Cell = std::pair<int, int>;

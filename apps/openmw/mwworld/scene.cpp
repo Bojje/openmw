@@ -1750,7 +1750,7 @@ namespace MWWorld
 
     void Scene::preloadCells(float dt)
     {
-        if (!mPreloader || dt <= 1e-06)
+        if (dt <= 1e-06)
             return;
         const auto& cellSettings = Settings::cells();
         std::vector<PositionCellGrid> exteriorPositions;
@@ -1781,7 +1781,16 @@ namespace MWWorld
                 preloadFastTravelDestinations(playerPos, exteriorPositions);
         }
 
-        mPreloader->setTerrainPreloadPositions(exteriorPositions);
+        if (mPreloader)
+            mPreloader->setTerrainPreloadPositions(exteriorPositions);
+        else if (!exteriorPositions.empty())
+        {
+            std::vector<std::array<int, 4>> bounds;
+            bounds.reserve(exteriorPositions.size());
+            for (const PositionCellGrid& preloadPosition : exteriorPositions)
+                bounds.push_back(preloadPosition.mCellBounds);
+            mTerrainStorage.preloadCells(bounds, mCurrentCell->getCell()->getWorldSpace());
+        }
     }
 
     void Scene::preloadTeleportDoorDestinations(const Render::Vec3& playerPos, const Render::Vec3& predictedPos)
@@ -1918,7 +1927,12 @@ namespace MWWorld
     void Scene::preloadTerrain(const Render::Vec3& pos, ESM::RefId worldspace, bool sync)
     {
         if (!mPreloader)
+        {
+            const ESM::ExteriorCellLocation cellPos = ESM::positionToExteriorCellLocation(pos.x, pos.y, worldspace);
+            const std::array<int, 4> bounds = gridCenterToBounds({ cellPos.mX, cellPos.mY });
+            mTerrainStorage.preloadCells(std::span(&bounds, 1), worldspace);
             return;
+        }
 
         if (!mPreloader->terrainWorldspaceMatches(worldspace))
             throw std::runtime_error("preloadTerrain can only work with the current exterior worldspace");
