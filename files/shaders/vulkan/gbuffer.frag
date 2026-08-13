@@ -20,6 +20,9 @@ layout(location = 16) in vec2 fragDarkTexCoord;
 layout(location = 17) in vec2 fragDetailTexCoord;
 layout(location = 18) in vec2 fragDecalTexCoord;
 layout(location = 19) in vec4 fragSpecular;
+layout(location = 20) in vec2 fragNormalTexCoord;
+layout(location = 21) in vec2 fragEmissiveTexCoord;
+layout(location = 22) in vec2 fragSpecularTexCoord;
 
 layout(set = 0, binding = 1) uniform sampler2D albedoTextures[64];
 layout(set = 0, binding = 2) uniform sampler2D alphaTextures[64];
@@ -71,14 +74,16 @@ void main() {
         bitangent = normalize(cross(N, tangent));
         if ((fragMaterialFlags & 2u) == 0u)
             bitangent *= fragTangent.w;
-        normalSample = texture(normalTextures[fragNormalTextureIndex], terrainTexCoord);
+            vec2 normalTexCoord = (fragMaterialFlags & 2u) != 0u ? terrainTexCoord : fragNormalTexCoord;
+            normalSample = texture(normalTextures[fragNormalTextureIndex], normalTexCoord);
         if ((fragMaterialFlags & 8u) != 0u)
         {
             vec3 viewDirection = normalize(camera.viewInverse[3].xyz - fragWorldPos);
             vec3 tangentViewDirection = vec3(dot(viewDirection, tangent), dot(viewDirection, bitangent),
                 dot(viewDirection, N));
             terrainTexCoord += tangentViewDirection.xy * (normalSample.a * 0.04 - 0.02);
-            normalSample = texture(normalTextures[fragNormalTextureIndex], terrainTexCoord);
+            normalTexCoord = terrainTexCoord;
+            normalSample = texture(normalTextures[fragNormalTextureIndex], normalTexCoord);
         }
     }
 
@@ -91,10 +96,10 @@ void main() {
     }
     vec3 emissiveSample = fragEmissiveTextureIndex == 0u
         ? vec3(0.0)
-        : texture(emissiveTextures[fragEmissiveTextureIndex], terrainTexCoord).rgb;
+        : texture(emissiveTextures[fragEmissiveTextureIndex], fragEmissiveTexCoord).rgb;
     vec3 specularSample = fragSpecularTextureIndex == 0u
         ? vec3(1.0)
-        : texture(specularTextures[fragSpecularTextureIndex], terrainTexCoord).rgb;
+        : texture(specularTextures[fragSpecularTextureIndex], fragSpecularTexCoord).rgb;
     if (fragMaterial.b > 1.5 && fragSpecularTextureIndex == 0u)
         specularSample = albedoSample.rgb;
     specularSample *= fragSpecular.rgb;

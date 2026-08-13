@@ -41,7 +41,7 @@ namespace Render
             vertex.tangent[1] = 0.f;
             vertex.tangent[2] = 0.f;
             vertex.tangent[3] = 1.f;
-            for (std::size_t layer = 0; layer < 3; ++layer)
+            for (std::size_t layer = 0; layer < 6; ++layer)
             {
                 vertex.textureLayerCoords[layer * 2] = vertex.texcoord[0];
                 vertex.textureLayerCoords[layer * 2 + 1] = vertex.texcoord[1];

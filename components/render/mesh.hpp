@@ -151,11 +151,11 @@ namespace Render
         // transforms. Keep their coordinates in the neutral vertex payload so
         // the backend does not need a renderer-specific material transform
         // table or a larger per-draw push-constant block.
-        std::array<float, 6> textureLayerCoords{};
+        std::array<float, 12> textureLayerCoords{};
         float specular[4];
     };
 
-    static_assert(sizeof(MeshVertex) == sizeof(float) * 40);
+    static_assert(sizeof(MeshVertex) == sizeof(float) * 46);
 
     struct ParticleState
     {

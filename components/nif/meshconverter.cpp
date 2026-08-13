@@ -921,9 +921,10 @@ namespace Nif
                     && std::isfinite(transform.mOrigin.x()) && std::isfinite(transform.mOrigin.y())
                     && std::isfinite(transform.mRotation);
             };
-            const std::array<NiTexturingProperty::TextureType, 3> layerTypes = {
+            const std::array<NiTexturingProperty::TextureType, 6> layerTypes = {
                 NiTexturingProperty::DarkTexture, NiTexturingProperty::DetailTexture,
-                NiTexturingProperty::DecalTexture };
+                NiTexturingProperty::DecalTexture, NiTexturingProperty::BumpTexture,
+                NiTexturingProperty::GlowTexture, NiTexturingProperty::GlossTexture };
             bool baseChanged = false;
             for (Render::MeshVertex& vertex : mesh.vertices)
             {

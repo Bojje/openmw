@@ -338,13 +338,28 @@ int main()
     texturing.mTextures[Nif::NiTexturingProperty::BumpTexture].mEnabled = true;
     texturing.mTextures[Nif::NiTexturingProperty::BumpTexture].mSourceTexture = &normalTexture;
     texturing.mTextures[Nif::NiTexturingProperty::BumpTexture].mClamp = 1;
+    texturing.mTextures[Nif::NiTexturingProperty::BumpTexture].mHasTransform = true;
+    texturing.mTextures[Nif::NiTexturingProperty::BumpTexture].mTransform.mOffset = { 0.3f, 0.6f };
+    texturing.mTextures[Nif::NiTexturingProperty::BumpTexture].mTransform.mScale = { 1.f, 1.f };
+    texturing.mTextures[Nif::NiTexturingProperty::BumpTexture].mTransform.mTransformMethod
+        = Nif::NiTextureTransform::Method::MayaLegacy;
     texturing.mEnvMapLumaBias = { 0.6f, 0.2f };
     texturing.mTextures[Nif::NiTexturingProperty::GlowTexture].mEnabled = true;
     texturing.mTextures[Nif::NiTexturingProperty::GlowTexture].mSourceTexture = &glowTexture;
     texturing.mTextures[Nif::NiTexturingProperty::GlowTexture].mClamp = 2;
+    texturing.mTextures[Nif::NiTexturingProperty::GlowTexture].mHasTransform = true;
+    texturing.mTextures[Nif::NiTexturingProperty::GlowTexture].mTransform.mOffset = { 0.7f, 0.8f };
+    texturing.mTextures[Nif::NiTexturingProperty::GlowTexture].mTransform.mScale = { 1.f, 1.f };
+    texturing.mTextures[Nif::NiTexturingProperty::GlowTexture].mTransform.mTransformMethod
+        = Nif::NiTextureTransform::Method::MayaLegacy;
     texturing.mTextures[Nif::NiTexturingProperty::GlossTexture].mEnabled = true;
     texturing.mTextures[Nif::NiTexturingProperty::GlossTexture].mSourceTexture = &glossTexture;
     texturing.mTextures[Nif::NiTexturingProperty::GlossTexture].mClamp = 1;
+    texturing.mTextures[Nif::NiTexturingProperty::GlossTexture].mHasTransform = true;
+    texturing.mTextures[Nif::NiTexturingProperty::GlossTexture].mTransform.mOffset = { 0.9f, 1.f };
+    texturing.mTextures[Nif::NiTexturingProperty::GlossTexture].mTransform.mScale = { 1.f, 1.f };
+    texturing.mTextures[Nif::NiTexturingProperty::GlossTexture].mTransform.mTransformMethod
+        = Nif::NiTextureTransform::Method::MayaLegacy;
     texturing.mTextures[Nif::NiTexturingProperty::DecalTexture].mEnabled = true;
     texturing.mTextures[Nif::NiTexturingProperty::DecalTexture].mSourceTexture = &glowTexture;
     texturing.mTextures[Nif::NiTexturingProperty::DecalTexture].mClamp = 0;
@@ -476,6 +491,12 @@ int main()
     expectNear(instances.front().mesh.vertices.front().textureLayerCoords[3], 0.2f, "detail texture V transform");
     expectNear(instances.front().mesh.vertices.front().textureLayerCoords[4], -0.1f, "decal texture U transform");
     expectNear(instances.front().mesh.vertices.front().textureLayerCoords[5], 0.4f, "decal texture V transform");
+    expectNear(instances.front().mesh.vertices.front().textureLayerCoords[6], 0.3f, "normal texture U transform");
+    expectNear(instances.front().mesh.vertices.front().textureLayerCoords[7], 0.6f, "normal texture V transform");
+    expectNear(instances.front().mesh.vertices.front().textureLayerCoords[8], 0.7f, "emissive texture U transform");
+    expectNear(instances.front().mesh.vertices.front().textureLayerCoords[9], 0.8f, "emissive texture V transform");
+    expectNear(instances.front().mesh.vertices.front().textureLayerCoords[10], 0.9f, "specular texture U transform");
+    expectNear(instances.front().mesh.vertices.front().textureLayerCoords[11], 1.f, "specular texture V transform");
     if (!instances.front().mesh.skinning || !instances.front().mesh.skinning->valid(3)
         || instances.front().mesh.skinning->vertices[1].weights[0] != 1.f
         || instances.front().mesh.skinning->boneNames != std::vector<std::string>{ "Root Bone" })
