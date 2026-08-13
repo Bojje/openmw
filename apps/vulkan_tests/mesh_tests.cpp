@@ -182,6 +182,15 @@ int main()
     modernController.mFlags = Nif::NiTimeController::Flag_Active;
     modernController.mInitialSize = 1.5f;
     modernController.mInitialColor = { 0.2f, 0.4f, 0.6f, 0.8f };
+    modernController.mEmitStartTime = 0.f;
+    modernController.mEmitStopTime = 2.f;
+    modernController.mEmitFlags = Nif::NiParticleSystemController::EmitFlag_NoAutoAdjust;
+    modernController.mBirthRate = 4.f;
+    modernController.mLifetime = 1.f;
+    modernController.mSpeed = 2.f;
+    modernController.mInitialNormal = { 1.f, 0.f, 0.f };
+    modernController.mEmitterDimensions = { 2.f, 4.f, 6.f };
+    modernController.mNumParticles = 4;
     modernController.mParticles.resize(1);
     modernController.mParticles.front().mCode = 1;
     modernController.mParticles.front().mVelocity = { 0.f, 0.f, 0.f };
@@ -189,12 +198,19 @@ int main()
     modernController.mNext = Nif::NiTimeControllerPtr(nullptr);
     Nif::NiParticleSystem modernParticleSystem;
     modernParticleSystem.mController = Nif::NiTimeControllerPtr(&modernController);
+    modernParticleSource.mNumParticles = 4;
     const Render::MeshData modernParticles = Nif::convertParticles(modernParticleSource, &modernParticleSystem);
     if (modernParticles.vertices.empty() || std::abs(modernParticles.vertices.front().tangent[0] - 4.f) > 1e-5f
         || std::abs(modernParticles.vertices.front().position[0] + 3.f) > 1e-5f
         || std::abs(modernParticles.vertices.front().color[0] - 0.2f) > 1e-5f
         || std::abs(modernParticles.vertices.front().color[3] - 0.8f) > 1e-5f)
         throw std::runtime_error("modern NIF particle controller state did not map its particle code");
+    const Render::MeshData emittedParticles = Render::advanceParticleMesh(modernParticles, 0.5f);
+    if (emittedParticles.particles || emittedParticles.vertices.size() != 12 || emittedParticles.indices.size() != 18
+        || emittedParticles.vertices[4].tangent[0] < -1.f || emittedParticles.vertices[4].tangent[0] > 1.f
+        || emittedParticles.vertices[4].tangent[1] < -2.f || emittedParticles.vertices[4].tangent[1] > 2.f
+        || emittedParticles.vertices[4].tangent[2] < -3.f || emittedParticles.vertices[4].tangent[2] > 3.f)
+        throw std::runtime_error("neutral particle controller did not emit bounded deterministic snapshots");
 
     Nif::NiTriStripsData strips;
     strips.mVertices = source.mVertices;

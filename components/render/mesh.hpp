@@ -153,6 +153,31 @@ namespace Render
         float baseScale = 1.f;
         float rotationSpeed = 0.f;
 
+        struct Emitter
+        {
+            float startTime = 0.f;
+            float stopTime = 0.f;
+            float birthRate = 0.f;
+            float lifetime = 0.f;
+            float lifetimeVariation = 0.f;
+            float speed = 0.f;
+            float speedVariation = 0.f;
+            Vec3 initialNormal{ 0.f, 0.f, 1.f };
+            Vec3 dimensions{};
+            std::size_t maxParticles = 0;
+
+            bool valid() const
+            {
+                return std::isfinite(startTime) && std::isfinite(stopTime) && std::isfinite(birthRate)
+                    && std::isfinite(lifetime) && std::isfinite(lifetimeVariation) && std::isfinite(speed)
+                    && std::isfinite(speedVariation) && Render::valid(initialNormal) && Render::valid(dimensions)
+                    && stopTime > startTime && birthRate > 0.f && lifetime >= 0.f && lifetimeVariation >= 0.f
+                    && speed >= 0.f && speedVariation >= 0.f && maxParticles > 0;
+            }
+        };
+
+        std::shared_ptr<const Emitter> emitter;
+
         bool valid() const
         {
             return Render::valid(acceleration) && std::isfinite(drag) && std::isfinite(growTime)
@@ -171,6 +196,8 @@ namespace Render
             if (states.size() > vertexCount / 4)
                 return false;
             if (simulation && !simulation->valid())
+                return false;
+            if (simulation && simulation->emitter && !simulation->emitter->valid())
                 return false;
             return std::all_of(states.begin(), states.end(), [](const ParticleState& state) {
                 return Render::valid(state.velocity) && std::isfinite(state.age)
@@ -191,35 +218,29 @@ namespace Render
 
     inline MeshData advanceParticleMesh(const MeshData& source, float elapsed)
     {
-        if (!source.particles || source.particles->states.empty() || !std::isfinite(elapsed) || elapsed <= 0.f)
+        if (!source.particles || !std::isfinite(elapsed) || elapsed <= 0.f)
             return source;
 
         MeshData result = source;
         result.particles.reset();
         const float time = std::max(elapsed, 0.f);
-        for (std::size_t particle = 0; particle < source.particles->states.size(); ++particle)
-        {
-            const ParticleState& state = source.particles->states[particle];
-            const std::size_t firstVertex = particle * 4;
-            if (firstVertex + 4 > source.vertices.size())
-                break;
+        const ParticleSimulationData* simulation = source.particles->simulation.get();
+        const Vec3 acceleration = simulation ? simulation->acceleration : Vec3{};
+        const float drag = simulation ? simulation->drag : 0.f;
 
+        const auto applyParticle = [&](std::size_t destinationFirstVertex, std::size_t sourceFirstVertex,
+                                       const ParticleState& state, float motionTime, const Vec3& origin) {
             const float age = state.age + time;
             const bool alive = state.lifespan <= 0.f || age < state.lifespan;
-            const ParticleSimulationData* simulation = source.particles->simulation.get();
-            const Vec3 acceleration = simulation ? simulation->acceleration : Vec3{};
-            const float drag = simulation ? simulation->drag : 0.f;
-            const float displacementScale = drag > 0.f ? (1.f - std::exp(-drag * time)) / drag : time;
+            const float displacementScale = drag > 0.f ? (1.f - std::exp(-drag * motionTime)) / drag : motionTime;
             const float accelerationScale
-                = drag > 0.f ? (time - displacementScale) / drag : 0.5f * time * time;
+                = drag > 0.f ? (motionTime - displacementScale) / drag : 0.5f * motionTime * motionTime;
             const Vec3 displacement = { state.velocity.x * displacementScale + acceleration.x * accelerationScale,
                 state.velocity.y * displacementScale + acceleration.y * accelerationScale,
                 state.velocity.z * displacementScale + acceleration.z * accelerationScale };
-            const Vec3 center = { source.vertices[firstVertex].tangent[0] + displacement.x,
-                source.vertices[firstVertex].tangent[1] + displacement.y,
-                source.vertices[firstVertex].tangent[2] + displacement.z };
+            const Vec3 center = { origin.x + displacement.x, origin.y + displacement.y, origin.z + displacement.z };
             const float rotationSpeed = state.rotationSpeed + (simulation ? simulation->rotationSpeed : 0.f);
-            const float angle = rotationSpeed * time;
+            const float angle = rotationSpeed * motionTime;
             const float cosine = std::cos(angle);
             const float sine = std::sin(angle);
             float scale = simulation ? simulation->baseScale : 1.f;
@@ -228,18 +249,90 @@ namespace Render
             if (simulation && simulation->fadeTime > 0.f && state.lifespan > 0.f
                 && age > state.lifespan - simulation->fadeTime)
                 scale *= std::clamp((state.lifespan - age) / simulation->fadeTime, 0.f, 1.f);
-            for (std::size_t vertex = firstVertex; vertex < firstVertex + 4; ++vertex)
+            for (std::size_t vertex = 0; vertex < 4; ++vertex)
             {
-                const float x = source.vertices[vertex].position[0];
-                const float y = source.vertices[vertex].position[1];
-                result.vertices[vertex].position[0] = (x * cosine - y * sine) * scale;
-                result.vertices[vertex].position[1] = (x * sine + y * cosine) * scale;
-                result.vertices[vertex].tangent[0] = center.x;
-                result.vertices[vertex].tangent[1] = center.y;
-                result.vertices[vertex].tangent[2] = center.z;
+                const MeshVertex& sourceVertex = source.vertices[sourceFirstVertex + vertex];
+                MeshVertex& resultVertex = result.vertices[destinationFirstVertex + vertex];
+                const float x = sourceVertex.position[0];
+                const float y = sourceVertex.position[1];
+                resultVertex.position[0] = (x * cosine - y * sine) * scale;
+                resultVertex.position[1] = (x * sine + y * cosine) * scale;
+                resultVertex.tangent[0] = center.x;
+                resultVertex.tangent[1] = center.y;
+                resultVertex.tangent[2] = center.z;
                 if (!alive)
-                    result.vertices[vertex].color[3] = 0.f;
+                    resultVertex.color[3] = 0.f;
             }
+        };
+
+        for (std::size_t particle = 0; particle < source.particles->states.size(); ++particle)
+        {
+            const ParticleState& state = source.particles->states[particle];
+            const std::size_t firstVertex = particle * 4;
+            if (firstVertex + 4 > source.vertices.size())
+                break;
+            applyParticle(firstVertex, firstVertex, state, time,
+                { source.vertices[firstVertex].tangent[0], source.vertices[firstVertex].tangent[1],
+                    source.vertices[firstVertex].tangent[2] });
+        }
+
+        const ParticleSimulationData::Emitter* emitter = simulation && simulation->emitter
+            ? simulation->emitter.get()
+            : nullptr;
+        if (!emitter || !emitter->valid() || source.vertices.size() < 4 || source.indices.size() < 6
+            || source.particles->states.size() >= emitter->maxParticles)
+            return result;
+
+        const float activeTime = std::min(time, emitter->stopTime) - emitter->startTime;
+        if (activeTime <= 0.f)
+            return result;
+
+        const std::size_t available = emitter->maxParticles - source.particles->states.size();
+        const float requestedEmissions = activeTime * emitter->birthRate;
+        const std::size_t emissionCount = std::min<std::size_t>(available,
+            static_cast<std::size_t>(std::min(requestedEmissions, 256.f)));
+        const auto randomUnit = [](std::size_t index, std::uint32_t salt) {
+            std::uint32_t value = static_cast<std::uint32_t>(index) ^ (salt + 0x9e3779b9u + (static_cast<std::uint32_t>(index) << 6)
+                + (static_cast<std::uint32_t>(index) >> 2));
+            value ^= value >> 16;
+            value *= 0x7feb352du;
+            value ^= value >> 15;
+            value *= 0x846ca68bu;
+            value ^= value >> 16;
+            return static_cast<float>(value) / static_cast<float>(std::numeric_limits<std::uint32_t>::max());
+        };
+        Vec3 normal = emitter->initialNormal;
+        const float normalLength = std::sqrt(normal.x * normal.x + normal.y * normal.y + normal.z * normal.z);
+        if (normalLength > 0.f)
+            normal = { normal.x / normalLength, normal.y / normalLength, normal.z / normalLength };
+        else
+            normal = { 0.f, 0.f, 1.f };
+        result.vertices.reserve(result.vertices.size() + emissionCount * 4);
+        result.indices.reserve(result.indices.size() + emissionCount * 6);
+        for (std::size_t particle = 0; particle < emissionCount; ++particle)
+        {
+            const float spawnTime = emitter->startTime + (static_cast<float>(particle) + 1.f) / emitter->birthRate;
+            if (spawnTime > time)
+                continue;
+            const float age = time - spawnTime;
+            const float lifespan = std::max(0.f,
+                emitter->lifetime + (randomUnit(particle, 0x3c6ef372u) - 0.5f) * emitter->lifetimeVariation);
+            if (lifespan > 0.f && age >= lifespan)
+                continue;
+            const float speed = std::max(0.f,
+                emitter->speed + (randomUnit(particle, 0xa54ff53au) - 0.5f) * emitter->speedVariation);
+            const Vec3 origin = { (randomUnit(particle, 0x510e527fu) - 0.5f) * emitter->dimensions.x,
+                (randomUnit(particle, 0x9b05688cu) - 0.5f) * emitter->dimensions.y,
+                (randomUnit(particle, 0x1f83d9abu) - 0.5f) * emitter->dimensions.z };
+            const std::size_t destinationVertex = result.vertices.size();
+            result.vertices.insert(result.vertices.end(), source.vertices.begin(), source.vertices.begin() + 4);
+            const std::uint32_t base = static_cast<std::uint32_t>(destinationVertex);
+            result.indices.insert(result.indices.end(), { base, base + 1, base + 2, base, base + 2, base + 3 });
+            ParticleState state;
+            state.age = age;
+            state.lifespan = lifespan;
+            state.velocity = { normal.x * speed, normal.y * speed, normal.z * speed };
+            applyParticle(destinationVertex, 0, state, 0.f, origin);
         }
         return result;
     }

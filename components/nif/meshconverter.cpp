@@ -906,7 +906,10 @@ namespace Nif
         return result;
     }
 
-    std::shared_ptr<Render::ParticleSimulationData> convertParticleSimulation(const NiParticleSystem* system)
+    const NiParticleSystemController* findParticleController(const NiParticleSystem* system);
+
+    std::shared_ptr<Render::ParticleSimulationData> convertParticleSimulation(
+        const NiParticlesData& source, const NiParticleSystem* system)
     {
         if (!system)
             return nullptr;
@@ -952,6 +955,36 @@ namespace Nif
                     result->rotationSpeed += rotation->mRotationSpeed;
             }
         }
+
+        if (const NiParticleSystemController* controller = findParticleController(system);
+            controller && !controller->emitAtVertex())
+        {
+            const float lifetime = controller->mLifetime;
+            const float lifetimeVariation = controller->mLifetimeVariation;
+            const float birthRate = controller->noAutoAdjust()
+                ? controller->mBirthRate
+                : lifetime + lifetimeVariation > 0.f
+                ? controller->mParticles.size() / (lifetime + lifetimeVariation * 0.5f)
+                : 0.f;
+            const std::size_t maxParticles
+                = std::max<std::size_t>(source.mNumParticles, std::max<std::size_t>(controller->mNumParticles,
+                    controller->mParticles.size()));
+            auto emitter = std::make_shared<Render::ParticleSimulationData::Emitter>();
+            emitter->startTime = controller->mEmitStartTime;
+            emitter->stopTime = controller->mEmitStopTime;
+            emitter->birthRate = birthRate;
+            emitter->lifetime = lifetime;
+            emitter->lifetimeVariation = lifetimeVariation;
+            emitter->speed = controller->mSpeed;
+            emitter->speedVariation = controller->mSpeedVariation;
+            emitter->initialNormal = { controller->mInitialNormal.x(), controller->mInitialNormal.y(),
+                controller->mInitialNormal.z() };
+            emitter->dimensions = { std::abs(controller->mEmitterDimensions.x()),
+                std::abs(controller->mEmitterDimensions.y()), std::abs(controller->mEmitterDimensions.z()) };
+            emitter->maxParticles = maxParticles;
+            if (emitter->valid())
+                result->emitter = std::move(emitter);
+        }
         return result;
     }
 
@@ -984,7 +1017,7 @@ namespace Nif
         const std::vector<NiParticleInfo>* particleStates = controllerStates ? controllerStates : dataStates;
         const std::size_t particleCount = std::min<std::size_t>(source.mActiveCount,
             controllerStates ? controllerStates->size() : source.mVertices.size());
-        const bool hasParticleState = particleStates != nullptr;
+        const bool hasParticleState = particleStates != nullptr || controller != nullptr;
         std::shared_ptr<Render::ParticleMeshData> particleState;
         if (hasParticleState)
         {
@@ -1051,22 +1084,23 @@ namespace Nif
             const std::uint32_t base = static_cast<std::uint32_t>(result.vertices.size());
             result.vertices.insert(result.vertices.end(), quadMesh.vertices.begin(), quadMesh.vertices.end());
             result.indices.insert(result.indices.end(), { base, base + 1, base + 2, base, base + 2, base + 3 });
-            if (particleState)
+            if (particleState && particleStates)
             {
                 const Nif::NiParticleInfo& state = (*particleStates)[particle];
                 Render::ParticleState neutralState;
                 neutralState.velocity = { state.mVelocity.x(), state.mVelocity.y(), state.mVelocity.z() };
                 neutralState.age = state.mAge;
                 neutralState.lifespan = state.mLifespan;
-                if (sourceParticle < systemData->mRotationSpeeds.size())
+                if (systemData && sourceParticle < systemData->mRotationSpeeds.size())
                     neutralState.rotationSpeed = systemData->mRotationSpeeds[sourceParticle];
                 particleState->states.push_back(neutralState);
             }
         }
 
-        if (particleState && !particleState->states.empty())
+        const std::shared_ptr<Render::ParticleSimulationData> simulation = convertParticleSimulation(source, system);
+        if (particleState && (!particleState->states.empty() || (simulation && simulation->emitter)))
         {
-            particleState->simulation = convertParticleSimulation(system);
+            particleState->simulation = simulation;
             result.particles = std::move(particleState);
         }
 
