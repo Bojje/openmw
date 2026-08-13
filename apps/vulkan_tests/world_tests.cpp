@@ -176,6 +176,15 @@ int main()
         || world.sceneData().pointLightColorsAndRadii[0].w != 32.f)
         throw std::runtime_error("renderer-neutral world scene failed to submit object point lights");
 
+    world.recordObject(&objectHandle, &firstCellHandle, true, 1, 2, "first", "meshes/pulse-light.nif", objectTransform,
+        true, {}, false, {}, { 0.2f, 0.4f, 0.6f, 1.f }, 32.f,
+        Render::WorldObject::PointLightAnimation::Pulse);
+    const float initialLightBrightness = world.sceneData().pointLightColorsAndRadii[0].y;
+    world.updateEffects(1.f);
+    if (world.sceneData().pointLightColorsAndRadii[0].y == initialLightBrightness
+        || world.sceneData().pointLightColorsAndRadii[0].y <= 0.f)
+        throw std::runtime_error("renderer-neutral world scene did not advance point-light animation");
+
     objectTransform.position.x = 8.f;
     world.recordObject(&objectHandle, &firstCellHandle, true, 1, 2, "first", "meshes/updated.nif", objectTransform, true);
     const Render::WorldObject& recorded = world.findCell(&firstCellHandle)->objects.front();

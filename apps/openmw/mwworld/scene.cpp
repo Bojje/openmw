@@ -121,7 +121,14 @@ namespace
             bounds };
     }
 
-    std::pair<Render::Vec4, float> getNeutralPointLight(const MWWorld::Ptr& ptr)
+    struct NeutralPointLight
+    {
+        Render::Vec4 color{};
+        float radius = 0.f;
+        Render::WorldObject::PointLightAnimation animation = Render::WorldObject::PointLightAnimation::None;
+    };
+
+    NeutralPointLight getNeutralPointLight(const MWWorld::Ptr& ptr)
     {
         const auto makeColor = [](std::uint32_t color) {
             return Render::Vec4{ static_cast<float>((color >> 0) & 0xff) / 255.f,
@@ -133,14 +140,34 @@ namespace
             const ESM::Light& light = *ptr.get<ESM::Light>()->mBase;
             if (light.mData.mFlags & ESM::Light::Negative)
                 return {};
-            return { makeColor(light.mData.mColor), std::max(static_cast<float>(light.mData.mRadius), 16.f) };
+            Render::WorldObject::PointLightAnimation animation
+                = Render::WorldObject::PointLightAnimation::None;
+            if (light.mData.mFlags & ESM::Light::Flicker)
+                animation = Render::WorldObject::PointLightAnimation::Flicker;
+            if (light.mData.mFlags & ESM::Light::FlickerSlow)
+                animation = Render::WorldObject::PointLightAnimation::FlickerSlow;
+            if (light.mData.mFlags & ESM::Light::Pulse)
+                animation = Render::WorldObject::PointLightAnimation::Pulse;
+            if (light.mData.mFlags & ESM::Light::PulseSlow)
+                animation = Render::WorldObject::PointLightAnimation::PulseSlow;
+            return { makeColor(light.mData.mColor), std::max(static_cast<float>(light.mData.mRadius), 16.f), animation };
         }
         if (ptr.getType() == ESM4::Light::sRecordId)
         {
             const ESM4::Light& light = *ptr.get<ESM4::Light>()->mBase;
             if (light.mData.flags & ESM4::Light::Negative)
                 return {};
-            return { makeColor(light.mData.colour), std::max(static_cast<float>(light.mData.radius), 16.f) };
+            Render::WorldObject::PointLightAnimation animation
+                = Render::WorldObject::PointLightAnimation::None;
+            if (light.mData.flags & ESM4::Light::Flicker)
+                animation = Render::WorldObject::PointLightAnimation::Flicker;
+            if (light.mData.flags & ESM4::Light::FlickerSlow)
+                animation = Render::WorldObject::PointLightAnimation::FlickerSlow;
+            if (light.mData.flags & ESM4::Light::Pulse)
+                animation = Render::WorldObject::PointLightAnimation::Pulse;
+            if (light.mData.flags & ESM4::Light::PulseSlow)
+                animation = Render::WorldObject::PointLightAnimation::PulseSlow;
+            return { makeColor(light.mData.colour), std::max(static_cast<float>(light.mData.radius), 16.f), animation };
         }
         return {};
     }
@@ -171,11 +198,11 @@ namespace
         animationSources.reserve(sourcePaths.size());
         for (const VFS::Path::Normalized& source : sourcePaths)
             animationSources.push_back(source.value());
-        const auto [pointLightColor, pointLightRadius] = getNeutralPointLight(ptr);
+        const NeutralPointLight pointLight = getNeutralPointLight(ptr);
         neutralWorld->recordObject(static_cast<const void*>(ptr.mRef), static_cast<const void*>(cell),
             cell->getCell()->isExterior(), cell->getCell()->getGridX(), cell->getCell()->getGridY(),
             cell->getCell()->getNameId(), model, transform, visible, cell->getCell()->getWorldSpace().serializeText(),
-            ptr.getClass().useAnim(), animationSources, pointLightColor, pointLightRadius);
+            ptr.getClass().useAnim(), animationSources, pointLight.color, pointLight.radius, pointLight.animation);
 
         if (!ptr.getClass().isNpc() || !ptr.getClass().useAnim())
             return;

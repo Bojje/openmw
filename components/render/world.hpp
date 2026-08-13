@@ -88,6 +88,15 @@ namespace Render
     // the scene bridge and is intentionally opaque to backends.
     struct WorldObject
     {
+        enum class PointLightAnimation
+        {
+            None,
+            Flicker,
+            FlickerSlow,
+            Pulse,
+            PulseSlow
+        };
+
         struct AnimationLayer
         {
             std::string id;
@@ -155,6 +164,10 @@ namespace Render
         // light or scene-graph types to the neutral scene.
         Vec4 pointLightColor{};
         float pointLightRadius = 0.f;
+        PointLightAnimation pointLightAnimation = PointLightAnimation::None;
+        float pointLightBrightness = 0.675f;
+        float pointLightPhase = 0.5f;
+        float pointLightTicks = 0.f;
         Vec4 emissiveColor{};
         bool emissiveOverride = false;
         float opacity = 1.f;
@@ -245,6 +258,39 @@ namespace Render
             mObjects.emplace(newKey, location);
         }
 
+        static void resetPointLightAnimation(WorldObject& object)
+        {
+            object.pointLightBrightness = 0.675f;
+            object.pointLightTicks = 0.f;
+            object.pointLightPhase = 0.25f + static_cast<float>(object.id % 1000) / 1000.f * 0.75f;
+        }
+
+        static void updatePointLightAnimation(WorldObject& object, float duration)
+        {
+            if (object.pointLightAnimation == WorldObject::PointLightAnimation::None)
+                return;
+
+            object.pointLightTicks = duration * 15.f * 0.25f + object.pointLightTicks * 0.75f;
+            const bool fast = object.pointLightAnimation == WorldObject::PointLightAnimation::Flicker
+                || object.pointLightAnimation == WorldObject::PointLightAnimation::Pulse;
+            const float speed = fast ? 0.1f : 0.05f;
+            if (object.pointLightBrightness >= object.pointLightPhase)
+                object.pointLightBrightness -= object.pointLightTicks * speed;
+            else
+                object.pointLightBrightness += object.pointLightTicks * speed;
+
+            if (std::abs(object.pointLightBrightness - object.pointLightPhase) < speed)
+            {
+                const bool flicker = object.pointLightAnimation == WorldObject::PointLightAnimation::Flicker
+                    || object.pointLightAnimation == WorldObject::PointLightAnimation::FlickerSlow;
+                if (flicker)
+                    object.pointLightPhase = 0.25f + static_cast<float>((object.id * 37) % 1000) / 1000.f * 0.75f;
+                else
+                    object.pointLightPhase = object.pointLightPhase <= 0.5f ? 1.f : 0.25f;
+            }
+            object.pointLightBrightness = std::clamp(object.pointLightBrightness, 0.f, 1.f);
+        }
+
         void refreshPointLights()
         {
             mSceneData.pointLightPositions = {};
@@ -262,8 +308,8 @@ namespace Render
                 mSceneData.pointLightPositions[count]
                     = { effect.transform.position.x, effect.transform.position.y, effect.transform.position.z, 1.f };
                 mSceneData.pointLightColorsAndRadii[count]
-                    = { effect.pointLightColor.x, effect.pointLightColor.y, effect.pointLightColor.z,
-                        effect.pointLightRadius };
+                        = { effect.pointLightColor.x, effect.pointLightColor.y, effect.pointLightColor.z,
+                            effect.pointLightRadius };
                 ++count;
             }
             for (const auto& [cellKey, cell] : mCells)
@@ -277,8 +323,12 @@ namespace Render
 
                     mSceneData.pointLightPositions[count]
                         = { object.transform.position.x, object.transform.position.y, object.transform.position.z, 1.f };
+                    const float brightness = object.pointLightAnimation == WorldObject::PointLightAnimation::None
+                        ? 1.f
+                        : object.pointLightBrightness;
                     mSceneData.pointLightColorsAndRadii[count]
-                        = { object.pointLightColor.x, object.pointLightColor.y, object.pointLightColor.z,
+                        = { object.pointLightColor.x * brightness, object.pointLightColor.y * brightness,
+                            object.pointLightColor.z * brightness,
                             object.pointLightRadius };
                     ++count;
                 }
@@ -430,12 +480,15 @@ namespace Render
 
             for (auto& [cellKey, cell] : mCells)
                 for (WorldObject& object : cell.objects)
+                {
+                    updatePointLightAnimation(object, duration);
                     if (object.dynamic)
                     {
                         object.animationTime += duration;
                         for (WorldObject::AnimationLayer& layer : object.animationLayers)
                             layer.time += duration;
                     }
+                }
 
             for (auto iter = mEffects.begin(); iter != mEffects.end();)
             {
@@ -518,7 +571,8 @@ namespace Render
             std::string_view cellName, std::string_view model, const ObjectTransform& transform, bool visible,
             std::string_view worldspace = {}, bool dynamic = false,
             std::span<const std::string> animationSources = {}, const Vec4& pointLightColor = {},
-            float pointLightRadius = 0.f)
+            float pointLightRadius = 0.f,
+            WorldObject::PointLightAnimation pointLightAnimation = WorldObject::PointLightAnimation::None)
         {
             if (objectKey == nullptr || cellKey == nullptr || model.empty() || !valid(pointLightColor)
                 || !valid(pointLightRadius) || pointLightRadius < 0.f
@@ -538,7 +592,7 @@ namespace Render
                     if (updateObjectCell(objectKey, objectKey, cellKey, exterior, gridX, gridY, cellName, worldspace))
                         return recordObject(
                             objectKey, cellKey, exterior, gridX, gridY, cellName, model, transform, visible, worldspace,
-                            dynamic, animationSources, pointLightColor, pointLightRadius);
+                            dynamic, animationSources, pointLightColor, pointLightRadius, pointLightAnimation);
                     mObjects.erase(found);
                 }
                 else if (CellScene* scene = findCell(location.cell))
@@ -553,6 +607,11 @@ namespace Render
                         object->dynamic = dynamic;
                         object->pointLightColor = pointLightColor;
                         object->pointLightRadius = pointLightRadius;
+                        if (object->pointLightAnimation != pointLightAnimation)
+                        {
+                            object->pointLightAnimation = pointLightAnimation;
+                            resetPointLightAnimation(*object);
+                        }
                         if (!dynamic || modelChanged)
                         {
                             object->boneMatrices.clear();
@@ -581,6 +640,8 @@ namespace Render
             object.dynamic = dynamic;
             object.pointLightColor = pointLightColor;
             object.pointLightRadius = pointLightRadius;
+            object.pointLightAnimation = pointLightAnimation;
+            resetPointLightAnimation(object);
             ensureCell(cellKey, exterior, gridX, gridY, cellName, worldspace).objects.push_back(std::move(object));
             mObjects.emplace(objectKey, ObjectLocation{ cellKey, id });
             refreshPointLights();
