@@ -577,7 +577,8 @@ scene boundary as injected callbacks rather than direct `ResourceSystem` calls.
 Neutral scene synchronization and bone-pose production now cross the same boundary as injected
 callbacks; the Vulkan game owner supplies camera synchronization and grouped NIF/KF pose sampling,
 preferring a sibling `.kf` for static NIF skeletons while retaining local-controller precedence for
-pose, duration, and text-key metadata; actor priority and blended animation remain to be ported.
+pose, duration, and text-key metadata; neutral scripted queue priority now matches the legacy controller,
+while actor `.kf` source arbitration and blended animation remain to be ported.
 The neutral pose sampler now preserves later-source-wins precedence for duplicate bone names, matching
 legacy animation-source ordering and preventing a lower-priority actor/KF source from masking a later one.
 Local-versus-sibling animation selection is also group-aware: unrelated local NIF controllers no longer
