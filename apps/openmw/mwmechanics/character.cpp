@@ -3388,6 +3388,9 @@ namespace MWMechanics
             clearAnimQueue();
             for (const ESM::AnimationState::ScriptedAnimation& animation : state.mScriptedAnims)
             {
+                if (mAnimation == nullptr
+                    && !MWBase::Environment::get().getWorld()->getNeutralAnimationDuration(mPtr, animation.mGroup))
+                    continue;
                 AnimationQueueEntry entry;
                 entry.mGroup = animation.mGroup;
                 entry.mLoopCount = static_cast<uint32_t>(
@@ -3444,6 +3447,8 @@ namespace MWMechanics
 
         if (!mAnimation)
         {
+            if (!MWBase::Environment::get().getWorld()->getNeutralAnimationDuration(mPtr, groupname))
+                return false;
             // Keep one neutral animation request alive when the legacy
             // scene-graph owner is absent. The neutral resource boundary
             // falls back to bind pose if the group is unavailable.
@@ -3546,6 +3551,8 @@ namespace MWMechanics
 
         if (!mAnimation)
         {
+            if (!MWBase::Environment::get().getWorld()->getNeutralAnimationDuration(mPtr, groupname, startKey, stopKey))
+                return false;
             AnimationQueueEntry entry;
             entry.mGroup = groupname;
             entry.mLoopCount = loops;
