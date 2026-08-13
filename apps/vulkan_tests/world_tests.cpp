@@ -341,6 +341,7 @@ int main()
         || effectSubmission.effects.back().meshes.back().mesh.skinning
         || !Render::validMeshInstance(effectSubmission.effects.back().meshes.back(), false)
         || !effectSubmission.effects.back().object.looping
+        || !effectSubmission.effects.back().object.animationLooping
         || effectSubmission.effects.back().object.animationDuration != 2.f
         || !effectSubmission.effects.back().object.magicVfx
         || !effectSubmission.valid())

@@ -1407,7 +1407,7 @@ namespace MWWorld
             if (mPoseResolver && skinning != nullptr)
             {
                 const std::vector<Render::Mat4> pose = mPoseResolver(effect.object.model,
-                    effect.object.animationGroup, effect.object.animationTime, false,
+                    effect.object.animationGroup, effect.object.animationTime, effect.object.animationLooping,
                     effect.object.animationStartKey, effect.object.animationStopKey, skinning->boneNames);
                 if (pose.size() == skinning->inverseBindMatrices.size())
                 {

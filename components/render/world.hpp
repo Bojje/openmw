@@ -298,6 +298,7 @@ namespace Render
             effect.transform.scale = { scale, scale, scale };
             effect.textureOverride = textureOverride;
             effect.looping = looping;
+            effect.animationLooping = looping;
             effect.animationDuration = valid(animationDuration) && animationDuration > 0.f ? animationDuration : 0.f;
             effect.magicVfx = magicVfx;
             mEffects[std::string(effectId)] = std::move(effect);
