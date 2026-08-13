@@ -406,6 +406,9 @@ int main()
         = Nif::collectBonePose(Nif::FileView(*timedControllerSequenceFile), animatedBoneNames, 0.25f, "idle");
     expectNear(backwardsControllerSequencePose.front().data[12], 3.375f,
         "backwards controller sequence time");
+    timedSequence->mWeight = 0.f;
+    if (!Nif::collectBonePose(Nif::FileView(*timedControllerSequenceFile), animatedBoneNames, 0.25f, "idle").empty())
+        throw std::runtime_error("zero-weight controller sequence unexpectedly produced a pose");
     expectNear(instances.front().mesh.material.diffuse.x, 0.25f, "material diffuse red");
     expectNear(instances.front().mesh.material.diffuse.w, 0.75f, "material alpha");
     expectNear(instances.front().mesh.material.emissive.z, 0.6f, "material emissive");

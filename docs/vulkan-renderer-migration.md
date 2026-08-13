@@ -548,7 +548,7 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the frozen `openmw-vulkan-osg-reference` tag, the current checkpoint changes
-213 code files excluding this ledger, deleting 2,479 lines and adding 16,852 lines (net `+14,373`). The larger Vulkan-only
+213 code files excluding this ledger, deleting 2,479 lines and adding 16,860 lines (net `+14,381`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; the current branch continues the reduction
 work with renderer-neutral ownership and compatibility-wrapper deletion. The live no-GUI
 consumer is the first deletion checkpoint; further reduction can now target OSG
@@ -595,9 +595,9 @@ layering world-selected actor base/default/custom/race sources plus sorted addit
 with later-source-wins bone precedence; highest-priority group metadata now owns pose duration and text-key segments.
 Neutral scripted queue priority also matches the legacy controller, and neutral animation layers now retain
 their mask, priority, and independent clock at the world boundary. Neutral controller sequences now
-arbitrate controlled blocks by priority and apply their frequency, phase, clip bounds, extrapolation mode,
-and reverse-play flag; blend-mask routing, sequence weights, and OSG-specific presentation events remain
-to be ported.
+arbitrate controlled blocks by priority, skip non-positive weights, and apply their frequency, phase, clip
+bounds, extrapolation mode, and reverse-play flag; weighted blending, blend-mask routing, and OSG-specific
+presentation events remain to be ported.
 The neutral pose sampler now preserves later-source-wins precedence for duplicate bone names within its
 discovered source list, preventing a lower-priority local/KF source from masking a later additional source.
 Local-versus-sibling animation selection is also group-aware: unrelated local NIF controllers no longer

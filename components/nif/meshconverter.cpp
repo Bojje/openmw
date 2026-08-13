@@ -499,6 +499,9 @@ namespace Nif
             std::unordered_map<std::string, Render::Mat4>& transforms,
             std::unordered_map<std::string, int>& sequencePriorities)
         {
+            if (const auto* controllerSequence = dynamic_cast<const NiControllerSequence*>(&sequence);
+                controllerSequence && (!std::isfinite(controllerSequence->mWeight) || controllerSequence->mWeight <= 0.f))
+                return;
             if (!group.empty() && !sequence.mName.empty()
                 && Misc::StringUtils::lowerCase(sequence.mName) != Misc::StringUtils::lowerCase(std::string(group)))
                 return;

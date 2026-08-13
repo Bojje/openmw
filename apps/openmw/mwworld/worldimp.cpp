@@ -254,6 +254,8 @@ namespace MWWorld
 
     void World::initSimulation(Debug::Level maxRecastLogLevel, Render::FrameLifecycle::Backend backend)
     {
+        if (mPhysics || mNavigator)
+            throw std::logic_error("World simulation services have already been initialized");
         const Resource::ResourceSystem::Backend resourceBackend = backend == Render::FrameLifecycle::Backend::Osg
             ? Resource::ResourceSystem::Backend::Osg
             : Resource::ResourceSystem::Backend::Neutral;
