@@ -119,6 +119,27 @@ int main()
         || particles.vertices[7].texcoord[1] != 1.f)
         throw std::runtime_error("NIF particle conversion did not create deterministic quad snapshots");
 
+    Nif::NiPSysData simulatedParticleSource;
+    simulatedParticleSource.mActiveCount = 1;
+    simulatedParticleSource.mVertices = { { 1.f, 2.f, 3.f } };
+    simulatedParticleSource.mRadii = { 1.f };
+    simulatedParticleSource.mParticles.resize(1);
+    simulatedParticleSource.mParticles.front().mVelocity = { 2.f, 0.f, 0.f };
+    simulatedParticleSource.mParticles.front().mAge = 0.f;
+    simulatedParticleSource.mParticles.front().mLifespan = 0.5f;
+    simulatedParticleSource.mRotationSpeeds = { 2.f * 3.14159265358979323846f };
+    const Render::MeshData simulatedParticles = Nif::convertParticles(simulatedParticleSource);
+    if (!simulatedParticles.particles || simulatedParticles.particles->states.size() != 1)
+        throw std::runtime_error("NIF particle conversion lost neutral particle state");
+    const Render::MeshData advancedParticles = Render::advanceParticleMesh(simulatedParticles, 0.25f);
+    if (advancedParticles.particles || std::abs(advancedParticles.vertices[0].tangent[0] - 1.5f) > 1e-5f
+        || std::abs(advancedParticles.vertices[0].position[0] - 1.f) > 1e-5f
+        || std::abs(advancedParticles.vertices[0].position[1] + 1.f) > 1e-5f)
+        throw std::runtime_error("renderer-neutral particle state did not advance position and rotation");
+    const Render::MeshData expiredParticles = Render::advanceParticleMesh(simulatedParticles, 1.f);
+    if (expiredParticles.vertices[0].color[3] != 0.f)
+        throw std::runtime_error("renderer-neutral particle state did not expire a dead particle");
+
     Nif::NiTriStripsData strips;
     strips.mVertices = source.mVertices;
     strips.mStrips = { { 0, 1, 2 } };

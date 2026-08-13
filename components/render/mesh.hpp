@@ -136,13 +136,77 @@ namespace Render
 
     static_assert(sizeof(MeshVertex) == sizeof(float) * 26);
 
+    struct ParticleState
+    {
+        Vec3 velocity{};
+        float age = 0.f;
+        float lifespan = 0.f;
+        float rotationSpeed = 0.f;
+    };
+
+    struct ParticleMeshData
+    {
+        std::vector<ParticleState> states;
+
+        bool valid(std::size_t vertexCount) const
+        {
+            if (states.size() > vertexCount / 4)
+                return false;
+            return std::all_of(states.begin(), states.end(), [](const ParticleState& state) {
+                return Render::valid(state.velocity) && std::isfinite(state.age)
+                    && std::isfinite(state.lifespan) && std::isfinite(state.rotationSpeed)
+                    && state.age >= 0.f;
+            });
+        }
+    };
+
     struct MeshData
     {
         std::vector<MeshVertex> vertices;
         std::vector<uint32_t> indices;
         MeshMaterial material;
         std::shared_ptr<const SkinningData> skinning;
+        std::shared_ptr<const ParticleMeshData> particles;
     };
+
+    inline MeshData advanceParticleMesh(const MeshData& source, float elapsed)
+    {
+        if (!source.particles || source.particles->states.empty() || !std::isfinite(elapsed) || elapsed <= 0.f)
+            return source;
+
+        MeshData result = source;
+        result.particles.reset();
+        const float time = std::max(elapsed, 0.f);
+        for (std::size_t particle = 0; particle < source.particles->states.size(); ++particle)
+        {
+            const ParticleState& state = source.particles->states[particle];
+            const std::size_t firstVertex = particle * 4;
+            if (firstVertex + 4 > source.vertices.size())
+                break;
+
+            const float age = state.age + time;
+            const bool alive = state.lifespan <= 0.f || age < state.lifespan;
+            const Vec3 center = { source.vertices[firstVertex].tangent[0] + state.velocity.x * time,
+                source.vertices[firstVertex].tangent[1] + state.velocity.y * time,
+                source.vertices[firstVertex].tangent[2] + state.velocity.z * time };
+            const float angle = state.rotationSpeed * time;
+            const float cosine = std::cos(angle);
+            const float sine = std::sin(angle);
+            for (std::size_t vertex = firstVertex; vertex < firstVertex + 4; ++vertex)
+            {
+                const float x = source.vertices[vertex].position[0];
+                const float y = source.vertices[vertex].position[1];
+                result.vertices[vertex].position[0] = x * cosine - y * sine;
+                result.vertices[vertex].position[1] = x * sine + y * cosine;
+                result.vertices[vertex].tangent[0] = center.x;
+                result.vertices[vertex].tangent[1] = center.y;
+                result.vertices[vertex].tangent[2] = center.z;
+                if (!alive)
+                    result.vertices[vertex].color[3] = 0.f;
+            }
+        }
+        return result;
+    }
 
     // The game/resource layer owns animation state and exposes only the
     // renderer-neutral pose payload. A resolver may return an empty vector

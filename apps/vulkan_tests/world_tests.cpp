@@ -487,6 +487,34 @@ int main()
     if (!Render::meshIntersectsViewDistance(largeVisibilityMesh, { 0.f, 0.f, 0.f }, 10.f))
         throw std::runtime_error("renderer-neutral visibility culled a mesh whose bounds cross the view distance");
 
+    Render::MeshInstance particleEffectMesh = aggregateMesh;
+    particleEffectMesh.mesh.vertices.resize(4);
+    particleEffectMesh.mesh.indices = { 0, 1, 2, 0, 2, 3 };
+    particleEffectMesh.mesh.material.alphaBlend = true;
+    auto particleData = std::make_shared<Render::ParticleMeshData>();
+    particleData->states.push_back({ { 2.f, 0.f, 0.f }, 0.f, 1.f, 0.f });
+    particleEffectMesh.mesh.particles = std::move(particleData);
+    for (std::size_t vertex = 0; vertex < 4; ++vertex)
+    {
+        particleEffectMesh.mesh.vertices[vertex].color[3] = 1.f;
+        particleEffectMesh.mesh.vertices[vertex].tangent[3] = 1.f;
+    }
+    Render::WorldScene particleWorld;
+    if (!particleWorld.recordEffect("particle", "particle.nif", { 0.f, 0.f, 0.f }, 1.f, {}, true, 2.f))
+        throw std::runtime_error("renderer-neutral particle effect could not be recorded");
+    particleWorld.updateEffects(0.25f);
+    const Render::SceneSubmission particleSubmission = Render::collectSceneSubmission(particleWorld,
+        Render::SceneData(), "", [&](std::string_view model) {
+            if (model != "particle.nif")
+                throw std::runtime_error("particle effect resolved an unexpected model");
+            return std::vector<Render::MeshInstance>{ particleEffectMesh };
+        }, false);
+    if (!particleSubmission.valid() || particleSubmission.effects.size() != 1
+        || particleSubmission.effects.front().meshes.front().mesh.particles
+        || std::abs(particleSubmission.effects.front().meshes.front().mesh.vertices.front().tangent[0] - 0.5f)
+            > 1e-5f)
+        throw std::runtime_error("renderer-neutral particle effect did not advance at submission time");
+
     Render::WorldScene terrainVisibilityWorld;
     int nearTerrainCell = 0;
     int farTerrainCell = 0;

@@ -910,6 +910,15 @@ namespace Nif
     {
         Render::MeshData result;
         const std::size_t particleCount = std::min<std::size_t>(source.mActiveCount, source.mVertices.size());
+        const auto* systemData = dynamic_cast<const NiPSysData*>(&source);
+        const bool hasParticleState = systemData != nullptr
+            && systemData->mParticles.size() == source.mVertices.size();
+        std::shared_ptr<Render::ParticleMeshData> particleState;
+        if (hasParticleState)
+        {
+            particleState = std::make_shared<Render::ParticleMeshData>();
+            particleState->states.reserve(particleCount);
+        }
         result.vertices.reserve(particleCount * 4);
         result.indices.reserve(particleCount * 6);
 
@@ -958,7 +967,21 @@ namespace Nif
             const std::uint32_t base = static_cast<std::uint32_t>(result.vertices.size());
             result.vertices.insert(result.vertices.end(), quadMesh.vertices.begin(), quadMesh.vertices.end());
             result.indices.insert(result.indices.end(), { base, base + 1, base + 2, base, base + 2, base + 3 });
+            if (particleState)
+            {
+                const Nif::NiParticleInfo& state = systemData->mParticles[particle];
+                Render::ParticleState neutralState;
+                neutralState.velocity = { state.mVelocity.x(), state.mVelocity.y(), state.mVelocity.z() };
+                neutralState.age = state.mAge;
+                neutralState.lifespan = state.mLifespan;
+                if (particle < systemData->mRotationSpeeds.size())
+                    neutralState.rotationSpeed = systemData->mRotationSpeeds[particle];
+                particleState->states.push_back(neutralState);
+            }
         }
+
+        if (particleState && !particleState->states.empty())
+            result.particles = std::move(particleState);
 
         return result;
     }

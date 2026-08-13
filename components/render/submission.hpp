@@ -43,6 +43,7 @@ namespace Render
             || !Render::valid(instance.mesh.material.diffuse) || !Render::valid(instance.mesh.material.emissive)
             || !std::isfinite(instance.mesh.material.glossiness)
             || (instance.mesh.material.alphaTexture && !instance.mesh.material.alphaTexture->valid())
+            || (instance.mesh.particles && !instance.mesh.particles->valid(instance.mesh.vertices.size()))
             || (instance.mesh.skinning && !instance.mesh.skinning->valid(instance.mesh.vertices.size())))
             return false;
 
@@ -664,7 +665,11 @@ namespace Render
             std::make_move_iterator(waterMeshes.end()));
         collectEffectMeshes(world, resolveMeshes, result.effects, result.unresolvedModels, includeEffectBindPose);
         for (EffectMeshSubmission& effect : result.effects)
+        {
+            for (MeshInstance& mesh : effect.meshes)
+                mesh.mesh = advanceParticleMesh(mesh.mesh, effect.object.animationTime);
             cullMeshInstancesToView(effect.meshes, scene);
+        }
         for (const CellScene* cell : world.cellsInOrder(worldspace))
             for (const WorldObject& object : cell->objects)
             {
@@ -681,7 +686,11 @@ namespace Render
                     if (!hasGeometry)
                         result.unresolvedModels.push_back(object.model);
                     for (const MeshInstance& mesh : resolvedMeshes)
-                        dynamic.meshes.push_back(transformMeshInstance(object, mesh));
+                    {
+                        MeshInstance transformed = transformMeshInstance(object, mesh);
+                        transformed.mesh = advanceParticleMesh(transformed.mesh, object.animationTime);
+                        dynamic.meshes.push_back(std::move(transformed));
+                    }
                 }
                 if (includeBindPose)
                     applyBindPose(dynamic);
