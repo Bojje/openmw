@@ -91,7 +91,7 @@ vertex-code mapping, initial color, and size; bounded box-emitter controllers no
 deterministic neutral spawn snapshots with controller timing, lifetime, speed, direction, and
 placement bounds; planar and spherical collider records now reflect neutral motion with authored bounce,
 die-on-collision, bounded collision-spawn snapshots, ordered collider-chain traversal, and bounded
-multi-generation spawn snapshots; unsupported collider types remain later gates.
+multi-generation spawn snapshots; unknown collider records remain without a collider in both adapters.
 NIF classic texture, diffuse/emissive, glossiness, and alpha properties now cross the
 renderer-neutral mesh boundary and survive batching; the neutral batch applies diffuse
 and alpha to vertex color output. NIF bump/normal texture slots now cross the same boundary
@@ -235,8 +235,8 @@ transform blend interpolators now feed that sampler as well;
 neutral NPCs now also publish their selected head, hair, race body-part, and equipped armor/clothing meshes as named
 bone attachments; weapon/shield presentation now carries animated-emissive state through the neutral
 material boundary; legacy dark/detail/decal texture composition now reaches the Vulkan material path,
-while exact enchanted caustic layering, full particle emission/spawn, unsupported collider types,
-and the remaining dynamic shading model remain outstanding.
+while exact enchanted caustic layering, full particle emission/spawn, and the remaining dynamic shading
+model remain outstanding.
 Neutral arrow release and container timing/GUI events now have renderer-neutral paths.
 Neutral actor idle and movement selection now honors weapon-specific short groups when those groups are actually
 present, and grouped duration queries reject unrelated controller files instead of falsely selecting a missing group.
@@ -592,7 +592,7 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the frozen `openmw-vulkan-osg-reference` tag, the current checkpoint changes
-214 code files excluding this ledger, deleting 2,490 lines and adding 19,395 lines (net `+16,905`). The larger Vulkan-only
+214 code files excluding this ledger, deleting 2,490 lines and adding 19,479 lines (net `+16,989`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; the current branch continues the reduction
 work with renderer-neutral ownership and compatibility-wrapper deletion. The live no-GUI
 consumer is the first deletion checkpoint; further reduction can now target OSG
