@@ -103,7 +103,9 @@ int main()
         expect(cellLodTiles.size() == 2 && cellLodTiles[0].lod == 0 && cellLodTiles[1].lod == 1
                 && cellLodTiles[0].center[0] == 3.5f && cellLodTiles[0].center[1] == -1.5f,
             "neutral terrain storage did not assemble deterministic cell LOD snapshots");
-        const auto regionTiles = neutralStorage.getRenderRegionTiles(0, 3, 0, 1, ESM::RefId());
+        const std::set<std::pair<int, int>> regionCells{ { 0, 0 }, { 1, 0 }, { 2, 0 }, { 3, 0 },
+            { 0, 1 }, { 1, 1 }, { 2, 1 }, { 3, 1 } };
+        const auto regionTiles = neutralStorage.getRenderRegionTiles(regionCells, ESM::RefId());
         expect(regionTiles.size() == 2 && regionTiles[0].minCellX == 0 && regionTiles[0].maxCellX == 1
                 && regionTiles[0].minCellY == 0 && regionTiles[0].maxCellY == 1 && regionTiles[1].minCellX == 2
                 && regionTiles[1].maxCellX == 3 && regionTiles[1].minCellY == 0 && regionTiles[1].maxCellY == 1

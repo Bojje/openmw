@@ -103,16 +103,6 @@ namespace Terrain
     }
 
     std::vector<Render::TerrainRegion> RenderStorage::getRenderRegionTiles(
-        int minCellX, int maxCellX, int minCellY, int maxCellY, ESM::RefId worldspace)
-    {
-        std::set<std::pair<int, int>> activeCells;
-        for (int y = minCellY; y <= maxCellY; ++y)
-            for (int x = minCellX; x <= maxCellX; ++x)
-                activeCells.emplace(x, y);
-        return getRenderRegionTiles(activeCells, worldspace);
-    }
-
-    std::vector<Render::TerrainRegion> RenderStorage::getRenderRegionTiles(
         const std::set<std::pair<int, int>>& activeCells, ESM::RefId worldspace)
     {
         if (activeCells.empty())

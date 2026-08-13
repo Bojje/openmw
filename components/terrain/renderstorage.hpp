@@ -55,12 +55,6 @@ namespace Terrain
 
         std::vector<Render::TerrainTile> getRenderTiles(int gridX, int gridY, ESM::RefId worldspace);
 
-        // Assemble aligned square regions covering an exterior cell rectangle.
-        // Invalid regions are retained in the result so callers can reject a
-        // partial quadtree set and keep using their per-cell fallback.
-        std::vector<Render::TerrainRegion> getRenderRegionTiles(
-            int minCellX, int maxCellX, int minCellY, int maxCellY, ESM::RefId worldspace);
-
         // Assemble aligned square regions only from cells that are currently
         // active. This avoids treating holes in a paged exterior cell set as
         // loaded terrain merely because they fall inside its bounding box.
