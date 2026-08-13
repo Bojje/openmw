@@ -34,8 +34,9 @@ namespace MWRender
     /// It supports both TES3 landscape records and ESM4 world/layer mapping.
     /// Decoded cells and generated neutral tiles are cached independently so
     /// scene refreshes do not repeatedly rebuild the same terrain payload.
-    /// Backend-owned quadtree scheduling and complete image coverage remain
-    /// separate parity work.
+    /// The preload hook warms a bounded set of detailed cell tiles while
+    /// higher LODs remain demand-driven; full asynchronous quadtree scheduling
+    /// and complete image coverage remain separate parity work.
     class NeutralTerrainStorage final : public Terrain::RenderStorage
     {
     public:

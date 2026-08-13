@@ -29,6 +29,7 @@ namespace MWRender
     {
         constexpr float defaultHeight = static_cast<float>(ESM::Land::DEFAULT_HEIGHT);
         constexpr std::size_t maxRenderTileCacheEntries = 256;
+        constexpr std::size_t maxPreloadedTileCells = 64;
 
         Render::TextureData makeAlphaTexture(int size, const std::vector<std::uint8_t>& alpha)
         {
@@ -98,6 +99,7 @@ namespace MWRender
 
     void NeutralTerrainStorage::preloadCells(std::span<const std::array<int, 4>> bounds, ESM::RefId worldspace)
     {
+        std::size_t preloadedTiles = 0;
         for (const std::array<int, 4>& range : bounds)
         {
             const int minX = std::min(range[0], range[2]);
@@ -106,7 +108,15 @@ namespace MWRender
             const int maxY = std::max(range[1], range[3]);
             for (int y = minY; y < maxY; ++y)
                 for (int x = minX; x < maxX; ++x)
+                {
                     getCell(x, y, worldspace);
+                    if (preloadedTiles < maxPreloadedTileCells)
+                    {
+                        const std::array<float, 2> center = { x + 0.5f, y + 0.5f };
+                        getRenderTile(0, 1.f, center, worldspace);
+                        ++preloadedTiles;
+                    }
+                }
         }
     }
 
