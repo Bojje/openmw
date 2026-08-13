@@ -355,7 +355,7 @@ namespace Render
                         && effect.object.animationTime >= effect.object.animationDuration))
                     return false;
                 for (const MeshInstance& instance : effect.meshes)
-                    if (!validMeshInstance(instance, false))
+                    if (!validMeshInstance(instance, false) || instance.mesh.skinning)
                         return false;
             }
 
