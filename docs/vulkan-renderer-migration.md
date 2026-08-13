@@ -594,8 +594,9 @@ callbacks; the Vulkan game owner supplies camera synchronization and grouped NIF
 layering world-selected actor base/default/custom/race sources plus sorted additional `animations/<model>/` files
 with later-source-wins bone precedence; highest-priority group metadata now owns pose duration and text-key segments.
 Neutral scripted queue priority also matches the legacy controller, and neutral animation layers now retain
-their mask, priority, and independent clock at the world boundary. Full controller-sequence arbitration
-and OSG-specific presentation events remain to be ported.
+their mask, priority, and independent clock at the world boundary. Neutral controller sequences now
+arbitrate controlled blocks by priority; blend-mask routing, sequence extrapolation, and OSG-specific
+presentation events remain to be ported.
 The neutral pose sampler now preserves later-source-wins precedence for duplicate bone names within its
 discovered source list, preventing a lower-priority local/KF source from masking a later additional source.
 Local-versus-sibling animation selection is also group-aware: unrelated local NIF controllers no longer
@@ -608,7 +609,8 @@ Renderer-neutral NIF/KF metadata now narrows queue completion to group-specific 
 when present, and pose sampling now starts from the same selected text-key segment. Neutral text-key
 events now dispatch Lua callbacks, sound/soundgen events, melee-hit timing, and spell-release timing;
 neutral scripted animation requests now retain the legacy priority rule over ordinary queue requests;
-per-bone mask arbitration is now present for neutral overlays, while OSG-specific presentation events remain outstanding.
+per-bone mask arbitration and controller-block priority arbitration are now present for neutral overlays,
+while full sequence blending and OSG-specific presentation events remain outstanding.
 Ordinary neutral actor movement/idle groups now carry looping state and wrap their sampled clock to
 the selected controller segment, while death, hit, queued, and landing groups remain finite.
 RGBA8 conversion is now one renderer-neutral helper shared by image resources and terrain

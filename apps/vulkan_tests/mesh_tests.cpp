@@ -339,11 +339,24 @@ int main()
     controllerSequence->mName = "idle";
     controllerSequence->mTextKeys = nullptr;
     controllerSequence->mControlledBlocks.push_back(sequenceBlock);
+    auto lowerPriorityInterpolator = std::make_unique<Nif::NiTransformInterpolator>();
+    lowerPriorityInterpolator->mRecordType = Nif::RC_NiTransformInterpolator;
+    lowerPriorityInterpolator->mDefaultValue = Nif::NiQuatTransform::getIdentity();
+    lowerPriorityInterpolator->mDefaultValue.mTranslation.x() = 9.f;
+    lowerPriorityInterpolator->mData = nullptr;
+    Nif::ControlledBlock lowerPriorityBlock = sequenceBlock;
+    lowerPriorityBlock.mInterpolator = lowerPriorityInterpolator.get();
+    lowerPriorityBlock.mBlendInterpolator = nullptr;
+    lowerPriorityBlock.mPriority = 1;
+    controllerSequence->mControlledBlocks.push_back(lowerPriorityBlock);
+    sequenceBlock.mPriority = 3;
+    controllerSequence->mControlledBlocks.front() = sequenceBlock;
     auto controllerSequenceFile = std::make_shared<Nif::NIFFile>(VFS::Path::Normalized("synthetic-controller.kf"));
     controllerSequenceFile->mRoots.push_back(controllerSequence.get());
     controllerSequenceFile->mRecords.push_back(std::move(sequenceInterpolatorA));
     controllerSequenceFile->mRecords.push_back(std::move(sequenceInterpolatorB));
     controllerSequenceFile->mRecords.push_back(std::move(sequenceBlend));
+    controllerSequenceFile->mRecords.push_back(std::move(lowerPriorityInterpolator));
     controllerSequenceFile->mRecords.push_back(std::move(controllerSequence));
     const std::vector<Render::Mat4> controllerSequencePose
         = Nif::collectBonePose(Nif::FileView(*controllerSequenceFile), animatedBoneNames, 0.25f, "idle");

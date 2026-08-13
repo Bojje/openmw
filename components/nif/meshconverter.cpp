@@ -439,7 +439,8 @@ namespace Nif
 
         void collectSequenceTransforms(const NiSequenceStreamHelper& sequence, float time, std::string_view group,
             std::string_view startKey, std::string_view stopKey,
-            std::unordered_map<std::string, Render::Mat4>& transforms)
+            std::unordered_map<std::string, Render::Mat4>& transforms,
+            std::unordered_map<std::string, int>& sequencePriorities)
         {
             const ExtraList extraList = sequence.getExtraList();
             const std::string_view effectiveStartKey = startKey.empty() ? std::string_view("start") : startKey;
@@ -470,15 +471,19 @@ namespace Nif
                 const auto* keyframe = static_cast<const NiKeyframeController*>(controller);
                 const NiTransform sampled
                     = sampleKeyframeController(*keyframe, NiTransform::getIdentity(), sampleTime).value;
-                // Sequence sources are visited in source order; preserve the
-                // same later-source-wins rule as model-local controllers.
-                transforms.insert_or_assign(name->mData, toRenderMatrix(sampled));
+                const auto priority = sequencePriorities.find(name->mData);
+                if (priority == sequencePriorities.end() || priority->second <= 0)
+                {
+                    sequencePriorities.insert_or_assign(name->mData, 0);
+                    transforms.insert_or_assign(name->mData, toRenderMatrix(sampled));
+                }
             }
         }
 
         void collectControllerSequenceTransforms(const NiSequence& sequence, float time, std::string_view group,
             std::string_view startKey, std::string_view stopKey,
-            std::unordered_map<std::string, Render::Mat4>& transforms)
+            std::unordered_map<std::string, Render::Mat4>& transforms,
+            std::unordered_map<std::string, int>& sequencePriorities)
         {
             if (!group.empty() && !sequence.mName.empty()
                 && Misc::StringUtils::lowerCase(sequence.mName) != Misc::StringUtils::lowerCase(std::string(group)))
@@ -510,7 +515,15 @@ namespace Nif
                 if (!sampled && !block.mInterpolator.empty())
                     sampled = sampleTransformInterpolator(block.mInterpolator.getPtr(), controllerSampleTime);
                 if (sampled)
-                    transforms.insert_or_assign(block.mTargetName, toRenderMatrix(*sampled));
+                {
+                    const int priority = static_cast<int>(block.mPriority);
+                    const auto previous = sequencePriorities.find(block.mTargetName);
+                    if (previous == sequencePriorities.end() || priority >= previous->second)
+                    {
+                        sequencePriorities.insert_or_assign(block.mTargetName, priority);
+                        transforms.insert_or_assign(block.mTargetName, toRenderMatrix(*sampled));
+                    }
+                }
             }
         }
 
@@ -896,6 +909,7 @@ namespace Nif
 
         const Render::Mat4 identity = Render::identityMat4();
         std::unordered_map<std::string, Render::Mat4> transforms;
+        std::unordered_map<std::string, int> sequencePriorities;
         for (const FileView& file : files)
         {
             float sampleTime = time;
@@ -919,9 +933,10 @@ namespace Nif
                 if (const auto* root = dynamic_cast<const NiAVObject*>(file.getRoot(i)))
                     collectBoneTransforms(*root, identity, sampleTime, transforms);
                 else if (const auto* stream = dynamic_cast<const NiSequenceStreamHelper*>(file.getRoot(i)))
-                    collectSequenceTransforms(*stream, time, group, startKey, stopKey, transforms);
+                    collectSequenceTransforms(*stream, time, group, startKey, stopKey, transforms, sequencePriorities);
                 else if (const auto* controllerSequence = dynamic_cast<const NiSequence*>(file.getRoot(i)))
-                    collectControllerSequenceTransforms(*controllerSequence, time, group, startKey, stopKey, transforms);
+                    collectControllerSequenceTransforms(
+                        *controllerSequence, time, group, startKey, stopKey, transforms, sequencePriorities);
             }
         }
 
