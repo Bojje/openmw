@@ -724,6 +724,8 @@ Neutral actors now also select jump and landing controller segments from physics
 available full `start`/`stop` interval when loop keys are absent.
 Neutral animation state now exposes renderer-neutral completion queries, so death and hit playback do not report
 finished merely because the OSG animation owner is absent.
+Neutral landing also retains fall damage, acrobatics progression/knockdown, and NPC landing sounds when no OSG
+animation owner exists.
   Neutral Lua/sound/melee/spell text-key dispatch is now covered for the migrated event classes.
 - Resting actors, owned-item lookup, line-of-sight, moving doors, and transformation-script movement/rotation now use active-cell state and world-model transforms instead of treating an absent OSG node as inactive.
 - Neutral focus selection and gameplay raycasts now use the renderer-neutral camera state and physics collision masks, so activation and targeting no longer require an OSG renderer.
