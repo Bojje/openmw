@@ -1026,6 +1026,10 @@ namespace MWWorld
             else
                 unloadCell(cell, navigatorUpdateGuard.get());
         }
+        // Terrain storage is allowed to retain decoded backend data while a
+        // grid is active, but a cell-grid shift is the streaming eviction
+        // boundary for the neutral backend.
+        mTerrainStorage.clearCache();
 
         const DetourNavigator::CellGridBounds cellGridBounds{
             .mCenter = osg::Vec2i(playerCellX, playerCellY),
