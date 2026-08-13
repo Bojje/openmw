@@ -40,7 +40,11 @@
 #include "../mwbase/windowmanager.hpp"
 #include "../mwbase/world.hpp"
 
+#include "../mwmechanics/creaturestats.hpp"
+#include "../mwmechanics/npcstats.hpp"
+
 #include "../mwrender/landmanager.hpp"
+#include "../mwrender/npcanimation.hpp"
 #include "../mwrender/camera.hpp"
 #include "../mwrender/objectpaging.hpp"
 #include "../mwrender/postprocessor.hpp"
@@ -142,6 +146,51 @@ namespace
             cell->getCell()->isExterior(), cell->getCell()->getGridX(), cell->getCell()->getGridY(),
             cell->getCell()->getNameId(), model, transform, visible, cell->getCell()->getWorldSpace().serializeText(),
             ptr.getClass().useAnim(), animationSources);
+
+        if (!ptr.getClass().isNpc() || !ptr.getClass().useAnim())
+            return;
+
+        const ESM::NPC* npc = ptr.get<ESM::NPC>()->mBase;
+        const ESM::Race* race = world.getStore().get<ESM::Race>().find(npc->mRace);
+        if (race == nullptr)
+            return;
+        const bool werewolf = ptr.getClass().getNpcStats(ptr).isWerewolf();
+        const auto& bodyParts
+            = MWRender::NpcAnimation::getBodyParts(npc->mRace, !npc->isMale(), false, werewolf);
+        static constexpr std::array<std::string_view, ESM::PRT_Count> bones = { "Head", "Head", "Neck", "Chest",
+            "Groin", "Groin", "Right Hand", "Left Hand", "Right Wrist", "Left Wrist", "Shield Bone",
+            "Right Forearm", "Left Forearm", "Right Upper Arm", "Left Upper Arm", "Right Foot", "Left Foot",
+            "Right Ankle", "Left Ankle", "Right Knee", "Left Knee", "Right Upper Leg", "Left Upper Leg",
+            "Right Clavicle", "Left Clavicle", "Weapon Bone", "Tail" };
+        for (int part = ESM::PRT_Neck; part < ESM::PRT_Count; ++part)
+            neutralWorld->updateObjectAttachment(static_cast<const void*>(ptr.mRef),
+                "bodypart-" + std::to_string(part), {}, {}, false);
+        neutralWorld->updateObjectAttachment(static_cast<const void*>(ptr.mRef), "head", {}, {}, false);
+        neutralWorld->updateObjectAttachment(static_cast<const void*>(ptr.mRef), "hair", {}, {}, false);
+        for (int part = ESM::PRT_Neck; part < ESM::PRT_Count; ++part)
+        {
+            if (part >= static_cast<int>(bodyParts.size()) || bodyParts[part] == nullptr)
+                continue;
+            const VFS::Path::Normalized partModel
+                = Misc::ResourceHelpers::correctMeshPath(bodyParts[part]->mModel.getNormalized());
+            if (!partModel.empty())
+                neutralWorld->updateObjectAttachment(static_cast<const void*>(ptr.mRef),
+                    "bodypart-" + std::to_string(part), partModel.value(), bones[part], true);
+        }
+
+        const auto addNamedPart = [&](std::string_view id, const ESM::RefId& name) {
+            if (name.empty())
+                return;
+            const ESM::BodyPart* bodyPart = world.getStore().get<ESM::BodyPart>().search(name);
+            if (bodyPart == nullptr)
+                return;
+            const VFS::Path::Normalized partModel
+                = Misc::ResourceHelpers::correctMeshPath(bodyPart->mModel.getNormalized());
+            if (!partModel.empty())
+                neutralWorld->updateObjectAttachment(static_cast<const void*>(ptr.mRef), id, partModel.value(), "Head", true);
+        };
+        addNamedPart("head", npc->mHead);
+        addNamedPart("hair", npc->mHair);
     }
 
     void setNodeRotation(const MWWorld::Ptr& ptr, MWRender::RenderingManager& rendering, const osg::Quat& rotation)
