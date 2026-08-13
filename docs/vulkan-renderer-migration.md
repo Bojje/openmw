@@ -727,7 +727,8 @@ prematurely clear or finish the active queue. Projectile collision, hit, spell, 
 bolts also submit movable mesh effects through the same `WorldScene` effect collection. Neutral continuous
 magic VFX now use actor-scoped effect IDs, follow neutral actor movement, and are removed when the corresponding
 magic effect expires or death animation completes. Anonymous one-shot VFX now receive generated neutral IDs at the world boundary,
-so existing spell, area, and summon effects are not silently discarded. The remaining animation
+so existing spell, area, and summon effects are not silently discarded. Non-looping spell-hit VFX
+also use that neutral world-effect lifetime when no OSG animation owner exists. The remaining animation
 gate is actor `.kf` priority/queue arbitration, OSG-specific presentation events, blending, and
 controller-stack ownership; projectile glows/lights/multi-effect composition and full particle presentation remain.
 Neutral effect meshes now defer skinning until the scene owner can sample the renderer-neutral pose resolver; compatible
