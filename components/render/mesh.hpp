@@ -11,6 +11,7 @@
 #include <span>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "math.hpp"
@@ -346,9 +347,11 @@ namespace Render
             return add(contact, scaleVector(reflected, collider->bounce));
         };
 
+        std::vector<std::pair<Vec3, ParticleState>> collisionSpawns;
+        collisionSpawns.reserve(8);
+
         const auto applyParticle = [&](std::size_t destinationFirstVertex, std::size_t sourceFirstVertex,
-                                       const ParticleState& state, float motionTime, const Vec3& origin) {
-            const float age = state.age + time;
+                                       const ParticleState& state, float motionTime, float age, const Vec3& origin) {
             bool alive = state.lifespan <= 0.f || age < state.lifespan;
             const float displacementScale = drag > 0.f ? (1.f - std::exp(-drag * motionTime)) / drag : motionTime;
             const float accelerationScale
@@ -362,6 +365,12 @@ namespace Render
                 collided);
             if (collided && collider && collider->dieOnCollision)
                 alive = false;
+            if (collided && collider && collider->spawnOnCollision && collisionSpawns.size() < 32)
+            {
+                ParticleState child;
+                child.lifespan = state.lifespan > age ? state.lifespan - age : state.lifespan;
+                collisionSpawns.emplace_back(center, child);
+            }
             const float rotationSpeed = state.rotationSpeed + (simulation ? simulation->rotationSpeed : 0.f);
             const float angle = rotationSpeed * motionTime;
             const float cosine = std::cos(angle);
@@ -394,9 +403,18 @@ namespace Render
             const std::size_t firstVertex = particle * 4;
             if (firstVertex + 4 > source.vertices.size())
                 break;
-            applyParticle(firstVertex, firstVertex, state, time,
+            applyParticle(firstVertex, firstVertex, state, time, state.age + time,
                 { source.vertices[firstVertex].tangent[0], source.vertices[firstVertex].tangent[1],
                     source.vertices[firstVertex].tangent[2] });
+        }
+
+        for (const auto& [origin, state] : collisionSpawns)
+        {
+            const std::size_t destinationVertex = result.vertices.size();
+            result.vertices.insert(result.vertices.end(), source.vertices.begin(), source.vertices.begin() + 4);
+            const std::uint32_t base = static_cast<std::uint32_t>(destinationVertex);
+            result.indices.insert(result.indices.end(), { base, base + 1, base + 2, base, base + 2, base + 3 });
+            applyParticle(destinationVertex, 0, state, 0.f, 0.f, origin);
         }
 
         const ParticleSimulationData::Emitter* emitter = simulation && simulation->emitter
@@ -455,7 +473,7 @@ namespace Render
             state.age = age;
             state.lifespan = lifespan;
             state.velocity = { normal.x * speed, normal.y * speed, normal.z * speed };
-            applyParticle(destinationVertex, 0, state, 0.f, origin);
+            applyParticle(destinationVertex, 0, state, 0.f, state.age, origin);
         }
         return result;
     }
