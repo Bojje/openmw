@@ -596,8 +596,8 @@ with later-source-wins bone precedence; highest-priority group metadata now owns
 Neutral scripted queue priority also matches the legacy controller, and neutral animation layers now retain
 their mask, priority, and independent clock at the world boundary. Neutral controller sequences now
 arbitrate controlled blocks by priority, skip non-positive weights, and apply their frequency, phase, clip
-bounds, extrapolation mode, and reverse-play flag; weighted blending, blend-mask routing, and OSG-specific
-presentation events remain to be ported.
+bounds, extrapolation mode, and reverse-play flag; weighted blending and per-bone overlay mask routing are
+now covered; controller-sequence blend-mask metadata and OSG-specific presentation events remain to be ported.
 The neutral pose sampler now preserves later-source-wins precedence for duplicate bone names within its
 discovered source list, preventing a lower-priority local/KF source from masking a later additional source.
 Local-versus-sibling animation selection is also group-aware: unrelated local NIF controllers no longer
@@ -763,7 +763,7 @@ magic VFX now use actor-scoped effect IDs, follow neutral actor movement, and ar
 magic effect expires or death animation completes. Anonymous one-shot VFX now receive generated neutral IDs at the world boundary,
 so existing spell, area, and summon effects are not silently discarded. Non-looping spell-hit VFX
 also use that neutral world-effect lifetime when no OSG animation owner exists. The remaining animation
-gate is OSG-specific presentation events, full controller-sequence arbitration, and exact dynamic shading; projectile
+gate is controller-sequence blend-mask metadata, OSG-specific presentation events, and exact dynamic shading; projectile
 multi-effect composition and full particle presentation remain; the neutral enchanted-arrow path now has a basic
 additive emissive glow while exact OSG glow layering remains a presentation-fidelity follow-up.
 Neutral effect meshes now defer skinning until the scene owner can sample the renderer-neutral pose resolver; compatible
