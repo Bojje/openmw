@@ -75,10 +75,6 @@ namespace Render
         Mat4 projection = identityMat4();
         Mat4 viewInverse = identityMat4();
         Mat4 projInverse = identityMat4();
-        // Backend-neutral far distance used by scene submission visibility.
-        // Zero disables distance culling for fixtures and non-perspective
-        // callers that do not provide a world view distance.
-        float viewDistance = 0.f;
         Vec4 sunDirection{ 0.f, 0.f, -1.f, 0.f };
         Vec4 sunColor{ 1.f, 1.f, 1.f, 1.f };
         Vec4 ambientColor{ 0.f, 0.f, 0.f, 1.f };
@@ -101,6 +97,11 @@ namespace Render
         // x is the number of active entries; the remaining components are
         // reserved for future light metadata.
         Vec4 pointLightCount{ 0.f, 0.f, 0.f, 0.f };
+        // Backend-neutral far distance used by scene submission visibility.
+        // Kept after the uniform-block fields so the existing Vulkan UBO
+        // offsets remain compatible with the shader declaration. Zero
+        // disables distance culling for fixtures and non-perspective callers.
+        float viewDistance = 0.f;
 
         bool valid() const
         {
