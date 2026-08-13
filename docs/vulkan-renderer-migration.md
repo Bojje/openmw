@@ -521,7 +521,7 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the frozen `openmw-vulkan-osg-reference` tag, the current checkpoint changes
-207 code files excluding this ledger, deleting 2,286 lines and adding 14,815 lines (net `+12,529`). The larger Vulkan-only
+207 code files excluding this ledger, deleting 2,286 lines and adding 14,873 lines (net `+12,587`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; the current branch continues the reduction
 work with renderer-neutral ownership and compatibility-wrapper deletion. The live no-GUI
 consumer is the first deletion checkpoint; further reduction can now target OSG
@@ -717,8 +717,10 @@ magic effect expires or death animation completes. Anonymous one-shot VFX now re
 so existing spell, area, and summon effects are not silently discarded. The remaining animation
 gate is actor `.kf` priority/queue arbitration, OSG-specific presentation events, blending, and
 controller-stack ownership; projectile glows/lights/multi-effect composition and full particle presentation remain.
-Neutral effect and attached-equipment meshes with skinning metadata are now baked to their explicit bind pose before
-entering the Vulkan batch, so unsupported controller-driven playback does not leave them in an unconsumed skinned form.
+Neutral effect meshes now defer skinning until the scene owner can sample the renderer-neutral pose resolver; compatible
+local-controller or sibling-KF poses are flattened before the Vulkan batch, while attached-equipment meshes retain the
+explicit bind-pose fallback when no actor pose is available. Neutral effect clocks also use sibling-KF duration metadata
+when the static NIF has no local controller, so external effect animation is not pinned to time zero.
 Neutral actor visibility now also carries opacity and alpha-blend state into dynamic mesh submission, including
 invisibility/chameleon fading without an OSG animation owner. Neutral container opening and closing now retain
 the `containeropen`/`containerclose` timing, including the `loot` event that gates GUI presentation while paused.
