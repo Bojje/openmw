@@ -216,9 +216,12 @@ int main()
         || world.findCell(&firstCellHandle)->objects.front().boneMatrices.size() != 1
         || world.findCell(&firstCellHandle)->objects.front().boneMatrices.front().data[12] != 3.f)
         throw std::runtime_error("renderer-neutral world scene failed dynamic pose ownership");
-    if (!world.updateObjectAttachment(&dynamicObjectHandle, "weapon", "meshes/weapon.nif", "Bip01 R Hand", true)
+    if (!world.updateObjectAttachment(&dynamicObjectHandle, "weapon", "meshes/weapon.nif", "Bip01 R Hand", true,
+            { 0.2f, 0.4f, 0.8f, 1.f }, true)
         || world.findCell(&firstCellHandle)->objects.front().attachments.size() != 1
-        || world.findCell(&firstCellHandle)->objects.front().attachments.front().bone != "Bip01 R Hand")
+        || world.findCell(&firstCellHandle)->objects.front().attachments.front().bone != "Bip01 R Hand"
+        || !world.findCell(&firstCellHandle)->objects.front().attachments.front().emissiveOverride
+        || world.findCell(&firstCellHandle)->objects.front().attachments.front().emissiveColor.z != 0.8f)
         throw std::runtime_error("renderer-neutral world scene failed attachment ownership");
     if (!world.updateObjectAttachment(&dynamicObjectHandle, "weapon", {}, {}, false)
         || !world.findCell(&firstCellHandle)->objects.front().attachments.empty())

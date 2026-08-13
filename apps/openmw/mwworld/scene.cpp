@@ -166,11 +166,16 @@ namespace
             "Right Clavicle", "Left Clavicle", "Weapon Bone", "Tail" };
         std::array<VFS::Path::Normalized, ESM::PRT_Count> selectedParts;
         std::array<int, ESM::PRT_Count> partPriorities{};
-        const auto setPart = [&](int part, int priority, VFS::Path::Normalized partModel) {
+        std::array<Render::Vec4, ESM::PRT_Count> selectedGlow;
+        std::array<bool, ESM::PRT_Count> selectedGlowEnabled{};
+        const auto setPart = [&](int part, int priority, VFS::Path::Normalized partModel,
+                                 const Render::Vec4& glow = {}, bool glowEnabled = false) {
             if (part < 0 || part >= ESM::PRT_Count || priority < partPriorities[part])
                 return;
             partPriorities[part] = priority;
             selectedParts[part] = std::move(partModel);
+            selectedGlow[part] = glow;
+            selectedGlowEnabled[part] = glowEnabled;
         };
         for (int part = ESM::PRT_Neck; part < ESM::PRT_Count; ++part)
         {
@@ -212,10 +217,13 @@ namespace
             priority = ((basePriority + 1) << 1) + (isArmor ? 1 : 0);
             const ESM::PartReferenceList& partList
                 = isClothing ? item->get<ESM::Clothing>()->mBase->mParts : item->get<ESM::Armor>()->mBase->mParts;
+            const bool enchanted = !item->getClass().getEnchantment(*item).empty();
+            const osg::Vec4 glow = item->getClass().getEnchantmentColor(*item);
+            const Render::Vec4 neutralGlow{ glow.r(), glow.g(), glow.b(), glow.a() > 0.f ? 1.f : 0.f };
             for (const ESM::PartReference& reference : partList.mParts)
             {
                 const int part = reference.mPart;
-                setPart(part, priority, resolvePart(reference));
+                setPart(part, priority, resolvePart(reference), neutralGlow, enchanted);
             }
             if (slot == MWWorld::InventoryStore::Slot_Robe)
                 for (const int part : { ESM::PRT_Groin, ESM::PRT_Skirt, ESM::PRT_RLeg, ESM::PRT_LLeg,
@@ -234,7 +242,8 @@ namespace
         for (int part = ESM::PRT_Neck; part < ESM::PRT_Count; ++part)
             if (!selectedParts[part].empty())
                 neutralWorld->updateObjectAttachment(static_cast<const void*>(ptr.mRef),
-                    "bodypart-" + std::to_string(part), selectedParts[part].value(), bones[part], true);
+                    "bodypart-" + std::to_string(part), selectedParts[part].value(), bones[part], true,
+                    selectedGlow[part], selectedGlowEnabled[part]);
 
         const auto addNamedPart = [&](std::string_view id, const ESM::RefId& name) {
             if (name.empty())
@@ -249,7 +258,8 @@ namespace
         };
         if (!selectedParts[ESM::PRT_Head].empty())
             neutralWorld->updateObjectAttachment(static_cast<const void*>(ptr.mRef), "head",
-                selectedParts[ESM::PRT_Head].value(), "Head", true);
+                selectedParts[ESM::PRT_Head].value(), "Head", true, selectedGlow[ESM::PRT_Head],
+                selectedGlowEnabled[ESM::PRT_Head]);
         else
             addNamedPart("head", npc->mHead);
         if (inventory.getSlot(MWWorld::InventoryStore::Slot_Helmet) == inventory.end())
@@ -1587,6 +1597,11 @@ namespace MWWorld
                             Render::MeshInstance attached = mesh;
                             Render::bakeMeshBindPose(attached);
                             attached.transform = Render::multiply(dynamic.boneMatrices[boneIndex], mesh.transform);
+                            if (attachment.emissiveOverride)
+                            {
+                                attached.mesh.material.emissive = attachment.emissiveColor;
+                                attached.mesh.material.emissiveOverride = true;
+                            }
                             dynamic.meshes.push_back(Render::transformMeshInstance(dynamic.object, attached));
                         }
                     }

@@ -94,6 +94,8 @@ namespace Render
             std::string model;
             std::string bone;
             bool visible = true;
+            Vec4 emissiveColor{};
+            bool emissiveOverride = false;
         };
 
         uint64_t id = 0;
@@ -623,9 +625,11 @@ namespace Render
         }
 
         bool updateObjectAttachment(const void* objectKey, std::string_view attachmentId, std::string_view model,
-            std::string_view bone, bool visible)
+            std::string_view bone, bool visible, const Vec4& emissiveColor = {}, bool emissiveOverride = false)
         {
-            if (objectKey == nullptr || attachmentId.empty())
+            if (objectKey == nullptr || attachmentId.empty() || !valid(emissiveColor)
+                || (emissiveOverride && (emissiveColor.x < 0.f || emissiveColor.y < 0.f
+                    || emissiveColor.z < 0.f || emissiveColor.w <= 0.f)))
                 return false;
             const auto found = mObjects.find(objectKey);
             if (found == mObjects.end())
@@ -647,12 +651,15 @@ namespace Render
             }
 
             if (attachment == object->attachments.end())
-                object->attachments.push_back({ std::string(attachmentId), std::string(model), std::string(bone), visible });
+                object->attachments.push_back({ std::string(attachmentId), std::string(model), std::string(bone), visible,
+                    emissiveColor, emissiveOverride });
             else
             {
                 attachment->model = model;
                 attachment->bone = bone;
                 attachment->visible = visible;
+                attachment->emissiveColor = emissiveColor;
+                attachment->emissiveOverride = emissiveOverride;
             }
             return true;
         }
