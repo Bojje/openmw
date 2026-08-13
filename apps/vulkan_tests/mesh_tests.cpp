@@ -214,6 +214,16 @@ int main()
     if (!instances.front().mesh.material.emissiveWrapU || instances.front().mesh.material.emissiveWrapV)
         throw std::runtime_error("NIF material conversion lost emissive texture wrapping");
 
+    std::array<Render::Mat4, 2> sourceBones{ Render::identityMat4(), Render::identityMat4() };
+    sourceBones[0].data[12] = 1.f;
+    sourceBones[1].data[12] = 2.f;
+    const std::array<std::string, 2> sourceBoneNames{ "Root Bone", "Arm Bone" };
+    const std::array<std::string, 2> reorderedBoneNames{ "Arm Bone", "Root Bone" };
+    const std::vector<Render::Mat4> reorderedBones
+        = Render::remapBoneMatrices(sourceBones, sourceBoneNames, reorderedBoneNames);
+    if (reorderedBones.size() != 2 || reorderedBones[0].data[12] != 2.f || reorderedBones[1].data[12] != 1.f)
+        throw std::runtime_error("renderer-neutral skinning did not remap mismatched bone orders");
+
     const std::array<std::string, 1> animatedBoneNames{ "Root Bone" };
     const std::vector<Render::Mat4> animatedPose
         = Nif::collectBonePose(Nif::FileView(*file), animatedBoneNames, 0.5f);

@@ -210,6 +210,30 @@ namespace Render
         return result;
     }
 
+    inline std::vector<Mat4> remapBoneMatrices(
+        std::span<const Mat4> source, std::span<const std::string> sourceNames, std::span<const std::string> targetNames)
+    {
+        if (targetNames.empty())
+            return { source.begin(), source.end() };
+        if (source.size() < targetNames.size())
+            return {};
+        if (sourceNames.empty())
+            return { source.begin(), source.begin() + static_cast<std::ptrdiff_t>(targetNames.size()) };
+        if (source.size() < sourceNames.size())
+            return {};
+
+        std::vector<Mat4> result;
+        result.reserve(targetNames.size());
+        for (const std::string& target : targetNames)
+        {
+            const auto found = std::find(sourceNames.begin(), sourceNames.end(), target);
+            if (found == sourceNames.end())
+                return {};
+            result.push_back(source[static_cast<std::size_t>(found - sourceNames.begin())]);
+        }
+        return result;
+    }
+
     struct MeshInstance
     {
         MeshData mesh;

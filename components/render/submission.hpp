@@ -295,6 +295,9 @@ namespace Render
         // Keeping the pose beside the dynamic record lets a backend consume
         // skinned meshes without borrowing an animation or scene-graph type.
         std::vector<Mat4> boneMatrices;
+        // Bone names describe the order used by boneMatrices. Individual mesh
+        // parts may use a different order and are remapped at rasterization.
+        std::vector<std::string> boneNames;
     };
 
     // One backend-neutral frame submission. Resource resolution remains a
@@ -336,13 +339,19 @@ namespace Render
                 if (!std::all_of(dynamic.boneMatrices.begin(), dynamic.boneMatrices.end(),
                         [](const Mat4& matrix) { return Render::valid(matrix); }))
                     return false;
+                if (!dynamic.boneNames.empty() && dynamic.boneNames.size() != dynamic.boneMatrices.size())
+                    return false;
                 for (const MeshInstance& instance : dynamic.meshes)
                 {
                     if (!validMeshInstance(instance, false))
                         return false;
-                    if (instance.mesh.skinning && !dynamic.boneMatrices.empty()
-                        && dynamic.boneMatrices.size() < instance.mesh.skinning->inverseBindMatrices.size())
-                        return false;
+                    if (instance.mesh.skinning && !dynamic.boneMatrices.empty())
+                    {
+                        const std::vector<Mat4> remapped = remapBoneMatrices(
+                            dynamic.boneMatrices, dynamic.boneNames, instance.mesh.skinning->boneNames);
+                        if (remapped.size() < instance.mesh.skinning->inverseBindMatrices.size())
+                            return false;
+                    }
                 }
             }
 
@@ -433,7 +442,11 @@ namespace Render
                     continue;
 
                 MeshInstance posed = instance;
-                posed.mesh = skinMesh(instance.mesh, dynamic.boneMatrices);
+                const std::vector<Mat4> remapped = remapBoneMatrices(
+                    dynamic.boneMatrices, dynamic.boneNames, instance.mesh.skinning->boneNames);
+                if (remapped.size() < instance.mesh.skinning->inverseBindMatrices.size())
+                    continue;
+                posed.mesh = skinMesh(instance.mesh, remapped);
                 result.push_back(std::move(posed));
             }
         }
@@ -458,6 +471,19 @@ namespace Render
         return compatible ? skinned->mesh.skinning.get() : nullptr;
     }
 
+    inline const SkinningData* findPrimarySkinning(std::span<const MeshInstance> meshes)
+    {
+        const auto found = std::find_if(meshes.begin(), meshes.end(), [](const MeshInstance& mesh) {
+            return mesh.mesh.skinning && !mesh.mesh.skinning->boneNames.empty();
+        });
+        return found == meshes.end() ? nullptr : found->mesh.skinning.get();
+    }
+
+    inline const SkinningData* findPrimarySkinning(const DynamicMeshSubmission& dynamic)
+    {
+        return findPrimarySkinning(dynamic.meshes);
+    }
+
     inline const SkinningData* findCompatibleSkinning(const DynamicMeshSubmission& dynamic)
     {
         return findCompatibleSkinning(dynamic.meshes);
@@ -480,6 +506,7 @@ namespace Render
         dynamic.boneMatrices.reserve(skinning->inverseBindMatrices.size());
         for (const Mat4& inverseBind : skinning->inverseBindMatrices)
             dynamic.boneMatrices.push_back(invertMat4(inverseBind));
+        dynamic.boneNames = skinning->boneNames;
     }
 
     // Build the backend-neutral portion of a frame from the scene owner. The
