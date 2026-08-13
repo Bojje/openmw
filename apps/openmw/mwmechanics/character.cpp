@@ -3318,14 +3318,7 @@ namespace MWMechanics
             animationGroup = mAnimQueue.front().mGroup;
         else if (mJumpState != JumpState_None)
         {
-            std::string jumpGroup = "jump";
-            const std::string_view weaponShortGroup = getWeaponShortGroup(mWeaponType);
-            if (!weaponShortGroup.empty())
-            {
-                std::string weaponJumpGroup = jumpGroup + std::string(weaponShortGroup);
-                if (world->getNeutralAnimationDuration(mPtr, weaponJumpGroup, "start", "stop"))
-                    jumpGroup = std::move(weaponJumpGroup);
-            }
+            std::string jumpGroup = selectNeutralWeaponGroup("jump");
 
             if (!world->getNeutralAnimationDuration(mPtr, jumpGroup, "start", "stop"))
                 animationGroup = "idle";
