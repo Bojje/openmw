@@ -66,27 +66,6 @@ namespace MWRender
         }
     }
 
-    struct NeutralTerrainStorage::CellCache
-    {
-        explicit CellCache(const NeutralTerrainStorage& storage)
-            : mStorage(storage)
-        {
-        }
-
-        const ESM::LandData* get(int gridX, int gridY, ESM::RefId worldspace)
-        {
-            const Cell key{ gridX, gridY };
-            auto found = mCells.find(key);
-            if (found == mCells.end())
-                found = mCells.emplace(key, mStorage.loadCell(gridX, gridY, worldspace)).first;
-            return found->second.get();
-        }
-
-    private:
-        const NeutralTerrainStorage& mStorage;
-        std::map<Cell, std::unique_ptr<ESM::LandData>> mCells;
-    };
-
     NeutralTerrainStorage::NeutralTerrainStorage(MWWorld::ESMStore& store, const VFS::Manager& vfs,
         std::string_view normalMapPattern, std::string_view normalHeightMapPattern, bool autoUseNormalMaps,
         std::string_view specularMapPattern, bool autoUseSpecularMaps)
@@ -131,6 +110,17 @@ namespace MWRender
         return land ? std::make_unique<ESM::LandData>(*land, dataFlags) : nullptr;
     }
 
+    const ESM::LandData* NeutralTerrainStorage::getCell(int gridX, int gridY, ESM::RefId worldspace) const
+    {
+        worldspace = resolveLandWorldspace(worldspace);
+        std::lock_guard lock(mCellCacheMutex);
+        const auto key = std::make_tuple(worldspace, gridX, gridY);
+        auto found = mCellCache.find(key);
+        if (found == mCellCache.end())
+            found = mCellCache.emplace(key, loadCell(gridX, gridY, worldspace)).first;
+        return found->second.get();
+    }
+
     void NeutralTerrainStorage::fillRenderVertexBuffers(int lodLevel, float size,
         const std::array<float, 2>& center, ESM::RefId worldspace, std::vector<Render::TerrainVertex>& vertices)
     {
@@ -148,8 +138,6 @@ namespace MWRender
         const std::array<float, 2> origin = { center[0] - size * 0.5f, center[1] - size * 0.5f };
         const int startCellX = static_cast<int>(std::floor(origin[0]));
         const int startCellY = static_cast<int>(std::floor(origin[1]));
-        CellCache cache(*this);
-
         const auto getNormal = [&](int cellX, int cellY, int col, int row) {
             while (col >= static_cast<int>(cellSize) - 1)
             {
@@ -172,7 +160,7 @@ namespace MWRender
                 row += static_cast<int>(cellSize) - 1;
             }
 
-            const ESM::LandData* data = cache.get(cellX, cellY, worldspace);
+            const ESM::LandData* data = getCell(cellX, cellY, worldspace);
             if (!data || !(data->getLoadFlags() & ESM::Land::DATA_VNML))
                 return std::array<float, 3>{ 0.f, 0.f, 1.f };
             const std::size_t index = (static_cast<std::size_t>(col) * cellSize + row) * 3;
@@ -185,7 +173,7 @@ namespace MWRender
                                       std::size_t col, std::size_t vertX, std::size_t vertY) {
             const int cellX = startCellX + static_cast<int>(cellShiftX);
             const int cellY = startCellY + static_cast<int>(cellShiftY);
-            const ESM::LandData* data = cache.get(cellX, cellY, worldspace);
+            const ESM::LandData* data = getCell(cellX, cellY, worldspace);
             const std::size_t index = col * cellSize + row;
             const std::size_t vertexIndex = vertX * numVerts + vertY;
 
@@ -342,8 +330,6 @@ namespace MWRender
 
             std::map<ESM::FormId, std::size_t> textureIndices;
             std::vector<std::vector<std::uint8_t>> alphaMaps;
-            CellCache cache(*this);
-
             const auto getOrCreateBlendmap = [&](ESM::FormId id, int gridX, int gridY)
                 -> std::vector<std::uint8_t>& {
                 if (const auto found = textureIndices.find(id); found != textureIndices.end())
@@ -359,7 +345,7 @@ namespace MWRender
 
             Terrain::sampleBlendmaps(chunkSize, origin[0], origin[1], quadsPerCell,
                 [&](const Terrain::CellSample& sample) {
-                    const ESM::LandData* data = cache.get(sample.mCellX, sample.mCellY, worldspace);
+                    const ESM::LandData* data = getCell(sample.mCellX, sample.mCellY, worldspace);
                     if (!data)
                         return;
 
@@ -412,10 +398,9 @@ namespace MWRender
         const std::size_t blendmapImageSize = blendmapSize * imageScaleFactor;
 
         std::vector<std::pair<std::uint16_t, int>> textureIds(blendmapSize * blendmapSize);
-        CellCache cache(*this);
         Terrain::sampleBlendmaps(chunkSize, origin[0], origin[1], ESM::Land::LAND_TEXTURE_SIZE,
             [&](const Terrain::CellSample& sample) {
-                const ESM::LandData* data = cache.get(sample.mCellX, sample.mCellY, worldspace);
+                const ESM::LandData* data = getCell(sample.mCellX, sample.mCellY, worldspace);
                 if (!data || !(data->getLoadFlags() & ESM::Land::DATA_VTEX))
                     return;
                 const auto textures = data->getTextures();
@@ -474,8 +459,7 @@ namespace MWRender
     std::optional<Render::TerrainHeightField> NeutralTerrainStorage::getHeightField(
         int gridX, int gridY, ESM::RefId worldspace)
     {
-        CellCache cache(*this);
-        const ESM::LandData* data = cache.get(gridX, gridY, worldspace);
+        const ESM::LandData* data = getCell(gridX, gridY, worldspace);
         if (!data || !(data->getLoadFlags() & ESM::Land::DATA_VHGT))
             return std::nullopt;
 
@@ -493,8 +477,7 @@ namespace MWRender
         const float cellSize = getCellWorldSize(worldspace);
         const int cellX = static_cast<int>(std::floor(worldPos.x / cellSize));
         const int cellY = static_cast<int>(std::floor(worldPos.y / cellSize));
-        CellCache cache(*this);
-        const ESM::LandData* data = cache.get(cellX, cellY, worldspace);
+        const ESM::LandData* data = getCell(cellX, cellY, worldspace);
         if (!data || !(data->getLoadFlags() & ESM::Land::DATA_VHGT))
             return ESM::isEsm4Ext(worldspace) ? std::numeric_limits<float>::lowest() : defaultHeight;
 

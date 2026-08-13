@@ -6,6 +6,7 @@
 #include <mutex>
 #include <string>
 #include <string_view>
+#include <tuple>
 
 #include <components/terrain/renderstorage.hpp>
 #include <components/vfs/pathutil.hpp>
@@ -60,11 +61,11 @@ namespace MWRender
     private:
         using Cell = std::pair<int, int>;
         using LayerCache = std::map<VFS::Path::Normalized, Terrain::LayerInfo, std::less<>>;
-
-        struct CellCache;
+        using CellCache = std::map<std::tuple<ESM::RefId, int, int>, std::unique_ptr<ESM::LandData>>;
 
         ESM::RefId resolveLandWorldspace(ESM::RefId worldspace) const;
         std::unique_ptr<ESM::LandData> loadCell(int gridX, int gridY, ESM::RefId worldspace) const;
+        const ESM::LandData* getCell(int gridX, int gridY, ESM::RefId worldspace) const;
         Terrain::LayerInfo getLayerInfo(VFS::Path::NormalizedView texture) const;
         Terrain::LayerInfo getEsm4DefaultLayerInfo(int gridX, int gridY, ESM::RefId worldspace) const;
         Terrain::LayerInfo getEsm4LayerInfo(ESM::FormId id) const;
@@ -78,6 +79,8 @@ namespace MWRender
         std::string mSpecularMapPattern;
         bool mAutoUseSpecularMaps;
         mutable std::mutex mDataMutex;
+        mutable std::mutex mCellCacheMutex;
+        mutable CellCache mCellCache;
         mutable std::mutex mLayerInfoMutex;
         mutable LayerCache mLayerInfo;
     };
