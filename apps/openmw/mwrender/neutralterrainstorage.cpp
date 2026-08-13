@@ -83,8 +83,14 @@ namespace MWRender
 
     void NeutralTerrainStorage::clearCache()
     {
-        std::lock_guard lock(mCellCacheMutex);
-        mCellCache.clear();
+        {
+            std::lock_guard lock(mCellCacheMutex);
+            mCellCache.clear();
+        }
+        {
+            std::lock_guard lock(mRenderTileCacheMutex);
+            mRenderTileCache.clear();
+        }
     }
 
     void NeutralTerrainStorage::preloadCells(std::span<const std::array<int, 4>> bounds, ESM::RefId worldspace)
@@ -98,6 +104,31 @@ namespace MWRender
             for (int y = minY; y < maxY; ++y)
                 for (int x = minX; x < maxX; ++x)
                     getCell(x, y, worldspace);
+        }
+    }
+
+    std::optional<Render::TerrainTile> NeutralTerrainStorage::getRenderTile(
+        int lodLevel, float size, const std::array<float, 2>& center, ESM::RefId worldspace)
+    {
+        const RenderTileKey key{ worldspace, lodLevel, size, center[0], center[1] };
+        {
+            std::lock_guard lock(mRenderTileCacheMutex);
+            const auto found = mRenderTileCache.find(key);
+            if (found != mRenderTileCache.end())
+                return found->second;
+        }
+
+        // Do not hold the cache lock while decoding cells or images. Apart
+        // from avoiding lock contention, this lets concurrent requests for
+        // different tiles make progress. A duplicate build is harmless; the
+        // second result is discarded when the key is inserted below.
+        std::optional<Render::TerrainTile> tile = RenderStorage::getRenderTile(lodLevel, size, center, worldspace);
+        {
+            std::lock_guard lock(mRenderTileCacheMutex);
+            const auto [found, inserted] = mRenderTileCache.emplace(key, std::move(tile));
+            if (!inserted)
+                return found->second;
+            return found->second;
         }
     }
 

@@ -71,7 +71,7 @@ namespace Terrain
         std::vector<Render::TerrainRegion> getRenderRegionTiles(
             const std::set<std::pair<int, int>>& activeCells, ESM::RefId worldspace);
 
-        std::optional<Render::TerrainTile> getRenderTile(
+        virtual std::optional<Render::TerrainTile> getRenderTile(
             int lodLevel, float size, const std::array<float, 2>& center, ESM::RefId worldspace);
     };
 }

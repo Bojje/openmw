@@ -31,9 +31,11 @@ namespace MWRender
     /// Terrain data source for the neutral renderer.
     ///
     /// This class reads ESM records directly and owns no OSG terrain objects.
-    /// It supports both TES3 landscape records and ESM4 world/layer mapping;
-    /// terrain quadtree streaming and complete image coverage remain backend
-    /// parity work rather than storage-contract dependencies.
+    /// It supports both TES3 landscape records and ESM4 world/layer mapping.
+    /// Decoded cells and generated neutral tiles are cached independently so
+    /// scene refreshes do not repeatedly rebuild the same terrain payload.
+    /// Backend-owned quadtree scheduling and complete image coverage remain
+    /// separate parity work.
     class NeutralTerrainStorage final : public Terrain::RenderStorage
     {
     public:
@@ -57,6 +59,8 @@ namespace MWRender
         float getHeightAt(const Render::Vec3& worldPos, ESM::RefId worldspace) override;
         std::optional<Render::TerrainHeightField> getHeightField(
             int gridX, int gridY, ESM::RefId worldspace) override;
+        std::optional<Render::TerrainTile> getRenderTile(
+            int lodLevel, float size, const std::array<float, 2>& center, ESM::RefId worldspace) override;
         void clearCache() override;
         void preloadCells(std::span<const std::array<int, 4>> bounds, ESM::RefId worldspace) override;
 
@@ -64,6 +68,8 @@ namespace MWRender
         using Cell = std::pair<int, int>;
         using LayerCache = std::map<VFS::Path::Normalized, Terrain::LayerInfo, std::less<>>;
         using CellCache = std::map<std::tuple<ESM::RefId, int, int>, std::unique_ptr<ESM::LandData>>;
+        using RenderTileKey = std::tuple<ESM::RefId, int, float, float, float>;
+        using RenderTileCache = std::map<RenderTileKey, std::optional<Render::TerrainTile>>;
 
         ESM::RefId resolveLandWorldspace(ESM::RefId worldspace) const;
         std::unique_ptr<ESM::LandData> loadCell(int gridX, int gridY, ESM::RefId worldspace) const;
@@ -83,6 +89,8 @@ namespace MWRender
         mutable std::mutex mDataMutex;
         mutable std::mutex mCellCacheMutex;
         mutable CellCache mCellCache;
+        mutable std::mutex mRenderTileCacheMutex;
+        mutable RenderTileCache mRenderTileCache;
         mutable std::mutex mLayerInfoMutex;
         mutable LayerCache mLayerInfo;
     };
