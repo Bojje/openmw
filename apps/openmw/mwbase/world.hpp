@@ -35,6 +35,7 @@ namespace osg
 namespace Render
 {
     struct Vec3;
+    struct Vec4;
     struct Quat;
     struct AnimationTextKey;
 }
@@ -233,6 +234,12 @@ namespace MWBase
         virtual void updateNeutralObjectAttachment(const MWWorld::Ptr&, std::string_view, std::string_view,
             std::string_view, bool)
         {
+        }
+        virtual void updateNeutralObjectAttachment(const MWWorld::Ptr& ptr, std::string_view attachmentId,
+            std::string_view model, std::string_view bone, bool visible, const Render::Vec4& emissiveColor,
+            bool emissiveOverride)
+        {
+            updateNeutralObjectAttachment(ptr, attachmentId, model, bone, visible);
         }
         virtual std::optional<float> getNeutralAnimationDuration(const MWWorld::Ptr&, std::string_view group = {},
             std::string_view startKey = {}, std::string_view stopKey = {}) const

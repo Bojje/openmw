@@ -220,7 +220,7 @@ namespace MWWorld
             std::optional<float> animationTime = std::nullopt, std::string_view startKey = {},
             std::string_view stopKey = {}, bool looping = false);
         void updateNeutralObjectAttachment(const Ptr& ptr, std::string_view attachmentId, std::string_view model,
-            std::string_view bone, bool visible);
+            std::string_view bone, bool visible, const Render::Vec4& emissiveColor = {}, bool emissiveOverride = false);
         bool isNeutralObjectAnimationPlaying(const Ptr& ptr, std::string_view group, float duration) const;
 
         void updateNeutralObjectCell(const Ptr& oldPtr, const Ptr& newPtr);

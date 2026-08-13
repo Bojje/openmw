@@ -542,11 +542,12 @@ namespace MWWorld
     }
 
     void Scene::updateNeutralObjectAttachment(
-        const Ptr& ptr, std::string_view attachmentId, std::string_view model, std::string_view bone, bool visible)
+        const Ptr& ptr, std::string_view attachmentId, std::string_view model, std::string_view bone, bool visible,
+        const Render::Vec4& emissiveColor, bool emissiveOverride)
     {
         if (mNeutralWorldScene)
-            mNeutralWorldScene->updateObjectAttachment(
-                static_cast<const void*>(ptr.mRef), attachmentId, model, bone, visible);
+            mNeutralWorldScene->updateObjectAttachment(static_cast<const void*>(ptr.mRef), attachmentId, model, bone,
+                visible, emissiveColor, emissiveOverride);
     }
 
     bool Scene::isNeutralObjectAnimationPlaying(const Ptr& ptr, std::string_view group, float duration) const

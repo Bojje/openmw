@@ -3236,24 +3236,44 @@ namespace MWMechanics
         updateNeutralWeaponState();
         std::string weaponModel;
         std::string weaponBone;
+        Render::Vec4 weaponGlow{};
+        bool weaponGlowEnabled = false;
         if (isRealWeapon(mWeaponType) && !mWeapon.isEmpty())
         {
             const VFS::Path::Normalized model = mWeapon.getClass().getCorrectedModel(mWeapon);
             weaponModel = model.value();
             weaponBone = getWeaponType(mWeaponType)->mAttachBone;
+            if (!mWeapon.getClass().getEnchantment(mWeapon).empty())
+            {
+                const osg::Vec4 glow = mWeapon.getClass().getEnchantmentColor(mWeapon);
+                weaponGlow = { glow.r(), glow.g(), glow.b(), 1.f };
+                weaponGlowEnabled = true;
+            }
         }
-        world->updateNeutralObjectAttachment(mPtr, "weapon", weaponModel, weaponBone, true);
+        world->updateNeutralObjectAttachment(
+            mPtr, "weapon", weaponModel, weaponBone, true, weaponGlow, weaponGlowEnabled);
 
         std::string carriedLeftModel;
+        Render::Vec4 carriedLeftGlow{};
+        bool carriedLeftGlowEnabled = false;
         if (mPtr.getClass().hasInventoryStore(mPtr) && updateCarriedLeftVisible(mWeaponType))
         {
             const MWWorld::InventoryStore& inventory = mPtr.getClass().getInventoryStore(mPtr);
             const MWWorld::ConstContainerStoreIterator carriedLeft
                 = inventory.getSlot(MWWorld::InventoryStore::Slot_CarriedLeft);
             if (carriedLeft != inventory.end())
+            {
                 carriedLeftModel = carriedLeft->getClass().getCorrectedModel(*carriedLeft).value();
+                if (!carriedLeft->getClass().getEnchantment(*carriedLeft).empty())
+                {
+                    const osg::Vec4 glow = carriedLeft->getClass().getEnchantmentColor(*carriedLeft);
+                    carriedLeftGlow = { glow.r(), glow.g(), glow.b(), 1.f };
+                    carriedLeftGlowEnabled = true;
+                }
+            }
         }
-        world->updateNeutralObjectAttachment(mPtr, "carried-left", carriedLeftModel, "Shield Bone", true);
+        world->updateNeutralObjectAttachment(mPtr, "carried-left", carriedLeftModel, "Shield Bone", true,
+            carriedLeftGlow, carriedLeftGlowEnabled);
         updateNeutralAnimationQueue(duration);
         updateNeutralHitAnimation();
 

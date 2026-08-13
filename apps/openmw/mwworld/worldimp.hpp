@@ -220,7 +220,8 @@ namespace MWWorld
             std::optional<float> animationTime = std::nullopt, std::string_view startKey = {},
             std::string_view stopKey = {}, bool looping = false) override;
         void updateNeutralObjectAttachment(const MWWorld::Ptr& ptr, std::string_view attachmentId,
-            std::string_view model, std::string_view bone, bool visible) override;
+            std::string_view model, std::string_view bone, bool visible, const Render::Vec4& emissiveColor,
+            bool emissiveOverride) override;
         std::vector<VFS::Path::Normalized> getNeutralAnimationSources(const MWWorld::Ptr& ptr) const;
         std::optional<float> getNeutralAnimationDuration(const MWWorld::Ptr& ptr, std::string_view group = {},
             std::string_view startKey = {}, std::string_view stopKey = {}) const override;

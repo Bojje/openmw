@@ -4280,10 +4280,12 @@ namespace MWWorld
     }
 
     void World::updateNeutralObjectAttachment(const MWWorld::Ptr& ptr, std::string_view attachmentId,
-        std::string_view model, std::string_view bone, bool visible)
+        std::string_view model, std::string_view bone, bool visible, const Render::Vec4& emissiveColor,
+        bool emissiveOverride)
     {
         if (mWorldScene)
-            mWorldScene->updateNeutralObjectAttachment(ptr, attachmentId, model, bone, visible);
+            mWorldScene->updateNeutralObjectAttachment(
+                ptr, attachmentId, model, bone, visible, emissiveColor, emissiveOverride);
     }
 
     std::vector<VFS::Path::Normalized> World::getNeutralAnimationSources(const MWWorld::Ptr& ptr) const
