@@ -50,6 +50,7 @@ namespace Nif
         {
             mBlendInterpolator.read(nif);
             nif->read(mBlendIndex);
+            mBlendIndexSet = true;
         }
         if (nif->getVersion() >= NIFStream::generateVersion(10, 1, 0, 106) && nif->getBethVersion() > 0)
             nif->read(mPriority);

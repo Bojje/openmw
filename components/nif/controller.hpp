@@ -15,6 +15,7 @@ namespace Nif
         NiTimeControllerPtr mController;
         NiBlendInterpolatorPtr mBlendInterpolator;
         uint16_t mBlendIndex{ 0 };
+        bool mBlendIndexSet{ false };
         uint8_t mPriority{ 0 };
         NiStringPalettePtr mStringPalette;
         uint32_t mNodeNameOffset{ 0 };

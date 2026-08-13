@@ -19,6 +19,7 @@
 #include "texture.hpp"
 #include <components/render/meshconversion.hpp>
 #include <components/render/math.hpp>
+#include <components/render/animationmask.hpp>
 #include <components/vfs/pathutil.hpp>
 #include <components/misc/strings/lower.hpp>
 
@@ -555,6 +556,10 @@ namespace Nif
                 if (block.mTargetName.empty())
                     continue;
                 const std::string targetName = normalizedBoneName(block.mTargetName);
+                if (block.mBlendIndexSet
+                    && (block.mBlendIndex >= 4
+                        || !Render::animationBoneInMask(targetName, 1u << block.mBlendIndex)))
+                    continue;
                 const float controllerSampleTime = block.mController.empty()
                     ? sampleTime
                     : controllerTime(*block.mController.getPtr(), sampleTime);

@@ -334,6 +334,8 @@ int main()
     sequenceBlock.mInterpolator = nullptr;
     sequenceBlock.mController = nullptr;
     sequenceBlock.mBlendInterpolator = sequenceBlend.get();
+    sequenceBlock.mBlendIndex = 0;
+    sequenceBlock.mBlendIndexSet = true;
     auto controllerSequence = std::make_unique<Nif::NiControllerSequence>();
     controllerSequence->mRecordType = Nif::RC_NiControllerSequence;
     controllerSequence->mName = "idle";
@@ -351,6 +353,12 @@ int main()
     controllerSequence->mControlledBlocks.push_back(lowerPriorityBlock);
     sequenceBlock.mPriority = 3;
     controllerSequence->mControlledBlocks.front() = sequenceBlock;
+    Nif::ControlledBlock excludedBlendBlock = sequenceBlock;
+    excludedBlendBlock.mInterpolator = lowerPriorityInterpolator.get();
+    excludedBlendBlock.mBlendInterpolator = nullptr;
+    excludedBlendBlock.mBlendIndex = 2;
+    excludedBlendBlock.mPriority = 255;
+    controllerSequence->mControlledBlocks.push_back(excludedBlendBlock);
     controllerSequence->mWeight = 0.75f;
     auto secondSequenceInterpolator = std::make_unique<Nif::NiTransformInterpolator>();
     secondSequenceInterpolator->mRecordType = Nif::RC_NiTransformInterpolator;
