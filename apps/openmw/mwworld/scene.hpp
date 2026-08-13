@@ -218,6 +218,8 @@ namespace MWWorld
         void updateObjectAnimation(const Ptr& ptr, std::string_view group,
             std::optional<float> animationTime = std::nullopt, std::string_view startKey = {},
             std::string_view stopKey = {});
+        void updateNeutralObjectAttachment(const Ptr& ptr, std::string_view attachmentId, std::string_view model,
+            std::string_view bone, bool visible);
         bool isNeutralObjectAnimationPlaying(const Ptr& ptr, std::string_view group, float duration) const;
 
         void updateNeutralObjectCell(const Ptr& oldPtr, const Ptr& newPtr);

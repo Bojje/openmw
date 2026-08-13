@@ -4232,6 +4232,13 @@ namespace MWWorld
             mWorldScene->updateObjectAnimation(ptr, group, animationTime, startKey, stopKey);
     }
 
+    void World::updateNeutralObjectAttachment(const MWWorld::Ptr& ptr, std::string_view attachmentId,
+        std::string_view model, std::string_view bone, bool visible)
+    {
+        if (mWorldScene)
+            mWorldScene->updateNeutralObjectAttachment(ptr, attachmentId, model, bone, visible);
+    }
+
     std::optional<float> World::getNeutralAnimationDuration(
         const MWWorld::Ptr& ptr, std::string_view group, std::string_view startKey, std::string_view stopKey) const
     {

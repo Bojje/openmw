@@ -87,6 +87,14 @@ namespace Render
     // the scene bridge and is intentionally opaque to backends.
     struct WorldObject
     {
+        struct Attachment
+        {
+            std::string id;
+            std::string model;
+            std::string bone;
+            bool visible = true;
+        };
+
         uint64_t id = 0;
         std::string model;
         ObjectTransform transform;
@@ -116,6 +124,7 @@ namespace Render
         bool magicVfx = false;
         float opacity = 1.f;
         bool active = true;
+        std::vector<Attachment> attachments;
     };
 
     // A cell snapshot is updated by the world lifecycle, not by a renderer.
@@ -430,6 +439,7 @@ namespace Render
                             object->boneMatrices.clear();
                             object->animationTime = 0.f;
                             object->animationGroup.clear();
+                            object->attachments.clear();
                         }
                         return;
                     }
@@ -535,6 +545,41 @@ namespace Render
             }
             if (animationTime && std::isfinite(*animationTime) && *animationTime >= 0.f)
                 object->animationTime = *animationTime;
+            return true;
+        }
+
+        bool updateObjectAttachment(const void* objectKey, std::string_view attachmentId, std::string_view model,
+            std::string_view bone, bool visible)
+        {
+            if (objectKey == nullptr || attachmentId.empty())
+                return false;
+            const auto found = mObjects.find(objectKey);
+            if (found == mObjects.end())
+                return false;
+            const auto scene = mCells.find(found->second.cell);
+            if (scene == mCells.end())
+                return false;
+            WorldObject* const object = scene->second.findObject(found->second.id);
+            if (object == nullptr || !object->dynamic)
+                return false;
+
+            const auto attachment = std::find_if(object->attachments.begin(), object->attachments.end(),
+                [&](const WorldObject::Attachment& candidate) { return candidate.id == attachmentId; });
+            if (model.empty())
+            {
+                if (attachment != object->attachments.end())
+                    object->attachments.erase(attachment);
+                return true;
+            }
+
+            if (attachment == object->attachments.end())
+                object->attachments.push_back({ std::string(attachmentId), std::string(model), std::string(bone), visible });
+            else
+            {
+                attachment->model = model;
+                attachment->bone = bone;
+                attachment->visible = visible;
+            }
             return true;
         }
 

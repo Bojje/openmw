@@ -3197,6 +3197,13 @@ namespace MWMechanics
         world->queueMovement(mPtr, movement);
 
         updateNeutralWeaponState();
+        std::string weaponModel;
+        if (isRealWeapon(mWeaponType) && !mWeapon.isEmpty())
+        {
+            const VFS::Path::Normalized model = mWeapon.getClass().getCorrectedModel(mWeapon);
+            weaponModel = model.value();
+        }
+        world->updateNeutralObjectAttachment(mPtr, "weapon", weaponModel, "Bip01 R Hand", true);
         updateNeutralAnimationQueue(duration);
         updateNeutralHitAnimation();
 

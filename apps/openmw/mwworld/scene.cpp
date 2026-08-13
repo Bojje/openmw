@@ -414,6 +414,14 @@ namespace MWWorld
                 static_cast<const void*>(ptr.mRef), group, animationTime, startKey, stopKey);
     }
 
+    void Scene::updateNeutralObjectAttachment(
+        const Ptr& ptr, std::string_view attachmentId, std::string_view model, std::string_view bone, bool visible)
+    {
+        if (mNeutralWorldScene)
+            mNeutralWorldScene->updateObjectAttachment(
+                static_cast<const void*>(ptr.mRef), attachmentId, model, bone, visible);
+    }
+
     bool Scene::isNeutralObjectAnimationPlaying(const Ptr& ptr, std::string_view group, float duration) const
     {
         return mNeutralWorldScene
@@ -1404,6 +1412,37 @@ namespace MWWorld
                         dynamic.object.animationStopKey, skinning->boneNames);
                     if (pose.size() == skinning->inverseBindMatrices.size())
                         dynamic.boneMatrices = pose;
+                }
+            }
+
+            if (!dynamic.boneMatrices.empty())
+            {
+                const Render::SkinningData* skinning = Render::findCompatibleSkinning(dynamic);
+                if (skinning != nullptr)
+                {
+                    for (const Render::WorldObject::Attachment& attachment : dynamic.object.attachments)
+                    {
+                        if (!attachment.visible || attachment.model.empty() || attachment.bone.empty())
+                            continue;
+                        const auto bone = std::find(skinning->boneNames.begin(), skinning->boneNames.end(), attachment.bone);
+                        if (bone == skinning->boneNames.end())
+                            continue;
+                        const std::size_t boneIndex = static_cast<std::size_t>(bone - skinning->boneNames.begin());
+                        if (boneIndex >= dynamic.boneMatrices.size())
+                            continue;
+                        const std::vector<Render::MeshInstance>& meshes = resolveMeshes(attachment.model);
+                        if (!std::any_of(meshes.begin(), meshes.end(), Render::hasRenderableGeometry))
+                        {
+                            result.unresolvedModels.push_back(attachment.model);
+                            continue;
+                        }
+                        for (const Render::MeshInstance& mesh : meshes)
+                        {
+                            Render::MeshInstance attached = mesh;
+                            attached.transform = Render::multiply(dynamic.boneMatrices[boneIndex], mesh.transform);
+                            dynamic.meshes.push_back(Render::transformMeshInstance(dynamic.object, attached));
+                        }
+                    }
                 }
             }
 
