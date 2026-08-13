@@ -556,7 +556,7 @@ scene/resource/presentation ownership rather than adding another compatibility b
 
 Submission validation now lives on the renderer-neutral `SceneSubmission` boundary used by the
 Vulkan consumer, including dynamic mesh textures. The latest validation checkpoint also rejects non-finite scene matrices, transforms, vertex
-attributes, skinning payloads, and terrain coordinates at the renderer-neutral submission boundary, before
+attributes, emissive payloads, skinning payloads, and terrain coordinates at the renderer-neutral submission boundary, before
 they reach Vulkan. This protects the backend from corrupted engine state without relying
 on GPU validation diagnostics. Visible models that resolve only to empty mesh batches are also
 reported as unresolved, so a converter cannot silently turn a world reference into no draw.

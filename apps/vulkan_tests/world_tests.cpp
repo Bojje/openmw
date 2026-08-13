@@ -715,6 +715,13 @@ int main()
         throw std::runtime_error("renderer-neutral scene submission accepted an invalid mesh index");
     submission.meshes.clear();
 
+    Render::MeshInstance malformedEmissive = aggregateMesh;
+    malformedEmissive.mesh.vertices.front().emissive[0] = std::numeric_limits<float>::quiet_NaN();
+    submission.meshes.push_back(std::move(malformedEmissive));
+    if (submission.valid())
+        throw std::runtime_error("renderer-neutral scene submission accepted a non-finite emissive payload");
+    submission.meshes.clear();
+
     submission.scene.view.data[0] = std::numeric_limits<float>::quiet_NaN();
     if (submission.valid())
         throw std::runtime_error("renderer-neutral scene submission accepted a non-finite scene matrix");

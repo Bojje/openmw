@@ -69,6 +69,9 @@ namespace Render
             for (const float value : vertex.tangent)
                 if (!std::isfinite(value))
                     return false;
+            for (const float value : vertex.emissive)
+                if (!std::isfinite(value))
+                    return false;
         }
         return std::all_of(instance.mesh.indices.begin(), instance.mesh.indices.end(), [&](std::uint32_t index) {
             return index < instance.mesh.vertices.size();
@@ -99,6 +102,8 @@ namespace Render
             vertex.texcoord[0] = texcoords[i][0];
             vertex.texcoord[1] = texcoords[i][1];
             vertex.color[0] = vertex.color[1] = vertex.color[2] = vertex.color[3] = 1.f;
+            vertex.emissive[0] = vertex.emissive[1] = vertex.emissive[2] = 0.f;
+            vertex.emissive[3] = 1.f;
             vertex.tangent[3] = 1.f;
         }
         result.mesh.indices = { 0, 1, 2, 0, 2, 3 };
@@ -231,6 +236,8 @@ namespace Render
                 vertex.texcoord[0] = vertexIndex == 1 || vertexIndex == 2 ? 1.f : 0.f;
                 vertex.texcoord[1] = vertexIndex >= 2 ? 1.f : 0.f;
                 vertex.color[0] = vertex.color[1] = vertex.color[2] = vertex.color[3] = 1.f;
+                vertex.emissive[0] = vertex.emissive[1] = vertex.emissive[2] = 0.f;
+                vertex.emissive[3] = 1.f;
                 vertex.tangent[3] = 1.f;
             }
             instance.mesh.indices = { 0, 1, 2, 0, 2, 3 };
