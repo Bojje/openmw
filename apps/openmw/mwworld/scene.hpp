@@ -88,6 +88,11 @@ namespace MWWorld
             ESM::ExteriorCellLocation mCellIndex;
             bool mChangeEvent;
         };
+        struct NeutralTerrainPreload
+        {
+            std::array<int, 4> mBounds;
+            ESM::RefId mWorldspace;
+        };
 
         CellStore* mCurrentCell; // the cell the player is in
         CellStoreCollection mActiveCells;
@@ -117,6 +122,7 @@ namespace MWWorld
         // second scene representation.
         std::unique_ptr<Render::WorldScene> mNeutralWorldScene;
         bool mNeutralTerrainRegionsDirty = true;
+        std::vector<NeutralTerrainPreload> mNeutralTerrainPreloads;
         mutable std::unordered_map<std::string, std::weak_ptr<const std::vector<Render::MeshInstance>>>
             mNeutralMeshCache;
 
@@ -140,6 +146,8 @@ namespace MWWorld
             const Render::Vec3& playerPos, std::vector<PositionCellGrid>& exteriorPositions);
         void preloadCellWithSurroundings(MWWorld::CellStore& cell);
         void preloadCell(MWWorld::CellStore& cell);
+        void queueNeutralTerrainPreload(const std::array<int, 4>& bounds, ESM::RefId worldspace);
+        void flushNeutralTerrainPreloads();
         void preloadTerrain(const Render::Vec3& pos, ESM::RefId worldspace, bool sync = false);
 
         std::array<int, 4> gridCenterToBounds(const std::array<int, 2>& centerCell) const;

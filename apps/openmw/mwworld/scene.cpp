@@ -1812,6 +1812,7 @@ namespace MWWorld
     {
         if (dt <= 1e-06)
             return;
+        mNeutralTerrainPreloads.clear();
         const auto& cellSettings = Settings::cells();
         std::vector<PositionCellGrid> exteriorPositions;
 
@@ -1843,13 +1844,11 @@ namespace MWWorld
 
         if (mPreloader)
             mPreloader->setTerrainPreloadPositions(exteriorPositions);
-        else if (!exteriorPositions.empty())
+        else
         {
-            std::vector<std::array<int, 4>> bounds;
-            bounds.reserve(exteriorPositions.size());
             for (const PositionCellGrid& preloadPosition : exteriorPositions)
-                bounds.push_back(preloadPosition.mCellBounds);
-            mTerrainStorage.preloadCells(bounds, mCurrentCell->getCell()->getWorldSpace());
+                queueNeutralTerrainPreload(preloadPosition.mCellBounds, mCurrentCell->getCell()->getWorldSpace());
+            flushNeutralTerrainPreloads();
         }
     }
 
@@ -1941,7 +1940,18 @@ namespace MWWorld
     void Scene::preloadCellWithSurroundings(CellStore& cell)
     {
         if (!mPreloader)
+        {
+            if (cell.isExterior())
+            {
+                const int cellX = cell.getCell()->getGridX();
+                const int cellY = cell.getCell()->getGridY();
+                queueNeutralTerrainPreload(
+                    { cellX - mHalfGridSize, cellY - mHalfGridSize, cellX + mHalfGridSize + 1,
+                        cellY + mHalfGridSize + 1 },
+                    cell.getCell()->getWorldSpace());
+            }
             return;
+        }
 
         if (!cell.isExterior())
         {
@@ -1981,7 +1991,38 @@ namespace MWWorld
     void Scene::preloadCell(CellStore& cell)
     {
         if (mPreloader)
+        {
             mPreloader->preload(cell, mFrameLifecycle.referenceTime());
+        }
+        else if (cell.isExterior())
+        {
+            const int cellX = cell.getCell()->getGridX();
+            const int cellY = cell.getCell()->getGridY();
+            queueNeutralTerrainPreload({ cellX, cellY, cellX + 1, cellY + 1 }, cell.getCell()->getWorldSpace());
+        }
+    }
+
+    void Scene::queueNeutralTerrainPreload(const std::array<int, 4>& bounds, ESM::RefId worldspace)
+    {
+        if (bounds[0] >= bounds[2] || bounds[1] >= bounds[3])
+            return;
+        mNeutralTerrainPreloads.push_back({ bounds, worldspace });
+    }
+
+    void Scene::flushNeutralTerrainPreloads()
+    {
+        if (mNeutralTerrainPreloads.empty())
+            return;
+
+        const ESM::RefId worldspace = mNeutralTerrainPreloads.front().mWorldspace;
+        std::vector<std::array<int, 4>> bounds;
+        for (const NeutralTerrainPreload& preload : mNeutralTerrainPreloads)
+        {
+            if (preload.mWorldspace == worldspace)
+                bounds.push_back(preload.mBounds);
+        }
+        mTerrainStorage.preloadCells(bounds, worldspace);
+        mNeutralTerrainPreloads.clear();
     }
 
     void Scene::preloadTerrain(const Render::Vec3& pos, ESM::RefId worldspace, bool sync)
