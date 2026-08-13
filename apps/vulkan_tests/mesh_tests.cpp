@@ -7,6 +7,7 @@
 #include <components/nif/controller.hpp>
 #include <components/nif/extra.hpp>
 #include <components/nif/meshconverter.hpp>
+#include <components/nif/particle.hpp>
 #include <components/nif/property.hpp>
 #include <components/nif/texture.hpp>
 #include <components/render/texture.hpp>
@@ -97,6 +98,17 @@ int main()
     }
     if (!rejectedInvalidIndex)
         throw std::runtime_error("invalid NIF index was accepted");
+
+    Nif::NiParticlesData particleSource;
+    particleSource.mActiveCount = 2;
+    particleSource.mVertices = { { 1.f, 2.f, 3.f }, { -2.f, 1.f, 0.f } };
+    particleSource.mRadii = { 2.f, 0.5f };
+    particleSource.mSizes = { 1.f, 2.f };
+    const Render::MeshData particles = Nif::convertParticles(particleSource);
+    if (particles.vertices.size() != 8 || particles.indices.size() != 12
+        || particles.vertices[0].position[0] != -1.f || particles.vertices[4].position[0] != -3.f
+        || particles.vertices[7].texcoord[1] != 1.f)
+        throw std::runtime_error("NIF particle conversion did not create deterministic quad snapshots");
 
     Nif::NiTriStripsData strips;
     strips.mVertices = source.mVertices;

@@ -15,6 +15,7 @@
 #include "extra.hpp"
 #include "nifkey.hpp"
 #include "node.hpp"
+#include "particle.hpp"
 #include "property.hpp"
 #include "texture.hpp"
 #include <components/render/meshconversion.hpp>
@@ -884,6 +885,42 @@ namespace Nif
         return result;
     }
 
+    Render::MeshData convertParticles(const NiParticlesData& source)
+    {
+        Render::MeshData result;
+        const std::size_t particleCount = std::min<std::size_t>(source.mActiveCount, source.mVertices.size());
+        result.vertices.reserve(particleCount * 4);
+        result.indices.reserve(particleCount * 6);
+
+        for (std::size_t particle = 0; particle < particleCount; ++particle)
+        {
+            float radius = particle < source.mRadii.size() ? source.mRadii[particle] : 1.f;
+            if (particle < source.mSizes.size())
+                radius *= source.mSizes[particle];
+            if (!std::isfinite(radius) || radius <= 0.f)
+                continue;
+
+            const osg::Vec3f& center = source.mVertices[particle];
+            const std::array<Render::MeshVertexSource, 4> quad = {
+                Render::MeshVertexSource{ { center.x() - radius, center.y() - radius, center.z() }, {},
+                    { 0.f, 0.f }, {}, false, true, false },
+                Render::MeshVertexSource{ { center.x() + radius, center.y() - radius, center.z() }, {},
+                    { 1.f, 0.f }, {}, false, true, false },
+                Render::MeshVertexSource{ { center.x() + radius, center.y() + radius, center.z() }, {},
+                    { 1.f, 1.f }, {}, false, true, false },
+                Render::MeshVertexSource{ { center.x() - radius, center.y() + radius, center.z() }, {},
+                    { 0.f, 1.f }, {}, false, true, false },
+            };
+            const Render::MeshData quadMesh = Render::makeMeshData(quad);
+            const std::uint32_t base = static_cast<std::uint32_t>(result.vertices.size());
+            result.vertices.insert(result.vertices.end(), quadMesh.vertices.begin(), quadMesh.vertices.end());
+            result.indices.insert(result.indices.end(), { base, base + 1, base + 2, base, base + 2, base + 3 });
+        }
+
+        Render::computeMeshTangents(result);
+        return result;
+    }
+
     namespace
     {
         Render::Mat4 toRenderMatrix(const NiTransform& transform)
@@ -923,7 +960,17 @@ namespace Nif
             {
                 if (!geometry->mData.empty())
                 {
-                    if (const auto* shapeData = dynamic_cast<const NiTriShapeData*>(&geometry->mData.get()))
+                    if (const auto* particleData = dynamic_cast<const NiParticlesData*>(&geometry->mData.get()))
+                    {
+                        Render::MeshData mesh = convertParticles(*particleData);
+                        if (!mesh.vertices.empty() && !mesh.indices.empty())
+                        {
+                            mesh.material = convertMaterial(*geometry);
+                            mesh.material.doubleSided = true;
+                            meshes.push_back({ std::move(mesh), transform });
+                        }
+                    }
+                    else if (const auto* shapeData = dynamic_cast<const NiTriShapeData*>(&geometry->mData.get()))
                     {
                         Render::MeshData mesh = convertMesh(*shapeData);
                         mesh.material = convertMaterial(*geometry);

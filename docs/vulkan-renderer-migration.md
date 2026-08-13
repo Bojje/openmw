@@ -84,7 +84,8 @@ Vulkan bootstrap now has a model-local NIF pose producer: the resource boundary 
 the resulting matrices into dynamic submissions. Explicit gameplay poses still take precedence;
 objects without a compatible pose retain the inverse-bind-derived bind pose. Actor source-order
 selection is now world-owned; neutral animation layers now carry explicit masks and priorities,
-while particles and animation-specific shading remain later gates.
+and active NIF particle records now have a renderer-neutral textured-quad fallback while
+time-based particle emission and modifiers remain later gates.
 NIF classic texture, diffuse/emissive, glossiness, and alpha properties now cross the
 renderer-neutral mesh boundary and survive batching; the neutral batch applies diffuse
 and alpha to vertex color output. NIF bump/normal texture slots now cross the same boundary
@@ -217,7 +218,7 @@ layer) without constructing OSG controller state. Modern `NiControllerSequence` 
 transform blend interpolators now feed that sampler as well;
 neutral NPCs now also publish their selected head, hair, race body-part, and equipped armor/clothing meshes as named
 bone attachments; weapon/shield presentation now carries animated-emissive state through the neutral
-material boundary, while exact enchanted caustic texture layering, particles, and dynamic shading remain outstanding.
+material boundary, while exact enchanted caustic texture layering, animated particle simulation, and dynamic shading remain outstanding.
 Neutral arrow release and container timing/GUI events now have renderer-neutral paths.
 Neutral actor idle and movement selection now honors weapon-specific short groups when those groups are actually
 present, and grouped duration queries reject unrelated controller files instead of falsely selecting a missing group.
@@ -553,7 +554,7 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the frozen `openmw-vulkan-osg-reference` tag, the current checkpoint changes
-214 code files excluding this ledger, deleting 2,490 lines and adding 17,231 lines (net `+14,741`). The larger Vulkan-only
+214 code files excluding this ledger, deleting 2,490 lines and adding 17,311 lines (net `+14,821`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; the current branch continues the reduction
 work with renderer-neutral ownership and compatibility-wrapper deletion. The live no-GUI
 consumer is the first deletion checkpoint; further reduction can now target OSG
@@ -748,7 +749,8 @@ provide a usable surface, while validation errors remain hard failures.
   interiors, and static objects. The terrain adapter now feeds opaque and ordered
   blendmap/multi-layer Vulkan mesh consumers with normal-map sampling, height-based
   parallax, diffuse-alpha specular data, and explicit ESM4 specular textures; active-cell-aware region
-  assembly now prevents paging holes from becoming neutral terrain; quadtree-scale streaming policy and
+  assembly now prevents paging holes from becoming neutral terrain; deterministic region LOD selection and
+  adjacent-region gap limiting are also neutral; quadtree-scale streaming policy and
   full terrain image coverage remain.
 - Reach a static playable scene without OSG rendering, then expand neutral image coverage and
   establish camera synchronization.
@@ -756,6 +758,8 @@ provide a usable surface, while validation errors remain hard failures.
 ### 7. Port dynamic content and presentation
 
 - Add actors, skinning, animation, particles, weather, water, spell effects, projectiles, and post-processing.
+  Active NIF particle records now convert into validated neutral textured quads; emission, aging, modifiers,
+  and camera-facing particle simulation remain to be moved out of the legacy owner.
   The neutral path now samples model-local NIF and classic external `.kf` keyframe controllers,
   honors selected group start/stop segments, carries explicit per-object animation groups and clocks,
 and starts neutral weapon and spell-cast queues with attack/cast timing keys, including non-biped

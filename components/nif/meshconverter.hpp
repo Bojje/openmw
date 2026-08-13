@@ -14,9 +14,11 @@ namespace Nif
 {
     struct NiTriShapeData;
     struct NiTriStripsData;
+    struct NiParticlesData;
 
     Render::MeshData convertMesh(const NiTriShapeData& source);
     Render::MeshData convertMesh(const NiTriStripsData& source);
+    Render::MeshData convertParticles(const NiParticlesData& source);
     std::vector<Render::MeshInstance> collectMeshInstances(FileView file);
 
     /// Sample model-local bone transforms without constructing an OSG scene.
