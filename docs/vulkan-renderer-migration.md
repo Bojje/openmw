@@ -521,7 +521,7 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the frozen `openmw-vulkan-osg-reference` tag, the current checkpoint changes
-207 code files excluding this ledger, deleting 2,284 lines and adding 15,034 lines (net `+12,750`). The larger Vulkan-only
+207 code files excluding this ledger, deleting 2,284 lines and adding 15,036 lines (net `+12,752`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; the current branch continues the reduction
 work with renderer-neutral ownership and compatibility-wrapper deletion. The live no-GUI
 consumer is the first deletion checkpoint; further reduction can now target OSG
@@ -726,6 +726,8 @@ Neutral effect meshes now defer skinning until the scene owner can sample the re
 local-controller or sibling-KF poses are flattened before the Vulkan batch, while attached-equipment meshes retain the
 explicit bind-pose fallback when no actor pose is available. Neutral effect clocks also use sibling-KF duration metadata
 when the static NIF has no local controller, so external effect animation is not pinned to time zero.
+Looping neutral effects now also carry their gameplay loop flag into pose sampling, keeping their
+controller clock wrapped instead of sampling past the resolved interval.
 Neutral actor visibility now also carries opacity and alpha-blend state into dynamic mesh submission, including
 invisibility/chameleon fading without an OSG animation owner. Neutral container opening and closing now retain
 the `containeropen`/`containerclose` timing, including the `loot` event that gates GUI presentation while paused.
