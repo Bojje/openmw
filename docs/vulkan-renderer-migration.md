@@ -521,7 +521,7 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the frozen `openmw-vulkan-osg-reference` tag, the current checkpoint changes
-207 code files excluding this ledger, deleting 2,290 lines and adding 14,437 lines (net `+12,147`). The larger Vulkan-only
+207 code files excluding this ledger, deleting 2,289 lines and adding 14,538 lines (net `+12,249`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; the current branch continues the reduction
 work with renderer-neutral ownership and compatibility-wrapper deletion. The live no-GUI
 consumer is the first deletion checkpoint; further reduction can now target OSG
@@ -722,6 +722,8 @@ Neutral actor processing-range activation now also filters dynamic submissions, 
 without hiding static cell references.
 Neutral actors now also select jump and landing controller segments from physics state, with fallback to the
 available full `start`/`stop` interval when loop keys are absent.
+Neutral animation state now exposes renderer-neutral completion queries, so death and hit playback do not report
+finished merely because the OSG animation owner is absent.
   Neutral Lua/sound/melee/spell text-key dispatch is now covered for the migrated event classes.
 - Resting actors, owned-item lookup, line-of-sight, moving doors, and transformation-script movement/rotation now use active-cell state and world-model transforms instead of treating an absent OSG node as inactive.
 - Neutral focus selection and gameplay raycasts now use the renderer-neutral camera state and physics collision masks, so activation and targeting no longer require an OSG renderer.
