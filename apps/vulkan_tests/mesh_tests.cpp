@@ -104,6 +104,7 @@ int main()
     particleSource.mVertices = { { 1.f, 2.f, 3.f }, { -2.f, 1.f, 0.f } };
     particleSource.mRadii = { 2.f };
     particleSource.mSizes = { 1.f, 2.f };
+    particleSource.mColors = { { 0.25f, 0.5f, 0.75f, 0.8f }, { 0.9f, 0.8f, 0.7f, 0.6f } };
     particleSource.mRotationAngles = { 3.14159265358979323846f / 2.f, 0.f };
     particleSource.mRotationAxes = { { 0.f, 0.f, 1.f }, { 0.f, 0.f, 1.f } };
     const Render::MeshData particles = Nif::convertParticles(particleSource);
@@ -111,6 +112,9 @@ int main()
         || std::abs(particles.vertices[0].position[0] - 2.f) > 1e-5f
         || std::abs(particles.vertices[0].position[1] + 2.f) > 1e-5f
         || particles.vertices[4].position[0] != -4.f
+        || std::abs(particles.vertices[0].color[0] - 0.25f) > 1e-5f
+        || std::abs(particles.vertices[0].color[3] - 0.8f) > 1e-5f
+        || std::abs(particles.vertices[4].color[2] - 0.7f) > 1e-5f
         || particles.vertices[0].tangent[0] != 1.f || particles.vertices[4].tangent[1] != 1.f
         || particles.vertices[7].texcoord[1] != 1.f)
         throw std::runtime_error("NIF particle conversion did not create deterministic quad snapshots");

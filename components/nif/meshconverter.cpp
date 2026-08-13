@@ -928,12 +928,17 @@ namespace Nif
             const std::array<std::array<float, 2>, 4> texcoords = {
                 std::array<float, 2>{ 0.f, 0.f }, std::array<float, 2>{ 1.f, 0.f },
                 std::array<float, 2>{ 1.f, 1.f }, std::array<float, 2>{ 0.f, 1.f } };
+            const bool hasColor = source.mColors.size() == source.mVertices.size();
+            const std::array<float, 4> color = hasColor
+                ? std::array<float, 4>{ source.mColors[particle].r(), source.mColors[particle].g(),
+                      source.mColors[particle].b(), source.mColors[particle].a() }
+                : std::array<float, 4>{ 1.f, 1.f, 1.f, 1.f };
             std::array<Render::MeshVertexSource, 4> quad = {};
             for (std::size_t corner = 0; corner < quad.size(); ++corner)
             {
                 const osg::Vec3f rotated = rotation * corners[corner];
                 quad[corner] = Render::MeshVertexSource{ { rotated.x(), rotated.y(), 0.f }, {},
-                    texcoords[corner], {}, false, true, false };
+                    texcoords[corner], color, false, true, hasColor };
             }
             Render::MeshData quadMesh = Render::makeMeshData(quad);
             for (Render::MeshVertex& vertex : quadMesh.vertices)
