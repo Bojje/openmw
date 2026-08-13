@@ -160,6 +160,23 @@ namespace
         indexedTga[18 + 3 + 2] = 255;
         indexedTga[24] = 0x80;
         indexedTga[25] = 1;
+        std::vector<std::uint8_t> dx10Rgba(152, 0);
+        dx10Rgba[0] = 'D';
+        dx10Rgba[1] = 'D';
+        dx10Rgba[2] = 'S';
+        dx10Rgba[3] = ' ';
+        write32(dx10Rgba, 4, 124);
+        write32(dx10Rgba, 12, 1);
+        write32(dx10Rgba, 16, 1);
+        write32(dx10Rgba, 76, 32);
+        write32(dx10Rgba, 84, 0x30315844); // DX10 extended header.
+        write32(dx10Rgba, 128, 28); // DXGI_FORMAT_R8G8B8A8_UNORM.
+        write32(dx10Rgba, 132, 3); // D3D10_RESOURCE_DIMENSION_TEXTURE2D.
+        write32(dx10Rgba, 136, 1); // Array size.
+        dx10Rgba[148] = 12;
+        dx10Rgba[149] = 34;
+        dx10Rgba[150] = 56;
+        dx10Rgba[151] = 255;
         {
             std::ofstream output(root / "textures/test.bmp", std::ios::binary);
             output.write(reinterpret_cast<const char*>(bmp.data()), static_cast<std::streamsize>(bmp.size()));
@@ -199,6 +216,10 @@ namespace
             std::ofstream output(root / "textures/indexed.tga", std::ios::binary);
             output.write(reinterpret_cast<const char*>(indexedTga.data()),
                 static_cast<std::streamsize>(indexedTga.size()));
+        }
+        {
+            std::ofstream output(root / "textures/dx10.dds", std::ios::binary);
+            output.write(reinterpret_cast<const char*>(dx10Rgba.data()), static_cast<std::streamsize>(dx10Rgba.size()));
         }
 
         const ToUTF8::Utf8Encoder encoder(ToUTF8::WINDOWS_1252);
@@ -253,6 +274,10 @@ namespace
             || dxt4Texture->pixels[0] != 255 || dxt4Texture->pixels[1] != 0 || dxt4Texture->pixels[2] != 0
             || dxt4Texture->pixels[3] != 0)
             throw std::runtime_error("neutral DXT4 texture decoding did not preserve premultiplied DXT5 data");
+        const auto dx10Texture = resources.getNeutralTextureManager()->get(VFS::Path::Normalized("textures/dx10.dds"));
+        if (!dx10Texture || dx10Texture->width != 1 || dx10Texture->height != 1
+            || dx10Texture->pixels != std::vector<std::uint8_t>({ 12, 34, 56, 255 }))
+            throw std::runtime_error("neutral DX10 DDS texture decoding changed pixel data");
         const auto correctedTexture
             = resources.getNeutralTextureManager()->get(VFS::Path::Normalized("textures/normal.tga"));
         if (!correctedTexture || correctedTexture != normal)

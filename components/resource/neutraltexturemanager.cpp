@@ -606,12 +606,76 @@ namespace
             return {};
         const std::uint32_t height = read32(data, 12);
         const std::uint32_t width = read32(data, 16);
-        const std::uint32_t fourCC = read32(data, 84);
+        std::uint32_t fourCC = read32(data, 84);
+        std::size_t pixelDataOffset = 128;
+        std::uint32_t dx10Format = 0;
+        if (fourCC == 0x30315844) // DX10
+        {
+            if (data.size() < 148 || read32(data, 132) != 3 || read32(data, 136) != 1)
+                return {};
+            dx10Format = read32(data, 128);
+            pixelDataOffset = 148;
+            switch (dx10Format)
+            {
+            case 71: // DXGI_FORMAT_BC1_UNORM
+                fourCC = 0x31545844;
+                break;
+            case 74: // DXGI_FORMAT_BC2_UNORM
+                fourCC = 0x33545844;
+                break;
+            case 77: // DXGI_FORMAT_BC3_UNORM
+                fourCC = 0x35545844;
+                break;
+            case 80: // DXGI_FORMAT_BC4_UNORM
+                fourCC = 0x34495441;
+                break;
+            case 83: // DXGI_FORMAT_BC5_UNORM
+                fourCC = 0x32495441;
+                break;
+            case 28: // DXGI_FORMAT_R8G8B8A8_UNORM
+            case 61: // DXGI_FORMAT_R8_UNORM
+            case 87: // DXGI_FORMAT_B8G8R8A8_UNORM
+                fourCC = 0;
+                break;
+            default:
+                return {};
+            }
+        }
         if (!width || !height)
             return {};
         if (!validRgbaSize(width, height))
             return {};
         const std::size_t pixelCount = static_cast<std::size_t>(width) * height;
+        if (fourCC == 0x34495441) // ATI1 / BC4U
+        {
+            const std::size_t blocksX = width / 4 + (width % 4 != 0);
+            const std::size_t blocksY = height / 4 + (height % 4 != 0);
+            if (blocksX == 0 || blocksY > std::numeric_limits<std::size_t>::max() / blocksX)
+                return {};
+            const std::size_t blockCount = blocksX * blocksY;
+            if (pixelDataOffset > data.size() || blockCount > (data.size() - pixelDataOffset) / 8)
+                return {};
+
+            auto result = std::make_shared<Render::TextureData>();
+            result->width = width;
+            result->height = height;
+            result->pixels.resize(pixelCount * 4);
+            std::size_t cursor = pixelDataOffset;
+            for (std::size_t by = 0; by < blocksY; ++by)
+                for (std::size_t bx = 0; bx < blocksX; ++bx)
+                {
+                    const auto values = decodeBc4Block(data, cursor);
+                    for (unsigned y = 0; y < 4; ++y)
+                        for (unsigned x = 0; x < 4; ++x)
+                            if (bx * 4 + x < width && by * 4 + y < height)
+                            {
+                                const std::uint8_t value = values[y * 4 + x];
+                                setPixel(*result, bx * 4 + x, by * 4 + y, value, value, value, 255);
+                            }
+                    cursor += 8;
+                }
+            return result;
+        }
         if (fourCC == 0x32495441 || fourCC == 0x55354342) // ATI2 / BC5U
         {
             const std::size_t blocksX = width / 4 + (width % 4 != 0);
@@ -619,14 +683,14 @@ namespace
             if (blocksX == 0 || blocksY > std::numeric_limits<std::size_t>::max() / blocksX)
                 return {};
             const std::size_t blockCount = blocksX * blocksY;
-            if (blockCount > (data.size() - 128) / 16)
+            if (pixelDataOffset > data.size() || blockCount > (data.size() - pixelDataOffset) / 16)
                 return {};
 
             auto result = std::make_shared<Render::TextureData>();
             result->width = width;
             result->height = height;
             result->pixels.resize(pixelCount * 4);
-            std::size_t cursor = 128;
+            std::size_t cursor = pixelDataOffset;
             for (std::size_t by = 0; by < blocksY; ++by)
                 for (std::size_t bx = 0; bx < blocksX; ++bx)
                 {
@@ -661,13 +725,14 @@ namespace
             const std::size_t blocksX = width / 4 + (width % 4 != 0);
             const std::size_t blocksY = height / 4 + (height % 4 != 0);
             if (!blocksX || blocksX > std::numeric_limits<std::size_t>::max() / blockBytes
-                || blocksY > (data.size() - 128) / (blocksX * blockBytes))
+                || pixelDataOffset > data.size()
+                || blocksY > (data.size() - pixelDataOffset) / (blocksX * blockBytes))
                 return {};
             auto result = std::make_shared<Render::TextureData>();
             result->width = width;
             result->height = height;
             result->pixels.resize(pixelCount * 4);
-            std::size_t cursor = 128;
+            std::size_t cursor = pixelDataOffset;
             for (std::size_t by = 0; by < blocksY; ++by)
                 for (std::size_t bx = 0; bx < blocksX; ++bx)
                 {
@@ -739,15 +804,21 @@ namespace
         }
         if (fourCC != 0)
             return {};
-        const std::uint32_t bits = read32(data, 88);
+        std::uint32_t bits = read32(data, 88);
+        if (dx10Format == 28 || dx10Format == 87)
+            bits = 32;
+        else if (dx10Format == 61)
+            bits = 8;
         const std::uint32_t redMask = read32(data, 92);
         const std::uint32_t greenMask = read32(data, 96);
         const std::uint32_t blueMask = read32(data, 100);
         const std::uint32_t alphaMask = read32(data, 104);
-        if (bits != 16 && bits != 24 && bits != 32)
+        if ((bits != 8 && bits != 16 && bits != 24 && bits != 32) || (bits == 8 && dx10Format != 61))
             return {};
         const std::size_t pixelBytes = bits / 8;
-        if (pixelBytes > 0 && static_cast<std::size_t>(width) * height > (data.size() - 128) / pixelBytes)
+        if (pixelDataOffset > data.size()
+            || (pixelBytes > 0 && static_cast<std::size_t>(width) * height
+                > (data.size() - pixelDataOffset) / pixelBytes))
             return {};
         auto result = std::make_shared<Render::TextureData>();
         result->width = width;
@@ -756,10 +827,19 @@ namespace
         for (std::uint32_t y = 0; y < height; ++y)
             for (std::uint32_t x = 0; x < width; ++x)
             {
-                const std::size_t offset = 128 + (static_cast<std::size_t>(y) * width + x) * pixelBytes;
-                const std::uint32_t value = bits == 16 ? read16(data, offset) : read32(data, offset);
-                setPixel(*result, x, y, expandChannel(value, redMask), expandChannel(value, greenMask),
-                    expandChannel(value, blueMask), alphaMask ? expandChannel(value, alphaMask) : 255);
+                const std::size_t offset = pixelDataOffset + (static_cast<std::size_t>(y) * width + x) * pixelBytes;
+                if (dx10Format == 28)
+                    setPixel(*result, x, y, data[offset], data[offset + 1], data[offset + 2], data[offset + 3]);
+                else if (dx10Format == 87)
+                    setPixel(*result, x, y, data[offset + 2], data[offset + 1], data[offset], data[offset + 3]);
+                else if (dx10Format == 61)
+                    setPixel(*result, x, y, data[offset], data[offset], data[offset], 255);
+                else
+                {
+                    const std::uint32_t value = bits == 16 ? read16(data, offset) : read32(data, offset);
+                    setPixel(*result, x, y, expandChannel(value, redMask), expandChannel(value, greenMask),
+                        expandChannel(value, blueMask), alphaMask ? expandChannel(value, alphaMask) : 255);
+                }
             }
         return result;
     }

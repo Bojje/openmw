@@ -97,8 +97,8 @@ neutral emissive channel. Resource images can now cross into neutral RGBA8 data,
 and authored BSLighting double-sided flags now select the matching Vulkan no-cull pipeline.
 The neutral resource backend now owns a VFS-backed RGBA8 texture cache with true-color and 1/4/8-bit indexed BMP,
 indexed TGA,
-PNG, JPEG, and
-common DDS/DXT decoding; the live Vulkan bootstrap uses it for real static-world texture
+PNG, JPEG, common DDS/DXT decoding, and the single-layer DX10 DDS formats used by newer
+content; the live Vulkan bootstrap uses it for real static-world texture
 paths; unsupported formats now fail the submission with their exact resource path instead of
 silently becoming white.
 Classic and BS shader texture wrap flags now select per-resource repeat/clamp sampler variants.
@@ -247,7 +247,7 @@ the player when POV is toggled, instead of silently remaining first-person witho
 Neutral vanity mode now also owns its orbit yaw/pitch, restores the prior POV when disabled, and
 loads/saves the existing `FIRS` camera state without constructing an OSG camera.
 The neutral image boundary now accepts the legacy premultiplied DXT2/DXT4 aliases in addition to DXT1/DXT3/DXT5,
-so those common DDS variants no longer require an OSG image fallback. The fast test suite now also contains a backend-neutral RGBA8 image comparator with
+as well as DX10 RGBA/BGRA/R8/BC4/BC5 payloads, so those common DDS variants no longer require an OSG image fallback. The fast test suite now also contains a backend-neutral RGBA8 image comparator with
 per-channel tolerance, differing-pixel count, maximum error, and mean error metrics.
 The renderer test family also includes a runnable resource-backend check: neutral resource
 initialization retains shared image/mesh services but does not construct OSG scene or keyframe
@@ -287,7 +287,7 @@ textures use a separate linear-repeat sampler so terrain tiling is preserved, wh
 attachments remain clamped. Terrain diffuse-specular maps are consumed, and ordinary object
 specular maps now use the configured pattern, dedicated texture table, and RGB G-buffer path;
 ESM4 explicit and auto-detected terrain specular maps now use the same neutral texture table and RGB path;
-complete terrain image coverage remains outstanding. The neutral cache now retains
+broader terrain image coverage remains outstanding. The neutral cache now retains
 per-cell LOD snapshots and also assembles aligned multi-cell region snapshots, selecting one
 region LOD deterministically by camera distance before handoff; adjacent regions are constrained
 to at most a one-level LOD gap to reduce cracks. Incomplete regions fall back to the per-cell
@@ -552,7 +552,7 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the frozen `openmw-vulkan-osg-reference` tag, the current checkpoint changes
-214 code files excluding this ledger, deleting 2,490 lines and adding 17,117 lines (net `+14,627`). The larger Vulkan-only
+214 code files excluding this ledger, deleting 2,490 lines and adding 17,221 lines (net `+14,731`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; the current branch continues the reduction
 work with renderer-neutral ownership and compatibility-wrapper deletion. The live no-GUI
 consumer is the first deletion checkpoint; further reduction can now target OSG
