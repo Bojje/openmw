@@ -30,6 +30,14 @@ namespace
 {
     using Bytes = std::vector<std::uint8_t>;
 
+    bool validRgbaSize(std::uint32_t width, std::uint32_t height)
+    {
+        if (!width || !height || static_cast<std::size_t>(width) > std::numeric_limits<std::size_t>::max() / height)
+            return false;
+        const std::size_t pixelCount = static_cast<std::size_t>(width) * height;
+        return pixelCount <= std::numeric_limits<std::size_t>::max() / 4;
+    }
+
     std::uint16_t read16(const Bytes& data, std::size_t offset)
     {
         if (offset + 2 > data.size())
@@ -73,7 +81,7 @@ namespace
         const std::uint32_t width = read16(data, 12);
         const std::uint32_t height = read16(data, 14);
         const unsigned bits = data[16];
-        if (!width || !height || (bits != 24 && bits != 32))
+        if (!validRgbaSize(width, height) || (bits != 24 && bits != 32))
             return {};
 
         const std::size_t pixelBytes = bits / 8;
@@ -146,8 +154,18 @@ namespace
         const std::uint32_t compression = read32(data, 30);
         if (width <= 0 || signedHeight == 0 || planes != 1 || (bits != 24 && bits != 32) || compression != 0)
             return {};
-        const std::uint32_t height = static_cast<std::uint32_t>(signedHeight < 0 ? -signedHeight : signedHeight);
-        const std::size_t bytesPerRow = ((static_cast<std::size_t>(width) * bits + 31) / 32) * 4;
+        const std::int64_t absoluteHeight = signedHeight < 0 ? -static_cast<std::int64_t>(signedHeight) : signedHeight;
+        if (absoluteHeight > std::numeric_limits<std::uint32_t>::max())
+            return {};
+        const std::uint32_t height = static_cast<std::uint32_t>(absoluteHeight);
+        if (!validRgbaSize(static_cast<std::uint32_t>(width), height))
+            return {};
+        if (static_cast<std::size_t>(width) > std::numeric_limits<std::size_t>::max() / bits)
+            return {};
+        const std::size_t widthBits = static_cast<std::size_t>(width) * bits;
+        if (widthBits > std::numeric_limits<std::size_t>::max() - 31)
+            return {};
+        const std::size_t bytesPerRow = ((widthBits + 31) / 32) * 4;
         if (offset > data.size() || (bytesPerRow > 0 && height > (data.size() - offset) / bytesPerRow))
             return {};
         auto result = std::make_shared<Render::TextureData>();
@@ -422,11 +440,9 @@ namespace
         const std::uint32_t fourCC = read32(data, 84);
         if (!width || !height)
             return {};
-        if (static_cast<std::size_t>(width) > std::numeric_limits<std::size_t>::max() / height)
+        if (!validRgbaSize(width, height))
             return {};
         const std::size_t pixelCount = static_cast<std::size_t>(width) * height;
-        if (pixelCount > std::numeric_limits<std::size_t>::max() / 4)
-            return {};
         auto result = std::make_shared<Render::TextureData>();
         result->width = width;
         result->height = height;
