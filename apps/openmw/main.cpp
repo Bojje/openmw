@@ -220,7 +220,6 @@ int runApplication(int argc, char* argv[])
     setenv("OSG_GL_TEXTURE_STORAGE", "OFF", 0);
 #endif
 
-    osg::setNotifyHandler(new OSGLogHandler());
     Files::ConfigurationManager cfgMgr;
     std::unique_ptr<OMW::Engine> engine = std::make_unique<OMW::Engine>(cfgMgr);
 
@@ -228,8 +227,12 @@ int runApplication(int argc, char* argv[])
 
     if (parseOptions(argc, argv, *engine, cfgMgr))
     {
-        if (!Misc::checkRequiredOSGPluginsArePresent())
-            return 1;
+        if (!engine->usesVulkan())
+        {
+            osg::setNotifyHandler(new OSGLogHandler());
+            if (!Misc::checkRequiredOSGPluginsArePresent())
+                return 1;
+        }
 
         engine->go();
     }

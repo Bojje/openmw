@@ -252,6 +252,7 @@ namespace OMW
 
         /// Select the experimental Vulkan game path. Requires a Vulkan build.
         void setVulkan(bool enabled) { mUseVulkan = enabled; }
+        bool usesVulkan() const { return mUseVulkan; }
 
         void setRecastMaxLogLevel(Debug::Level value) { mMaxRecastLogLevel = value; }
     };

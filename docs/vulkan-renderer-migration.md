@@ -39,6 +39,8 @@ The unused OpenMW-level neutral pose mutator was removed; dynamic poses now have
 at submission time while the renderer-neutral `WorldScene` pose API remains independently testable.
 The engine now constructs exactly one renderer-specific frame lifecycle: OSG by default or
 Vulkan when explicitly selected. OSG and Vulkan are not initialized in the same runtime;
+the Vulkan command path also skips OSG notify-handler installation and plugin discovery,
+so OSG startup services are not a hidden Vulkan prerequisite.
 OSG libraries still remain in the transitional full-game link because GUI, legacy world
 services, and shared engine code have not yet been deleted. CI must therefore distinguish
 runtime ownership from the temporary link footprint. The standalone Vulkan smoke target
@@ -548,7 +550,7 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the frozen `openmw-vulkan-osg-reference` tag, the current checkpoint changes
-214 code files excluding this ledger, deleting 2,487 lines and adding 17,042 lines (net `+14,555`). The larger Vulkan-only
+214 code files excluding this ledger, deleting 2,490 lines and adding 17,049 lines (net `+14,559`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; the current branch continues the reduction
 work with renderer-neutral ownership and compatibility-wrapper deletion. The live no-GUI
 consumer is the first deletion checkpoint; further reduction can now target OSG
