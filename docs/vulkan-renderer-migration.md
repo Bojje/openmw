@@ -521,7 +521,7 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the frozen `openmw-vulkan-osg-reference` tag, the current checkpoint changes
-207 code files excluding this ledger, deleting 2,289 lines and adding 14,752 lines (net `+12,463`). The larger Vulkan-only
+207 code files excluding this ledger, deleting 2,289 lines and adding 14,773 lines (net `+12,484`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; the current branch continues the reduction
 work with renderer-neutral ownership and compatibility-wrapper deletion. The live no-GUI
 consumer is the first deletion checkpoint; further reduction can now target OSG
@@ -715,6 +715,8 @@ magic effect expires or death animation completes. Anonymous one-shot VFX now re
 so existing spell, area, and summon effects are not silently discarded. The remaining animation
 gate is actor `.kf` priority/queue arbitration, OSG-specific presentation events, blending, and
 controller-stack ownership; projectile glows/lights/multi-effect composition and full particle presentation remain.
+Neutral effect meshes with skinning metadata are now baked to their explicit bind pose before entering the static Vulkan
+batch, so unsupported controller-driven effect playback does not leave them in an unconsumed skinned form.
 Neutral actor visibility now also carries opacity and alpha-blend state into dynamic mesh submission, including
 invisibility/chameleon fading without an OSG animation owner. Neutral container opening and closing now retain
 the `containeropen`/`containerclose` timing, including the `loot` event that gates GUI presentation while paused.
