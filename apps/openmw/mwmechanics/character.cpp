@@ -3263,7 +3263,43 @@ namespace MWMechanics
                 return group;
             std::string weaponGroup = group;
             weaponGroup += weaponShortGroup;
-            return world->getNeutralAnimationDuration(mPtr, weaponGroup) ? weaponGroup : group;
+            if (world->getNeutralAnimationDuration(mPtr, weaponGroup))
+                return weaponGroup;
+
+            const ESM::WeaponType* weaponInfo = getWeaponType(mWeaponType);
+            const std::string_view fallback = weaponInfo->mFlags & ESM::WeaponType::TwoHanded
+                    && weaponInfo->mWeaponClass == ESM::WeaponType::Melee
+                ? getWeaponShortGroup(ESM::Weapon::LongBladeTwoHand)
+                : getWeaponShortGroup(ESM::Weapon::LongBladeOneHand);
+            if (fallback != weaponShortGroup)
+            {
+                weaponGroup = group;
+                weaponGroup += fallback;
+                if (world->getNeutralAnimationDuration(mPtr, weaponGroup))
+                    return weaponGroup;
+            }
+
+            return group;
+        };
+
+        const auto selectNeutralMovementGroup = [&](std::string group, bool running) {
+            std::string selected = selectNeutralWeaponGroup(group);
+            if (world->getNeutralAnimationDuration(mPtr, selected))
+                return selected;
+
+            if (running)
+            {
+                const std::string::size_type run = selected.find("run");
+                if (run != std::string::npos)
+                {
+                    selected.replace(run, 3, "walk");
+                    selected = selectNeutralWeaponGroup(std::move(selected));
+                    if (world->getNeutralAnimationDuration(mPtr, selected))
+                        return selected;
+                }
+            }
+
+            return std::string();
         };
 
         std::string animationGroup;
@@ -3308,10 +3344,13 @@ namespace MWMechanics
                 const std::string_view direction = input.y() >= 0.f
                     ? "forward"
                     : "back";
-                animationGroup = selectNeutralWeaponGroup(std::string(prefix) + std::string(direction));
+                animationGroup = selectNeutralMovementGroup(std::string(prefix) + std::string(direction), running);
                 if (std::abs(input.y()) <= 0.001f)
-                    animationGroup = selectNeutralWeaponGroup(
-                        std::string(prefix) + (input.x() >= 0.f ? "right" : "left"));
+                    animationGroup = selectNeutralMovementGroup(
+                        std::string(prefix) + (input.x() >= 0.f ? "right" : "left"), running);
+
+                if (animationGroup.empty())
+                    animationGroup = selectNeutralWeaponGroup("idle");
             }
         }
         const std::optional<float> animationTime

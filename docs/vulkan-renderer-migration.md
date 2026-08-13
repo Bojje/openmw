@@ -152,6 +152,8 @@ full text-key stop/loop handling, blended controller stacks, and animation-speci
 Neutral dynamic and effect submissions now carry canonical pose bone names and remap compatible multi-part skin orders
 before skinning, with bind-pose fallback only for parts whose bone sets do not match. NIF skinning metadata preserves source bone
 names beside inverse-bind matrices, making the mapping deterministic without borrowing OSG types.
+Neutral actor movement now follows the legacy group fallback order for missing weapon-specific groups: compatible weapon-family
+groups are tried first, then running groups fall back to their walking counterparts before the neutral submission settles on idle.
 The Vulkan composite pass now consumes that single scene-lighting UBO directly; duplicated
 sun push constants were removed, and ambient light is part of the neutral snapshot. The
 world-owned `Scene` now resolves loaded-world meshes and RGBA8 textures through the existing
@@ -531,7 +533,7 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the frozen `openmw-vulkan-osg-reference` tag, the current checkpoint changes
-208 code files excluding this ledger, deleting 2,284 lines and adding 15,435 lines (net `+13,151`). The larger Vulkan-only
+208 code files excluding this ledger, deleting 2,284 lines and adding 15,474 lines (net `+13,190`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; the current branch continues the reduction
 work with renderer-neutral ownership and compatibility-wrapper deletion. The live no-GUI
 consumer is the first deletion checkpoint; further reduction can now target OSG
