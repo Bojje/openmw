@@ -226,7 +226,7 @@ int main()
 
     Nif::NiPSysSpawnModifier spawnModifier;
     spawnModifier.mActive = true;
-    spawnModifier.mNumSpawnGenerations = 1;
+    spawnModifier.mNumSpawnGenerations = 2;
     spawnModifier.mPercentageSpawned = 1.f;
     spawnModifier.mMinNumToSpawn = 1;
     spawnModifier.mMaxNumToSpawn = 1;
@@ -245,6 +245,10 @@ int main()
         || generatedParticles.vertices[4].color[3] == 0.f
         || std::abs(generatedParticles.vertices[4].tangent[0] - 3.f) > 1e-5f)
         throw std::runtime_error("neutral particle spawn modifier did not generate a bounded child snapshot");
+    const Render::MeshData multiGenerationParticles = Render::advanceParticleMesh(spawnParticles, 2.75f);
+    if (multiGenerationParticles.vertices.size() != 12 || multiGenerationParticles.indices.size() != 18
+        || multiGenerationParticles.vertices[8].color[3] != 0.f)
+        throw std::runtime_error("neutral particle spawn modifier did not process bounded descendants");
 
     Nif::NiPSysData modernParticleSource;
     modernParticleSource.mActiveCount = 1;

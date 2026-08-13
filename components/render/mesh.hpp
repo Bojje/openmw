@@ -553,8 +553,12 @@ namespace Render
                     source.vertices[firstVertex].tangent[2] });
         }
 
-        for (const SpawnedParticle& spawned : spawnedParticles)
+        // Process snapshots appended by a parent as well. The fixed reserve
+        // keeps this bounded, while copying the queue entry prevents an
+        // appended descendant from invalidating the active snapshot.
+        for (std::size_t spawnedIndex = 0; spawnedIndex < spawnedParticles.size(); ++spawnedIndex)
         {
+            const SpawnedParticle spawned = spawnedParticles[spawnedIndex];
             const std::size_t destinationVertex = result.vertices.size();
             result.vertices.insert(result.vertices.end(), source.vertices.begin(), source.vertices.begin() + 4);
             const std::uint32_t base = static_cast<std::uint32_t>(destinationVertex);

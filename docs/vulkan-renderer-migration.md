@@ -90,8 +90,8 @@ grow/fade presentation; modern controller-owned particle records preserve their 
 vertex-code mapping, initial color, and size; bounded box-emitter controllers now produce
 deterministic neutral spawn snapshots with controller timing, lifetime, speed, direction, and
 placement bounds; planar and spherical collider records now reflect neutral motion with authored bounce,
-die-on-collision, bounded collision-spawn snapshots, ordered collider-chain traversal, and one-step
-generation-spawn snapshots; unsupported collider types and multi-generation spawn behavior remain later gates.
+die-on-collision, bounded collision-spawn snapshots, ordered collider-chain traversal, and bounded
+multi-generation spawn snapshots; unsupported collider types remain later gates.
 NIF classic texture, diffuse/emissive, glossiness, and alpha properties now cross the
 renderer-neutral mesh boundary and survive batching; the neutral batch applies diffuse
 and alpha to vertex color output. NIF bump/normal texture slots now cross the same boundary
@@ -228,8 +228,8 @@ transform blend interpolators now feed that sampler as well;
 neutral NPCs now also publish their selected head, hair, race body-part, and equipped armor/clothing meshes as named
 bone attachments; weapon/shield presentation now carries animated-emissive state through the neutral
 material boundary; legacy dark/detail/decal texture composition now reaches the Vulkan material path,
-while exact enchanted caustic layering, full particle emission/spawn, unsupported collider types and
-multi-generation spawn behavior, and dynamic shading remain outstanding.
+while exact enchanted caustic layering, full particle emission/spawn, unsupported collider types,
+and dynamic shading remain outstanding.
 Neutral arrow release and container timing/GUI events now have renderer-neutral paths.
 Neutral actor idle and movement selection now honors weapon-specific short groups when those groups are actually
 present, and grouped duration queries reject unrelated controller files instead of falsely selecting a missing group.
@@ -711,7 +711,7 @@ the game unplayable rather than reduce duplication safely.
 | Inactive raster ray-tracing scaffold | Removed | Reintroduce only with a complete RT pipeline |
 | Vulkan utility/queue helper paths | Removed | Complete |
 | Parsed NIF resource cache wrapper | Removed | Complete; cache now owns shared NIF files directly |
-| NIF-to-neutral mesh conversion | Renderer-neutral NIF boundary, material data, mesh cache, authored gloss texture transport, dark/detail/decal texture-layer composition and independent texture transforms, static particle quad rotation and authored-color transport, neutral initial particle position/rotation/lifetime advancement, modern controller-owned particle vertex-code mapping, gravity/drag/rotation/grow/fade particle payload, bounded deterministic box-emitter spawn snapshots, planar/spherical collider reflection, ordered collider-chain traversal, die-on-collision, bounded collision-spawn and one-step generation-spawn snapshots, skinning metadata, world-selected layered actor/additional `.kf` pose sampling, highest-priority group metadata, neutral animation-group handoff, scripted queue priority, per-bone neutral overlay masks and priorities, text-key extraction and selected-segment rebasing, neutral Lua/sound/melee/spell event dispatch with footstep and random-attack fallback parity, dynamic mesh payloads, named NPC body-part and armor/clothing attachments, neutral controller chains and transform blends, neutral weapon/shield attachments with equipment glow metadata, `SceneSubmission`, Vulkan mesh batch, full-game neutral resolver, controller-sequence clip-time extrapolation, equal-priority sequence weighting, case-insensitive pose/remap/attachment bone lookup, controller-sequence blend-index routing, emissive RGB G-buffer transport, reflected caustic UVs, authored gloss multiplication and bump/luma bias, authored BSLighting specular strength, and point-light specular lighting | Add unsupported collider types/multi-generation spawn behavior and remaining dynamic shading |
+| NIF-to-neutral mesh conversion | Renderer-neutral NIF boundary, material data, mesh cache, authored gloss texture transport, dark/detail/decal texture-layer composition and independent texture transforms, static particle quad rotation and authored-color transport, neutral initial particle position/rotation/lifetime advancement, modern controller-owned particle vertex-code mapping, gravity/drag/rotation/grow/fade particle payload, bounded deterministic box-emitter spawn snapshots, planar/spherical collider reflection, ordered collider-chain traversal, die-on-collision, bounded collision-spawn and multi-generation spawn snapshots, skinning metadata, world-selected layered actor/additional `.kf` pose sampling, highest-priority group metadata, neutral animation-group handoff, scripted queue priority, per-bone neutral overlay masks and priorities, text-key extraction and selected-segment rebasing, neutral Lua/sound/melee/spell event dispatch with footstep and random-attack fallback parity, dynamic mesh payloads, named NPC body-part and armor/clothing attachments, neutral controller chains and transform blends, neutral weapon/shield attachments with equipment glow metadata, `SceneSubmission`, Vulkan mesh batch, full-game neutral resolver, controller-sequence clip-time extrapolation, equal-priority sequence weighting, case-insensitive pose/remap/attachment bone lookup, controller-sequence blend-index routing, emissive RGB G-buffer transport, reflected caustic UVs, authored gloss multiplication and bump/luma bias, authored BSLighting specular strength, and point-light specular lighting | Add unsupported collider types and remaining dynamic shading |
 | Terrain geometry and layer data | Renderer-neutral `Terrain::RenderStorage` contract with storage-owned decoded-land cell caching and grid-shift eviction, cached per-cell LOD snapshots, active-cell-aware aligned regions, root-relative quadtree block assembly, legacy texture-path correction, and a Vulkan opaque/normal/parallax/blendmap/specular layer consumer; concrete `MWRender::TerrainStorage` and legacy OSG ChunkManager remain the reference data path, including explicit ESM4 specular textures | Add backend-owned quadtree preload/streaming policy and broader image-format coverage |
 | Loaded-cell object identity, transforms, terrain snapshots, and paging state | Renderer-neutral `WorldScene`/`CellScene` snapshots updated by scene lifecycle; active-cell static references bypass legacy OSG paging visibility, cell-lifecycle-cached terrain tiles flow into `SceneSubmission`, and static/dynamic/effect submissions apply neutral view-distance visibility; neutral movement, cell transfer, water, effect, and weather writes are now encapsulated by `MWWorld::Scene` | Vulkan consumes neutral snapshots; migrate backend-owned preload/paging policy |
 | GUI, loading screens, screenshots, and presentation | NullWindowManager for Vulkan bootstrap; OSG/MyGUI reference path | Vulkan presentation and GUI coverage, then remove the null compatibility surface |
@@ -787,9 +787,8 @@ provide a usable surface, while validation errors remain hard failures.
   modern controller-owned records retain their source vertex-code mapping, initial color, and size.
   bounded box-emitter controllers now produce deterministic spawn snapshots with controller timing and
   placement bounds; planar and spherical collider records now reflect neutral motion with authored bounce and
-  die-on-collision behavior, bounded collision-spawn snapshots, ordered collider-chain traversal, and one-step
-  generation-spawn snapshots; unsupported collider types and multi-generation spawn behavior remain to be moved out
-  of the legacy owner.
+  die-on-collision behavior, bounded collision-spawn snapshots, ordered collider-chain traversal, and bounded
+  multi-generation spawn snapshots; unsupported collider types remain to be moved out of the legacy owner.
   The neutral path now samples model-local NIF and classic external `.kf` keyframe controllers,
   honors selected group start/stop segments, carries explicit per-object animation groups and clocks,
 and starts neutral weapon and spell-cast queues with attack/cast timing keys, including non-biped
@@ -806,7 +805,7 @@ also use that neutral world-effect lifetime when no OSG animation owner exists. 
 gate is remaining OSG-specific presentation events and exact dynamic shading; projectile
 multi-effect composition and full particle presentation remain; the neutral enchanted-equipment path now carries
 the animated caustic texture frame, reflected spherical UVs, emissive state, authored gloss multiplication, and NIF bump/luma bias, while
-unsupported collider types, multi-generation particle spawning, and the remaining presentation-specific composition stay as follow-up work.
+unsupported collider types and the remaining presentation-specific composition stay as follow-up work.
 Neutral effect meshes now defer skinning until the scene owner can sample the renderer-neutral pose resolver; compatible
 local-controller or sibling-KF poses are flattened before the Vulkan batch, while attached-equipment meshes retain the
 explicit bind-pose fallback when no actor pose is available. Neutral effect clocks also use sibling-KF duration metadata
