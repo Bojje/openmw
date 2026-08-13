@@ -134,8 +134,12 @@ namespace
         dxt2[137] = 0xf8; // RGB565 red.
         dxt2[138] = 0x00;
         dxt2[139] = 0x07; // RGB565 green.
+        dxt2[128] = 0xf8; // First pixel uses a non-opaque DXT3 alpha nibble.
         auto dxt4 = dxt2;
         write32(dxt4, 84, 0x34545844); // DXT4, the premultiplied DXT5 alias.
+        dxt4[128] = 0;
+        dxt4[129] = 255; // First pixel uses the first DXT5 alpha endpoint.
+        std::fill(dxt4.begin() + 130, dxt4.begin() + 136, 0);
         std::vector<std::uint8_t> tga(20, 0);
         tga[2] = 2;
         tga[12] = 1;
@@ -240,13 +244,14 @@ namespace
         if (dxt2IsRed)
             for (std::size_t pixel = 0; pixel < 16; ++pixel)
                 dxt2IsRed = dxt2Texture->pixels[pixel * 4] == 255 && dxt2Texture->pixels[pixel * 4 + 1] == 0
-                    && dxt2Texture->pixels[pixel * 4 + 2] == 0 && dxt2Texture->pixels[pixel * 4 + 3] == 255;
+                    && dxt2Texture->pixels[pixel * 4 + 2] == 0
+                    && dxt2Texture->pixels[pixel * 4 + 3] == (pixel == 0 ? 136 : 255);
         if (!dxt2IsRed)
             throw std::runtime_error("neutral DXT2 texture decoding did not preserve premultiplied DXT3 data");
         const auto dxt4Texture = resources.getNeutralTextureManager()->get(VFS::Path::Normalized("textures/dxt4.dds"));
         if (!dxt4Texture || dxt4Texture->width != 4 || dxt4Texture->height != 4
             || dxt4Texture->pixels[0] != 255 || dxt4Texture->pixels[1] != 0 || dxt4Texture->pixels[2] != 0
-            || dxt4Texture->pixels[3] != 255)
+            || dxt4Texture->pixels[3] != 0)
             throw std::runtime_error("neutral DXT4 texture decoding did not preserve premultiplied DXT5 data");
         const auto correctedTexture
             = resources.getNeutralTextureManager()->get(VFS::Path::Normalized("textures/normal.tga"));

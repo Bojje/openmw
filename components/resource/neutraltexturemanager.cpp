@@ -691,13 +691,15 @@ namespace
                     else
                         colors[3] = { 0, 0, 0, 0 };
                     std::array<std::uint8_t, 8> alphaValues = {};
-                    if (fourCC == 0x32545844 || fourCC == 0x33545844)
+                    // DXT2/DXT4 are the premultiplied-color aliases of
+                    // DXT3/DXT5; their block alpha layout is identical.
+                    const bool dxt3 = fourCC == 0x32545844 || fourCC == 0x33545844;
+                    const bool dxt5 = fourCC == 0x34545844 || fourCC == 0x35545844;
+                    if (dxt5)
                     {
-                        // DXT3 stores one four-bit alpha value per pixel in the
-                        // first eight bytes of the block.
-                    }
-                    else if (fourCC == 0x34545844 || fourCC == 0x35545844)
-                    {
+                        // DXT4 is the premultiplied-color alias of DXT5. Both
+                        // formats store two alpha endpoints followed by 3-bit
+                        // palette indices.
                         alphaValues[0] = data[cursor + 0];
                         alphaValues[1] = data[cursor + 1];
                         if (alphaValues[0] > alphaValues[1])
@@ -715,7 +717,7 @@ namespace
                     }
                     const std::uint32_t colorBits = read32(data, colorOffset + 4);
                     std::uint64_t alphaBits48 = 0;
-                    if (fourCC == 0x34545844 || fourCC == 0x35545844)
+                    if (dxt5)
                         for (unsigned byte = 0; byte < 6; ++byte)
                             alphaBits48 |= static_cast<std::uint64_t>(data[cursor + 2 + byte]) << (8 * byte);
                     for (unsigned y = 0; y < 4; ++y)
@@ -724,9 +726,9 @@ namespace
                             const std::size_t index = y * 4 + x;
                             const auto& color = colors[(colorBits >> (2 * index)) & 3];
                             std::uint8_t alpha = 255;
-                            if (fourCC == 0x33545844)
+                            if (dxt3)
                                 alpha = static_cast<std::uint8_t>(((data[cursor + index / 2] >> ((index % 2) * 4)) & 15) * 17);
-                            else if (fourCC == 0x35545844)
+                            else if (dxt5)
                                 alpha = alphaValues[(alphaBits48 >> (3 * index)) & 7];
                             if (bx * 4 + x < width && by * 4 + y < height)
                                 setPixel(*result, bx * 4 + x, by * 4 + y, color[0], color[1], color[2], alpha);
