@@ -16,6 +16,7 @@
 #include <components/esm3/loadbody.hpp>
 #include <components/esm3/loadmgef.hpp>
 #include <components/esm3/loadrace.hpp>
+#include <components/render/actorparts.hpp>
 #include <components/resource/resourcesystem.hpp>
 #include <components/resource/scenemanager.hpp>
 #include <components/sceneutil/depth.hpp>
@@ -1160,140 +1161,14 @@ namespace MWRender
         mHeadAnimationTime->updatePtr(updated);
     }
 
-    // Remember body parts so we only have to search through the store once for each race/gender/viewmode combination
-    typedef std::map<std::pair<ESM::RefId, int>, std::vector<const ESM::BodyPart*>> RaceMapping;
-    static RaceMapping sRaceMapping;
-
     const std::vector<const ESM::BodyPart*>& NpcAnimation::getBodyParts(
         const ESM::RefId& race, bool female, bool firstPerson, bool werewolf)
     {
-        constexpr int flagFirstPerson = 1 << 1;
-        constexpr int flagFemale = 1 << 0;
-
-        int flags = (werewolf ? -1 : 0);
-        if (female)
-            flags |= flagFemale;
-        if (firstPerson)
-            flags |= flagFirstPerson;
-
-        RaceMapping::iterator found = sRaceMapping.find(std::make_pair(race, flags));
-        if (found != sRaceMapping.end())
-            return found->second;
-        else
-        {
-            std::vector<const ESM::BodyPart*>& parts = sRaceMapping[std::make_pair(race, flags)];
-
-            typedef std::multimap<ESM::BodyPart::MeshPart, ESM::PartReferenceType> BodyPartMapType;
-            static const BodyPartMapType sBodyPartMap = { { ESM::BodyPart::MP_Neck, ESM::PRT_Neck },
-                { ESM::BodyPart::MP_Chest, ESM::PRT_Cuirass }, { ESM::BodyPart::MP_Groin, ESM::PRT_Groin },
-                { ESM::BodyPart::MP_Hand, ESM::PRT_RHand }, { ESM::BodyPart::MP_Hand, ESM::PRT_LHand },
-                { ESM::BodyPart::MP_Wrist, ESM::PRT_RWrist }, { ESM::BodyPart::MP_Wrist, ESM::PRT_LWrist },
-                { ESM::BodyPart::MP_Forearm, ESM::PRT_RForearm }, { ESM::BodyPart::MP_Forearm, ESM::PRT_LForearm },
-                { ESM::BodyPart::MP_Upperarm, ESM::PRT_RUpperarm }, { ESM::BodyPart::MP_Upperarm, ESM::PRT_LUpperarm },
-                { ESM::BodyPart::MP_Foot, ESM::PRT_RFoot }, { ESM::BodyPart::MP_Foot, ESM::PRT_LFoot },
-                { ESM::BodyPart::MP_Ankle, ESM::PRT_RAnkle }, { ESM::BodyPart::MP_Ankle, ESM::PRT_LAnkle },
-                { ESM::BodyPart::MP_Knee, ESM::PRT_RKnee }, { ESM::BodyPart::MP_Knee, ESM::PRT_LKnee },
-                { ESM::BodyPart::MP_Upperleg, ESM::PRT_RLeg }, { ESM::BodyPart::MP_Upperleg, ESM::PRT_LLeg },
-                { ESM::BodyPart::MP_Tail, ESM::PRT_Tail } };
-
-            parts.resize(ESM::PRT_Count, nullptr);
-
-            if (werewolf)
-                return parts;
-
-            const MWWorld::ESMStore& store = *MWBase::Environment::get().getESMStore();
-
-            for (const ESM::BodyPart& bodypart : store.get<ESM::BodyPart>())
-            {
-                if (bodypart.mData.mFlags & ESM::BodyPart::BPF_NotPlayable)
-                    continue;
-                if (bodypart.mData.mType != ESM::BodyPart::MT_Skin)
-                    continue;
-
-                if (!(bodypart.mRace == race))
-                    continue;
-
-                const bool partFirstPerson = ESM::isFirstPersonBodyPart(bodypart);
-
-                bool isHand = bodypart.mData.mPart == ESM::BodyPart::MP_Hand
-                    || bodypart.mData.mPart == ESM::BodyPart::MP_Wrist
-                    || bodypart.mData.mPart == ESM::BodyPart::MP_Forearm
-                    || bodypart.mData.mPart == ESM::BodyPart::MP_Upperarm;
-
-                bool isSameGender = isFemalePart(&bodypart) == female;
-
-                /* A fallback for the arms if 1st person is missing:
-                 1. Try to use 3d person skin for same gender
-                 2. Try to use 1st person skin for male, if female == true
-                 3. Try to use 3d person skin for male, if female == true
-
-                 A fallback in another cases: allow to use male bodyparts, if female == true
-                */
-                if (firstPerson && isHand && !partFirstPerson)
-                {
-                    // Allow 3rd person skins as a fallback for the arms if 1st person is missing
-                    BodyPartMapType::const_iterator bIt
-                        = sBodyPartMap.lower_bound(BodyPartMapType::key_type(bodypart.mData.mPart));
-                    while (bIt != sBodyPartMap.end() && bIt->first == bodypart.mData.mPart)
-                    {
-                        // If we have no fallback bodypart now and bodypart is for same gender (1)
-                        if (!parts[bIt->second] && isSameGender)
-                            parts[bIt->second] = &bodypart;
-
-                        // If we have fallback bodypart for other gender and found fallback for current gender (1)
-                        else if (isSameGender && isFemalePart(parts[bIt->second]) != female)
-                            parts[bIt->second] = &bodypart;
-
-                        // If we have no fallback bodypart and searching for female bodyparts (3)
-                        else if (!parts[bIt->second] && female)
-                            parts[bIt->second] = &bodypart;
-
-                        ++bIt;
-                    }
-
-                    continue;
-                }
-
-                // Don't allow to use podyparts for a different view
-                if (partFirstPerson != firstPerson)
-                    continue;
-
-                if (female && !isFemalePart(&bodypart))
-                {
-                    // Allow male parts as fallback for females if female parts are missing
-                    BodyPartMapType::const_iterator bIt
-                        = sBodyPartMap.lower_bound(BodyPartMapType::key_type(bodypart.mData.mPart));
-                    while (bIt != sBodyPartMap.end() && bIt->first == bodypart.mData.mPart)
-                    {
-                        // If we have no fallback bodypart now
-                        if (!parts[bIt->second])
-                            parts[bIt->second] = &bodypart;
-
-                        // If we have 3d person fallback bodypart for hand and 1st person fallback found (2)
-                        else if (isHand && !ESM::isFirstPersonBodyPart(*parts[bIt->second]) && partFirstPerson)
-                            parts[bIt->second] = &bodypart;
-
-                        ++bIt;
-                    }
-
-                    continue;
-                }
-
-                // Don't allow to use podyparts for another gender
-                if (female != isFemalePart(&bodypart))
-                    continue;
-
-                // Use properly found bodypart, replacing fallbacks
-                BodyPartMapType::const_iterator bIt
-                    = sBodyPartMap.lower_bound(BodyPartMapType::key_type(bodypart.mData.mPart));
-                while (bIt != sBodyPartMap.end() && bIt->first == bodypart.mData.mPart)
-                {
-                    parts[bIt->second] = &bodypart;
-                    ++bIt;
-                }
-            }
-            return parts;
-        }
+        std::vector<const ESM::BodyPart*> available;
+        const MWWorld::ESMStore& store = *MWBase::Environment::get().getESMStore();
+        for (const ESM::BodyPart& bodypart : store.get<ESM::BodyPart>())
+            available.push_back(&bodypart);
+        return Render::selectNpcBodyParts(race, female, firstPerson, werewolf, available);
     }
 
     void NpcAnimation::setAccurateAiming(bool enabled)
