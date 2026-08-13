@@ -19,7 +19,6 @@
 #include "texture.hpp"
 #include <components/render/meshconversion.hpp>
 #include <components/render/math.hpp>
-#include <components/render/animationmask.hpp>
 #include <components/vfs/pathutil.hpp>
 #include <components/misc/strings/lower.hpp>
 
