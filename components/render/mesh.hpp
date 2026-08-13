@@ -65,6 +65,11 @@ namespace Render
         bool terrainSpecular = false;
         bool ambientOverride = false;
         bool emissiveOverride = false;
+        // Enchanted equipment uses the legacy animated caustic layer. The
+        // neutral backend keeps that presentation state explicit so a
+        // consumer can animate the emissive contribution without scene-graph
+        // callbacks.
+        bool emissiveAnimated = false;
         std::shared_ptr<const TextureData> alphaTexture;
     };
 

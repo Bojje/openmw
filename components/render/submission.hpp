@@ -295,6 +295,7 @@ namespace Render
                     {
                         instance.mesh.material.emissive = effect->emissiveColor;
                         instance.mesh.material.emissiveOverride = true;
+                        instance.mesh.material.emissiveAnimated = true;
                     }
                     submission.meshes.push_back(std::move(instance));
                 }

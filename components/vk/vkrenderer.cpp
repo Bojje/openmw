@@ -1453,6 +1453,8 @@ namespace Vk
                             materialFlags |= 32u;
                         if (draw.material.emissiveOverride)
                             materialFlags |= 64u;
+                        if (draw.material.emissiveAnimated)
+                            materialFlags |= 128u;
                         const PushData pushData = {
                             draw.transform,
                             { draw.normalMatrix.data[0], draw.normalMatrix.data[1], draw.normalMatrix.data[2], 0.f,

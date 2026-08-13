@@ -216,8 +216,8 @@ per-bone mask and priority arbitration now selects compatible overlay poses (inc
 layer) without constructing OSG controller state. Modern `NiControllerSequence` controlled blocks and
 transform blend interpolators now feed that sampler as well;
 neutral NPCs now also publish their selected head, hair, race body-part, and equipped armor/clothing meshes as named
-bone attachments; weapon/shield presentation, exact enchanted equipment glow layering, particles, and dynamic
-shading remain outstanding.
+bone attachments; weapon/shield presentation now carries animated-emissive state through the neutral
+material boundary, while exact enchanted caustic texture layering, particles, and dynamic shading remain outstanding.
 Neutral arrow release and container timing/GUI events now have renderer-neutral paths.
 Neutral actor idle and movement selection now honors weapon-specific short groups when those groups are actually
 present, and grouped duration queries reject unrelated controller files instead of falsely selecting a missing group.
@@ -230,7 +230,9 @@ cleanup removes them through the neutral world owner instead of dereferencing a 
 The neutral effect record also preserves the gameplay loop flag, controller duration, and legacy white
 ambient-light override through submission. Neutral magical projectile effects now also publish their legacy
 point-light color and radius through a bounded scene-light array consumed by Vulkan. Enchanted neutral arrows
-carry a flagged emissive-color override through the G-buffer for an additive Vulkan glow. Controller-driven visual
+carry a flagged emissive-color override through the G-buffer for an additive Vulkan glow; the same neutral
+material flag now applies a deterministic caustic-style luminance animation from the shared frame clock.
+Controller-driven visual
 playback still requires the future animation owner; effects without a discoverable controller interval remain
 explicitly removable by gameplay.
 Mesh submission no longer waits for the whole device or
@@ -550,7 +552,7 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the frozen `openmw-vulkan-osg-reference` tag, the current checkpoint changes
-214 code files excluding this ledger, deleting 2,490 lines and adding 17,099 lines (net `+14,609`). The larger Vulkan-only
+214 code files excluding this ledger, deleting 2,490 lines and adding 17,117 lines (net `+14,627`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; the current branch continues the reduction
 work with renderer-neutral ownership and compatibility-wrapper deletion. The live no-GUI
 consumer is the first deletion checkpoint; further reduction can now target OSG
@@ -767,8 +769,9 @@ magic effect expires or death animation completes. Anonymous one-shot VFX now re
 so existing spell, area, and summon effects are not silently discarded. Non-looping spell-hit VFX
 also use that neutral world-effect lifetime when no OSG animation owner exists. The remaining animation
 gate is remaining OSG-specific presentation events and exact dynamic shading; projectile
-multi-effect composition and full particle presentation remain; the neutral enchanted-arrow path now has a basic
-additive emissive glow while exact OSG glow layering remains a presentation-fidelity follow-up.
+multi-effect composition and full particle presentation remain; the neutral enchanted-equipment path now carries
+an animated emissive state and deterministic caustic-style luminance modulation, while exact OSG glow texture
+layering remains a presentation-fidelity follow-up.
 Neutral effect meshes now defer skinning until the scene owner can sample the renderer-neutral pose resolver; compatible
 local-controller or sibling-KF poses are flattened before the Vulkan batch, while attached-equipment meshes retain the
 explicit bind-pose fallback when no actor pose is available. Neutral effect clocks also use sibling-KF duration metadata

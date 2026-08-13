@@ -1622,6 +1622,7 @@ namespace MWWorld
                             {
                                 attached.mesh.material.emissive = attachment.emissiveColor;
                                 attached.mesh.material.emissiveOverride = true;
+                                attached.mesh.material.emissiveAnimated = true;
                             }
                             dynamic.meshes.push_back(Render::transformMeshInstance(dynamic.object, attached));
                         }

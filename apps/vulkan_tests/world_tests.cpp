@@ -404,6 +404,7 @@ int main()
         || !effectSubmission.effects.back().meshes.front().mesh.material.ambientOverride
         || !effectSubmission.effects.back().meshes.back().mesh.material.ambientOverride
         || !effectSubmission.effects.back().meshes.front().mesh.material.emissiveOverride
+        || !effectSubmission.effects.back().meshes.front().mesh.material.emissiveAnimated
         || effectSubmission.effects.back().meshes.front().mesh.material.emissive.z != 0.8f
         || !effectSubmission.valid())
         throw std::runtime_error("renderer-neutral scene submission lost an identified effect");
