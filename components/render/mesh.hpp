@@ -143,6 +143,7 @@ namespace Render
         float age = 0.f;
         float lifespan = 0.f;
         float rotationSpeed = 0.f;
+        std::uint16_t spawnGeneration = 0;
     };
 
     struct ParticleSimulationData
@@ -213,15 +214,36 @@ namespace Render
             }
         };
 
+        struct Spawn
+        {
+            std::uint16_t generations = 0;
+            float percentage = 0.f;
+            std::uint16_t minimum = 0;
+            std::uint16_t maximum = 0;
+            float speedVariation = 0.f;
+            float directionVariation = 0.f;
+            float lifespan = 0.f;
+            float lifespanVariation = 0.f;
+
+            bool valid() const
+            {
+                return generations > 0 && std::isfinite(percentage) && percentage >= 0.f && percentage <= 1.f
+                    && minimum <= maximum && std::isfinite(speedVariation) && speedVariation >= 0.f
+                    && std::isfinite(directionVariation) && directionVariation >= 0.f && std::isfinite(lifespan)
+                    && lifespan >= 0.f && std::isfinite(lifespanVariation) && lifespanVariation >= 0.f;
+            }
+        };
+
         std::shared_ptr<const Emitter> emitter;
         std::shared_ptr<const Collider> collider;
+        std::shared_ptr<const Spawn> spawn;
 
         bool valid() const
         {
             return Render::valid(acceleration) && std::isfinite(drag) && std::isfinite(growTime)
                 && std::isfinite(fadeTime) && std::isfinite(baseScale) && std::isfinite(rotationSpeed)
                 && drag >= 0.f && growTime >= 0.f && fadeTime >= 0.f && baseScale >= 0.f
-                && (!emitter || emitter->valid()) && (!collider || collider->valid());
+                && (!emitter || emitter->valid()) && (!collider || collider->valid()) && (!spawn || spawn->valid());
         }
     };
 
@@ -239,6 +261,8 @@ namespace Render
             if (simulation && simulation->emitter && !simulation->emitter->valid())
                 return false;
             if (simulation && simulation->collider && !simulation->collider->valid())
+                return false;
+            if (simulation && simulation->spawn && !simulation->spawn->valid())
                 return false;
             return std::all_of(states.begin(), states.end(), [](const ParticleState& state) {
                 return Render::valid(state.velocity) && std::isfinite(state.age)
@@ -347,8 +371,8 @@ namespace Render
             return add(contact, scaleVector(reflected, collider->bounce));
         };
 
-        std::vector<std::pair<Vec3, ParticleState>> collisionSpawns;
-        collisionSpawns.reserve(8);
+        std::vector<std::pair<Vec3, ParticleState>> spawnedParticles;
+        spawnedParticles.reserve(32);
 
         const auto applyParticle = [&](std::size_t destinationFirstVertex, std::size_t sourceFirstVertex,
                                        const ParticleState& state, float motionTime, float age, const Vec3& origin) {
@@ -365,11 +389,30 @@ namespace Render
                 collided);
             if (collided && collider && collider->dieOnCollision)
                 alive = false;
-            if (collided && collider && collider->spawnOnCollision && collisionSpawns.size() < 32)
+            if (collided && collider && collider->spawnOnCollision && spawnedParticles.size() < 32)
             {
                 ParticleState child;
                 child.lifespan = state.lifespan > age ? state.lifespan - age : state.lifespan;
-                collisionSpawns.emplace_back(center, child);
+                child.spawnGeneration = state.spawnGeneration + 1;
+                spawnedParticles.emplace_back(center, child);
+            }
+            if (!alive && simulation && simulation->spawn && state.lifespan > 0.f
+                && state.spawnGeneration < simulation->spawn->generations && spawnedParticles.size() < 32)
+            {
+                const std::size_t requested = static_cast<std::size_t>(std::ceil(
+                    simulation->spawn->percentage * static_cast<float>(simulation->spawn->maximum)));
+                const std::size_t count = std::clamp<std::size_t>(requested, simulation->spawn->minimum,
+                    std::min<std::size_t>(simulation->spawn->maximum, 32 - spawnedParticles.size()));
+                const float deathTime = std::clamp(state.lifespan - state.age, 0.f, time);
+                for (std::size_t childIndex = 0; childIndex < count && spawnedParticles.size() < 32; ++childIndex)
+                {
+                    ParticleState child;
+                    child.age = std::max(0.f, time - deathTime);
+                    child.lifespan = simulation->spawn->lifespan;
+                    child.velocity = state.velocity;
+                    child.spawnGeneration = state.spawnGeneration + 1;
+                    spawnedParticles.emplace_back(center, child);
+                }
             }
             const float rotationSpeed = state.rotationSpeed + (simulation ? simulation->rotationSpeed : 0.f);
             const float angle = rotationSpeed * motionTime;
@@ -408,13 +451,13 @@ namespace Render
                     source.vertices[firstVertex].tangent[2] });
         }
 
-        for (const auto& [origin, state] : collisionSpawns)
+        for (const auto& [origin, state] : spawnedParticles)
         {
             const std::size_t destinationVertex = result.vertices.size();
             result.vertices.insert(result.vertices.end(), source.vertices.begin(), source.vertices.begin() + 4);
             const std::uint32_t base = static_cast<std::uint32_t>(destinationVertex);
             result.indices.insert(result.indices.end(), { base, base + 1, base + 2, base, base + 2, base + 3 });
-            applyParticle(destinationVertex, 0, state, 0.f, 0.f, origin);
+            applyParticle(destinationVertex, 0, state, 0.f, state.age, origin);
         }
 
         const ParticleSimulationData::Emitter* emitter = simulation && simulation->emitter

@@ -212,6 +212,28 @@ int main()
         || bouncedParticles.vertices[0].color[3] != 0.f)
         throw std::runtime_error("neutral particle planar collider did not reflect motion");
 
+    Nif::NiPSysSpawnModifier spawnModifier;
+    spawnModifier.mActive = true;
+    spawnModifier.mNumSpawnGenerations = 1;
+    spawnModifier.mPercentageSpawned = 1.f;
+    spawnModifier.mMinNumToSpawn = 1;
+    spawnModifier.mMaxNumToSpawn = 1;
+    spawnModifier.mSpawnSpeedVariation = 0.f;
+    spawnModifier.mSpawnDirVariation = 0.f;
+    spawnModifier.mLifespan = 1.f;
+    spawnModifier.mLifespanVariation = 0.f;
+    Nif::NiParticleSystem spawnParticleSystem;
+    spawnParticleSystem.mController = Nif::NiTimeControllerPtr(nullptr);
+    spawnParticleSystem.mModifiers = { Nif::NiPSysModifierPtr(&spawnModifier) };
+    const Render::MeshData spawnParticles
+        = Nif::convertParticles(simulatedParticleSource, &spawnParticleSystem);
+    const Render::MeshData generatedParticles = Render::advanceParticleMesh(spawnParticles, 0.75f);
+    if (!spawnParticles.particles || !spawnParticles.particles->simulation
+        || !spawnParticles.particles->simulation->spawn || generatedParticles.vertices.size() != 8
+        || generatedParticles.vertices[4].color[3] == 0.f
+        || std::abs(generatedParticles.vertices[4].tangent[0] - 2.5f) > 1e-5f)
+        throw std::runtime_error("neutral particle spawn modifier did not generate a bounded child snapshot");
+
     Nif::NiPSysData modernParticleSource;
     modernParticleSource.mActiveCount = 1;
     modernParticleSource.mVertices = { { 1.f, 0.f, 0.f }, { 4.f, 0.f, 0.f } };

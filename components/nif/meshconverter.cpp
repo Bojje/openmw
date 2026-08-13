@@ -915,6 +915,18 @@ namespace Nif
             return nullptr;
 
         auto result = std::make_shared<Render::ParticleSimulationData>();
+        const auto convertSpawn = [](const NiPSysSpawnModifier& spawnSource) {
+            auto spawn = std::make_shared<Render::ParticleSimulationData::Spawn>();
+            spawn->generations = spawnSource.mNumSpawnGenerations;
+            spawn->percentage = spawnSource.mPercentageSpawned;
+            spawn->minimum = spawnSource.mMinNumToSpawn;
+            spawn->maximum = spawnSource.mMaxNumToSpawn;
+            spawn->speedVariation = spawnSource.mSpawnSpeedVariation;
+            spawn->directionVariation = spawnSource.mSpawnDirVariation;
+            spawn->lifespan = spawnSource.mLifespan;
+            spawn->lifespanVariation = spawnSource.mLifespanVariation;
+            return spawn->valid() ? spawn : nullptr;
+        };
         for (const NiPSysModifierPtr& modifierReference : system->mModifiers)
         {
             if (modifierReference.empty())
@@ -953,6 +965,14 @@ namespace Nif
             {
                 if (std::isfinite(rotation->mRotationSpeed))
                     result->rotationSpeed += rotation->mRotationSpeed;
+            }
+            else if (!result->spawn)
+            {
+                if (const auto* spawn = dynamic_cast<const NiPSysSpawnModifier*>(modifier))
+                    result->spawn = convertSpawn(*spawn);
+                else if (const auto* ageDeath = dynamic_cast<const NiPSysAgeDeathModifier*>(modifier);
+                         ageDeath->mSpawnOnDeath && !ageDeath->mSpawnModifier.empty())
+                    result->spawn = convertSpawn(*ageDeath->mSpawnModifier.getPtr());
             }
         }
 
