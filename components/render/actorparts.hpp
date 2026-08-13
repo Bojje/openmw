@@ -1,7 +1,6 @@
 #ifndef OPENMW_COMPONENTS_RENDER_ACTORPARTS_H
 #define OPENMW_COMPONENTS_RENDER_ACTORPARTS_H
 
-#include <algorithm>
 #include <map>
 #include <span>
 #include <utility>
@@ -14,25 +13,10 @@ namespace Render
 {
     // Select the same race/gender/view body-part fallback set used by the
     // reference actor renderer, without requiring an OSG animation owner.
-    inline const std::vector<const ESM::BodyPart*>& selectNpcBodyParts(const ESM::RefId& race, bool female,
+    inline std::vector<const ESM::BodyPart*> selectNpcBodyParts(const ESM::RefId& race, bool female,
         bool firstPerson, bool werewolf, std::span<const ESM::BodyPart* const> available)
     {
-        constexpr int flagFirstPerson = 1 << 1;
-        constexpr int flagFemale = 1 << 0;
-        int flags = werewolf ? -1 : 0;
-        if (female)
-            flags |= flagFemale;
-        if (firstPerson)
-            flags |= flagFirstPerson;
-
-        using Cache = std::map<std::pair<ESM::RefId, int>, std::vector<const ESM::BodyPart*>>;
-        static Cache cache;
-        auto found = cache.find({ race, flags });
-        if (found != cache.end())
-            return found->second;
-
-        auto& parts = cache[{ race, flags }];
-        parts.resize(ESM::PRT_Count, nullptr);
+        std::vector<const ESM::BodyPart*> parts(ESM::PRT_Count, nullptr);
         if (werewolf)
             return parts;
 
