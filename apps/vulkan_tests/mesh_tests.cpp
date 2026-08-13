@@ -240,6 +240,11 @@ int main()
         = Render::remapBoneMatrices(sourceBones, sourceBoneNames, reorderedBoneNames);
     if (reorderedBones.size() != 2 || reorderedBones[0].data[12] != 2.f || reorderedBones[1].data[12] != 1.f)
         throw std::runtime_error("renderer-neutral skinning did not remap mismatched bone orders");
+    const std::array<std::string, 2> mixedCaseBoneNames{ "arm bone", "root bone" };
+    const std::vector<Render::Mat4> mixedCaseBones
+        = Render::remapBoneMatrices(sourceBones, sourceBoneNames, mixedCaseBoneNames);
+    if (mixedCaseBones.size() != 2 || mixedCaseBones[0].data[12] != 2.f || mixedCaseBones[1].data[12] != 1.f)
+        throw std::runtime_error("renderer-neutral skinning did not match bone names case-insensitively");
 
     const std::array<std::string, 1> animatedBoneNames{ "Root Bone" };
     const std::vector<Render::Mat4> animatedPose

@@ -9,6 +9,7 @@
 #include <iterator>
 #include <limits>
 #include <memory>
+#include <optional>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -271,7 +272,9 @@ namespace Render
         result.reserve(targetNames.size());
         for (const std::string& target : targetNames)
         {
-            const auto found = std::find(sourceNames.begin(), sourceNames.end(), target);
+            const auto found = std::find_if(sourceNames.begin(), sourceNames.end(), [&](const std::string& sourceName) {
+                return animationBoneNamesEqual(sourceName, target);
+            });
             if (found == sourceNames.end())
                 return {};
             result.push_back(source[static_cast<std::size_t>(found - sourceNames.begin())]);

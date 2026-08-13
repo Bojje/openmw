@@ -1598,7 +1598,10 @@ namespace MWWorld
                     {
                         if (!attachment.visible || attachment.model.empty() || attachment.bone.empty())
                             continue;
-                        const auto bone = std::find(skinning->boneNames.begin(), skinning->boneNames.end(), attachment.bone);
+                        const auto bone = std::find_if(skinning->boneNames.begin(), skinning->boneNames.end(),
+                            [&](const std::string& boneName) {
+                                return Render::animationBoneNamesEqual(boneName, attachment.bone);
+                            });
                         if (bone == skinning->boneNames.end())
                             continue;
                         const std::size_t boneIndex = static_cast<std::size_t>(bone - skinning->boneNames.begin());

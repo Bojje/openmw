@@ -22,12 +22,23 @@ namespace Render
     inline constexpr unsigned AnimationMask_LeftArm = 1u << 2;
     inline constexpr unsigned AnimationMask_RightArm = 1u << 3;
 
-    inline AnimationBoneGroup classifyAnimationBone(std::string_view name)
+    inline std::string normalizeAnimationBoneName(std::string_view name)
     {
         std::string normalized(name);
         std::transform(normalized.begin(), normalized.end(), normalized.begin(), [](unsigned char value) {
             return static_cast<char>(std::tolower(value));
         });
+        return normalized;
+    }
+
+    inline bool animationBoneNamesEqual(std::string_view lhs, std::string_view rhs)
+    {
+        return normalizeAnimationBoneName(lhs) == normalizeAnimationBoneName(rhs);
+    }
+
+    inline AnimationBoneGroup classifyAnimationBone(std::string_view name)
+    {
+        const std::string normalized = normalizeAnimationBoneName(name);
 
         static constexpr std::array<std::string_view, 8> torso = { "bip01 spine1", "bip01 spine2", "bip01 neck",
             "bip01 head", "head", "neck", "chest", "groin" };

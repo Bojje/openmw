@@ -86,7 +86,7 @@ namespace Nif
 
         std::string normalizedBoneName(std::string_view name)
         {
-            return Misc::StringUtils::lowerCase(std::string(name));
+            return Render::normalizeAnimationBoneName(name);
         }
 
         template <class Map, class Interpolate>
