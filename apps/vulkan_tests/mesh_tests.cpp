@@ -351,18 +351,39 @@ int main()
     controllerSequence->mControlledBlocks.push_back(lowerPriorityBlock);
     sequenceBlock.mPriority = 3;
     controllerSequence->mControlledBlocks.front() = sequenceBlock;
+    controllerSequence->mWeight = 0.75f;
+    auto secondSequenceInterpolator = std::make_unique<Nif::NiTransformInterpolator>();
+    secondSequenceInterpolator->mRecordType = Nif::RC_NiTransformInterpolator;
+    secondSequenceInterpolator->mDefaultValue = Nif::NiQuatTransform::getIdentity();
+    secondSequenceInterpolator->mDefaultValue.mTranslation.x() = 8.f;
+    secondSequenceInterpolator->mData = nullptr;
+    Nif::ControlledBlock secondSequenceBlock;
+    secondSequenceBlock.mTargetName = "Root Bone";
+    secondSequenceBlock.mInterpolator = secondSequenceInterpolator.get();
+    secondSequenceBlock.mController = nullptr;
+    secondSequenceBlock.mBlendInterpolator = nullptr;
+    secondSequenceBlock.mPriority = 3;
+    auto secondControllerSequence = std::make_unique<Nif::NiControllerSequence>();
+    secondControllerSequence->mRecordType = Nif::RC_NiControllerSequence;
+    secondControllerSequence->mName = "idle";
+    secondControllerSequence->mTextKeys = nullptr;
+    secondControllerSequence->mWeight = 0.25f;
+    secondControllerSequence->mControlledBlocks.push_back(secondSequenceBlock);
     auto controllerSequenceFile = std::make_shared<Nif::NIFFile>(VFS::Path::Normalized("synthetic-controller.kf"));
     controllerSequenceFile->mRoots.push_back(controllerSequence.get());
+    controllerSequenceFile->mRoots.push_back(secondControllerSequence.get());
     controllerSequenceFile->mRecords.push_back(std::move(sequenceInterpolatorA));
     controllerSequenceFile->mRecords.push_back(std::move(sequenceInterpolatorB));
     controllerSequenceFile->mRecords.push_back(std::move(sequenceBlend));
     controllerSequenceFile->mRecords.push_back(std::move(lowerPriorityInterpolator));
+    controllerSequenceFile->mRecords.push_back(std::move(secondSequenceInterpolator));
     controllerSequenceFile->mRecords.push_back(std::move(controllerSequence));
+    controllerSequenceFile->mRecords.push_back(std::move(secondControllerSequence));
     const std::vector<Render::Mat4> controllerSequencePose
         = Nif::collectBonePose(Nif::FileView(*controllerSequenceFile), animatedBoneNames, 0.25f, "idle");
     if (controllerSequencePose.size() != 1)
         throw std::runtime_error("neutral controller sequence did not produce a bone pose");
-    expectNear(controllerSequencePose.front().data[12], 4.f, "blended controller sequence translation");
+    expectNear(controllerSequencePose.front().data[12], 5.f, "weighted controller sequence translation");
 
     auto sequenceTimeInterpolator = std::make_unique<Nif::NiTransformInterpolator>();
     sequenceTimeInterpolator->mRecordType = Nif::RC_NiTransformInterpolator;

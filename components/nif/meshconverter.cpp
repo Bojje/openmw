@@ -451,10 +451,30 @@ namespace Nif
             }
         }
 
+        struct SequenceTransformState
+        {
+            NiQuatTransform transform;
+            float weight;
+        };
+
+        NiQuatTransform blendSequenceTransforms(const SequenceTransformState& lhs, const NiQuatTransform& rhs,
+            float rhsWeight)
+        {
+            const float totalWeight = lhs.weight + rhsWeight;
+            if (totalWeight <= 0.f)
+                return rhs;
+            const float fraction = rhsWeight / totalWeight;
+            osg::Quat rotation = lhs.transform.mRotation;
+            rotation.slerp(fraction, lhs.transform.mRotation, rhs.mRotation);
+            return { (lhs.transform.mTranslation * lhs.weight + rhs.mTranslation * rhsWeight) / totalWeight,
+                rotation, (lhs.transform.mScale * lhs.weight + rhs.mScale * rhsWeight) / totalWeight };
+        }
+
         void collectSequenceTransforms(const NiSequenceStreamHelper& sequence, float time, std::string_view group,
             std::string_view startKey, std::string_view stopKey,
             std::unordered_map<std::string, Render::Mat4>& transforms,
-            std::unordered_map<std::string, int>& sequencePriorities)
+            std::unordered_map<std::string, int>& sequencePriorities,
+            std::unordered_map<std::string, SequenceTransformState>& weightedSequences)
         {
             const ExtraList extraList = sequence.getExtraList();
             const std::string_view effectiveStartKey = startKey.empty() ? std::string_view("start") : startKey;
@@ -489,6 +509,7 @@ namespace Nif
                 if (priority == sequencePriorities.end() || priority->second <= 0)
                 {
                     sequencePriorities.insert_or_assign(name->mData, 0);
+                    weightedSequences.erase(name->mData);
                     transforms.insert_or_assign(name->mData, toRenderMatrix(sampled));
                 }
             }
@@ -497,10 +518,12 @@ namespace Nif
         void collectControllerSequenceTransforms(const NiSequence& sequence, float time, std::string_view group,
             std::string_view startKey, std::string_view stopKey,
             std::unordered_map<std::string, Render::Mat4>& transforms,
-            std::unordered_map<std::string, int>& sequencePriorities)
+            std::unordered_map<std::string, int>& sequencePriorities,
+            std::unordered_map<std::string, SequenceTransformState>& weightedSequences)
         {
-            if (const auto* controllerSequence = dynamic_cast<const NiControllerSequence*>(&sequence);
-                controllerSequence && (!std::isfinite(controllerSequence->mWeight) || controllerSequence->mWeight <= 0.f))
+            const auto* controllerSequence = dynamic_cast<const NiControllerSequence*>(&sequence);
+            const float sequenceWeight = controllerSequence != nullptr ? controllerSequence->mWeight : 1.f;
+            if (!std::isfinite(sequenceWeight) || sequenceWeight <= 0.f)
                 return;
             if (!group.empty() && !sequence.mName.empty()
                 && Misc::StringUtils::lowerCase(sequence.mName) != Misc::StringUtils::lowerCase(std::string(group)))
@@ -518,7 +541,7 @@ namespace Nif
                     stop && *stop >= segmentStart)
                     sampleTime = std::min(sampleTime, *stop);
             }
-            if (const auto* controllerSequence = dynamic_cast<const NiControllerSequence*>(&sequence))
+            if (controllerSequence != nullptr)
                 sampleTime = controllerSequenceTime(*controllerSequence, sampleTime);
 
             for (const ControlledBlock& block : sequence.mControlledBlocks)
@@ -537,9 +560,33 @@ namespace Nif
                 {
                     const int priority = static_cast<int>(block.mPriority);
                     const auto previous = sequencePriorities.find(block.mTargetName);
-                    if (previous == sequencePriorities.end() || priority >= previous->second)
+                    if (previous != sequencePriorities.end() && priority < previous->second)
+                        continue;
+
+                    if (previous == sequencePriorities.end() || priority > previous->second)
                     {
                         sequencePriorities.insert_or_assign(block.mTargetName, priority);
+                        if (controllerSequence != nullptr)
+                            weightedSequences.insert_or_assign(block.mTargetName,
+                                SequenceTransformState{ *sampled, sequenceWeight });
+                        else
+                            weightedSequences.erase(block.mTargetName);
+                        transforms.insert_or_assign(block.mTargetName, toRenderMatrix(*sampled));
+                        continue;
+                    }
+
+                    const auto weighted = weightedSequences.find(block.mTargetName);
+                    if (controllerSequence != nullptr && weighted != weightedSequences.end()
+                        && (weighted->second.weight != 1.f || sequenceWeight != 1.f))
+                    {
+                        const NiQuatTransform blended
+                            = blendSequenceTransforms(weighted->second, *sampled, sequenceWeight);
+                        weighted->second = { blended, weighted->second.weight + sequenceWeight };
+                        transforms.insert_or_assign(block.mTargetName, toRenderMatrix(blended));
+                    }
+                    else
+                    {
+                        weightedSequences.erase(block.mTargetName);
                         transforms.insert_or_assign(block.mTargetName, toRenderMatrix(*sampled));
                     }
                 }
@@ -929,6 +976,7 @@ namespace Nif
         const Render::Mat4 identity = Render::identityMat4();
         std::unordered_map<std::string, Render::Mat4> transforms;
         std::unordered_map<std::string, int> sequencePriorities;
+        std::unordered_map<std::string, SequenceTransformState> weightedSequences;
         for (const FileView& file : files)
         {
             float sampleTime = time;
@@ -952,10 +1000,12 @@ namespace Nif
                 if (const auto* root = dynamic_cast<const NiAVObject*>(file.getRoot(i)))
                     collectBoneTransforms(*root, identity, sampleTime, transforms);
                 else if (const auto* stream = dynamic_cast<const NiSequenceStreamHelper*>(file.getRoot(i)))
-                    collectSequenceTransforms(*stream, time, group, startKey, stopKey, transforms, sequencePriorities);
+                    collectSequenceTransforms(
+                        *stream, time, group, startKey, stopKey, transforms, sequencePriorities, weightedSequences);
                 else if (const auto* controllerSequence = dynamic_cast<const NiSequence*>(file.getRoot(i)))
                     collectControllerSequenceTransforms(
-                        *controllerSequence, time, group, startKey, stopKey, transforms, sequencePriorities);
+                        *controllerSequence, time, group, startKey, stopKey, transforms, sequencePriorities,
+                        weightedSequences);
             }
         }
 
