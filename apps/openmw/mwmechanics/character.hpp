@@ -171,6 +171,8 @@ namespace MWMechanics
 
         int mWeaponType{ ESM::Weapon::None };
         std::string mCurrentWeapon;
+        bool mNeutralWeaponVisible{ false };
+        bool mNeutralCarriedLeftVisible{ false };
 
         float mAttackWindUp{ -1.f };
         float mAttackStrength{ -1.f };

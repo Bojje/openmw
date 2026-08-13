@@ -2814,6 +2814,8 @@ namespace MWMechanics
         mWeaponType = weaponType;
         mCurrentWeapon = weaponType == ESM::Weapon::None ? std::string() : std::string(getWeaponAnimation(weaponType));
         mUpperBodyState = weaponType == ESM::Weapon::None ? UpperBodyState::None : UpperBodyState::WeaponEquipped;
+        mNeutralWeaponVisible = isRealWeapon(mWeaponType) && !mWeapon.isEmpty();
+        mNeutralCarriedLeftVisible = updateCarriedLeftVisible(mWeaponType);
     }
 
     void CharacterController::updateNeutralWeaponState()
@@ -3066,6 +3068,20 @@ namespace MWMechanics
         if (!event.starts_with(prefix))
             return;
         const std::string_view action = event.substr(prefix.size());
+        if (action == "equip attach")
+        {
+            if (groupname == "shield")
+                mNeutralCarriedLeftVisible = true;
+            else
+                mNeutralWeaponVisible = true;
+        }
+        else if (action == "unequip detach")
+        {
+            if (groupname == "shield")
+                mNeutralCarriedLeftVisible = false;
+            else
+                mNeutralWeaponVisible = false;
+        }
         if (action == mAttackType + " max attack" && !mReadyToHit)
             prepareHit();
         if (action == "shoot release")
@@ -3251,8 +3267,10 @@ namespace MWMechanics
                 weaponGlowEnabled = true;
             }
         }
+        if (!isRealWeapon(mWeaponType) || mWeapon.isEmpty())
+            mNeutralWeaponVisible = false;
         world->updateNeutralObjectAttachment(
-            mPtr, "weapon", weaponModel, weaponBone, true, weaponGlow, weaponGlowEnabled);
+            mPtr, "weapon", weaponModel, weaponBone, mNeutralWeaponVisible, weaponGlow, weaponGlowEnabled);
 
         std::string carriedLeftModel;
         Render::Vec4 carriedLeftGlow{};
@@ -3273,7 +3291,10 @@ namespace MWMechanics
                 }
             }
         }
-        world->updateNeutralObjectAttachment(mPtr, "carried-left", carriedLeftModel, "Shield Bone", true,
+        if (!updateCarriedLeftVisible(mWeaponType))
+            mNeutralCarriedLeftVisible = false;
+        world->updateNeutralObjectAttachment(mPtr, "carried-left", carriedLeftModel, "Shield Bone",
+            mNeutralCarriedLeftVisible,
             carriedLeftGlow, carriedLeftGlowEnabled);
         updateNeutralAnimationQueue(duration);
         updateNeutralHitAnimation();

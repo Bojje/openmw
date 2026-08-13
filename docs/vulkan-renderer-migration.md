@@ -550,7 +550,7 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the frozen `openmw-vulkan-osg-reference` tag, the current checkpoint changes
-214 code files excluding this ledger, deleting 2,490 lines and adding 17,071 lines (net `+14,581`). The larger Vulkan-only
+214 code files excluding this ledger, deleting 2,490 lines and adding 17,094 lines (net `+14,604`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; the current branch continues the reduction
 work with renderer-neutral ownership and compatibility-wrapper deletion. The live no-GUI
 consumer is the first deletion checkpoint; further reduction can now target OSG
@@ -599,7 +599,8 @@ Neutral scripted queue priority also matches the legacy controller, and neutral 
 their mask, priority, and independent clock at the world boundary. Neutral controller sequences now
 arbitrate controlled blocks by priority, skip non-positive weights, and apply their frequency, phase, clip
 bounds, extrapolation mode, and reverse-play flag; weighted blending, per-bone overlay mask routing, and
-controller-sequence blend-index routing are now covered; OSG-specific presentation events remain to be ported.
+controller-sequence blend-index routing are now covered; neutral equip/unequip attachment events now update
+renderer-neutral visibility, while other OSG-specific presentation events remain to be ported.
 The neutral pose sampler now preserves later-source-wins precedence for duplicate bone names within its
 discovered source list, preventing a lower-priority local/KF source from masking a later additional source.
 Local-versus-sibling animation selection is also group-aware: unrelated local NIF controllers no longer
@@ -613,7 +614,7 @@ when present, and pose sampling now starts from the same selected text-key segme
 events now dispatch Lua callbacks, sound/soundgen events, melee-hit timing, and spell-release timing;
 neutral scripted animation requests now retain the legacy priority rule over ordinary queue requests;
 per-bone mask arbitration and controller-block priority arbitration are now present for neutral overlays,
-while full sequence blending and OSG-specific presentation events remain outstanding.
+while remaining OSG-specific presentation events are still outstanding.
 Ordinary neutral actor movement/idle groups now carry looping state and wrap their sampled clock to
 the selected controller segment, while death, hit, queued, and landing groups remain finite.
 RGBA8 conversion is now one renderer-neutral helper shared by image resources and terrain
@@ -765,7 +766,7 @@ magic VFX now use actor-scoped effect IDs, follow neutral actor movement, and ar
 magic effect expires or death animation completes. Anonymous one-shot VFX now receive generated neutral IDs at the world boundary,
 so existing spell, area, and summon effects are not silently discarded. Non-looping spell-hit VFX
 also use that neutral world-effect lifetime when no OSG animation owner exists. The remaining animation
-gate is OSG-specific presentation events and exact dynamic shading; projectile
+gate is remaining OSG-specific presentation events and exact dynamic shading; projectile
 multi-effect composition and full particle presentation remain; the neutral enchanted-arrow path now has a basic
 additive emissive glow while exact OSG glow layering remains a presentation-fidelity follow-up.
 Neutral effect meshes now defer skinning until the scene owner can sample the renderer-neutral pose resolver; compatible
