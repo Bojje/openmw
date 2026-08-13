@@ -443,10 +443,6 @@ namespace
         if (!validRgbaSize(width, height))
             return {};
         const std::size_t pixelCount = static_cast<std::size_t>(width) * height;
-        auto result = std::make_shared<Render::TextureData>();
-        result->width = width;
-        result->height = height;
-        result->pixels.resize(pixelCount * 4);
         if (fourCC == 0x32495441 || fourCC == 0x55354342) // ATI2 / BC5U
         {
             const std::size_t blocksX = width / 4 + (width % 4 != 0);
@@ -457,6 +453,10 @@ namespace
             if (blockCount > (data.size() - 128) / 16)
                 return {};
 
+            auto result = std::make_shared<Render::TextureData>();
+            result->width = width;
+            result->height = height;
+            result->pixels.resize(pixelCount * 4);
             std::size_t cursor = 128;
             for (std::size_t by = 0; by < blocksY; ++by)
                 for (std::size_t bx = 0; bx < blocksX; ++bx)
@@ -490,8 +490,13 @@ namespace
             const std::size_t blockBytes = fourCC == 0x31545844 ? 8 : 16;
             const std::size_t blocksX = width / 4 + (width % 4 != 0);
             const std::size_t blocksY = height / 4 + (height % 4 != 0);
-            if (blocksX > 0 && blocksY > (data.size() - 128) / (blocksX * blockBytes))
+            if (!blocksX || blocksX > std::numeric_limits<std::size_t>::max() / blockBytes
+                || blocksY > (data.size() - 128) / (blocksX * blockBytes))
                 return {};
+            auto result = std::make_shared<Render::TextureData>();
+            result->width = width;
+            result->height = height;
+            result->pixels.resize(pixelCount * 4);
             std::size_t cursor = 128;
             for (std::size_t by = 0; by < blocksY; ++by)
                 for (std::size_t bx = 0; bx < blocksX; ++bx)
@@ -572,6 +577,10 @@ namespace
         const std::size_t pixelBytes = bits / 8;
         if (pixelBytes > 0 && static_cast<std::size_t>(width) * height > (data.size() - 128) / pixelBytes)
             return {};
+        auto result = std::make_shared<Render::TextureData>();
+        result->width = width;
+        result->height = height;
+        result->pixels.resize(pixelCount * 4);
         for (std::uint32_t y = 0; y < height; ++y)
             for (std::uint32_t x = 0; x < width; ++x)
             {

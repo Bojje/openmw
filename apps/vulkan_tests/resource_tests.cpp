@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
+#include <limits>
 #include <stdexcept>
 #include <vector>
 
@@ -99,6 +100,16 @@ namespace
             || normal->pixels[1] > 130 || normal->pixels[2] < 235 || normal->pixels[2] > 240
             || normal->pixels[3] != 255 || normal->pixels[4] < 62 || normal->pixels[4] > 66)
             throw std::runtime_error("neutral BC5 texture decoding did not reconstruct a normal");
+        auto oversized = dds;
+        write32(oversized, 12, std::numeric_limits<std::uint32_t>::max());
+        write32(oversized, 16, std::numeric_limits<std::uint32_t>::max());
+        {
+            std::ofstream output(root / "textures/test.dds", std::ios::binary | std::ios::trunc);
+            output.write(reinterpret_cast<const char*>(oversized.data()), static_cast<std::streamsize>(oversized.size()));
+        }
+        resources.getNeutralTextureManager()->clearCache();
+        if (resources.getNeutralTextureManager()->get(VFS::Path::Normalized("textures/test.dds")))
+            throw std::runtime_error("oversized neutral BC5 texture unexpectedly allocated");
         {
             std::ofstream output(root / "textures/test.dds", std::ios::binary | std::ios::trunc);
             output.write(reinterpret_cast<const char*>(dds.data()), 128);
