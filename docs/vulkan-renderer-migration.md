@@ -80,8 +80,9 @@ visibility, transform, model, and cell ordering together with resolved mesh data
 Vulkan bootstrap now has a model-local NIF pose producer: the resource boundary samples
 `NiKeyframeController` transforms by the converted skinning bone names and the scene owner injects
 the resulting matrices into dynamic submissions. Explicit gameplay poses still take precedence;
-objects without a compatible pose retain the inverse-bind-derived bind pose. Actor `.kf` sequence
-selection, blended controller stacks, particles, and animation-specific shading remain later gates.
+objects without a compatible pose retain the inverse-bind-derived bind pose. Actor source-order
+selection is now world-owned; blended controller stacks, particles, and animation-specific shading
+remain later gates.
 NIF classic texture, diffuse/emissive, glossiness, and alpha properties now cross the
 renderer-neutral mesh boundary and survive batching; the neutral batch applies diffuse
 and alpha to vertex color output. NIF bump/normal texture slots now cross the same boundary
@@ -138,8 +139,8 @@ resolved dynamic mesh. The scene owner invalidates that pose and clock when a dy
 model, preventing a previous skeleton's matrices from being applied to a replacement mesh. The
 resource boundary now samples model-local NIF keyframe controllers and classic external `.kf`
 controllers without constructing an OSG scene, while explicit gameplay poses remain authoritative.
-The Vulkan pose resolver uses the sibling `.kf` as a fallback when a model has no local controller;
-external text-key start times are honored for the selected group. No-OSG mechanics now publish
+The Vulkan pose resolver uses the world-selected layered source list and honors external text-key
+start times for the selected group. No-OSG mechanics now publish
 neutral idle, movement, and one-active-scripted groups, and changing groups resets the neutral pose
 clock. Neutral animation-state restoration no longer dereferences the absent OSG animation owner;
 scripted group requests remain visible to the neutral resolver and fall back to bind pose when no
@@ -147,8 +148,9 @@ controller is available. Neutral dynamic submission now defers bind-pose fallbac
 injected NIF/KF pose resolver runs, so model-local animation is not masked by an early fallback.
 Neutral death transitions now publish a deterministic death group instead
 of being discarded when OSG animation is absent. Neutral hit, knockdown, knockout, and block states
-also publish their canonical groups and clear when gameplay recovery ends. Live actor `.kf` priority arbitration,
-full text-key stop/loop handling, blended controller stacks, and animation-specific shading remain outstanding.
+also publish their canonical groups and clear when gameplay recovery ends. Full text-key stop/loop
+handling is now shared by the selected source; blended controller stacks and animation-specific shading
+remain outstanding.
 Neutral dynamic and effect submissions now carry canonical pose bone names and remap compatible multi-part skin orders
 before skinning, with bind-pose fallback only for parts whose bone sets do not match. NIF skinning metadata preserves source bone
 names beside inverse-bind matrices, making the mapping deterministic without borrowing OSG types.
@@ -593,8 +595,7 @@ Renderer-neutral NIF/KF metadata now narrows queue completion to group-specific 
 when present, and pose sampling now starts from the same selected text-key segment. Neutral text-key
 events now dispatch Lua callbacks, sound/soundgen events, melee-hit timing, and spell-release timing;
 neutral scripted animation requests now retain the legacy priority rule over ordinary queue requests;
-actor `.kf` source priority beyond group presence, blended controller-stack ownership, and OSG-specific
-presentation events remain outstanding.
+blended controller-stack ownership and OSG-specific presentation events remain outstanding.
 Ordinary neutral actor movement/idle groups now carry looping state and wrap their sampled clock to
 the selected controller segment, while death, hit, queued, and landing groups remain finite.
 RGBA8 conversion is now one renderer-neutral helper shared by image resources and terrain
