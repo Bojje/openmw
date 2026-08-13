@@ -220,7 +220,10 @@ namespace Nif
             const Render::Mat4 transform = Render::multiply(parentTransform,
                 toRenderMatrix(sampleNodeTransform(object, time).value));
             if (!object.mName.empty())
-                transforms.emplace(object.mName, transform);
+                // Later animation sources are higher priority in the legacy
+                // controller stack, so a later occurrence replaces an older
+                // transform for the same bone name.
+                transforms.insert_or_assign(object.mName, transform);
             if (const auto* node = dynamic_cast<const NiNode*>(&object))
                 for (const auto& child : node->mChildren)
                     if (!child.empty())
@@ -369,7 +372,9 @@ namespace Nif
                 const auto* keyframe = static_cast<const NiKeyframeController*>(controller);
                 const NiTransform sampled
                     = sampleKeyframeController(*keyframe, NiTransform::getIdentity(), sampleTime).value;
-                transforms.emplace(name->mData, toRenderMatrix(sampled));
+                // Sequence sources are visited in source order; preserve the
+                // same later-source-wins rule as model-local controllers.
+                transforms.insert_or_assign(name->mData, toRenderMatrix(sampled));
             }
         }
 

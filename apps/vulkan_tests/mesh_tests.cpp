@@ -224,6 +224,20 @@ int main()
         = Nif::collectBonePose(Nif::FileView(*file), animatedBoneNames, 0.25f);
     expectNear(earlyAnimatedPose.front().data[12], 10.625f, "quadratic sampled bone translation");
 
+    Nif::NiNode higherPriorityBone;
+    higherPriorityBone.mName = "Root Bone";
+    higherPriorityBone.mTransform = Nif::NiTransform::getIdentity();
+    higherPriorityBone.mTransform.mTranslation.x() = 7.f;
+    higherPriorityBone.mController = Nif::NiTimeControllerPtr(nullptr);
+    auto priorityFile = std::make_shared<Nif::NIFFile>(VFS::Path::Normalized("priority.nif"));
+    priorityFile->mRoots.push_back(&animatedBone);
+    priorityFile->mRoots.push_back(&higherPriorityBone);
+    const std::vector<Render::Mat4> priorityPose
+        = Nif::collectBonePose(Nif::FileView(*priorityFile), animatedBoneNames, 0.5f);
+    if (priorityPose.size() != 1)
+        throw std::runtime_error("NIF priority pose sampler did not find the duplicate bone");
+    expectNear(priorityPose.front().data[12], 7.f, "later animation source priority");
+
     Nif::NiTextKeyExtraData sequenceTextKeys;
     sequenceTextKeys.mRecordType = Nif::RC_NiTextKeyExtraData;
     sequenceTextKeys.mList.push_back({ 0.25f, "Idle: Start" });
