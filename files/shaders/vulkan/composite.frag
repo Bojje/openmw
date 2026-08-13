@@ -112,11 +112,17 @@ void main() {
         vec3 pointLightDirection = toLight / distanceToLight;
         float attenuation = 1.0 - distanceToLight / radius;
         vec3 pointLightColor = scene.pointLightColorsAndRadii[i].rgb;
+        bool negativePointLight = scene.pointLightPositions[i].w < 0.0;
+        if (negativePointLight)
+            pointLightColor = -pointLightColor;
         pointAmbient += albedo * pointLightColor * attenuation * 0.25;
         pointDiffuse += albedo * pointLightColor * max(dot(N, pointLightDirection), 0.0) * attenuation;
-        vec3 pointHalfway = normalize(pointLightDirection + V);
-        float pointHighlight = pow(max(dot(N, pointHalfway), 0.0), mix(128.0, 1.0, roughness));
-        pointSpecular += pointLightColor * pointHighlight * attenuation;
+        if (!negativePointLight)
+        {
+            vec3 pointHalfway = normalize(pointLightDirection + V);
+            float pointHighlight = pow(max(dot(N, pointHalfway), 0.0), mix(128.0, 1.0, roughness));
+            pointSpecular += pointLightColor * pointHighlight * attenuation;
+        }
     }
 
     float specularStrength = objectSpecular ? materialSample.g

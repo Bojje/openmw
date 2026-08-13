@@ -90,8 +90,9 @@ namespace Render
         // procedural water motion and y as the underwater camera flag; the
         // remaining components are reserved.
         Vec4 effectTime{ 0.f, 0.f, 0.f, 0.f };
-        // Bounded renderer-neutral point lights. Positions use w=1 and the
-        // matching color/radius entries use w for the attenuation radius.
+        // Bounded renderer-neutral point lights. Positions use w=1 for normal
+        // lights and w=-1 for negative lights; matching color/radius entries
+        // use w for the attenuation radius.
         std::array<Vec4, maxPointLights> pointLightPositions{};
         std::array<Vec4, maxPointLights> pointLightColorsAndRadii{};
         // x is the number of active entries; w stores the neutral submission

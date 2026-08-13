@@ -185,6 +185,12 @@ int main()
         || world.sceneData().pointLightColorsAndRadii[0].y <= 0.f)
         throw std::runtime_error("renderer-neutral world scene did not advance point-light animation");
 
+    world.recordObject(&objectHandle, &firstCellHandle, true, 1, 2, "first", "meshes/negative-light.nif", objectTransform,
+        true, {}, false, {}, { 0.2f, 0.4f, 0.6f, 1.f }, 32.f,
+        Render::WorldObject::PointLightAnimation::None, true);
+    if (world.sceneData().pointLightPositions[0].w >= 0.f || !world.sceneData().valid())
+        throw std::runtime_error("renderer-neutral world scene did not preserve negative point-light state");
+
     objectTransform.position.x = 8.f;
     world.recordObject(&objectHandle, &firstCellHandle, true, 1, 2, "first", "meshes/updated.nif", objectTransform, true);
     const Render::WorldObject& recorded = world.findCell(&firstCellHandle)->objects.front();

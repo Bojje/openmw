@@ -164,6 +164,7 @@ namespace Render
         // light or scene-graph types to the neutral scene.
         Vec4 pointLightColor{};
         float pointLightRadius = 0.f;
+        bool pointLightNegative = false;
         PointLightAnimation pointLightAnimation = PointLightAnimation::None;
         float pointLightBrightness = 0.675f;
         float pointLightPhase = 0.5f;
@@ -322,7 +323,8 @@ namespace Render
                         continue;
 
                     mSceneData.pointLightPositions[count]
-                        = { object.transform.position.x, object.transform.position.y, object.transform.position.z, 1.f };
+                        = { object.transform.position.x, object.transform.position.y, object.transform.position.z,
+                            object.pointLightNegative ? -1.f : 1.f };
                     const float brightness = object.pointLightAnimation == WorldObject::PointLightAnimation::None
                         ? 1.f
                         : object.pointLightBrightness;
@@ -572,7 +574,8 @@ namespace Render
             std::string_view worldspace = {}, bool dynamic = false,
             std::span<const std::string> animationSources = {}, const Vec4& pointLightColor = {},
             float pointLightRadius = 0.f,
-            WorldObject::PointLightAnimation pointLightAnimation = WorldObject::PointLightAnimation::None)
+            WorldObject::PointLightAnimation pointLightAnimation = WorldObject::PointLightAnimation::None,
+            bool pointLightNegative = false)
         {
             if (objectKey == nullptr || cellKey == nullptr || model.empty() || !valid(pointLightColor)
                 || !valid(pointLightRadius) || pointLightRadius < 0.f
@@ -592,7 +595,8 @@ namespace Render
                     if (updateObjectCell(objectKey, objectKey, cellKey, exterior, gridX, gridY, cellName, worldspace))
                         return recordObject(
                             objectKey, cellKey, exterior, gridX, gridY, cellName, model, transform, visible, worldspace,
-                            dynamic, animationSources, pointLightColor, pointLightRadius, pointLightAnimation);
+                            dynamic, animationSources, pointLightColor, pointLightRadius, pointLightAnimation,
+                            pointLightNegative);
                     mObjects.erase(found);
                 }
                 else if (CellScene* scene = findCell(location.cell))
@@ -607,6 +611,7 @@ namespace Render
                         object->dynamic = dynamic;
                         object->pointLightColor = pointLightColor;
                         object->pointLightRadius = pointLightRadius;
+                        object->pointLightNegative = pointLightNegative;
                         if (object->pointLightAnimation != pointLightAnimation)
                         {
                             object->pointLightAnimation = pointLightAnimation;
@@ -640,6 +645,7 @@ namespace Render
             object.dynamic = dynamic;
             object.pointLightColor = pointLightColor;
             object.pointLightRadius = pointLightRadius;
+            object.pointLightNegative = pointLightNegative;
             object.pointLightAnimation = pointLightAnimation;
             resetPointLightAnimation(object);
             ensureCell(cellKey, exterior, gridX, gridY, cellName, worldspace).objects.push_back(std::move(object));
