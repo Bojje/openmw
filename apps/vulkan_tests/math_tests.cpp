@@ -1,4 +1,5 @@
 #include <cmath>
+#include <cstddef>
 #include <cstdlib>
 #include <exception>
 #include <initializer_list>
@@ -14,6 +15,8 @@ namespace
 
     static_assert(sizeof(Render::Mat4) == 64);
     static_assert(sizeof(Render::SceneData) == 896);
+    static_assert(offsetof(Render::SceneData, sunDirection) == 256);
+    static_assert(offsetof(Render::SceneData, pointLightCount) == 880);
 
     void expectNear(float actual, float expected, const std::string& label)
     {
