@@ -533,7 +533,7 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the frozen `openmw-vulkan-osg-reference` tag, the current checkpoint changes
-208 code files excluding this ledger, deleting 2,287 lines and adding 15,561 lines (net `+13,274`). The larger Vulkan-only
+208 code files excluding this ledger, deleting 2,287 lines and adding 15,710 lines (net `+13,423`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; the current branch continues the reduction
 work with renderer-neutral ownership and compatibility-wrapper deletion. The live no-GUI
 consumer is the first deletion checkpoint; further reduction can now target OSG
@@ -576,10 +576,10 @@ Neutral mesh and texture resolution, including optional specular-file discovery,
 scene boundary as injected callbacks rather than direct `ResourceSystem` calls.
 Neutral scene synchronization and bone-pose production now cross the same boundary as injected
 callbacks; the Vulkan game owner supplies camera synchronization and grouped NIF/KF pose sampling,
-layering model-local NIF, sibling `.kf`, and sorted additional `animations/<model>/` sources with later-source-wins
-bone precedence; highest-priority group metadata now owns pose duration and text-key segments. Neutral scripted
-queue priority also matches the legacy controller, while per-bone blend masks and full controller-stack ownership
-remain to be ported.
+layering world-selected actor base/default/custom/race sources plus sorted additional `animations/<model>/` files
+with later-source-wins bone precedence; highest-priority group metadata now owns pose duration and text-key segments.
+Neutral scripted queue priority also matches the legacy controller, while per-bone blend masks and full
+controller-stack ownership remain to be ported.
 The neutral pose sampler now preserves later-source-wins precedence for duplicate bone names within its
 discovered source list, preventing a lower-priority local/KF source from masking a later additional source.
 Local-versus-sibling animation selection is also group-aware: unrelated local NIF controllers no longer
@@ -663,7 +663,7 @@ the game unplayable rather than reduce duplication safely.
 | Inactive raster ray-tracing scaffold | Removed | Reintroduce only with a complete RT pipeline |
 | Vulkan utility/queue helper paths | Removed | Complete |
 | Parsed NIF resource cache wrapper | Removed | Complete; cache now owns shared NIF files directly |
-| NIF-to-neutral mesh conversion | Renderer-neutral NIF boundary, material data, mesh cache, skinning metadata, layered model-local/additional `.kf` pose sampling, highest-priority group metadata, neutral animation-group handoff, scripted queue priority, text-key extraction and selected-segment rebasing, neutral Lua/sound/melee/spell event dispatch with footstep and random-attack fallback parity, dynamic mesh payloads, `SceneSubmission`, Vulkan mesh batch, and full-game neutral resolver | Add actor-provided base/default/custom source priority, per-bone blend masks/controller-stack ownership, remaining OSG-specific equipment presentation, image-backed texture resolution, and dynamic shading |
+| NIF-to-neutral mesh conversion | Renderer-neutral NIF boundary, material data, mesh cache, skinning metadata, world-selected layered actor/additional `.kf` pose sampling, highest-priority group metadata, neutral animation-group handoff, scripted queue priority, text-key extraction and selected-segment rebasing, neutral Lua/sound/melee/spell event dispatch with footstep and random-attack fallback parity, dynamic mesh payloads, `SceneSubmission`, Vulkan mesh batch, and full-game neutral resolver | Add per-bone blend masks/controller-stack ownership, remaining OSG-specific equipment presentation, image-backed texture resolution, and dynamic shading |
 | Terrain geometry and layer data | Renderer-neutral `Terrain::RenderStorage` contract with cached per-cell LOD snapshots, active-cell-aware aligned regions, legacy texture-path correction, and a Vulkan opaque/normal/parallax/blendmap/specular layer consumer; concrete `MWRender::TerrainStorage` and legacy OSG ChunkManager remain the reference data path, including explicit ESM4 specular textures | Add quadtree-scale streaming policy and broader image-format coverage |
 | Loaded-cell object identity, transforms, terrain snapshots, and paging state | Renderer-neutral `WorldScene`/`CellScene` snapshots updated by scene lifecycle; active-cell static references bypass legacy OSG paging visibility, and cell-lifecycle-cached terrain tiles flow into `SceneSubmission`; neutral movement, cell transfer, water, effect, and weather writes are now encapsulated by `MWWorld::Scene` | Consume snapshots from a backend and migrate visibility/paging policy |
 | GUI, loading screens, screenshots, and presentation | NullWindowManager for Vulkan bootstrap; OSG/MyGUI reference path | Vulkan presentation and GUI coverage, then remove the null compatibility surface |

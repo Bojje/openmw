@@ -702,18 +702,28 @@ void OMW::Engine::prepareVulkanEngine()
         return textureManager->get(VFS::Path::Normalized(name));
     };
     const Render::PoseResolver poseResolver = [resourceSystem = mResourceSystem.get()](
-                                                 std::string_view model, std::string_view group, float time,
-                                                 bool looping, std::string_view startKey, std::string_view stopKey,
+                                                 std::string_view model,
+                                                 std::span<const std::string> animationSources,
+                                                 std::string_view group, float time, bool looping,
+                                                 std::string_view startKey, std::string_view stopKey,
                                                  std::span<const std::string> boneNames) {
         const VFS::Path::Normalized path(model);
         if (path.extension().value() != "nif")
             return std::vector<Render::Mat4>();
+        std::vector<VFS::Path::Normalized> sourcePaths;
+        if (animationSources.empty())
+            sourcePaths.push_back(path);
+        else
+            for (const std::string& source : animationSources)
+                sourcePaths.emplace_back(source);
+        const std::vector<Nif::NIFFilePtr> files
+            = resourceSystem->getNifMeshManager()->getAnimationSources(sourcePaths);
         std::string sampleStartKey(startKey);
         std::string sampleStopKey(stopKey);
         if (looping && sampleStartKey.empty() && sampleStopKey.empty() && !group.empty())
         {
             const std::vector<Render::AnimationTextKey> keys
-                = resourceSystem->getNifMeshManager()->getAnimationTextKeys(path, group);
+                = resourceSystem->getNifMeshManager()->getAnimationTextKeys(files, group);
             const auto hasKey = [&](std::string_view key) {
                 const std::string requested = std::string(group) + ": " + std::string(key);
                 return std::any_of(keys.begin(), keys.end(), [&](const Render::AnimationTextKey& candidate) {
@@ -738,14 +748,14 @@ void OMW::Engine::prepareVulkanEngine()
             const std::optional<float> duration
                 = !sampleStartKey.empty() && !sampleStopKey.empty()
                 ? resourceSystem->getNifMeshManager()->getAnimationDuration(
-                      path, group, sampleStartKey, sampleStopKey)
-                : resourceSystem->getNifMeshManager()->getAnimationDuration(path);
+                      files, group, sampleStartKey, sampleStopKey)
+                : resourceSystem->getNifMeshManager()->getAnimationDuration(files);
             if (duration && *duration > 0.f)
                 sampleTime = std::fmod(std::max(0.f, sampleTime), *duration);
         }
 
         return resourceSystem->getNifMeshManager()->getBonePose(
-            path, sampleTime, boneNames, group, sampleStartKey, sampleStopKey);
+            files, sampleTime, boneNames, group, sampleStartKey, sampleStopKey);
     };
     const Render::SceneSynchronizer sceneSynchronizer = [this](Render::SceneData& sceneData) {
         mWorld->updateNeutralSceneData(sceneData);

@@ -176,13 +176,14 @@ int main()
         throw std::runtime_error("renderer-neutral world scene failed to move an object");
 
     int dynamicObjectHandle = 0;
+    const std::vector<std::string> animationSources{ "meshes/base_anim.kf", "meshes/custom.kf" };
     world.recordObject(&dynamicObjectHandle, &firstCellHandle, true, 1, 2, "first", "meshes/animated.nif",
-        objectTransform, true, {}, true);
+        objectTransform, true, {}, true, animationSources);
     if (world.findCell(&firstCellHandle)->objects.size() != 1 || !world.findCell(&firstCellHandle)->objects.front().dynamic)
         throw std::runtime_error("renderer-neutral world scene failed to retain dynamic-object state");
     const auto& dynamicObject = world.findCell(&firstCellHandle)->objects.front();
     if (world.findCell(&firstCellHandle)->objects.size() != 1 || dynamicObject.model != "meshes/animated.nif"
-        || !dynamicObject.visible)
+        || !dynamicObject.visible || dynamicObject.animationSources != animationSources)
         throw std::runtime_error("renderer-neutral world scene failed dynamic-object handoff");
     world.updateEffects(0.25f);
     if (world.findCell(&firstCellHandle)->objects.front().animationTime != 0.25f)

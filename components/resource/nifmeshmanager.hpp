@@ -5,6 +5,7 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <span>
 #include <string_view>
 #include <vector>
 
@@ -52,6 +53,7 @@ namespace Resource
         /// Return the model-local file, its sibling actor KF, and additional
         /// animation sources in deterministic insertion order.
         std::vector<Nif::NIFFilePtr> getAnimationSources(VFS::Path::NormalizedView name) const;
+        std::vector<Nif::NIFFilePtr> getAnimationSources(std::span<const VFS::Path::Normalized> names) const;
 
         /// Select the highest-priority source that declares a requested group.
         Nif::NIFFilePtr getAnimationSource(VFS::Path::NormalizedView name, std::string_view group) const;
@@ -60,6 +62,7 @@ namespace Resource
         /// This is renderer-neutral metadata used by world-owned effects.
         std::optional<float> getAnimationDuration(VFS::Path::NormalizedView name);
         std::optional<float> getAnimationDuration(const Nif::NIFFilePtr& file) const;
+        std::optional<float> getAnimationDuration(std::span<const Nif::NIFFilePtr> files) const;
         /// Report whether a requested group is present in this file. Group
         /// presence is text-key based so unrelated local controllers do not
         /// mask a sibling actor/KF source.
@@ -68,6 +71,8 @@ namespace Resource
             std::string_view startKey, std::string_view stopKey);
         std::optional<float> getAnimationDuration(const Nif::NIFFilePtr& file, std::string_view group,
             std::string_view startKey, std::string_view stopKey) const;
+        std::optional<float> getAnimationDuration(std::span<const Nif::NIFFilePtr> files, std::string_view group,
+            std::string_view startKey, std::string_view stopKey) const;
 
         /// Return events in a selected animation segment, rebased to segment time.
         std::vector<Render::AnimationTextKey> getAnimationTextKeys(
@@ -75,6 +80,9 @@ namespace Resource
             std::string_view stopKey = {});
         std::vector<Render::AnimationTextKey> getAnimationTextKeys(
             const Nif::NIFFilePtr& file, std::string_view group, std::string_view startKey = {},
+            std::string_view stopKey = {}) const;
+        std::vector<Render::AnimationTextKey> getAnimationTextKeys(
+            std::span<const Nif::NIFFilePtr> files, std::string_view group, std::string_view startKey = {},
             std::string_view stopKey = {}) const;
 
         /// Sample model-local bone transforms without constructing an OSG
@@ -85,11 +93,17 @@ namespace Resource
         std::vector<Render::Mat4> getBonePose(
             const Nif::NIFFilePtr& file, float time, std::span<const std::string> boneNames,
             std::string_view group = {}, std::string_view startKey = {}, std::string_view stopKey = {}) const;
+        std::vector<Render::Mat4> getBonePose(
+            std::span<const Nif::NIFFilePtr> files, float time, std::span<const std::string> boneNames,
+            std::string_view group = {}, std::string_view startKey = {}, std::string_view stopKey = {}) const;
 
         void updateCache(double referenceTime) override;
         void clearCache() override;
         void setExpiryDelay(double expiryDelay) override;
         CacheStats getStats() const;
+
+    private:
+        Nif::NIFFilePtr getAnimationSource(std::span<const Nif::NIFFilePtr> files, std::string_view group) const;
     };
 }
 

@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <map>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -97,6 +98,9 @@ namespace Render
 
         uint64_t id = 0;
         std::string model;
+        // Actor animation source order is selected by the world owner. Empty
+        // means the resource manager may use model-local discovery defaults.
+        std::vector<std::string> animationSources;
         ObjectTransform transform;
         bool visible = true;
         bool dynamic = false;
@@ -407,7 +411,8 @@ namespace Render
 
         void recordObject(const void* objectKey, const void* cellKey, bool exterior, int gridX, int gridY,
             std::string_view cellName, std::string_view model, const ObjectTransform& transform, bool visible,
-            std::string_view worldspace = {}, bool dynamic = false)
+            std::string_view worldspace = {}, bool dynamic = false,
+            std::span<const std::string> animationSources = {})
         {
             if (objectKey == nullptr || cellKey == nullptr || model.empty())
             {
@@ -424,7 +429,7 @@ namespace Render
                     if (updateObjectCell(objectKey, objectKey, cellKey, exterior, gridX, gridY, cellName, worldspace))
                         return recordObject(
                             objectKey, cellKey, exterior, gridX, gridY, cellName, model, transform, visible, worldspace,
-                            dynamic);
+                            dynamic, animationSources);
                     mObjects.erase(found);
                 }
                 else if (CellScene* scene = findCell(location.cell))
@@ -433,6 +438,7 @@ namespace Render
                     {
                         const bool modelChanged = object->model != model;
                         object->model = model;
+                        object->animationSources.assign(animationSources.begin(), animationSources.end());
                         object->transform = transform;
                         object->visible = visible;
                         object->dynamic = dynamic;
@@ -456,6 +462,7 @@ namespace Render
                 object.id = mNextObjectId++;
             const uint64_t id = object.id;
             object.model = model;
+            object.animationSources.assign(animationSources.begin(), animationSources.end());
             object.transform = transform;
             object.visible = visible;
             object.dynamic = dynamic;

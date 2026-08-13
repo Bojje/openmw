@@ -112,8 +112,8 @@ namespace
             bounds };
     }
 
-    void recordNeutralObject(const MWWorld::Ptr& ptr, std::string_view model, bool visible,
-        Render::WorldScene* neutralWorld)
+    void recordNeutralObject(const MWWorld::World& world, const MWWorld::Ptr& ptr, std::string_view model,
+        bool visible, Render::WorldScene* neutralWorld)
     {
         if (neutralWorld == nullptr)
             return;
@@ -133,10 +133,15 @@ namespace
         transform.position = { position.pos[0], position.pos[1], position.pos[2] };
         transform.rotation = makeDirectRenderRotation(ptr);
         transform.scale = scale;
+        const std::vector<VFS::Path::Normalized> sourcePaths = world.getNeutralAnimationSources(ptr);
+        std::vector<std::string> animationSources;
+        animationSources.reserve(sourcePaths.size());
+        for (const VFS::Path::Normalized& source : sourcePaths)
+            animationSources.push_back(source.value());
         neutralWorld->recordObject(static_cast<const void*>(ptr.mRef), static_cast<const void*>(cell),
             cell->getCell()->isExterior(), cell->getCell()->getGridX(), cell->getCell()->getGridY(),
             cell->getCell()->getNameId(), model, transform, visible, cell->getCell()->getWorldSpace().serializeText(),
-            ptr.getClass().useAnim());
+            ptr.getClass().useAnim(), animationSources);
     }
 
     void setNodeRotation(const MWWorld::Ptr& ptr, MWRender::RenderingManager& rendering, const osg::Quat& rotation)
@@ -173,7 +178,7 @@ namespace
             // Record neutral ownership before the optional legacy scene graph
             // is touched. A paging or OSG insertion failure must not erase
             // the backend's active-cell snapshot.
-            recordNeutralObject(ptr, model.view(), true, neutralWorld);
+            recordNeutralObject(world, ptr, model.view(), true, neutralWorld);
         }
 
         if (rendering)
@@ -379,7 +384,7 @@ namespace MWWorld
             const VFS::Path::Normalized model = getModel(ptr);
             ptr.getClass().insertObjectRendering(ptr, model, mRendering->getObjects());
             setNodeRotation(ptr, *mRendering, makeNodeRotation(ptr, RotationOrder::direct));
-            recordNeutralObject(ptr, model.view(), true, mNeutralWorldScene.get());
+            recordNeutralObject(mWorld, ptr, model.view(), true, mNeutralWorldScene.get());
             reloadTerrain();
         }
     }
@@ -1396,8 +1401,9 @@ namespace MWWorld
             if (mPoseResolver && skinning != nullptr)
             {
                 const std::vector<Render::Mat4> pose = mPoseResolver(effect.object.model,
-                    effect.object.animationGroup, effect.object.animationTime, effect.object.animationLooping,
-                    effect.object.animationStartKey, effect.object.animationStopKey, skinning->boneNames);
+                    effect.object.animationSources, effect.object.animationGroup, effect.object.animationTime,
+                    effect.object.animationLooping, effect.object.animationStartKey, effect.object.animationStopKey,
+                    skinning->boneNames);
                 if (pose.size() == skinning->inverseBindMatrices.size())
                 {
                     for (Render::MeshInstance& mesh : effect.meshes)
@@ -1428,8 +1434,9 @@ namespace MWWorld
                 if (skinning != nullptr)
                 {
                     const std::vector<Render::Mat4> pose = mPoseResolver(dynamic.object.model,
-                        dynamic.object.animationGroup, dynamic.object.animationTime, dynamic.object.animationLooping,
-                        dynamic.object.animationStartKey, dynamic.object.animationStopKey, skinning->boneNames);
+                        dynamic.object.animationSources, dynamic.object.animationGroup, dynamic.object.animationTime,
+                        dynamic.object.animationLooping, dynamic.object.animationStartKey,
+                        dynamic.object.animationStopKey, skinning->boneNames);
                     if (pose.size() == skinning->inverseBindMatrices.size())
                     {
                         dynamic.boneMatrices = pose;

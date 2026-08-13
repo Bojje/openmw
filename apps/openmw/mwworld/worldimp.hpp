@@ -221,6 +221,7 @@ namespace MWWorld
             std::string_view stopKey = {}, bool looping = false) override;
         void updateNeutralObjectAttachment(const MWWorld::Ptr& ptr, std::string_view attachmentId,
             std::string_view model, std::string_view bone, bool visible) override;
+        std::vector<VFS::Path::Normalized> getNeutralAnimationSources(const MWWorld::Ptr& ptr) const;
         std::optional<float> getNeutralAnimationDuration(const MWWorld::Ptr& ptr, std::string_view group = {},
             std::string_view startKey = {}, std::string_view stopKey = {}) const override;
         bool isNeutralAnimationPlaying(const MWWorld::Ptr& ptr, std::string_view group) const override;

@@ -24,7 +24,9 @@
 #include <components/esm3/loadgmst.hpp>
 #include <components/esm3/loadlevlist.hpp>
 #include <components/esm3/loadmgef.hpp>
+#include <components/esm3/loadnpc.hpp>
 #include <components/esm3/loadregn.hpp>
+#include <components/esm3/loadrace.hpp>
 #include <components/esm3/loadstat.hpp>
 #include <components/esm4/loadcell.hpp>
 #include <components/esm4/loaddoor.hpp>
@@ -81,6 +83,7 @@
 #include "../mwmechanics/spellcasting.hpp"
 
 #include "../mwrender/neutralterrainstorage.hpp"
+#include "../mwrender/actorutil.hpp"
 #include "../mwmechanics/spellutil.hpp"
 #include "../mwmechanics/summoning.hpp"
 
@@ -4277,6 +4280,71 @@ namespace MWWorld
             mWorldScene->updateNeutralObjectAttachment(ptr, attachmentId, model, bone, visible);
     }
 
+    std::vector<VFS::Path::Normalized> World::getNeutralAnimationSources(const MWWorld::Ptr& ptr) const
+    {
+        std::vector<VFS::Path::Normalized> result;
+        const VFS::Path::Normalized model = ptr.getClass().getCorrectedModel(ptr);
+        if (model.empty())
+            return result;
+
+        const auto add = [&](VFS::Path::Normalized source) {
+            if (source.empty() || std::find(result.begin(), result.end(), source) != result.end())
+                return;
+            result.push_back(std::move(source));
+        };
+        const auto addActorSource = [&](VFS::Path::Normalized source) {
+            if (source.changeExtension(VFS::Path::ExtensionView("kf")))
+                add(std::move(source));
+        };
+
+        if (!ptr.getClass().isActor())
+        {
+            add(model);
+            return result;
+        }
+
+        if (!ptr.getClass().isNpc())
+        {
+            const auto* creature = ptr.get<ESM::Creature>()->mBase;
+            if ((creature->mFlags & ESM::Creature::Bipedal) != 0)
+                addActorSource(VFS::Path::toNormalized(Settings::models().mXbaseanim.get().value()));
+            if (ptr.getClass().useAnim())
+                addActorSource(model);
+            return result;
+        }
+
+        const ESM::NPC* npc = ptr.get<ESM::NPC>()->mBase;
+        const bool werewolf = ptr.getClass().getNpcStats(ptr).isWerewolf();
+        const ESM::Race* race = mStore.get<ESM::Race>().find(npc->mRace);
+        const bool beast = race != nullptr && (race->mData.mFlags & ESM::Race::Beast) != 0;
+        const bool female = !npc->isMale();
+        const std::string base = werewolf
+            ? std::string()
+            : (mNeutralFirstPerson ? Settings::models().mXbaseanim1st.get().value()
+                                   : Settings::models().mXbaseanim.get().value());
+        addActorSource(VFS::Path::toNormalized(base));
+
+        const VFS::Path::Normalized defaultSkeleton = Misc::ResourceHelpers::correctActorModelPath(
+            VFS::Path::toNormalized(MWRender::getActorSkeleton(mNeutralFirstPerson, female, beast, werewolf)),
+            mResourceSystem->getVFS());
+        if (defaultSkeleton != VFS::Path::toNormalized(base))
+            addActorSource(defaultSkeleton);
+
+        const bool customModel = !mNeutralFirstPerson && !werewolf && !npc->mModel.empty();
+        if (customModel)
+        {
+            const VFS::Path::Normalized custom = Misc::ResourceHelpers::correctMeshPath(npc->mModel.getNormalized());
+            if (!MWRender::isDefaultActorSkeleton(custom))
+                addActorSource(Misc::ResourceHelpers::correctActorModelPath(custom, mResourceSystem->getVFS()));
+        }
+
+        if (!mNeutralFirstPerson && !werewolf && beast && npc->mRace.contains("argonian"))
+            addActorSource(VFS::Path::toNormalized(Settings::models().mXargonianswimkna.get().value()));
+
+        addActorSource(model);
+        return result;
+    }
+
     std::optional<float> World::getNeutralAnimationDuration(
         const MWWorld::Ptr& ptr, std::string_view group, std::string_view startKey, std::string_view stopKey) const
     {
@@ -4287,7 +4355,9 @@ namespace MWWorld
         if (model.empty())
             return std::nullopt;
 
-        return mResourceSystem->getNifMeshManager()->getAnimationDuration(model, group, startKey, stopKey);
+        const std::vector<VFS::Path::Normalized> sourceNames = getNeutralAnimationSources(ptr);
+        const std::vector<Nif::NIFFilePtr> sources = mResourceSystem->getNifMeshManager()->getAnimationSources(sourceNames);
+        return mResourceSystem->getNifMeshManager()->getAnimationDuration(sources, group, startKey, stopKey);
     }
 
     bool World::isNeutralAnimationPlaying(const MWWorld::Ptr& ptr, std::string_view group) const
@@ -4309,7 +4379,9 @@ namespace MWWorld
         if (model.empty())
             return {};
 
-        return mResourceSystem->getNifMeshManager()->getAnimationTextKeys(model, group, startKey, stopKey);
+        const std::vector<VFS::Path::Normalized> sourceNames = getNeutralAnimationSources(ptr);
+        const std::vector<Nif::NIFFilePtr> sources = mResourceSystem->getNifMeshManager()->getAnimationSources(sourceNames);
+        return mResourceSystem->getNifMeshManager()->getAnimationTextKeys(sources, group, startKey, stopKey);
     }
 
     void World::setActorActive(const MWWorld::Ptr& ptr, bool value)
