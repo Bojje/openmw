@@ -302,7 +302,8 @@ to at most a one-level LOD gap to reduce cracks. Incomplete regions fall back to
 path. Geometry neighbor stitching, quadtree streaming policy, and composite-image coverage
 remain outstanding. `NeutralTerrainStorage` now keeps a worldspace-aware decoded-land cache
 across queries, so terrain vertex, blendmap, and collision requests reuse one backend-owned cell
-payload instead of rebuilding a temporary cache per operation. `WorldScene` now
+payload instead of rebuilding a temporary cache per operation; the neutral scene clears that
+cache at world reset. `WorldScene` now
 records empty loaded cells as well as object-bearing cells and owns each cell's cached terrain
 LOD snapshots. `MWWorld::Scene::getNeutralScene()` now assembles those snapshots for loaded
 exterior cells in the active worldspace, so terrain is part of the real full-game neutral
@@ -562,7 +563,7 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the frozen `openmw-vulkan-osg-reference` tag, the current checkpoint changes
-214 code files excluding this ledger, deleting 2,490 lines and adding 18,331 lines (net `+15,841`). The larger Vulkan-only
+214 code files excluding this ledger, deleting 2,490 lines and adding 18,343 lines (net `+15,853`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; the current branch continues the reduction
 work with renderer-neutral ownership and compatibility-wrapper deletion. The live no-GUI
 consumer is the first deletion checkpoint; further reduction can now target OSG

@@ -51,6 +51,10 @@ namespace Terrain
             return std::nullopt;
         }
 
+        // Drop backend-owned decoded terrain payloads at a world reset. The
+        // reference adapter has no neutral cache and keeps the default no-op.
+        virtual void clearCache() {}
+
         std::vector<Render::TerrainTile> getRenderTiles(int gridX, int gridY, ESM::RefId worldspace);
 
         // Assemble aligned square regions only from cells that are currently

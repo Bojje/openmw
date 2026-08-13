@@ -57,6 +57,7 @@ namespace MWRender
         float getHeightAt(const Render::Vec3& worldPos, ESM::RefId worldspace) override;
         std::optional<Render::TerrainHeightField> getHeightField(
             int gridX, int gridY, ESM::RefId worldspace) override;
+        void clearCache() override;
 
     private:
         using Cell = std::pair<int, int>;

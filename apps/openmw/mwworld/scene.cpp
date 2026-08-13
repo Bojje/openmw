@@ -925,6 +925,7 @@ namespace MWWorld
         assert(mActiveCells.empty());
         if (mNeutralWorldScene)
             mNeutralWorldScene->clear();
+        mTerrainStorage.clearCache();
         mNeutralTerrainRegionsDirty = false;
         if (mNeutralWorldScene)
             mNeutralMeshCache.clear();

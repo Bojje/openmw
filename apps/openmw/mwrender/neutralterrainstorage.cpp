@@ -81,6 +81,12 @@ namespace MWRender
 
     NeutralTerrainStorage::~NeutralTerrainStorage() = default;
 
+    void NeutralTerrainStorage::clearCache()
+    {
+        std::lock_guard lock(mCellCacheMutex);
+        mCellCache.clear();
+    }
+
     ESM::RefId NeutralTerrainStorage::resolveLandWorldspace(ESM::RefId worldspace) const
     {
         if (!ESM::isEsm4Ext(worldspace))
