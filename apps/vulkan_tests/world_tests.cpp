@@ -2,6 +2,7 @@
 #include <cmath>
 #include <stdexcept>
 #include <string>
+#include <utility>
 
 #include <components/render/submission.hpp>
 #include <components/render/world.hpp>
@@ -17,7 +18,11 @@ int main()
     scene.exterior = true;
     scene.gridX = 2;
     scene.gridY = -3;
-    scene.objects.push_back({ 7, "meshes/test.nif", {}, false, false, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {} });
+    Render::WorldObject testObject;
+    testObject.id = 7;
+    testObject.model = "meshes/test.nif";
+    testObject.visible = false;
+    scene.objects.push_back(std::move(testObject));
 
     if (scene.objects.size() != 1 || scene.objects.front().id != 7 || scene.objects.front().model != "meshes/test.nif"
         || scene.objects.front().transform.rotation.w != 1.f || scene.objects.front().transform.scale.x != 1.f
@@ -630,8 +635,13 @@ int main()
         || !submission.valid() || !submission.validationError().empty())
         throw std::runtime_error("renderer-neutral scene submission failed resource handoff");
 
-    submission.dynamicMeshes.push_back(
-        { { 17, "meshes/animated.nif", objectTransform, true, true, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {} }, {}, {} });
+    Render::DynamicMeshSubmission testDynamic;
+    testDynamic.object.id = 17;
+    testDynamic.object.model = "meshes/animated.nif";
+    testDynamic.object.transform = objectTransform;
+    testDynamic.object.visible = true;
+    testDynamic.object.dynamic = true;
+    submission.dynamicMeshes.push_back(std::move(testDynamic));
     if (submission.dynamicMeshes.size() != 1 || !submission.dynamicMeshes.front().object.dynamic
         || submission.dynamicMeshes.front().object.model != "meshes/animated.nif" || !submission.valid())
         throw std::runtime_error("renderer-neutral scene submission lost dynamic records");

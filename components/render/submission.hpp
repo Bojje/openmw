@@ -494,12 +494,17 @@ namespace Render
         return findCompatibleSkinning(effect.meshes);
     }
 
+    inline const SkinningData* findPrimarySkinning(const EffectMeshSubmission& effect)
+    {
+        return findPrimarySkinning(effect.meshes);
+    }
+
     inline void applyBindPose(DynamicMeshSubmission& dynamic)
     {
         if (!dynamic.boneMatrices.empty())
             return;
 
-        const SkinningData* skinning = findCompatibleSkinning(dynamic);
+        const SkinningData* skinning = findPrimarySkinning(dynamic);
         if (skinning == nullptr)
             return;
 

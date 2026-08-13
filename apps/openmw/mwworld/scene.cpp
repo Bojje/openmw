@@ -1402,7 +1402,7 @@ namespace MWWorld
 
         for (Render::EffectMeshSubmission& effect : result.effects)
         {
-            const Render::SkinningData* skinning = Render::findCompatibleSkinning(effect);
+            const Render::SkinningData* skinning = Render::findPrimarySkinning(effect);
             bool posed = false;
             if (mPoseResolver && skinning != nullptr)
             {
@@ -1413,8 +1413,17 @@ namespace MWWorld
                 {
                     for (Render::MeshInstance& mesh : effect.meshes)
                         if (mesh.mesh.skinning)
-                            mesh.mesh = Render::skinMesh(mesh.mesh, pose);
-                    posed = true;
+                        {
+                            const std::vector<Render::Mat4> remapped = Render::remapBoneMatrices(
+                                pose, skinning->boneNames, mesh.mesh.skinning->boneNames);
+                            if (remapped.size() >= mesh.mesh.skinning->inverseBindMatrices.size())
+                            {
+                                mesh.mesh = Render::skinMesh(mesh.mesh, remapped);
+                                posed = true;
+                            }
+                            else
+                                Render::bakeMeshBindPose(mesh);
+                        }
                 }
             }
             if (!posed)

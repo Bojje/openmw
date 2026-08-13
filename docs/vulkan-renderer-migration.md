@@ -149,8 +149,8 @@ Neutral death transitions now publish a deterministic death group instead
 of being discarded when OSG animation is absent. Neutral hit, knockdown, knockout, and block states
 also publish their canonical groups and clear when gameplay recovery ends. Live actor `.kf` priority arbitration,
 full text-key stop/loop handling, blended controller stacks, and animation-specific shading remain outstanding.
-Neutral dynamic submissions now carry canonical pose bone names and remap compatible multi-part skin orders
-before skinning; effect submissions still use the conservative compatible-order path. NIF skinning metadata preserves source bone
+Neutral dynamic and effect submissions now carry canonical pose bone names and remap compatible multi-part skin orders
+before skinning, with bind-pose fallback only for parts whose bone sets do not match. NIF skinning metadata preserves source bone
 names beside inverse-bind matrices, making the mapping deterministic without borrowing OSG types.
 The Vulkan composite pass now consumes that single scene-lighting UBO directly; duplicated
 sun push constants were removed, and ambient light is part of the neutral snapshot. The
@@ -531,7 +531,7 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the frozen `openmw-vulkan-osg-reference` tag, the current checkpoint changes
-208 code files excluding this ledger, deleting 2,284 lines and adding 15,402 lines (net `+13,118`). The larger Vulkan-only
+208 code files excluding this ledger, deleting 2,284 lines and adding 15,426 lines (net `+13,142`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; the current branch continues the reduction
 work with renderer-neutral ownership and compatibility-wrapper deletion. The live no-GUI
 consumer is the first deletion checkpoint; further reduction can now target OSG
