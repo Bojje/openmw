@@ -955,13 +955,34 @@ namespace Nif
         return result;
     }
 
+    const NiParticleSystemController* findParticleController(const NiParticleSystem* system)
+    {
+        if (!system)
+            return nullptr;
+        for (NiTimeControllerPtr controller = system->mController; !controller.empty(); controller = controller->mNext)
+        {
+            if (!controller->isActive())
+                continue;
+            if (controller->mRecordType == RC_NiParticleSystemController
+                || controller->mRecordType == RC_NiBSPArrayController)
+                return static_cast<const NiParticleSystemController*>(controller.getPtr());
+        }
+        return nullptr;
+    }
+
     Render::MeshData convertParticles(const NiParticlesData& source, const NiParticleSystem* system)
     {
         Render::MeshData result;
-        const std::size_t particleCount = std::min<std::size_t>(source.mActiveCount, source.mVertices.size());
         const auto* systemData = dynamic_cast<const NiPSysData*>(&source);
-        const bool hasParticleState = systemData != nullptr
-            && systemData->mParticles.size() == source.mVertices.size();
+        const NiParticleSystemController* controller = findParticleController(system);
+        const std::vector<NiParticleInfo>* controllerStates
+            = controller && !controller->mParticles.empty() ? &controller->mParticles : nullptr;
+        const std::vector<NiParticleInfo>* dataStates
+            = systemData && systemData->mParticles.size() == source.mVertices.size() ? &systemData->mParticles : nullptr;
+        const std::vector<NiParticleInfo>* particleStates = controllerStates ? controllerStates : dataStates;
+        const std::size_t particleCount = std::min<std::size_t>(source.mActiveCount,
+            controllerStates ? controllerStates->size() : source.mVertices.size());
+        const bool hasParticleState = particleStates != nullptr;
         std::shared_ptr<Render::ParticleMeshData> particleState;
         if (hasParticleState)
         {
@@ -973,30 +994,33 @@ namespace Nif
 
         for (std::size_t particle = 0; particle < particleCount; ++particle)
         {
-            float radius = particle < source.mRadii.size()
-                ? source.mRadii[particle]
+            if (controllerStates && (*controllerStates)[particle].mCode >= source.mVertices.size())
+                continue;
+            const std::size_t sourceParticle = controllerStates ? (*controllerStates)[particle].mCode : particle;
+            float radius = sourceParticle < source.mRadii.size()
+                ? source.mRadii[sourceParticle]
                 : (!source.mRadii.empty() ? source.mRadii.front() : 1.f);
-            if (particle < source.mSizes.size())
-                radius *= source.mSizes[particle];
+            if (sourceParticle < source.mSizes.size())
+                radius *= source.mSizes[sourceParticle];
             if (!std::isfinite(radius) || radius <= 0.f)
                 continue;
 
-            const osg::Vec3f& center = source.mVertices[particle];
+            const osg::Vec3f& center = source.mVertices[sourceParticle];
             const std::array<osg::Vec3f, 4> corners = {
                 osg::Vec3f{ -radius, -radius, 0.f }, osg::Vec3f{ radius, -radius, 0.f },
                 osg::Vec3f{ radius, radius, 0.f }, osg::Vec3f{ -radius, radius, 0.f } };
             osg::Quat rotation;
-            if (particle < source.mRotations.size())
-                rotation = source.mRotations[particle];
-            else if (particle < source.mRotationAngles.size() && particle < source.mRotationAxes.size())
-                rotation = osg::Quat(source.mRotationAngles[particle], source.mRotationAxes[particle]);
+            if (sourceParticle < source.mRotations.size())
+                rotation = source.mRotations[sourceParticle];
+            else if (sourceParticle < source.mRotationAngles.size() && sourceParticle < source.mRotationAxes.size())
+                rotation = osg::Quat(source.mRotationAngles[sourceParticle], source.mRotationAxes[sourceParticle]);
             const std::array<std::array<float, 2>, 4> texcoords = {
                 std::array<float, 2>{ 0.f, 0.f }, std::array<float, 2>{ 1.f, 0.f },
                 std::array<float, 2>{ 1.f, 1.f }, std::array<float, 2>{ 0.f, 1.f } };
             const bool hasColor = source.mColors.size() == source.mVertices.size();
             const std::array<float, 4> color = hasColor
-                ? std::array<float, 4>{ source.mColors[particle].r(), source.mColors[particle].g(),
-                      source.mColors[particle].b(), source.mColors[particle].a() }
+                ? std::array<float, 4>{ source.mColors[sourceParticle].r(), source.mColors[sourceParticle].g(),
+                      source.mColors[sourceParticle].b(), source.mColors[sourceParticle].a() }
                 : std::array<float, 4>{ 1.f, 1.f, 1.f, 1.f };
             std::array<Render::MeshVertexSource, 4> quad = {};
             for (std::size_t corner = 0; corner < quad.size(); ++corner)
@@ -1018,13 +1042,13 @@ namespace Nif
             result.indices.insert(result.indices.end(), { base, base + 1, base + 2, base, base + 2, base + 3 });
             if (particleState)
             {
-                const Nif::NiParticleInfo& state = systemData->mParticles[particle];
+                const Nif::NiParticleInfo& state = (*particleStates)[particle];
                 Render::ParticleState neutralState;
                 neutralState.velocity = { state.mVelocity.x(), state.mVelocity.y(), state.mVelocity.z() };
                 neutralState.age = state.mAge;
                 neutralState.lifespan = state.mLifespan;
-                if (particle < systemData->mRotationSpeeds.size())
-                    neutralState.rotationSpeed = systemData->mRotationSpeeds[particle];
+                if (sourceParticle < systemData->mRotationSpeeds.size())
+                    neutralState.rotationSpeed = systemData->mRotationSpeeds[sourceParticle];
                 particleState->states.push_back(neutralState);
             }
         }

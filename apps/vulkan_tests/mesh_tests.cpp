@@ -139,6 +139,7 @@ int main()
     growFade.mFadeTime = 0.25f;
     growFade.mBaseScale = 1.f;
     Nif::NiParticleSystem particleSystem;
+    particleSystem.mController = Nif::NiTimeControllerPtr(nullptr);
     particleSystem.mModifiers = { Nif::NiPSysModifierPtr(&gravity), Nif::NiPSysModifierPtr(&growFade) };
     const Render::MeshData simulatedParticles = Nif::convertParticles(simulatedParticleSource);
     const Render::MeshData convertedModifiers = Nif::convertParticles(simulatedParticleSource, &particleSystem);
@@ -171,6 +172,25 @@ int main()
             > 1e-5f
         || std::abs(advancedModifiers.vertices[0].tangent[2] - 2.875f) > 1e-5f)
         throw std::runtime_error("renderer-neutral particle modifiers did not affect scale and acceleration");
+
+    Nif::NiPSysData modernParticleSource;
+    modernParticleSource.mActiveCount = 1;
+    modernParticleSource.mVertices = { { 1.f, 0.f, 0.f }, { 4.f, 0.f, 0.f } };
+    modernParticleSource.mRadii = { 1.f, 2.f };
+    Nif::NiParticleSystemController modernController;
+    modernController.mRecordType = Nif::RC_NiParticleSystemController;
+    modernController.mFlags = Nif::NiTimeController::Flag_Active;
+    modernController.mParticles.resize(1);
+    modernController.mParticles.front().mCode = 1;
+    modernController.mParticles.front().mVelocity = { 0.f, 0.f, 0.f };
+    modernController.mParticles.front().mLifespan = 1.f;
+    modernController.mNext = Nif::NiTimeControllerPtr(nullptr);
+    Nif::NiParticleSystem modernParticleSystem;
+    modernParticleSystem.mController = Nif::NiTimeControllerPtr(&modernController);
+    const Render::MeshData modernParticles = Nif::convertParticles(modernParticleSource, &modernParticleSystem);
+    if (modernParticles.vertices.empty() || std::abs(modernParticles.vertices.front().tangent[0] - 4.f) > 1e-5f
+        || std::abs(modernParticles.vertices.front().position[0] + 2.f) > 1e-5f)
+        throw std::runtime_error("modern NIF particle controller state did not map its particle code");
 
     Nif::NiTriStripsData strips;
     strips.mVertices = source.mVertices;
