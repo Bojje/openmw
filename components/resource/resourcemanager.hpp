@@ -22,11 +22,17 @@ namespace osg
 namespace Resource
 {
 
+    class OsgStatsReporter
+    {
+    public:
+        virtual ~OsgStatsReporter() = default;
+        virtual void reportStats(unsigned int frameNumber, osg::Stats* stats) const = 0;
+    };
+
     class BaseResourceManager : public CacheManager
     {
     public:
         virtual ~BaseResourceManager() = default;
-        virtual void reportStats(unsigned int frameNumber, osg::Stats* stats) const = 0;
         virtual void releaseGLObjects(osg::State* state) = 0;
     };
 
@@ -59,8 +65,6 @@ namespace Resource
         double getExpiryDelay() const { return mExpiryDelay; }
 
         const VFS::Manager* getVFS() const { return mVFS; }
-
-        void reportStats(unsigned int frameNumber, osg::Stats* stats) const override {}
 
         void releaseGLObjects(osg::State* state) override { mCache->releaseGLObjects(state); }
 

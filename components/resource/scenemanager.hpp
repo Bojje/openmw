@@ -87,7 +87,7 @@ namespace Resource
     /// @brief Handles loading and caching of scenes, e.g. .nif files or .osg files
     /// @note Some methods of the scene manager can be used from any thread, see the methods documentation for more
     /// details.
-    class SceneManager : public ResourceManager
+    class SceneManager : public ResourceManager, public OsgStatsReporter
     {
     public:
         explicit SceneManager(const VFS::Manager* vfs, Resource::ImageManager* imageManager,

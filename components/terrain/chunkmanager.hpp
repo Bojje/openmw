@@ -72,7 +72,8 @@ namespace Terrain
     }
 
     /// @brief Handles loading and caching of terrain chunks
-    class ChunkManager : public Resource::GenericResourceManager<ChunkKey>, public QuadTreeWorld::ChunkManager
+    class ChunkManager : public Resource::GenericResourceManager<ChunkKey>, public Resource::OsgStatsReporter,
+                         public QuadTreeWorld::ChunkManager
     {
     public:
         explicit ChunkManager(Storage* storage, Resource::SceneManager* sceneMgr, TextureManager* textureManager,

@@ -587,11 +587,12 @@ while Vulkan uses `BasicFrameStats` and does not construct an OSG statistics obj
 resource-manager reporting remains behind the OSG lifecycle boundary until those resource
 statistics consumers are migrated.
 The shared NIF file and converted-mesh caches now use a renderer-neutral `CacheManager` lifecycle;
-`BaseResourceManager` extends that same contract and adds only OSG statistics/release hooks. Only
-OSG-owned resource managers remain in the OSG manager list. Cache expiry, clearing, and statistics
-preserve the existing behavior, while the neutral cache headers no longer import the OSG
-resource-manager interface. CI checks this boundary so the Vulkan resource path cannot regain an
-OSG cache dependency accidentally.
+`BaseResourceManager` extends that same contract for cache expiry, clearing, and release ownership.
+The optional `OsgStatsReporter` interface keeps legacy resource statistics on OSG-owned managers
+without making every resource manager implement an OSG statistics hook. Only OSG-owned resource
+managers remain in the OSG manager list. Cache expiry and clearing preserve the existing behavior,
+while OSG statistics reporting is collected through the explicit reporter list. CI checks this
+boundary so the Vulkan resource path cannot regain an OSG cache dependency accidentally.
 
 Against the frozen `openmw-vulkan-osg-reference` tag, the current checkpoint changes
 214 code files excluding this ledger, deleting 2,490 lines and adding 19,479 lines (net `+16,989`). The larger Vulkan-only

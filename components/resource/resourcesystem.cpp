@@ -140,6 +140,8 @@ namespace Resource
     void ResourceSystem::addResourceManager(BaseResourceManager* resourceMgr)
     {
         mResourceManagers.push_back(resourceMgr);
+        if (auto* const statsReporter = dynamic_cast<OsgStatsReporter*>(resourceMgr))
+            mOsgStatsReporters.push_back(statsReporter);
     }
 
     void ResourceSystem::removeResourceManager(BaseResourceManager* resourceMgr)
@@ -148,6 +150,11 @@ namespace Resource
             = std::find(mResourceManagers.begin(), mResourceManagers.end(), resourceMgr);
         if (found != mResourceManagers.end())
             mResourceManagers.erase(found);
+
+        auto statsFound = std::find(mOsgStatsReporters.begin(), mOsgStatsReporters.end(),
+            dynamic_cast<OsgStatsReporter*>(resourceMgr));
+        if (statsFound != mOsgStatsReporters.end())
+            mOsgStatsReporters.erase(statsFound);
     }
 
     const VFS::Manager* ResourceSystem::getVFS() const
@@ -159,8 +166,8 @@ namespace Resource
     {
         Resource::reportStats("Nif", frameNumber, mNifFileManager->getStats(), *stats);
         Resource::reportStats("NifMesh", frameNumber, mNifMeshManager->getStats(), *stats);
-        for (std::vector<BaseResourceManager*>::const_iterator it = mResourceManagers.begin();
-             it != mResourceManagers.end(); ++it)
+        for (std::vector<OsgStatsReporter*>::const_iterator it = mOsgStatsReporters.begin();
+             it != mOsgStatsReporters.end(); ++it)
             (*it)->reportStats(frameNumber, stats);
     }
 

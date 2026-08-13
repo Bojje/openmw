@@ -31,6 +31,7 @@ namespace Resource
     class NifMeshManager;
     class KeyframeManager;
     class BaseResourceManager;
+    class OsgStatsReporter;
     class AnimBlendRulesManager;
     class CacheManager;
 
@@ -104,6 +105,7 @@ namespace Resource
         // OSG managers expose releaseGLObjects and are kept separate from
         // renderer-neutral cache managers.
         std::vector<BaseResourceManager*> mResourceManagers;
+        std::vector<OsgStatsReporter*> mOsgStatsReporters;
         std::vector<CacheManager*> mCacheManagers;
 
         const VFS::Manager* mVFS;

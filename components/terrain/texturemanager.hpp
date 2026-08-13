@@ -17,7 +17,7 @@ namespace osg
 namespace Terrain
 {
 
-    class TextureManager : public Resource::ResourceManager
+    class TextureManager : public Resource::ResourceManager, public Resource::OsgStatsReporter
     {
     public:
         explicit TextureManager(Resource::SceneManager* sceneMgr, double expiryDelay);
