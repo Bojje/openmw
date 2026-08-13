@@ -2752,8 +2752,35 @@ namespace MWMechanics
                 mPtr, mAnimQueue.front().mGroup, std::nullopt, mAnimQueue.front().mStartKey, mAnimQueue.front().mStopKey);
     }
 
+    void CharacterController::syncNeutralWeaponState()
+    {
+        if (!mPtr.getClass().isActor() || !mPtr.getClass().hasInventoryStore(mPtr) || !mAnimQueue.empty()
+            || mUpperBodyState > UpperBodyState::WeaponEquipped)
+            return;
+
+        const MWWorld::Class& cls = mPtr.getClass();
+        CreatureStats& stats = cls.getCreatureStats(mPtr);
+        MWWorld::InventoryStore& inventory = cls.getInventoryStore(mPtr);
+        int weaponType = ESM::Weapon::None;
+        MWWorld::ContainerStoreIterator weapon = getActiveWeapon(mPtr, &weaponType);
+        if (stats.getDrawState() == DrawState::Spell)
+            weapon = inventory.getSlot(MWWorld::InventoryStore::Slot_CarriedRight);
+
+        MWWorld::Ptr newWeapon;
+        if (weapon != inventory.end())
+            newWeapon = *weapon;
+        if (mWeapon == newWeapon && mWeaponType == weaponType)
+            return;
+
+        mWeapon = newWeapon;
+        mWeaponType = weaponType;
+        mCurrentWeapon = weaponType == ESM::Weapon::None ? std::string() : std::string(getWeaponAnimation(weaponType));
+        mUpperBodyState = weaponType == ESM::Weapon::None ? UpperBodyState::None : UpperBodyState::WeaponEquipped;
+    }
+
     void CharacterController::updateNeutralWeaponState()
     {
+        syncNeutralWeaponState();
         if (!mPtr.getClass().isActor() || !mPtr.getClass().hasInventoryStore(mPtr)
             || mUpperBodyState != UpperBodyState::WeaponEquipped || !getAttackingOrSpell()
             || mWeaponType == ESM::Weapon::None || !mAnimQueue.empty())

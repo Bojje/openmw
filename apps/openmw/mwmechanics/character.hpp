@@ -256,6 +256,7 @@ namespace MWMechanics
 
         void unpersistAnimationState();
         void updateNeutralAnimationQueue(float duration);
+        void syncNeutralWeaponState();
         void updateNeutralWeaponState();
         void releaseNeutralProjectile();
 
