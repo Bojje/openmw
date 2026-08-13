@@ -325,9 +325,14 @@ int main()
     effectSkinning->inverseBindMatrices = { Render::identityMat4() };
     secondEffectMesh.mesh.skinning = std::move(effectSkinning);
     if (!world.recordEffect("spark", "meshes/effect.nif", { 10.f, 11.f, 12.f }, 2.f, "textures/effect.dds", true, 2.f,
-            true, true)
+            true, true, { 0.8f, 0.3f, 0.1f, 0.f }, 66.f)
         || world.recordEffect("", "meshes/effect.nif", { 10.f, 11.f, 12.f }, 1.f))
         throw std::runtime_error("renderer-neutral world scene accepted an invalid or anonymous effect");
+    if (world.sceneData().pointLightCount.x != 1.f || world.sceneData().pointLightPositions[0].x != 10.f
+        || world.sceneData().pointLightPositions[0].w != 1.f
+        || world.sceneData().pointLightColorsAndRadii[0].z != 0.1f
+        || world.sceneData().pointLightColorsAndRadii[0].w != 66.f || !world.sceneData().valid())
+        throw std::runtime_error("renderer-neutral world scene lost an effect point light");
     const Render::SceneSubmission effectSubmission = Render::collectSceneSubmission(world, aggregateScene, "",
         [&](std::string_view model) -> std::vector<Render::MeshInstance> {
             if (model != "meshes/first.nif" && model != "meshes/effect.nif")
@@ -365,7 +370,7 @@ int main()
         || !deferredEffectSubmission.effects.back().meshes.back().mesh.skinning
         || Render::findCompatibleSkinning(deferredEffectSubmission.effects.back()) == nullptr)
         throw std::runtime_error("renderer-neutral scene submission did not guard deferred effect skinning");
-    if (!world.removeEffect("spark") || world.removeEffect("spark"))
+    if (!world.removeEffect("spark") || world.removeEffect("spark") || world.sceneData().pointLightCount.x != 0.f)
         throw std::runtime_error("renderer-neutral world scene failed effect removal");
     if (!world.recordEffect("loop", "meshes/effect.nif", { 1.f, 2.f, 3.f }, 1.f, {}, true, 2.f)
         || world.effectsInOrder().size() != 1 || !world.effectsInOrder().front()->looping)

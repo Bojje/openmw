@@ -1,5 +1,6 @@
 #include "projectilemanager.hpp"
 
+#include <array>
 #include <iomanip>
 #include <memory>
 #include <optional>
@@ -388,7 +389,8 @@ namespace MWWorld
         {
             state.mNeutralEffectId = makeNeutralProjectileEffectId(state.mProjectileId);
             MWBase::Environment::get().getWorld()->spawnEffect(
-                visualModel, std::string(texture.value()), pos, 1.f, true, false, state.mNeutralEffectId, true);
+                visualModel, std::string(texture.value()), pos, 1.f, true, false, state.mNeutralEffectId, true,
+                std::array<float, 4>{ lightDiffuseColor.r(), lightDiffuseColor.g(), lightDiffuseColor.b(), 0.f }, 66.f);
             MWBase::Environment::get().getWorld()->updateEffect(
                 state.mNeutralEffectId, toRenderVec3(state.mPosition), toRenderQuat(state.mOrientation));
         }
@@ -871,7 +873,8 @@ namespace MWWorld
                 state.mNeutralEffectId = makeNeutralProjectileEffectId(state.mProjectileId);
                 MWBase::Environment::get().getWorld()->spawnEffect(
                     model, std::string(texture.value()), osg::Vec3f(esm.mPosition), 1.f, true, false,
-                    state.mNeutralEffectId, true);
+                    state.mNeutralEffectId, true,
+                    std::array<float, 4>{ lightDiffuseColor.r(), lightDiffuseColor.g(), lightDiffuseColor.b(), 0.f }, 66.f);
                 MWBase::Environment::get().getWorld()->updateEffect(
                     state.mNeutralEffectId, toRenderVec3(state.mPosition), toRenderQuat(state.mOrientation));
             }

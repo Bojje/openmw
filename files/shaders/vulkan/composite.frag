@@ -20,6 +20,9 @@ layout(set = 0, binding = 4) uniform SceneUBO {
     vec4 fogParameters;
     vec4 skyColor;
     vec4 effectTime;
+    vec4 pointLightPositions[16];
+    vec4 pointLightColorsAndRadii[16];
+    vec4 pointLightCount;
 } scene;
 
 layout(location = 0) out vec4 outColor;
@@ -90,6 +93,24 @@ void main() {
         N = normalize(mix(N, waveNormal, 0.35));
     }
 
+    vec3 pointAmbient = vec3(0.0);
+    vec3 pointDiffuse = vec3(0.0);
+    int pointLightTotal = int(scene.pointLightCount.x);
+    for (int i = 0; i < pointLightTotal; ++i)
+    {
+        vec3 toLight = scene.pointLightPositions[i].xyz - worldPos;
+        float distanceToLight = length(toLight);
+        float radius = scene.pointLightColorsAndRadii[i].w;
+        if (distanceToLight <= 0.0001 || distanceToLight >= radius)
+            continue;
+
+        vec3 pointLightDirection = toLight / distanceToLight;
+        float attenuation = 1.0 - distanceToLight / radius;
+        vec3 pointLightColor = scene.pointLightColorsAndRadii[i].rgb;
+        pointAmbient += albedo * pointLightColor * attenuation * 0.25;
+        pointDiffuse += albedo * pointLightColor * max(dot(N, pointLightDirection), 0.0) * attenuation;
+    }
+
     float specularStrength = objectSpecular ? 1.0
         : terrainSpecular ? materialSample.g : 0.3 * (1.0 - roughness);
     vec3 V = normalize(scene.viewInverse[3].xyz - worldPos);
@@ -99,7 +120,7 @@ void main() {
     if (scene.effectTime.y > 0.5)
         specular *= 0.15;
 
-    vec3 color = ambient + diffuse + specular + reflectionColor + albedo * emission;
+    vec3 color = ambient + pointAmbient + diffuse + pointDiffuse + specular + reflectionColor + albedo * emission;
 
     if (waterSurface)
     {

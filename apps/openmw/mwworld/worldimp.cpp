@@ -3945,7 +3945,7 @@ namespace MWWorld
 
     void World::spawnEffect(VFS::Path::NormalizedView model, const std::string& textureOverride,
         const osg::Vec3f& worldPos, float scale, bool isMagicVFX, bool useAmbientLight, std::string_view effectId,
-        bool loop)
+        bool loop, std::array<float, 4> pointLightColor, float pointLightRadius)
     {
         if (mRendering)
             mRendering->spawnEffect(model, textureOverride, worldPos, scale, isMagicVFX, useAmbientLight, effectId, loop);
@@ -3958,9 +3958,12 @@ namespace MWWorld
             std::optional<float> animationDuration;
             if (mResourceSystem != nullptr && mResourceSystem->backend() == Resource::ResourceSystem::Backend::Neutral)
                 animationDuration = mResourceSystem->getNifMeshManager()->getAnimationDuration(model);
+            const Render::Vec4 neutralPointLightColor
+                = { pointLightColor[0], pointLightColor[1], pointLightColor[2], pointLightColor[3] };
             mWorldScene->recordNeutralEffect(neutralEffectId, model.value(),
                 { worldPos.x(), worldPos.y(), worldPos.z() }, scale, textureOverride, loop,
-                animationDuration.value_or(0.f), isMagicVFX, useAmbientLight);
+                animationDuration.value_or(0.f), isMagicVFX, useAmbientLight, neutralPointLightColor,
+                pointLightRadius);
         }
     }
 

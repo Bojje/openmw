@@ -491,12 +491,12 @@ namespace MWWorld
 
     void Scene::recordNeutralEffect(std::string_view effectId, std::string_view model, const Render::Vec3& position,
         float scale, std::string_view textureOverride, bool loop, float animationDuration, bool isMagicVfx,
-        bool ambientOverride)
+        bool ambientOverride, const Render::Vec4& pointLightColor, float pointLightRadius)
     {
         if (mNeutralWorldScene)
             mNeutralWorldScene->recordEffect(
                 effectId, model, position, scale, textureOverride, loop, animationDuration, isMagicVfx,
-                ambientOverride);
+                ambientOverride, pointLightColor, pointLightRadius);
     }
 
     void Scene::removeNeutralEffect(std::string_view effectId)

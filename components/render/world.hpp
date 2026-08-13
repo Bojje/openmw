@@ -129,6 +129,10 @@ namespace Render
         bool magicVfx = false;
         // Legacy VFX may override the scene ambient term with white light.
         bool ambientOverride = false;
+        // Optional gameplay-provided point light, without exposing backend
+        // light or scene-graph types to the neutral scene.
+        Vec4 pointLightColor{};
+        float pointLightRadius = 0.f;
         float opacity = 1.f;
         bool active = true;
         std::vector<Attachment> attachments;
@@ -217,6 +221,30 @@ namespace Render
             mObjects.emplace(newKey, location);
         }
 
+        void refreshPointLights()
+        {
+            mSceneData.pointLightPositions = {};
+            mSceneData.pointLightColorsAndRadii = {};
+            mSceneData.pointLightCount = {};
+
+            std::size_t count = 0;
+            for (const auto& [id, effect] : mEffects)
+            {
+                if (count >= SceneData::maxPointLights || !effect.active || !effect.visible
+                    || !valid(effect.transform.position) || !valid(effect.pointLightColor)
+                    || !valid(effect.pointLightRadius) || effect.pointLightRadius <= 0.f)
+                    continue;
+
+                mSceneData.pointLightPositions[count]
+                    = { effect.transform.position.x, effect.transform.position.y, effect.transform.position.z, 1.f };
+                mSceneData.pointLightColorsAndRadii[count]
+                    = { effect.pointLightColor.x, effect.pointLightColor.y, effect.pointLightColor.z,
+                        effect.pointLightRadius };
+                ++count;
+            }
+            mSceneData.pointLightCount.x = static_cast<float>(count);
+        }
+
         template <class Update>
         bool updateObjectTransform(const void* objectKey, Update&& update)
         {
@@ -291,9 +319,13 @@ namespace Render
 
         bool recordEffect(std::string_view effectId, std::string_view model, const Vec3& position, float scale,
             std::string_view textureOverride = {}, bool looping = false, float animationDuration = 0.f,
-            bool magicVfx = false, bool ambientOverride = false)
+            bool magicVfx = false, bool ambientOverride = false, const Vec4& pointLightColor = {},
+            float pointLightRadius = 0.f)
         {
-            if (effectId.empty() || model.empty() || !valid(position) || !valid(scale) || scale <= 0.f)
+            if (effectId.empty() || model.empty() || !valid(position) || !valid(scale) || scale <= 0.f
+                || !valid(pointLightColor) || !valid(pointLightRadius) || pointLightRadius < 0.f
+                || (pointLightRadius > 0.f
+                    && (pointLightColor.x < 0.f || pointLightColor.y < 0.f || pointLightColor.z < 0.f)))
                 return false;
             WorldObject effect;
             effect.id = mNextObjectId++;
@@ -308,11 +340,20 @@ namespace Render
             effect.animationDuration = valid(animationDuration) && animationDuration > 0.f ? animationDuration : 0.f;
             effect.magicVfx = magicVfx;
             effect.ambientOverride = ambientOverride;
+            effect.pointLightColor = pointLightColor;
+            effect.pointLightRadius = pointLightRadius;
             mEffects[std::string(effectId)] = std::move(effect);
+            refreshPointLights();
             return true;
         }
 
-        bool removeEffect(std::string_view effectId) { return mEffects.erase(std::string(effectId)) != 0; }
+        bool removeEffect(std::string_view effectId)
+        {
+            const bool removed = mEffects.erase(std::string(effectId)) != 0;
+            if (removed)
+                refreshPointLights();
+            return removed;
+        }
 
         bool updateEffect(std::string_view effectId, const Vec3& position, const Quat& rotation)
         {
@@ -321,6 +362,7 @@ namespace Render
                 return false;
             found->second.transform.position = position;
             found->second.transform.rotation = rotation;
+            refreshPointLights();
             return true;
         }
 
@@ -366,9 +408,14 @@ namespace Render
                 effect.animationTime = std::fmod(effect.animationTime, effect.animationDuration);
                 ++iter;
             }
+            refreshPointLights();
         }
 
-        void clearEffects() { mEffects.clear(); }
+        void clearEffects()
+        {
+            mEffects.clear();
+            refreshPointLights();
+        }
 
         std::vector<const WorldObject*> effectsInOrder() const
         {

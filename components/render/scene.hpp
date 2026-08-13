@@ -1,6 +1,7 @@
 #ifndef OPENMW_COMPONENTS_RENDER_SCENE_H
 #define OPENMW_COMPONENTS_RENDER_SCENE_H
 
+#include <array>
 #include <cmath>
 #include <functional>
 #include <string_view>
@@ -68,6 +69,8 @@ namespace Render
     // Renderer-neutral per-frame data shared by backend adapters.
     struct SceneData
     {
+        static constexpr std::size_t maxPointLights = 16;
+
         Mat4 view = identityMat4();
         Mat4 projection = identityMat4();
         Mat4 viewInverse = identityMat4();
@@ -87,13 +90,35 @@ namespace Render
         // procedural water motion and y as the underwater camera flag; the
         // remaining components are reserved.
         Vec4 effectTime{ 0.f, 0.f, 0.f, 0.f };
+        // Bounded renderer-neutral point lights. Positions use w=1 and the
+        // matching color/radius entries use w for the attenuation radius.
+        std::array<Vec4, maxPointLights> pointLightPositions{};
+        std::array<Vec4, maxPointLights> pointLightColorsAndRadii{};
+        // x is the number of active entries; the remaining components are
+        // reserved for future light metadata.
+        Vec4 pointLightCount{ 0.f, 0.f, 0.f, 0.f };
 
         bool valid() const
         {
             return Render::valid(view) && Render::valid(projection) && Render::valid(viewInverse)
                 && Render::valid(projInverse) && Render::valid(sunDirection) && Render::valid(sunColor)
                 && Render::valid(ambientColor) && Render::valid(fogColor) && Render::valid(fogParameters)
-                && Render::valid(skyColor) && Render::valid(effectTime);
+                && Render::valid(skyColor) && Render::valid(effectTime) && Render::valid(pointLightCount)
+                && pointLightCount.x >= 0.f && pointLightCount.x <= static_cast<float>(maxPointLights)
+                && std::floor(pointLightCount.x) == pointLightCount.x
+                && [&] {
+                       const std::size_t count = static_cast<std::size_t>(pointLightCount.x);
+                       for (std::size_t i = 0; i < count; ++i)
+                       {
+                           if (!Render::valid(pointLightPositions[i])
+                               || !Render::valid(pointLightColorsAndRadii[i])
+                               || pointLightColorsAndRadii[i].x < 0.f || pointLightColorsAndRadii[i].y < 0.f
+                               || pointLightColorsAndRadii[i].z < 0.f
+                               || pointLightColorsAndRadii[i].w <= 0.f)
+                               return false;
+                       }
+                       return true;
+                   }();
         }
     };
 
