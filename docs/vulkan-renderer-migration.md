@@ -318,8 +318,9 @@ path. Geometry neighbor stitching, quadtree streaming policy, and composite-imag
 remain outstanding. `NeutralTerrainStorage` now keeps a worldspace-aware decoded-land cache
 across queries, so terrain vertex, blendmap, and collision requests reuse one backend-owned cell
 payload instead of rebuilding a temporary cache per operation, and lazily caches complete neutral
-tile snapshots by worldspace/LOD/size/center so scene refreshes do not rebuild the same mesh and
-blendmap payload. The neutral scene clears both caches at world reset and at each cell-grid shift;
+tile snapshots by worldspace/LOD/size/center, with a bounded LRU cap and generation invalidation, so
+scene refreshes do not rebuild the same mesh and blendmap payload or retain stale tiles across a reset.
+The neutral scene clears both caches at world reset and at each cell-grid shift;
 preload remains limited to decoded cells, leaving tile construction lazy. `WorldScene` now
 records empty loaded cells as well as object-bearing cells and owns each cell's cached terrain
 LOD snapshots. `MWWorld::Scene::getNeutralScene()` now assembles those snapshots for loaded

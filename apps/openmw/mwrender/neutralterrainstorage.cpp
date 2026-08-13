@@ -28,6 +28,7 @@ namespace MWRender
     namespace
     {
         constexpr float defaultHeight = static_cast<float>(ESM::Land::DEFAULT_HEIGHT);
+        constexpr std::size_t maxRenderTileCacheEntries = 256;
 
         Render::TextureData makeAlphaTexture(int size, const std::vector<std::uint8_t>& alpha)
         {
@@ -90,6 +91,8 @@ namespace MWRender
         {
             std::lock_guard lock(mRenderTileCacheMutex);
             mRenderTileCache.clear();
+            ++mRenderTileCacheGeneration;
+            mRenderTileAccessCounter = 0;
         }
     }
 
@@ -110,12 +113,20 @@ namespace MWRender
     std::optional<Render::TerrainTile> NeutralTerrainStorage::getRenderTile(
         int lodLevel, float size, const std::array<float, 2>& center, ESM::RefId worldspace)
     {
+        if (!std::isfinite(size) || !std::isfinite(center[0]) || !std::isfinite(center[1]))
+            return std::nullopt;
+
         const RenderTileKey key{ worldspace, lodLevel, size, center[0], center[1] };
+        std::uint64_t generation = 0;
         {
             std::lock_guard lock(mRenderTileCacheMutex);
             const auto found = mRenderTileCache.find(key);
             if (found != mRenderTileCache.end())
-                return found->second;
+            {
+                found->second.lastAccess = ++mRenderTileAccessCounter;
+                return found->second.tile;
+            }
+            generation = mRenderTileCacheGeneration;
         }
 
         // Do not hold the cache lock while decoding cells or images. Apart
@@ -125,10 +136,26 @@ namespace MWRender
         std::optional<Render::TerrainTile> tile = RenderStorage::getRenderTile(lodLevel, size, center, worldspace);
         {
             std::lock_guard lock(mRenderTileCacheMutex);
-            const auto [found, inserted] = mRenderTileCache.emplace(key, std::move(tile));
-            if (!inserted)
-                return found->second;
-            return found->second;
+            if (generation != mRenderTileCacheGeneration)
+                return tile;
+
+            const auto found = mRenderTileCache.find(key);
+            if (found != mRenderTileCache.end())
+            {
+                found->second.lastAccess = ++mRenderTileAccessCounter;
+                return found->second.tile;
+            }
+            if (mRenderTileCache.size() >= maxRenderTileCacheEntries)
+            {
+                const auto oldest = std::min_element(mRenderTileCache.begin(), mRenderTileCache.end(),
+                    [](const auto& lhs, const auto& rhs) { return lhs.second.lastAccess < rhs.second.lastAccess; });
+                mRenderTileCache.erase(oldest);
+            }
+            const RenderTileCacheEntry entry{ std::move(tile), ++mRenderTileAccessCounter };
+            const auto [inserted, didInsert] = mRenderTileCache.emplace(key, std::move(entry));
+            if (!didInsert)
+                return inserted->second.tile;
+            return inserted->second.tile;
         }
     }
 

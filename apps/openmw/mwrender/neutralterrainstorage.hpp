@@ -69,7 +69,12 @@ namespace MWRender
         using LayerCache = std::map<VFS::Path::Normalized, Terrain::LayerInfo, std::less<>>;
         using CellCache = std::map<std::tuple<ESM::RefId, int, int>, std::unique_ptr<ESM::LandData>>;
         using RenderTileKey = std::tuple<ESM::RefId, int, float, float, float>;
-        using RenderTileCache = std::map<RenderTileKey, std::optional<Render::TerrainTile>>;
+        struct RenderTileCacheEntry
+        {
+            std::optional<Render::TerrainTile> tile;
+            std::uint64_t lastAccess = 0;
+        };
+        using RenderTileCache = std::map<RenderTileKey, RenderTileCacheEntry>;
 
         ESM::RefId resolveLandWorldspace(ESM::RefId worldspace) const;
         std::unique_ptr<ESM::LandData> loadCell(int gridX, int gridY, ESM::RefId worldspace) const;
@@ -91,6 +96,8 @@ namespace MWRender
         mutable CellCache mCellCache;
         mutable std::mutex mRenderTileCacheMutex;
         mutable RenderTileCache mRenderTileCache;
+        mutable std::uint64_t mRenderTileCacheGeneration = 0;
+        mutable std::uint64_t mRenderTileAccessCounter = 0;
         mutable std::mutex mLayerInfoMutex;
         mutable LayerCache mLayerInfo;
     };
