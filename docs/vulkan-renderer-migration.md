@@ -87,7 +87,8 @@ selection is now world-owned; neutral animation layers now carry explicit masks 
 and active NIF particle records now have a renderer-neutral textured-quad path whose neutral
 effect/actor clocks advance initial position, rotation, lifetime, gravity, drag, rotation, and
 grow/fade presentation; modern controller-owned particle records preserve their authored
-vertex-code mapping; emission/spawn and collision modifiers remain later gates.
+vertex-code mapping, initial color, and size; emission/spawn and collision modifiers remain
+later gates.
 NIF classic texture, diffuse/emissive, glossiness, and alpha properties now cross the
 renderer-neutral mesh boundary and survive batching; the neutral batch applies diffuse
 and alpha to vertex color output. NIF bump/normal texture slots now cross the same boundary
@@ -557,7 +558,7 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the frozen `openmw-vulkan-osg-reference` tag, the current checkpoint changes
-214 code files excluding this ledger, deleting 2,490 lines and adding 17,944 lines (net `+15,454`). The larger Vulkan-only
+214 code files excluding this ledger, deleting 2,490 lines and adding 17,957 lines (net `+15,467`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; the current branch continues the reduction
 work with renderer-neutral ownership and compatibility-wrapper deletion. The live no-GUI
 consumer is the first deletion checkpoint; further reduction can now target OSG
@@ -768,7 +769,7 @@ provide a usable surface, while validation errors remain hard failures.
 - Add actors, skinning, animation, particles, weather, water, spell effects, projectiles, and post-processing.
   Active NIF particle records now convert into validated camera-facing neutral textured quads with authored static rotation and per-particle color;
   neutral effect/actor clocks advance initial particle position, rotation, lifetime, gravity, drag, and grow/fade presentation before submission;
-  modern controller-owned records retain their source vertex-code mapping.
+  modern controller-owned records retain their source vertex-code mapping, initial color, and size.
   Emission/spawn and collision modifiers remain to be moved out of the legacy owner.
   The neutral path now samples model-local NIF and classic external `.kf` keyframe controllers,
   honors selected group start/stop segments, carries explicit per-object animation groups and clocks,

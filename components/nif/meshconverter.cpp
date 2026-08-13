@@ -1002,6 +1002,8 @@ namespace Nif
                 : (!source.mRadii.empty() ? source.mRadii.front() : 1.f);
             if (sourceParticle < source.mSizes.size())
                 radius *= source.mSizes[sourceParticle];
+            if (controller && std::isfinite(controller->mInitialSize) && controller->mInitialSize > 0.f)
+                radius *= controller->mInitialSize;
             if (!std::isfinite(radius) || radius <= 0.f)
                 continue;
 
@@ -1018,7 +1020,14 @@ namespace Nif
                 std::array<float, 2>{ 0.f, 0.f }, std::array<float, 2>{ 1.f, 0.f },
                 std::array<float, 2>{ 1.f, 1.f }, std::array<float, 2>{ 0.f, 1.f } };
             const bool hasColor = source.mColors.size() == source.mVertices.size();
-            const std::array<float, 4> color = hasColor
+            const bool hasControllerColor = controller && std::isfinite(controller->mInitialColor.x())
+                && std::isfinite(controller->mInitialColor.y()) && std::isfinite(controller->mInitialColor.z())
+                && std::isfinite(controller->mInitialColor.w());
+            const bool authoredColor = hasColor || hasControllerColor;
+            const std::array<float, 4> color = hasControllerColor
+                ? std::array<float, 4>{ controller->mInitialColor.x(), controller->mInitialColor.y(),
+                      controller->mInitialColor.z(), controller->mInitialColor.w() }
+                : hasColor
                 ? std::array<float, 4>{ source.mColors[sourceParticle].r(), source.mColors[sourceParticle].g(),
                       source.mColors[sourceParticle].b(), source.mColors[sourceParticle].a() }
                 : std::array<float, 4>{ 1.f, 1.f, 1.f, 1.f };
@@ -1027,7 +1036,7 @@ namespace Nif
             {
                 const osg::Vec3f rotated = rotation * corners[corner];
                 quad[corner] = Render::MeshVertexSource{ { rotated.x(), rotated.y(), 0.f }, {},
-                    texcoords[corner], color, false, true, hasColor };
+                    texcoords[corner], color, false, true, authoredColor };
             }
             Render::MeshData quadMesh = Render::makeMeshData(quad);
             for (Render::MeshVertex& vertex : quadMesh.vertices)
