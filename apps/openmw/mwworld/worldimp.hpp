@@ -219,6 +219,10 @@ namespace MWWorld
         void updateNeutralAnimation(const MWWorld::Ptr& ptr, std::string_view group,
             std::optional<float> animationTime = std::nullopt, std::string_view startKey = {},
             std::string_view stopKey = {}, bool looping = false) override;
+        void updateNeutralAnimationLayer(const MWWorld::Ptr& ptr, std::string_view layerId, std::string_view group,
+            std::optional<float> animationTime = std::nullopt, std::string_view startKey = {},
+            std::string_view stopKey = {}, bool looping = false, unsigned mask = 0xfu, int priority = 0) override;
+        void removeNeutralAnimationLayer(const MWWorld::Ptr& ptr, std::string_view layerId) override;
         void updateNeutralObjectAttachment(const MWWorld::Ptr& ptr, std::string_view attachmentId,
             std::string_view model, std::string_view bone, bool visible, const Render::Vec4& emissiveColor,
             bool emissiveOverride) override;

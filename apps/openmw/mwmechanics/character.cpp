@@ -30,6 +30,7 @@
 #include <components/misc/strings/conversion.hpp>
 
 #include <components/render/animation.hpp>
+#include <components/render/animationmask.hpp>
 
 #include <components/settings/values.hpp>
 
@@ -3392,6 +3393,22 @@ namespace MWMechanics
                                  && mJumpState != JumpState_Landing)
             || (knockout && !mCurrentHit.empty());
         world->updateNeutralAnimation(mPtr, animationGroup, animationTime, startKey, stopKey, looping);
+
+        bool torchVisible = false;
+        if (cls.hasInventoryStore(mPtr))
+        {
+            const MWWorld::InventoryStore& inventory = cls.getInventoryStore(mPtr);
+            const MWWorld::ConstContainerStoreIterator carriedLeft
+                = inventory.getSlot(MWWorld::InventoryStore::Slot_CarriedLeft);
+            torchVisible = carriedLeft != inventory.end() && carriedLeft->getType() == ESM::Light::sRecordId
+                && updateCarriedLeftVisible(mWeaponType)
+                && world->getNeutralAnimationDuration(mPtr, "torch", "start", "stop").has_value();
+        }
+        if (torchVisible)
+            world->updateNeutralAnimationLayer(mPtr, "torch", "torch", std::nullopt, "start", "stop", true,
+                Render::AnimationMask_LeftArm, Priority_Torch);
+        else
+            world->removeNeutralAnimationLayer(mPtr, "torch");
         settings.mPosition[0] = settings.mPosition[1] = 0.f;
         if (movement.z() == 0.f)
             settings.mPosition[2] = 0.f;

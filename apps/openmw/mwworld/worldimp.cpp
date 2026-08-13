@@ -4279,6 +4279,21 @@ namespace MWWorld
             mWorldScene->updateObjectAnimation(ptr, group, animationTime, startKey, stopKey, looping);
     }
 
+    void World::updateNeutralAnimationLayer(const MWWorld::Ptr& ptr, std::string_view layerId,
+        std::string_view group, std::optional<float> animationTime, std::string_view startKey,
+        std::string_view stopKey, bool looping, unsigned mask, int priority)
+    {
+        if (mWorldScene)
+            mWorldScene->updateNeutralAnimationLayer(
+                ptr, layerId, group, animationTime, startKey, stopKey, looping, mask, priority);
+    }
+
+    void World::removeNeutralAnimationLayer(const MWWorld::Ptr& ptr, std::string_view layerId)
+    {
+        if (mWorldScene)
+            mWorldScene->removeNeutralAnimationLayer(ptr, layerId);
+    }
+
     void World::updateNeutralObjectAttachment(const MWWorld::Ptr& ptr, std::string_view attachmentId,
         std::string_view model, std::string_view bone, bool visible, const Render::Vec4& emissiveColor,
         bool emissiveOverride)

@@ -5,6 +5,7 @@
 #include <utility>
 
 #include <components/render/submission.hpp>
+#include <components/render/animationmask.hpp>
 #include <components/render/world.hpp>
 
 int main()
@@ -207,9 +208,43 @@ int main()
         throw std::runtime_error("renderer-neutral world scene did not accept an explicit animation clock");
     if (!world.isObjectAnimationPlaying(&dynamicObjectHandle, "walkforward", 2.f))
         throw std::runtime_error("renderer-neutral world scene did not report an active animation");
+    if (!world.updateObjectAnimationLayer(&dynamicObjectHandle, "torch", "torch", std::nullopt, "start", "stop",
+            true, Render::AnimationMask_LeftArm, 10)
+        || world.findCell(&firstCellHandle)->objects.front().animationLayers.size() != 1
+        || world.findCell(&firstCellHandle)->objects.front().animationLayers.front().mask != Render::AnimationMask_LeftArm
+        || world.findCell(&firstCellHandle)->objects.front().animationLayers.front().priority != 10)
+        throw std::runtime_error("renderer-neutral world scene failed animation-layer ownership");
     world.updateEffects(0.75f);
     if (world.isObjectAnimationPlaying(&dynamicObjectHandle, "walkforward", 2.f))
         throw std::runtime_error("renderer-neutral world scene kept a completed animation active");
+    if (world.findCell(&firstCellHandle)->objects.front().animationLayers.front().time != 0.75f)
+        throw std::runtime_error("renderer-neutral world scene did not advance animation-layer time");
+    if (!world.removeObjectAnimationLayer(&dynamicObjectHandle, "torch")
+        || !world.findCell(&firstCellHandle)->objects.front().animationLayers.empty())
+        throw std::runtime_error("renderer-neutral world scene failed animation-layer removal");
+
+    Render::WorldObject layeredObject;
+    layeredObject.model = "meshes/layered.nif";
+    layeredObject.animationGroup = "base";
+    layeredObject.animationLayers = { { "left", "left", {}, {}, 0.f, true, Render::AnimationMask_LeftArm, 2 },
+        { "higher", "higher", {}, {}, 0.f, true, Render::AnimationMask_LeftArm, 3 } };
+    Render::SkinningData layeredSkinning;
+    layeredSkinning.boneNames = { "Bip01 Pelvis", "Shield Bone" };
+    layeredSkinning.inverseBindMatrices = { Render::identityMat4(), Render::identityMat4() };
+    const Render::PoseResolver layerResolver = [](std::string_view, std::span<const std::string>, std::string_view group,
+                                                   float, bool, std::string_view, std::string_view,
+                                                   std::span<const std::string>) {
+        std::vector<Render::Mat4> result(2, Render::identityMat4());
+        const float offset = group == "base" ? 1.f : (group == "left" ? 2.f : 3.f);
+        result[0].data[12] = offset;
+        result[1].data[12] = offset;
+        return result;
+    };
+    const std::vector<Render::Mat4> layeredPose
+        = Render::resolveAnimationLayers(layeredObject, layeredSkinning, layerResolver);
+    if (layeredPose.size() != 2 || layeredPose[0].data[12] != 1.f || layeredPose[1].data[12] != 3.f)
+        throw std::runtime_error("renderer-neutral animation layers ignored bone masks or priority");
+
     Render::Mat4 dynamicBone = Render::identityMat4();
     dynamicBone.data[12] = 3.f;
     if (!world.updateObjectPose(&dynamicObjectHandle, { dynamicBone })

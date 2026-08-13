@@ -88,6 +88,18 @@ namespace Render
     // the scene bridge and is intentionally opaque to backends.
     struct WorldObject
     {
+        struct AnimationLayer
+        {
+            std::string id;
+            std::string group;
+            std::string startKey;
+            std::string stopKey;
+            float time = 0.f;
+            bool looping = false;
+            unsigned mask = 0xfu;
+            int priority = 0;
+        };
+
         struct Attachment
         {
             std::string id;
@@ -129,6 +141,10 @@ namespace Render
         std::string animationStartKey;
         std::string animationStopKey;
         bool animationLooping = false;
+        // Optional overlays are resolved against the same skin in priority
+        // order. The base animation above remains the compatibility path for
+        // callers that only need one full-body group.
+        std::vector<AnimationLayer> animationLayers;
         // Magic VFX use the legacy first-root texture replacement rule when
         // their flattened neutral mesh list is submitted.
         bool magicVfx = false;
@@ -394,7 +410,11 @@ namespace Render
             for (auto& [cellKey, cell] : mCells)
                 for (WorldObject& object : cell.objects)
                     if (object.dynamic)
+                    {
                         object.animationTime += duration;
+                        for (WorldObject::AnimationLayer& layer : object.animationLayers)
+                            layer.time += duration;
+                    }
 
             for (auto iter = mEffects.begin(); iter != mEffects.end();)
             {
@@ -511,6 +531,7 @@ namespace Render
                             object->animationTime = 0.f;
                             object->animationGroup.clear();
                             object->animationLooping = false;
+                            object->animationLayers.clear();
                             object->attachments.clear();
                         }
                         return;
@@ -621,6 +642,68 @@ namespace Render
                 object->animationLooping = looping;
             if (animationTime && std::isfinite(*animationTime) && *animationTime >= 0.f)
                 object->animationTime = *animationTime;
+            return true;
+        }
+
+        bool updateObjectAnimationLayer(const void* objectKey, std::string_view layerId, std::string_view group,
+            std::optional<float> animationTime = std::nullopt, std::string_view startKey = {},
+            std::string_view stopKey = {}, bool looping = false, unsigned mask = 0xfu, int priority = 0)
+        {
+            if (layerId.empty() || group.empty() || mask == 0)
+                return false;
+            const auto found = mObjects.find(objectKey);
+            if (found == mObjects.end())
+                return false;
+            const auto scene = mCells.find(found->second.cell);
+            if (scene == mCells.end())
+                return false;
+            WorldObject* object = scene->second.findObject(found->second.id);
+            if (object == nullptr || !object->dynamic)
+                return false;
+
+            auto layer = std::find_if(object->animationLayers.begin(), object->animationLayers.end(),
+                [&](const WorldObject::AnimationLayer& candidate) { return candidate.id == layerId; });
+            if (layer == object->animationLayers.end())
+            {
+                layer = object->animationLayers.emplace(object->animationLayers.end(), WorldObject::AnimationLayer{});
+                layer->id = layerId;
+                layer->time = 0.f;
+            }
+            if (layer->group != group || layer->startKey != startKey || layer->stopKey != stopKey)
+            {
+                layer->time = 0.f;
+                object->boneMatrices.clear();
+            }
+            layer->group = group;
+            layer->startKey = startKey;
+            layer->stopKey = stopKey;
+            layer->looping = looping;
+            layer->mask = mask;
+            layer->priority = priority;
+            if (animationTime && std::isfinite(*animationTime) && *animationTime >= 0.f)
+                layer->time = *animationTime;
+            return true;
+        }
+
+        bool removeObjectAnimationLayer(const void* objectKey, std::string_view layerId)
+        {
+            if (layerId.empty())
+                return false;
+            const auto found = mObjects.find(objectKey);
+            if (found == mObjects.end())
+                return false;
+            const auto scene = mCells.find(found->second.cell);
+            if (scene == mCells.end())
+                return false;
+            WorldObject* object = scene->second.findObject(found->second.id);
+            if (object == nullptr || !object->dynamic)
+                return false;
+            const auto layer = std::find_if(object->animationLayers.begin(), object->animationLayers.end(),
+                [&](const WorldObject::AnimationLayer& candidate) { return candidate.id == layerId; });
+            if (layer == object->animationLayers.end())
+                return false;
+            object->animationLayers.erase(layer);
+            object->boneMatrices.clear();
             return true;
         }
 

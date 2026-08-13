@@ -231,6 +231,16 @@ namespace MWBase
             (void)animationTime;
             (void)looping;
         }
+        virtual void updateNeutralAnimationLayer(const MWWorld::Ptr&, std::string_view, std::string_view,
+            std::optional<float> animationTime = std::nullopt, std::string_view startKey = {},
+            std::string_view stopKey = {}, bool looping = false, unsigned mask = 0xfu, int priority = 0)
+        {
+            (void)animationTime;
+            (void)looping;
+            (void)mask;
+            (void)priority;
+        }
+        virtual void removeNeutralAnimationLayer(const MWWorld::Ptr&, std::string_view) {}
         virtual void updateNeutralObjectAttachment(const MWWorld::Ptr&, std::string_view, std::string_view,
             std::string_view, bool)
         {

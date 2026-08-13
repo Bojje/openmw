@@ -15,6 +15,7 @@
 #include <vector>
 
 #include "math.hpp"
+#include "animationmask.hpp"
 #include "texture.hpp"
 #include "world.hpp"
 
@@ -139,6 +140,47 @@ namespace Render
     using PoseResolver = std::function<std::vector<Mat4>(std::string_view model,
         std::span<const std::string> animationSources, std::string_view group, float time, bool looping,
         std::string_view startKey, std::string_view stopKey, std::span<const std::string> boneNames)>;
+
+    inline std::vector<Mat4> resolveAnimationLayers(const WorldObject& object, const SkinningData& skinning,
+        const PoseResolver& resolver)
+    {
+        const std::size_t boneCount = skinning.inverseBindMatrices.size();
+        std::vector<Mat4> pose;
+        if (resolver)
+            pose = resolver(object.model, object.animationSources, object.animationGroup, object.animationTime,
+                object.animationLooping, object.animationStartKey, object.animationStopKey, skinning.boneNames);
+        const bool hasBasePose = pose.size() == boneCount;
+        if (object.animationLayers.empty())
+            return hasBasePose ? pose : std::vector<Mat4>();
+
+        if (!hasBasePose)
+        {
+            pose.clear();
+            pose.reserve(boneCount);
+            for (const Mat4& inverseBind : skinning.inverseBindMatrices)
+                pose.push_back(invertMat4(inverseBind));
+        }
+        std::vector<int> priorities(boneCount, hasBasePose ? 0 : std::numeric_limits<int>::min());
+        bool hasLayerPose = false;
+        for (const WorldObject::AnimationLayer& layer : object.animationLayers)
+        {
+            if (!resolver || layer.group.empty())
+                continue;
+            const std::vector<Mat4> layerPose = resolver(object.model, object.animationSources, layer.group, layer.time,
+                layer.looping, layer.startKey, layer.stopKey, skinning.boneNames);
+            if (layerPose.size() != boneCount)
+                continue;
+            for (std::size_t bone = 0; bone < boneCount; ++bone)
+            {
+                if (!animationBoneInMask(skinning.boneNames[bone], layer.mask) || layer.priority < priorities[bone])
+                    continue;
+                pose[bone] = layerPose[bone];
+                priorities[bone] = layer.priority;
+                hasLayerPose = true;
+            }
+        }
+        return hasBasePose || hasLayerPose ? pose : std::vector<Mat4>();
+    }
 
     inline MeshData skinMesh(const MeshData& source, std::span<const Mat4> boneMatrices)
     {

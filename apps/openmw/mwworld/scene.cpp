@@ -545,6 +545,21 @@ namespace MWWorld
                 static_cast<const void*>(ptr.mRef), group, animationTime, startKey, stopKey, looping);
     }
 
+    void Scene::updateNeutralAnimationLayer(const Ptr& ptr, std::string_view layerId, std::string_view group,
+        std::optional<float> animationTime, std::string_view startKey, std::string_view stopKey, bool looping,
+        unsigned mask, int priority)
+    {
+        if (mNeutralWorldScene)
+            mNeutralWorldScene->updateObjectAnimationLayer(static_cast<const void*>(ptr.mRef), layerId, group,
+                animationTime, startKey, stopKey, looping, mask, priority);
+    }
+
+    void Scene::removeNeutralAnimationLayer(const Ptr& ptr, std::string_view layerId)
+    {
+        if (mNeutralWorldScene)
+            mNeutralWorldScene->removeObjectAnimationLayer(static_cast<const void*>(ptr.mRef), layerId);
+    }
+
     void Scene::updateNeutralObjectAttachment(
         const Ptr& ptr, std::string_view attachmentId, std::string_view model, std::string_view bone, bool visible,
         const Render::Vec4& emissiveColor, bool emissiveOverride)
@@ -1563,10 +1578,8 @@ namespace MWWorld
                 const Render::SkinningData* skinning = Render::findPrimarySkinning(dynamic);
                 if (skinning != nullptr)
                 {
-                    const std::vector<Render::Mat4> pose = mPoseResolver(dynamic.object.model,
-                        dynamic.object.animationSources, dynamic.object.animationGroup, dynamic.object.animationTime,
-                        dynamic.object.animationLooping, dynamic.object.animationStartKey,
-                        dynamic.object.animationStopKey, skinning->boneNames);
+                    const std::vector<Render::Mat4> pose
+                        = Render::resolveAnimationLayers(dynamic.object, *skinning, mPoseResolver);
                     if (pose.size() == skinning->inverseBindMatrices.size())
                     {
                         dynamic.boneMatrices = pose;
