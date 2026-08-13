@@ -44,6 +44,8 @@ void main() {
         vec3 skyHorizon = scene.skyColor.rgb;
         vec3 skyTop = mix(skyHorizon, vec3(0.2, 0.4, 0.8), 0.45);
         float t = fragTexCoord.y;
+        if (scene.effectTime.y > 0.5)
+            skyHorizon = mix(skyHorizon, scene.fogColor.rgb, 0.75);
         outColor = vec4(mix(skyHorizon, skyTop, t), 1.0);
         return;
     }
@@ -66,6 +68,8 @@ void main() {
     float emission = max(materialSample.a, 0.0);
     vec3 ambient = albedo * scene.ambientColor.rgb * ao;
     vec3 diffuse = albedo * sunCol * NdotL * shadow;
+    if (scene.effectTime.y > 0.5)
+        diffuse *= 0.35;
 
     // Reconstruct world position from depth and inverse matrices
     vec2 ndc = fragTexCoord * 2.0 - 1.0;
@@ -91,6 +95,8 @@ void main() {
     vec3 H = normalize(L + V);
     float spec = pow(max(dot(N, H), 0.0), mix(128.0, 1.0, roughness));
     vec3 specular = specularColor * sunCol * spec * specularStrength * shadow;
+    if (scene.effectTime.y > 0.5)
+        specular *= 0.15;
 
     vec3 color = ambient + diffuse + specular + reflectionColor + albedo * emission;
 
@@ -101,6 +107,9 @@ void main() {
             pow(max(dot(reflect(-L, N), V), 0.0), 32.0));
         color = mix(color, reflectedSky, 0.25 + 0.35 * fresnel);
     }
+
+    if (scene.effectTime.y > 0.5)
+        color = mix(color, scene.fogColor.rgb, 0.18);
 
     if (scene.fogParameters.y > scene.fogParameters.x && scene.fogParameters.y > 0.0)
     {

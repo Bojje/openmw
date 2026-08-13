@@ -84,7 +84,8 @@ namespace Render
         // value instead of keeping a backend-local hard-coded sky.
         Vec4 skyColor{ 0.6f, 0.75f, 0.9f, 1.f };
         // Renderer-neutral effect clock. The Vulkan composite uses x for
-        // procedural water motion; the remaining components are reserved.
+        // procedural water motion and y as the underwater camera flag; the
+        // remaining components are reserved.
         Vec4 effectTime{ 0.f, 0.f, 0.f, 0.f };
 
         bool valid() const

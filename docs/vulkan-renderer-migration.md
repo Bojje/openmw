@@ -403,7 +403,10 @@ neutral world snapshot as bounded `WaterSurface` records. The Vulkan submission 
 explicit alpha-blended planar water material with bounded Fresnel/sky lighting; refraction,
 animated waves now use the neutral effect clock in the Vulkan composite, and underwater projectile impacts
 produce renderer-neutral expiring ripple rings; interior-water bounds,
-and the full legacy water shader remain outstanding.
+and the full legacy water shader remain outstanding. Neutral underwater camera state now crosses
+the existing scene UBO and applies fog-colored sky, reduced diffuse/specular response, and a bounded
+underwater color grade in the Vulkan composite; underwater fog-range parity and refraction remain
+outstanding.
 Projectile water-hit notification now crosses the world boundary once: the OSG-owned projectile
 service publishes an impact to `MWBase::World`, which fans it out to the active OSG and neutral
 scene owners. This removes the projectile service's direct `RenderingManager` dependency while
@@ -521,7 +524,7 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the frozen `openmw-vulkan-osg-reference` tag, the current checkpoint changes
-207 code files excluding this ledger, deleting 2,284 lines and adding 15,036 lines (net `+12,752`). The larger Vulkan-only
+207 code files excluding this ledger, deleting 2,284 lines and adding 15,070 lines (net `+12,786`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; the current branch continues the reduction
 work with renderer-neutral ownership and compatibility-wrapper deletion. The live no-GUI
 consumer is the first deletion checkpoint; further reduction can now target OSG
@@ -728,6 +731,9 @@ explicit bind-pose fallback when no actor pose is available. Neutral effect cloc
 when the static NIF has no local controller, so external effect animation is not pinned to time zero.
 Looping neutral effects now also carry their gameplay loop flag into pose sampling, keeping their
 controller clock wrapped instead of sampling past the resolved interval.
+Neutral scene export also carries an underwater camera flag through the shared scene data; the Vulkan
+composite uses it for underwater sky, lighting, and fog grading without introducing a second renderer
+specific state path.
 Neutral actor visibility now also carries opacity and alpha-blend state into dynamic mesh submission, including
 invisibility/chameleon fading without an OSG animation owner. Neutral container opening and closing now retain
 the `containeropen`/`containerclose` timing, including the `loot` event that gates GUI presentation while paused.

@@ -4206,6 +4206,10 @@ namespace MWWorld
 
     void World::updateNeutralSceneData(Render::SceneData& sceneData) const
     {
+        // effectTime.y is the renderer-neutral underwater flag. Keep it in
+        // the existing scene UBO so this state does not create a second
+        // backend-specific lighting contract.
+        sceneData.effectTime.y = 0.f;
         if (mWeatherManager)
         {
             mWeatherManager->updateNeutralSceneData(sceneData);
@@ -4214,25 +4218,45 @@ namespace MWWorld
         }
 
         const CellStore* const currentCell = mWorldScene ? mWorldScene->getCurrentCell() : nullptr;
-        if (currentCell == nullptr || currentCell->isExterior() || currentCell->isQuasiExterior())
+        if (currentCell == nullptr)
             return;
-        if (mWorldScene)
-            mWorldScene->clearNeutralWeatherEffects();
+        if (!currentCell->isExterior() && !currentCell->isQuasiExterior())
+        {
+            if (mWorldScene)
+                mWorldScene->clearNeutralWeatherEffects();
 
-        const auto color = [](unsigned int value) {
-            return Render::Vec4{ static_cast<float>((value >> 0) & 0xff) / 255.f,
-                static_cast<float>((value >> 8) & 0xff) / 255.f,
-                static_cast<float>((value >> 16) & 0xff) / 255.f, 1.f };
-        };
-        const auto& mood = currentCell->getCell()->getMood();
-        sceneData.ambientColor = color(mood.mAmbiantColor);
-        sceneData.sunColor = color(mood.mDirectionalColor);
-        sceneData.fogColor = color(mood.mFogColor);
-        const float viewDistance = Settings::camera().mViewingDistance;
-        const float fogDepth = std::clamp(mood.mFogDensity, 0.f, 1.f);
-        sceneData.fogParameters = fogDepth > 0.f
-            ? Render::Vec4{ viewDistance * (1.f - fogDepth), viewDistance, 0.f, 0.f }
-            : Render::Vec4{ 0.f, 0.f, 0.f, 0.f };
+            const auto color = [](unsigned int value) {
+                return Render::Vec4{ static_cast<float>((value >> 0) & 0xff) / 255.f,
+                    static_cast<float>((value >> 8) & 0xff) / 255.f,
+                    static_cast<float>((value >> 16) & 0xff) / 255.f, 1.f };
+            };
+            const auto& mood = currentCell->getCell()->getMood();
+            sceneData.ambientColor = color(mood.mAmbiantColor);
+            sceneData.sunColor = color(mood.mDirectionalColor);
+            sceneData.fogColor = color(mood.mFogColor);
+            const float viewDistance = Settings::camera().mViewingDistance;
+            const float fogDepth = std::clamp(mood.mFogDensity, 0.f, 1.f);
+            sceneData.fogParameters = fogDepth > 0.f
+                ? Render::Vec4{ viewDistance * (1.f - fogDepth), viewDistance, 0.f, 0.f }
+                : Render::Vec4{ 0.f, 0.f, 0.f, 0.f };
+        }
+
+        const MWWorld::ConstPtr player = getPlayerConstPtr();
+        if (player.isEmpty())
+            return;
+        const ESM::Position& position = player.getRefData().getPosition();
+        const Render::CameraPose camera = Render::makeCameraPose(
+            { position.pos[0], position.pos[1], position.pos[2] },
+            { position.rot[0], position.rot[1], position.rot[2] }, mNeutralFirstPerson, mNeutralVanityMode,
+            mNeutralVanityPitch, mNeutralVanityYaw);
+        const osg::Vec3f cameraPosition(camera.eye.x, camera.eye.y, camera.eye.z);
+        if (!isUnderwater(currentCell, cameraPosition))
+            return;
+
+        sceneData.effectTime.y = 1.f;
+        if (Settings::fog().mUseDistantFog)
+            sceneData.fogParameters = { Settings::fog().mDistantUnderwaterFogStart,
+                Settings::fog().mDistantUnderwaterFogEnd, 0.f, 0.f };
     }
 
     void World::updateNeutralAnimation(
