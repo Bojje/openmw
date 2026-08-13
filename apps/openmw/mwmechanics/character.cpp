@@ -3107,6 +3107,55 @@ namespace MWMechanics
             mJumpState = JumpState_None;
         }
 
+        if (mJumpState == JumpState_Landing)
+        {
+            const bool isPlayer = mPtr == getPlayer();
+            const bool godmode = isPlayer && world->getGodModeState();
+            const float height = cls.getCreatureStats(mPtr).land(isPlayer);
+            float healthLost = 0.f;
+            if (!inWater)
+                healthLost = getFallDamage(mPtr, height);
+
+            if (healthLost > 0.f)
+            {
+                const float fatigueTerm = cls.getCreatureStats(mPtr).getFatigueTerm();
+                if (!godmode)
+                {
+                    DynamicStat<float> health = cls.getCreatureStats(mPtr).getHealth();
+                    health.setCurrent(health.getCurrent() - healthLost * (1.f - 0.25f * fatigueTerm));
+                    cls.getCreatureStats(mPtr).setHealth(health);
+                    static const auto sHealthDamage = ESM::RefId::stringRefId("Health Damage");
+                    MWBase::Environment::get().getSoundManager()->playSound3D(mPtr, sHealthDamage, 1.f, 1.f);
+                    if (isPlayer)
+                        MWBase::Environment::get().getWindowManager()->activateHitOverlay();
+                }
+
+                const float acrobaticsSkill = cls.getSkill(mPtr, ESM::Skill::Acrobatics);
+                if (healthLost > acrobaticsSkill * fatigueTerm)
+                {
+                    if (!godmode)
+                        cls.getCreatureStats(mPtr).setKnockedDown(true);
+                }
+                else if (isPlayer)
+                    cls.skillUsageSucceeded(mPtr, ESM::Skill::Acrobatics, ESM::Skill::Acrobatics_Fall);
+            }
+
+            if (mPtr.getClass().isNpc())
+            {
+                static const auto sDefaultLandWater = ESM::RefId::stringRefId("DefaultLandWater");
+                static const auto sDefaultLand = ESM::RefId::stringRefId("DefaultLand");
+                const osg::Vec3f position = mPtr.getRefData().getPosition().asVec3();
+                const ESM::RefId* sound = nullptr;
+                if (world->isUnderwater(mPtr.getCell(), position) || world->isWalkingOnWater(mPtr))
+                    sound = &sDefaultLandWater;
+                else if (onGround)
+                    sound = &sDefaultLand;
+                if (sound)
+                    MWBase::Environment::get().getSoundManager()->playSound3D(
+                        mPtr, *sound, 1.f, 1.f, MWSound::Type::Foot, MWSound::PlayMode::NoPlayerLocal);
+            }
+        }
+
         if (mInJump && !onGround && !inWater && !flying && solid)
             movement.z() = 0.f;
         else if (mInJump && jumpRequested && cls.getJump(mPtr) > 0.f)
