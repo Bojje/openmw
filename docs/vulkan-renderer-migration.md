@@ -595,7 +595,7 @@ while OSG statistics reporting is collected through the explicit reporter list. 
 boundary so the Vulkan resource path cannot regain an OSG cache dependency accidentally.
 
 Against the frozen `openmw-vulkan-osg-reference` tag, the current checkpoint changes
-214 code files excluding this ledger, deleting 2,490 lines and adding 19,479 lines (net `+16,989`). The larger Vulkan-only
+231 code files excluding this ledger, deleting 2,575 lines and adding 19,640 lines (net `+17,065`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; the current branch continues the reduction
 work with renderer-neutral ownership and compatibility-wrapper deletion. The live no-GUI
 consumer is the first deletion checkpoint; further reduction can now target OSG
