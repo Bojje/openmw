@@ -1314,6 +1314,9 @@ namespace MWMechanics
 
     bool CharacterController::updateCarriedLeftVisible(const int weaptype) const
     {
+        if (!mAnimation)
+            return !(MWMechanics::getWeaponType(weaptype)->mFlags & ESM::WeaponType::TwoHanded);
+
         // Shields/torches shouldn't be visible during any operation involving two hands
         // There seems to be no text keys for this purpose, except maybe for "[un]equip start/stop",
         // but they are also present in weapon drawing animation.
@@ -3206,6 +3209,17 @@ namespace MWMechanics
             weaponBone = getWeaponType(mWeaponType)->mAttachBone;
         }
         world->updateNeutralObjectAttachment(mPtr, "weapon", weaponModel, weaponBone, true);
+
+        std::string carriedLeftModel;
+        if (mPtr.getClass().hasInventoryStore(mPtr) && updateCarriedLeftVisible(mWeaponType))
+        {
+            const MWWorld::InventoryStore& inventory = mPtr.getClass().getInventoryStore(mPtr);
+            const MWWorld::ConstContainerStoreIterator carriedLeft
+                = inventory.getSlot(MWWorld::InventoryStore::Slot_CarriedLeft);
+            if (carriedLeft != inventory.end())
+                carriedLeftModel = carriedLeft->getClass().getCorrectedModel(*carriedLeft).value();
+        }
+        world->updateNeutralObjectAttachment(mPtr, "carried-left", carriedLeftModel, "Shield Bone", true);
         updateNeutralAnimationQueue(duration);
         updateNeutralHitAnimation();
 
