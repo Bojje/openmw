@@ -32,6 +32,10 @@ namespace Render
             vertex.material[1] = 0.f;
             vertex.material[2] = 1.f;
             vertex.material[3] = 0.f;
+            vertex.emissive[0] = 0.f;
+            vertex.emissive[1] = 0.f;
+            vertex.emissive[2] = 0.f;
+            vertex.emissive[3] = 1.f;
             vertex.tangent[0] = 1.f;
             vertex.tangent[1] = 0.f;
             vertex.tangent[2] = 0.f;

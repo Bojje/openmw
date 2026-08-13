@@ -52,7 +52,7 @@ int main()
 
     skinning->vertices.front().weights[0] = 1.f;
     Render::MeshData skinnedMesh;
-    skinnedMesh.vertices.push_back({ { 1.f, 0.f, 0.f }, { 0.f, 0.f, 1.f }, {}, {}, {}, {}, {} });
+    skinnedMesh.vertices.push_back({ { 1.f, 0.f, 0.f }, { 0.f, 0.f, 1.f }, {}, {}, {}, {}, {}, {} });
     skinnedMesh.skinning = std::make_shared<const Render::SkinningData>(*skinning);
     Render::Mat4 bone = identity;
     bone.data[12] = 2.f;
@@ -544,6 +544,8 @@ int main()
     expectNear(batch.vertices.front().color[3], 0.75f, "batched material alpha");
     expectNear(batch.vertices.front().material[0], 1.f - 42.f / 128.f, "batched material roughness");
     expectNear(batch.vertices.front().material[3], 0.6f, "batched material emission");
+    expectNear(batch.vertices.front().emissive[0], 0.2f, "batched emissive red");
+    expectNear(batch.vertices.front().emissive[2], 0.6f, "batched emissive blue");
     expectNear(batch.draws[1].transform.data[12], 12.0f, "batched mesh translation");
 
     Render::WorldObject object;

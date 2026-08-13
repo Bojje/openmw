@@ -147,6 +147,8 @@ namespace Render
                         vertex.position[2] = cell->water->level + 0.02f;
                         vertex.normal[2] = 1.f;
                         vertex.color[0] = vertex.color[1] = vertex.color[2] = vertex.color[3] = 1.f;
+                        vertex.emissive[0] = vertex.emissive[1] = vertex.emissive[2] = 0.f;
+                        vertex.emissive[3] = 1.f;
                         vertex.tangent[3] = 1.f;
                         ring.mesh.vertices.push_back(vertex);
                     }

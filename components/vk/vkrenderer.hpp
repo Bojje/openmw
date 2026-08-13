@@ -45,6 +45,10 @@ namespace Vk
         VkDeviceMemory specularMemory = VK_NULL_HANDLE;
         VkImageView specularView = VK_NULL_HANDLE;
 
+        VkImage emissiveImage = VK_NULL_HANDLE;
+        VkDeviceMemory emissiveMemory = VK_NULL_HANDLE;
+        VkImageView emissiveView = VK_NULL_HANDLE;
+
         VkImage materialImage = VK_NULL_HANDLE;
         VkDeviceMemory materialMemory = VK_NULL_HANDLE;
         VkImageView materialView = VK_NULL_HANDLE;

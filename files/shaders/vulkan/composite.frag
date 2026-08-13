@@ -7,6 +7,7 @@ layout(set = 0, binding = 1) uniform sampler2D gbufferNormal;
 layout(set = 0, binding = 2) uniform sampler2D gbufferDepth;
 layout(set = 0, binding = 5) uniform sampler2D gbufferMaterial;
 layout(set = 0, binding = 6) uniform sampler2D gbufferSpecular;
+layout(set = 0, binding = 7) uniform sampler2D gbufferEmissive;
 
 layout(set = 0, binding = 4) uniform SceneUBO {
     mat4 view;
@@ -70,7 +71,7 @@ void main() {
     bool ambientOverride = materialSample.b > 3.5;
     bool emissiveOverride = materialSample.b > 4.5;
     float ao = ambientOverride ? 1.0 : clamp(materialSample.b, 0.0, 1.0);
-    float emission = max(materialSample.a, 0.0);
+    vec3 emission = texture(gbufferEmissive, fragTexCoord).rgb;
     vec3 ambient = albedo * (ambientOverride ? vec3(1.0) : scene.ambientColor.rgb * ao);
     vec3 diffuse = albedo * sunCol * NdotL * shadow;
     if (scene.effectTime.y > 0.5)
@@ -121,7 +122,7 @@ void main() {
     if (scene.effectTime.y > 0.5)
         specular *= 0.15;
 
-    vec3 emissive = emissiveOverride ? specularColor * emission : albedo * emission;
+    vec3 emissive = emission;
     vec3 color = ambient + pointAmbient + diffuse + pointDiffuse + specular + reflectionColor + emissive;
 
     if (waterSurface)

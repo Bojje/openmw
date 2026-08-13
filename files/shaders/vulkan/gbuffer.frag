@@ -13,6 +13,7 @@ layout(location = 9) flat in uint fragNormalTextureIndex;
 layout(location = 10) in vec4 fragTangent;
 layout(location = 11) flat in uint fragEmissiveTextureIndex;
 layout(location = 12) flat in uint fragSpecularTextureIndex;
+layout(location = 13) in vec4 fragEmissive;
 
 layout(set = 0, binding = 1) uniform sampler2D albedoTextures[64];
 layout(set = 0, binding = 2) uniform sampler2D alphaTextures[64];
@@ -34,6 +35,7 @@ layout(location = 0) out vec4 outAlbedo;
 layout(location = 1) out vec4 outNormal;
 layout(location = 2) out vec4 outMaterial;
 layout(location = 3) out vec4 outSpecular;
+layout(location = 4) out vec4 outEmissive;
 
 void main() {
     vec2 terrainTexCoord = fragTexCoord;
@@ -76,6 +78,9 @@ void main() {
     vec3 emissiveSample = fragEmissiveTextureIndex == 0u
         ? vec3(0.0)
         : texture(emissiveTextures[fragEmissiveTextureIndex], terrainTexCoord).rgb;
+    vec3 emissiveColor = fragEmissive.rgb * max(fragEmissive.a, 0.0);
+    if (fragEmissiveTextureIndex != 0u)
+        emissiveColor = max(fragEmissive.rgb, vec3(1.0)) * emissiveSample * max(fragEmissive.a, 1.0);
     vec3 specularSample = fragSpecularTextureIndex == 0u
         ? vec3(1.0)
         : texture(specularTextures[fragSpecularTextureIndex], terrainTexCoord).rgb;
@@ -101,6 +106,7 @@ void main() {
     }
     outNormal = vec4(N * 0.5 + 0.5, 1.0);
     outSpecular = vec4(specularSample, albedo.a);
+    outEmissive = vec4(emissiveColor, 1.0);
 
     outMaterial = fragMaterial;
     if (fragEmissiveTextureIndex != 0u)

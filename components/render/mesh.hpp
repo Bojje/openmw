@@ -121,9 +121,10 @@ namespace Render
         float color[4];
         float material[4];
         float tangent[4];
+        float emissive[4];
     };
 
-    static_assert(sizeof(MeshVertex) == sizeof(float) * 22);
+    static_assert(sizeof(MeshVertex) == sizeof(float) * 26);
 
     struct MeshData
     {
@@ -361,6 +362,10 @@ namespace Render
                     vertex.material[3] = std::max({ mesh.mesh.material.emissive.x, mesh.mesh.material.emissive.y,
                         mesh.mesh.material.emissive.z });
                 }
+                vertex.emissive[0] = mesh.mesh.material.emissive.x;
+                vertex.emissive[1] = mesh.mesh.material.emissive.y;
+                vertex.emissive[2] = mesh.mesh.material.emissive.z;
+                vertex.emissive[3] = mesh.mesh.material.emissive.w;
                 result.vertices.push_back(vertex);
             }
             result.draws.push_back(draw);

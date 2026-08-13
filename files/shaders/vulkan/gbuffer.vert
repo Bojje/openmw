@@ -7,6 +7,7 @@ layout(location = 3) in vec4 inColor;
 layout(location = 4) in vec4 inMaterial;
 layout(location = 5) in vec2 inBlendTexCoord;
 layout(location = 6) in vec4 inTangent;
+layout(location = 7) in vec4 inEmissive;
 
 layout(push_constant) uniform PushConstants {
     mat4 model;
@@ -38,6 +39,7 @@ layout(location = 9) flat out uint fragNormalTextureIndex;
 layout(location = 10) out vec4 fragTangent;
 layout(location = 11) flat out uint fragEmissiveTextureIndex;
 layout(location = 12) flat out uint fragSpecularTextureIndex;
+layout(location = 13) out vec4 fragEmissive;
 
 void main() {
     vec4 worldPos = push.model * vec4(inPosition, 1.0);
@@ -52,6 +54,7 @@ void main() {
     fragNormalTextureIndex = (push.textureIndices >> 12u) & 63u;
     fragEmissiveTextureIndex = (push.textureIndices >> 18u) & 63u;
     fragSpecularTextureIndex = (push.textureIndices >> 24u) & 63u;
+    fragEmissive = inEmissive;
     fragAlphaTexCoord = inBlendTexCoord;
     fragTangent = vec4(normalize(mat3(push.model) * inTangent.xyz), inTangent.w);
     gl_Position = camera.projection * camera.view * worldPos;
