@@ -177,6 +177,24 @@ namespace
         dx10Rgba[149] = 34;
         dx10Rgba[150] = 56;
         dx10Rgba[151] = 255;
+        std::vector<std::uint8_t> rgb24Dds(132, 0);
+        rgb24Dds[0] = 'D';
+        rgb24Dds[1] = 'D';
+        rgb24Dds[2] = 'S';
+        rgb24Dds[3] = ' ';
+        write32(rgb24Dds, 4, 124);
+        write32(rgb24Dds, 12, 1);
+        write32(rgb24Dds, 16, 1);
+        write32(rgb24Dds, 20, 4); // One padded BGR24 row.
+        write32(rgb24Dds, 76, 32);
+        write32(rgb24Dds, 80, 0x40); // DDPF_RGB.
+        write32(rgb24Dds, 88, 24);
+        write32(rgb24Dds, 92, 0x00ff0000);
+        write32(rgb24Dds, 96, 0x0000ff00);
+        write32(rgb24Dds, 100, 0x000000ff);
+        rgb24Dds[128] = 0;
+        rgb24Dds[129] = 0;
+        rgb24Dds[130] = 255; // BGR24 red.
         {
             std::ofstream output(root / "textures/test.bmp", std::ios::binary);
             output.write(reinterpret_cast<const char*>(bmp.data()), static_cast<std::streamsize>(bmp.size()));
@@ -220,6 +238,10 @@ namespace
         {
             std::ofstream output(root / "textures/dx10.dds", std::ios::binary);
             output.write(reinterpret_cast<const char*>(dx10Rgba.data()), static_cast<std::streamsize>(dx10Rgba.size()));
+        }
+        {
+            std::ofstream output(root / "textures/rgb24.dds", std::ios::binary);
+            output.write(reinterpret_cast<const char*>(rgb24Dds.data()), static_cast<std::streamsize>(rgb24Dds.size()));
         }
 
         const ToUTF8::Utf8Encoder encoder(ToUTF8::WINDOWS_1252);
@@ -278,6 +300,10 @@ namespace
         if (!dx10Texture || dx10Texture->width != 1 || dx10Texture->height != 1
             || dx10Texture->pixels != std::vector<std::uint8_t>({ 12, 34, 56, 255 }))
             throw std::runtime_error("neutral DX10 DDS texture decoding changed pixel data");
+        const auto rgb24Texture = resources.getNeutralTextureManager()->get(VFS::Path::Normalized("textures/rgb24.dds"));
+        if (!rgb24Texture || rgb24Texture->width != 1 || rgb24Texture->height != 1
+            || rgb24Texture->pixels != std::vector<std::uint8_t>({ 255, 0, 0, 255 }))
+            throw std::runtime_error("neutral 24-bit DDS texture decoding changed pixel data");
         const auto correctedTexture
             = resources.getNeutralTextureManager()->get(VFS::Path::Normalized("textures/normal.tga"));
         if (!correctedTexture || correctedTexture != normal)

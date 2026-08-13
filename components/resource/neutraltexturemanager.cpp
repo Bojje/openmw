@@ -816,9 +816,17 @@ namespace
         if ((bits != 8 && bits != 16 && bits != 24 && bits != 32) || (bits == 8 && dx10Format != 61))
             return {};
         const std::size_t pixelBytes = bits / 8;
-        if (pixelDataOffset > data.size()
-            || (pixelBytes > 0 && static_cast<std::size_t>(width) * height
-                > (data.size() - pixelDataOffset) / pixelBytes))
+        const std::size_t packedRowBytes = static_cast<std::size_t>(width) * pixelBytes;
+        std::size_t rowBytes = packedRowBytes;
+        if (bits == 24)
+        {
+            // Legacy DDS RGB24 data is normally BGR and may include four-byte
+            // row padding. The pitch field is authoritative when present.
+            const std::size_t pitch = read32(data, 20);
+            if (pitch >= packedRowBytes)
+                rowBytes = pitch;
+        }
+        if (pixelDataOffset > data.size() || (rowBytes > 0 && height > (data.size() - pixelDataOffset) / rowBytes))
             return {};
         auto result = std::make_shared<Render::TextureData>();
         result->width = width;
@@ -827,7 +835,8 @@ namespace
         for (std::uint32_t y = 0; y < height; ++y)
             for (std::uint32_t x = 0; x < width; ++x)
             {
-                const std::size_t offset = pixelDataOffset + (static_cast<std::size_t>(y) * width + x) * pixelBytes;
+                const std::size_t offset = pixelDataOffset + static_cast<std::size_t>(y) * rowBytes
+                    + static_cast<std::size_t>(x) * pixelBytes;
                 if (dx10Format == 28)
                     setPixel(*result, x, y, data[offset], data[offset + 1], data[offset + 2], data[offset + 3]);
                 else if (dx10Format == 87)
@@ -836,7 +845,11 @@ namespace
                     setPixel(*result, x, y, data[offset], data[offset], data[offset], 255);
                 else
                 {
-                    const std::uint32_t value = bits == 16 ? read16(data, offset) : read32(data, offset);
+                    const std::uint32_t value = bits == 16 ? read16(data, offset)
+                        : bits == 24 ? static_cast<std::uint32_t>(data[offset])
+                                | (static_cast<std::uint32_t>(data[offset + 1]) << 8)
+                                | (static_cast<std::uint32_t>(data[offset + 2]) << 16)
+                                : read32(data, offset);
                     setPixel(*result, x, y, expandChannel(value, redMask), expandChannel(value, greenMask),
                         expandChannel(value, blueMask), alphaMask ? expandChannel(value, alphaMask) : 255);
                 }
