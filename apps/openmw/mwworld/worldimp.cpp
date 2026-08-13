@@ -3980,6 +3980,12 @@ namespace MWWorld
             mWorldScene->updateNeutralObjectVisibility(ptr, visibility);
     }
 
+    void World::updateObjectActive(const MWWorld::Ptr& ptr, bool active)
+    {
+        if (!mRendering && mWorldScene)
+            mWorldScene->updateNeutralObjectActive(ptr, active);
+    }
+
     struct ResetActorsVisitor
     {
         World& mWorld;

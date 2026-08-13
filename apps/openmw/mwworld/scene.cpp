@@ -444,6 +444,12 @@ namespace MWWorld
             mNeutralWorldScene->updateObjectVisibility(static_cast<const void*>(ptr.mRef), visibility);
     }
 
+    void Scene::updateNeutralObjectActive(const Ptr& ptr, bool active)
+    {
+        if (mNeutralWorldScene)
+            mNeutralWorldScene->updateObjectActive(static_cast<const void*>(ptr.mRef), active);
+    }
+
     void Scene::emitNeutralWaterRipple(const Render::Vec3& position, float size)
     {
         if (mNeutralWorldScene)

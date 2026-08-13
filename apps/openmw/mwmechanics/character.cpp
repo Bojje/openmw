@@ -3735,6 +3735,8 @@ namespace MWMechanics
     {
         if (mAnimation)
             mAnimation->setActive(active);
+        else
+            MWBase::Environment::get().getWorld()->updateObjectActive(mPtr, active != 0);
     }
 
     void CharacterController::setHeadTrackTarget(const MWWorld::ConstPtr& target)

@@ -404,7 +404,7 @@ namespace Render
         std::vector<MeshInstance> result;
         for (const DynamicMeshSubmission& dynamic : submission.dynamicMeshes)
         {
-            if (!dynamic.object.visible)
+            if (!dynamic.object.visible || !dynamic.object.active)
                 continue;
             for (const MeshInstance& instance : dynamic.meshes)
             {

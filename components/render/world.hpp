@@ -115,6 +115,7 @@ namespace Render
         // their flattened neutral mesh list is submitted.
         bool magicVfx = false;
         float opacity = 1.f;
+        bool active = true;
     };
 
     // A cell snapshot is updated by the world lifecycle, not by a renderer.
@@ -477,6 +478,21 @@ namespace Render
                 return false;
             object->opacity = std::clamp(value, 0.f, 1.f);
             object->visible = object->opacity > 0.f;
+            return true;
+        }
+
+        bool updateObjectActive(const void* objectKey, bool value)
+        {
+            const auto found = mObjects.find(objectKey);
+            if (found == mObjects.end())
+                return false;
+            const auto scene = mCells.find(found->second.cell);
+            if (scene == mCells.end())
+                return false;
+            WorldObject* object = scene->second.findObject(found->second.id);
+            if (object == nullptr)
+                return false;
+            object->active = value;
             return true;
         }
 

@@ -251,6 +251,10 @@ int main()
         || world.updateObjectVisibility(&objectHandle, std::numeric_limits<float>::quiet_NaN()))
         throw std::runtime_error("renderer-neutral world scene lost object visibility state");
 
+    if (!world.updateObjectActive(&objectHandle, false) || world.findCell(&firstCellHandle)->objects.front().active
+        || !world.updateObjectActive(&objectHandle, true) || !world.findCell(&firstCellHandle)->objects.front().active)
+        throw std::runtime_error("renderer-neutral world scene lost object activation state");
+
     world.setActiveWorldspace("active");
     if (world.activeWorldspace() != "active")
         throw std::runtime_error("renderer-neutral world scene did not retain active worldspace");

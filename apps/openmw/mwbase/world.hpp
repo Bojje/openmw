@@ -569,6 +569,8 @@ namespace MWBase
 
         virtual void updateObjectVisibility(const MWWorld::Ptr& ptr, float visibility) = 0;
 
+        virtual void updateObjectActive(const MWWorld::Ptr& ptr, bool active) = 0;
+
         /// @see MWWorld::WeatherManager::isInStorm
         virtual bool isInStorm() const = 0;
 
