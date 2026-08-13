@@ -521,7 +521,7 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the frozen `openmw-vulkan-osg-reference` tag, the current checkpoint changes
-207 code files excluding this ledger, deleting 2,289 lines and adding 14,775 lines (net `+12,486`). The larger Vulkan-only
+207 code files excluding this ledger, deleting 2,286 lines and adding 14,789 lines (net `+12,503`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; the current branch continues the reduction
 work with renderer-neutral ownership and compatibility-wrapper deletion. The live no-GUI
 consumer is the first deletion checkpoint; further reduction can now target OSG
@@ -561,7 +561,8 @@ Neutral mesh and texture resolution, including optional specular-file discovery,
 scene boundary as injected callbacks rather than direct `ResourceSystem` calls.
 Neutral scene synchronization and bone-pose production now cross the same boundary as injected
 callbacks; the Vulkan game owner supplies camera synchronization and grouped NIF/KF pose sampling,
-while actor priority and blended animation remain to be ported. Neutral one-shot animation queues
+preferring a sibling `.kf` for static NIF skeletons while retaining local-controller precedence;
+actor priority and blended animation remain to be ported. Neutral one-shot animation queues
 now advance from resource duration metadata and hand off to the next queued group, including
 finite loop counts; looping groups now retain a wrapped neutral clock, and mechanics exports
 the queue clock at submission time so the resource pose sampler does not invent a second timeline.
