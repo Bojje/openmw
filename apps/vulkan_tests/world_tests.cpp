@@ -477,6 +477,16 @@ int main()
         || !visibilitySubmission.valid())
         throw std::runtime_error("renderer-neutral submission did not apply view-distance ownership");
 
+    Render::MeshInstance largeVisibilityMesh = aggregateMesh;
+    largeVisibilityMesh.mesh.vertices.resize(3);
+    largeVisibilityMesh.mesh.vertices[0].position[0] = -20.f;
+    largeVisibilityMesh.mesh.vertices[0].position[1] = -20.f;
+    largeVisibilityMesh.mesh.vertices[1].position[0] = 20.f;
+    largeVisibilityMesh.mesh.vertices[1].position[1] = -20.f;
+    largeVisibilityMesh.mesh.vertices[2].position[1] = 20.f;
+    if (!Render::meshIntersectsViewDistance(largeVisibilityMesh, { 0.f, 0.f, 0.f }, 10.f))
+        throw std::runtime_error("renderer-neutral visibility culled a mesh whose bounds cross the view distance");
+
     Render::WorldScene terrainVisibilityWorld;
     int nearTerrainCell = 0;
     int farTerrainCell = 0;

@@ -543,6 +543,12 @@ namespace Render
             return true;
 
         const float maximumDistanceSquared = viewDistance * viewDistance;
+        float minimumX = std::numeric_limits<float>::infinity();
+        float maximumX = -std::numeric_limits<float>::infinity();
+        float minimumY = std::numeric_limits<float>::infinity();
+        float maximumY = -std::numeric_limits<float>::infinity();
+        float minimumZ = std::numeric_limits<float>::infinity();
+        float maximumZ = -std::numeric_limits<float>::infinity();
         for (const MeshVertex& vertex : instance.mesh.vertices)
         {
             const float x = instance.transform.data[0] * vertex.position[0]
@@ -556,13 +562,20 @@ namespace Render
                 + instance.transform.data[10] * vertex.position[2] + instance.transform.data[14];
             if (!std::isfinite(x) || !std::isfinite(y) || !std::isfinite(z))
                 return true;
-            const float dx = x - cameraPosition.x;
-            const float dy = y - cameraPosition.y;
-            const float dz = z - cameraPosition.z;
-            if (dx * dx + dy * dy + dz * dz <= maximumDistanceSquared)
-                return true;
+            minimumX = std::min(minimumX, x);
+            maximumX = std::max(maximumX, x);
+            minimumY = std::min(minimumY, y);
+            maximumY = std::max(maximumY, y);
+            minimumZ = std::min(minimumZ, z);
+            maximumZ = std::max(maximumZ, z);
         }
-        return false;
+        const float closestX = std::clamp(cameraPosition.x, minimumX, maximumX);
+        const float closestY = std::clamp(cameraPosition.y, minimumY, maximumY);
+        const float closestZ = std::clamp(cameraPosition.z, minimumZ, maximumZ);
+        const float dx = closestX - cameraPosition.x;
+        const float dy = closestY - cameraPosition.y;
+        const float dz = closestZ - cameraPosition.z;
+        return dx * dx + dy * dy + dz * dz <= maximumDistanceSquared;
     }
 
     inline void cullMeshInstancesToView(std::vector<MeshInstance>& meshes, const SceneData& scene)

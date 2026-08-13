@@ -554,7 +554,7 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the frozen `openmw-vulkan-osg-reference` tag, the current checkpoint changes
-214 code files excluding this ledger, deleting 2,490 lines and adding 17,567 lines (net `+15,077`). The larger Vulkan-only
+214 code files excluding this ledger, deleting 2,490 lines and adding 17,590 lines (net `+15,100`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; the current branch continues the reduction
 work with renderer-neutral ownership and compatibility-wrapper deletion. The live no-GUI
 consumer is the first deletion checkpoint; further reduction can now target OSG
@@ -587,8 +587,9 @@ parallax or specular state. Explicit ESM4 terrain specular maps now also select 
 shader/material path even when specular is not packed into diffuse alpha, preserving their
 contribution in Vulkan.
 Static, dynamic, and effect mesh visibility now applies the engine view distance at the single
-renderer-neutral submission boundary; invalid or non-finite geometry remains visible for validation
-instead of being silently discarded.
+renderer-neutral submission boundary using conservative transformed bounds; large geometry that
+crosses the radius remains visible even when none of its vertices lies inside it. Invalid or
+non-finite geometry remains visible for validation instead of being silently discarded.
 Neutral scene export receives the world-owned `ResourceSystem` directly for mesh and texture
 resolution, so `RenderingManager` is not used as that renderer-neutral resource gateway.
 The manager's OSG-owned terrain, object paging, incremental compile operation, light root, sky,
