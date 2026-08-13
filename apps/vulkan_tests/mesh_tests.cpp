@@ -183,6 +183,7 @@ int main()
     Nif::NiPlanarCollider planarCollider;
     planarCollider.mRecordType = Nif::RC_NiPlanarCollider;
     planarCollider.mBounceFactor = 0.5f;
+    planarCollider.mDieOnCollision = true;
     planarCollider.mExtents = { 10.f, 10.f };
     planarCollider.mPosition = { 0.f, 0.f, 0.f };
     planarCollider.mXVector = { 1.f, 0.f, 0.f };
@@ -206,7 +207,7 @@ int main()
     const Render::MeshData bouncedParticles = Render::advanceParticleMesh(collisionParticles, 0.5f);
     if (!collisionParticles.particles || !collisionParticles.particles->simulation
         || !collisionParticles.particles->simulation->collider || std::abs(bouncedParticles.vertices[0].tangent[2] - 0.5f)
-            > 1e-5f)
+            > 1e-5f || bouncedParticles.vertices[0].color[3] != 0.f)
         throw std::runtime_error("neutral particle planar collider did not reflect motion");
 
     Nif::NiPSysData modernParticleSource;

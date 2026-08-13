@@ -986,12 +986,15 @@ namespace Nif
                 result->emitter = std::move(emitter);
         }
 
-        const auto makePlanarCollider = [](float bounce, const osg::Vec3f& position, const osg::Vec3f& normal,
+        const auto makePlanarCollider = [](float bounce, bool dieOnCollision, bool spawnOnCollision,
+                                               const osg::Vec3f& position, const osg::Vec3f& normal,
                                                const osg::Vec3f& xAxis, const osg::Vec3f& yAxis, float planeDistance,
                                                float extentX, float extentY) {
             auto collider = std::make_shared<Render::ParticleSimulationData::Collider>();
             collider->type = Render::ParticleSimulationData::Collider::Type::Planar;
             collider->bounce = bounce;
+            collider->dieOnCollision = dieOnCollision;
+            collider->spawnOnCollision = spawnOnCollision;
             collider->position = { position.x(), position.y(), position.z() };
             collider->normal = { normal.x(), normal.y(), normal.z() };
             collider->xAxis = { xAxis.x(), xAxis.y(), xAxis.z() };
@@ -1001,10 +1004,13 @@ namespace Nif
             collider->extentY = extentY;
             return collider;
         };
-        const auto makeSphericalCollider = [](float bounce, const osg::Vec3f& center, float radius) {
+        const auto makeSphericalCollider = [](float bounce, bool dieOnCollision, bool spawnOnCollision,
+                                                  const osg::Vec3f& center, float radius) {
             auto collider = std::make_shared<Render::ParticleSimulationData::Collider>();
             collider->type = Render::ParticleSimulationData::Collider::Type::Spherical;
             collider->bounce = bounce;
+            collider->dieOnCollision = dieOnCollision;
+            collider->spawnOnCollision = spawnOnCollision;
             collider->position = { center.x(), center.y(), center.z() };
             collider->radius = radius;
             return collider;
@@ -1020,14 +1026,16 @@ namespace Nif
                 {
                     const auto* planar = static_cast<const NiPlanarCollider*>(modifier.getPtr());
                     // The legacy operator intentionally swaps the serialized extents when testing its local axes.
-                    collider = makePlanarCollider(planar->mBounceFactor, planar->mPosition, planar->mPlaneNormal,
+                    collider = makePlanarCollider(planar->mBounceFactor, planar->mDieOnCollision,
+                        planar->mSpawnOnCollision, planar->mPosition, planar->mPlaneNormal,
                         planar->mXVector, planar->mYVector, planar->mPlaneDistance, planar->mExtents.y(),
                         planar->mExtents.x());
                 }
                 else if (modifier->mRecordType == RC_NiSphericalCollider)
                 {
                     const auto* spherical = static_cast<const NiSphericalCollider*>(modifier.getPtr());
-                    collider = makeSphericalCollider(spherical->mBounceFactor, spherical->mCenter, spherical->mRadius);
+                    collider = makeSphericalCollider(spherical->mBounceFactor, spherical->mDieOnCollision,
+                        spherical->mSpawnOnCollision, spherical->mCenter, spherical->mRadius);
                 }
                 if (collider && collider->valid())
                 {
@@ -1057,8 +1065,8 @@ namespace Nif
                             ? osg::Vec3f{}
                             : planar->mColliderObject->mTransform.mTranslation;
                         const osg::Vec3f normal = osg::Vec3f(planar->mXAxis ^ planar->mYAxis);
-                        collider = makePlanarCollider(planar->mBounce, position, normal, planar->mXAxis, planar->mYAxis,
-                            0.f, planar->mWidth, planar->mHeight);
+                        collider = makePlanarCollider(planar->mBounce, planar->mCollideDie, planar->mCollideSpawn, position,
+                            normal, planar->mXAxis, planar->mYAxis, 0.f, planar->mWidth, planar->mHeight);
                     }
                     else if (colliderReference->mRecordType == RC_NiPSysSphericalCollider)
                     {
@@ -1066,7 +1074,8 @@ namespace Nif
                         const osg::Vec3f center = spherical->mColliderObject.empty()
                             ? osg::Vec3f{}
                             : spherical->mColliderObject->mTransform.mTranslation;
-                        collider = makeSphericalCollider(spherical->mBounce, center, spherical->mRadius);
+                        collider = makeSphericalCollider(spherical->mBounce, spherical->mCollideDie,
+                            spherical->mCollideSpawn, center, spherical->mRadius);
                     }
                     if (collider && collider->valid())
                     {

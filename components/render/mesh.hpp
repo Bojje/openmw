@@ -186,6 +186,8 @@ namespace Render
 
             Type type = Type::Planar;
             float bounce = 1.f;
+            bool dieOnCollision = false;
+            bool spawnOnCollision = false;
             Vec3 position{};
             Vec3 normal{ 0.f, 0.f, 1.f };
             Vec3 xAxis{ 1.f, 0.f, 0.f };
@@ -284,7 +286,7 @@ namespace Render
             const float length = std::sqrt(dot(value, value));
             return length > 0.f ? scaleVector(value, 1.f / length) : fallback;
         };
-        const auto resolveCollision = [&](const Vec3& origin, Vec3 center, float motionTime) {
+        const auto resolveCollision = [&](const Vec3& origin, Vec3 center, float motionTime, bool& collided) {
             if (!collider || motionTime <= 0.f)
                 return center;
             const Vec3 travel = subtract(center, origin);
@@ -303,7 +305,10 @@ namespace Render
                     const Vec3 relative = subtract(contact, collider->position);
                     if (std::abs(dot(relative, xAxis)) <= collider->extentX * 0.5f
                         && std::abs(dot(relative, yAxis)) <= collider->extentY * 0.5f)
+                    {
+                        collided = true;
                         return subtract(center, scaleVector(normal, endDistance * (1.f + collider->bounce)));
+                    }
                 }
                 return center;
             }
@@ -333,6 +338,7 @@ namespace Render
             }
             if (fraction < 0.f)
                 return center;
+            collided = true;
             const Vec3 contact = add(origin, scaleVector(travel, fraction));
             const Vec3 normal = normalize(subtract(contact, collider->position), { 0.f, 0.f, 1.f });
             const Vec3 remaining = subtract(center, contact);
@@ -343,15 +349,19 @@ namespace Render
         const auto applyParticle = [&](std::size_t destinationFirstVertex, std::size_t sourceFirstVertex,
                                        const ParticleState& state, float motionTime, const Vec3& origin) {
             const float age = state.age + time;
-            const bool alive = state.lifespan <= 0.f || age < state.lifespan;
+            bool alive = state.lifespan <= 0.f || age < state.lifespan;
             const float displacementScale = drag > 0.f ? (1.f - std::exp(-drag * motionTime)) / drag : motionTime;
             const float accelerationScale
                 = drag > 0.f ? (motionTime - displacementScale) / drag : 0.5f * motionTime * motionTime;
             const Vec3 displacement = { state.velocity.x * displacementScale + acceleration.x * accelerationScale,
                 state.velocity.y * displacementScale + acceleration.y * accelerationScale,
                 state.velocity.z * displacementScale + acceleration.z * accelerationScale };
+            bool collided = false;
             const Vec3 center = resolveCollision(origin,
-                { origin.x + displacement.x, origin.y + displacement.y, origin.z + displacement.z }, motionTime);
+                { origin.x + displacement.x, origin.y + displacement.y, origin.z + displacement.z }, motionTime,
+                collided);
+            if (collided && collider && collider->dieOnCollision)
+                alive = false;
             const float rotationSpeed = state.rotationSpeed + (simulation ? simulation->rotationSpeed : 0.f);
             const float angle = rotationSpeed * motionTime;
             const float cosine = std::cos(angle);
