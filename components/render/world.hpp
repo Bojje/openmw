@@ -121,6 +121,7 @@ namespace Render
         ObjectTransform transform;
         bool visible = true;
         bool dynamic = false;
+        bool staticInstance = false;
         // Optional frame pose supplied by the animation owner. The matrices
         // use the skinning order of the resolved mesh and contain no backend
         // or scene-graph types.
@@ -309,7 +310,9 @@ namespace Render
         {
             if (cellKey == nullptr)
                 return;
-            ensureCell(cellKey, exterior, gridX, gridY, name, worldspace).water = std::move(water);
+            CellScene& scene = ensureCell(cellKey, exterior, gridX, gridY, name, worldspace);
+            std::erase_if(scene.objects, [](const WorldObject& object) { return object.staticInstance; });
+            scene.water = std::move(water);
         }
 
         void setWaterEnabled(bool enabled) { mWaterEnabled = enabled; }
@@ -489,6 +492,7 @@ namespace Render
             object.transform = transform;
             object.visible = visible;
             object.dynamic = false;
+            object.staticInstance = true;
             ensureCell(cellKey, exterior, gridX, gridY, cellName, worldspace).objects.push_back(std::move(object));
         }
 

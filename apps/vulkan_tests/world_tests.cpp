@@ -154,6 +154,11 @@ int main()
         || staticCell->objects.front().model != "grass/test.nif"
         || staticCell->objects.front().transform.position.z != 5.f)
         throw std::runtime_error("renderer-neutral world scene failed to record a cell-owned static instance");
+    if (!staticCell->objects.front().staticInstance)
+        throw std::runtime_error("renderer-neutral world scene failed to mark a static instance");
+    world.recordCell(&staticCellHandle, true, 4, 5, "static", "Tamriel");
+    if (world.findCell(&staticCellHandle)->objects.size() != 0)
+        throw std::runtime_error("renderer-neutral world scene retained stale static instances on cell refresh");
     world.removeCell(&staticCellHandle);
 
     Render::ObjectTransform objectTransform;
