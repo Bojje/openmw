@@ -334,6 +334,7 @@ int main()
         || effectSubmission.effects.back().meshes.back().mesh.material.albedoTexture
             != "textures/effect-original.dds"
         || effectSubmission.effects.back().meshes.back().mesh.skinning
+        || !Render::validMeshInstance(effectSubmission.effects.back().meshes.back(), false)
         || !effectSubmission.effects.back().object.looping
         || effectSubmission.effects.back().object.animationDuration != 2.f
         || !effectSubmission.effects.back().object.magicVfx

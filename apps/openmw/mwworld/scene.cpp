@@ -1440,6 +1440,7 @@ namespace MWWorld
                         for (const Render::MeshInstance& mesh : meshes)
                         {
                             Render::MeshInstance attached = mesh;
+                            Render::bakeMeshBindPose(attached);
                             attached.transform = Render::multiply(dynamic.boneMatrices[boneIndex], mesh.transform);
                             dynamic.meshes.push_back(Render::transformMeshInstance(dynamic.object, attached));
                         }

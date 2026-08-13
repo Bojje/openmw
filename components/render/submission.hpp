@@ -243,7 +243,7 @@ namespace Render
         std::vector<MeshInstance> meshes;
     };
 
-    inline void bakeEffectBindPose(MeshInstance& instance)
+    inline void bakeMeshBindPose(MeshInstance& instance)
     {
         if (!instance.mesh.skinning || !instance.mesh.skinning->valid(instance.mesh.vertices.size()))
             return;
@@ -271,7 +271,7 @@ namespace Render
             for (const MeshInstance& mesh : resolvedMeshes)
             {
                 MeshInstance instance = transformMeshInstance(*effect, mesh);
-                bakeEffectBindPose(instance);
+                bakeMeshBindPose(instance);
                 if (!effect->textureOverride.empty() && (!effect->magicVfx || !textureOverrideApplied))
                 {
                     instance.mesh.material.albedoTexture = effect->textureOverride;
