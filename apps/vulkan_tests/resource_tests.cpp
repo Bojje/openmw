@@ -74,6 +74,19 @@ namespace
         indexedBmp[54 + 4 + 2] = 255;
         indexedBmp[62] = 1;
         indexedBmp[63] = 0;
+        std::vector<std::uint8_t> packedBmp(14 + 40 + 8 + 4, 0);
+        packedBmp[0] = 'B';
+        packedBmp[1] = 'M';
+        write32(packedBmp, 2, packedBmp.size());
+        write32(packedBmp, 10, 62);
+        write32(packedBmp, 14, 40);
+        write32(packedBmp, 18, 1);
+        write32(packedBmp, 22, 1);
+        packedBmp[26] = 1;
+        packedBmp[28] = 4;
+        write32(packedBmp, 46, 2);
+        packedBmp[54 + 4 + 2] = 255;
+        packedBmp[62] = 0x10;
         std::vector<std::uint8_t> dds(144, 0);
         dds[0] = 'D';
         dds[1] = 'D';
@@ -120,6 +133,11 @@ namespace
                 static_cast<std::streamsize>(indexedBmp.size()));
         }
         {
+            std::ofstream output(root / "textures/packed.bmp", std::ios::binary);
+            output.write(reinterpret_cast<const char*>(packedBmp.data()),
+                static_cast<std::streamsize>(packedBmp.size()));
+        }
+        {
             std::ofstream output(root / "textures/test.dds", std::ios::binary);
             output.write(reinterpret_cast<const char*>(dds.data()), static_cast<std::streamsize>(dds.size()));
         }
@@ -147,6 +165,10 @@ namespace
         if (!indexedTexture || indexedTexture->width != 1 || indexedTexture->height != 1
             || indexedTexture->pixels != std::vector<std::uint8_t>({ 255, 0, 0, 255 }))
             throw std::runtime_error("neutral indexed BMP texture decoding changed pixel data");
+        const auto packedTexture = resources.getNeutralTextureManager()->get(VFS::Path::Normalized("textures/packed.bmp"));
+        if (!packedTexture || packedTexture->width != 1 || packedTexture->height != 1
+            || packedTexture->pixels != std::vector<std::uint8_t>({ 255, 0, 0, 255 }))
+            throw std::runtime_error("neutral packed BMP texture decoding changed pixel data");
         const auto tgaTexture = resources.getNeutralTextureManager()->get(VFS::Path::Normalized("textures/test.tga"));
         if (!tgaTexture || tgaTexture->width != 1 || tgaTexture->height != 1
             || tgaTexture->pixels != std::vector<std::uint8_t>({ 255, 0, 0, 255 }))

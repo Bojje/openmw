@@ -264,7 +264,7 @@ namespace
         const std::uint32_t compression = read32(data, 30);
         const std::uint32_t colorsUsed = read32(data, 46);
         if (dibSize < 40 || static_cast<std::size_t>(dibSize) > data.size() - 14 || width <= 0 || signedHeight == 0
-            || planes != 1 || (bits != 8 && bits != 24 && bits != 32) || compression != 0)
+            || planes != 1 || (bits != 1 && bits != 4 && bits != 8 && bits != 24 && bits != 32) || compression != 0)
             return {};
         const std::int64_t absoluteHeight = signedHeight < 0 ? -static_cast<std::int64_t>(signedHeight) : signedHeight;
         if (absoluteHeight > std::numeric_limits<std::uint32_t>::max())
@@ -272,7 +272,7 @@ namespace
         const std::uint32_t height = static_cast<std::uint32_t>(absoluteHeight);
         if (!validRgbaSize(static_cast<std::uint32_t>(width), height))
             return {};
-        const std::size_t paletteEntries = bits == 8 ? (colorsUsed != 0 ? colorsUsed : 256) : 0;
+        const std::size_t paletteEntries = bits <= 8 ? (colorsUsed != 0 ? colorsUsed : std::size_t(1) << bits) : 0;
         const std::size_t paletteOffset = 14 + static_cast<std::size_t>(dibSize);
         if (paletteEntries > 0
             && (paletteEntries > (std::numeric_limits<std::size_t>::max() - paletteOffset) / 4
@@ -298,9 +298,12 @@ namespace
             for (std::uint32_t x = 0; x < static_cast<std::uint32_t>(width); ++x)
             {
                 const std::size_t source = row + static_cast<std::size_t>(x) * pixelBytes;
-                if (bits == 8)
+                if (bits <= 8)
                 {
-                    const std::size_t paletteIndex = data[source];
+                    const std::size_t packed = row + (static_cast<std::size_t>(x) * bits) / 8;
+                    const unsigned shift
+                        = 8 - bits - static_cast<unsigned>((static_cast<std::size_t>(x) * bits) % 8);
+                    const std::size_t paletteIndex = (data[packed] >> shift) & ((std::size_t(1) << bits) - 1);
                     if (paletteIndex >= paletteEntries)
                         return {};
                     const std::size_t palette = paletteOffset + paletteIndex * 4;
