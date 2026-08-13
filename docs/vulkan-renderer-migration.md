@@ -521,7 +521,7 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the frozen `openmw-vulkan-osg-reference` tag, the current checkpoint changes
-207 code files excluding this ledger, deleting 2,286 lines and adding 14,873 lines (net `+12,587`). The larger Vulkan-only
+207 code files excluding this ledger, deleting 2,284 lines and adding 14,937 lines (net `+12,653`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; the current branch continues the reduction
 work with renderer-neutral ownership and compatibility-wrapper deletion. The live no-GUI
 consumer is the first deletion checkpoint; further reduction can now target OSG
@@ -549,7 +549,9 @@ blendmap/multi-layer Vulkan terrain, including explicit ESM4 and auto-detected s
 owner boundary is quadtree-scale streaming and complete image coverage. Terrain layer feature
 flags now default to disabled
 at the shared storage boundary, preventing ESM4 default layers from acquiring undefined
-parallax or specular state.
+parallax or specular state. Explicit ESM4 terrain specular maps now also select the terrain
+shader/material path even when specular is not packed into diffuse alpha, preserving their
+contribution in Vulkan.
 Neutral scene export receives the world-owned `ResourceSystem` directly for mesh and texture
 resolution, so `RenderingManager` is not used as that renderer-neutral resource gateway.
 The manager's OSG-owned terrain, object paging, incremental compile operation, light root, sky,
@@ -572,6 +574,8 @@ when present, and pose sampling now starts from the same selected text-key segme
 events now dispatch Lua callbacks, sound/soundgen events, melee-hit timing, and spell-release timing;
 actor priority arbitration, blended controller-stack ownership, and OSG-specific presentation events
 remain outstanding.
+Ordinary neutral actor movement/idle groups now carry looping state and wrap their sampled clock to
+the selected controller segment, while death, hit, queued, and landing groups remain finite.
 RGBA8 conversion is now one renderer-neutral helper shared by image resources and terrain
 blendmaps, so clamping, finite-value rejection, and byte quantization cannot drift between
 resource paths. The conversion helper has direct CPU coverage.
