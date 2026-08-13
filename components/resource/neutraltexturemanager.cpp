@@ -155,18 +155,27 @@ namespace
         if (data.size() < 54 || data[0] != 'B' || data[1] != 'M')
             return {};
         const std::uint32_t offset = read32(data, 10);
+        const std::uint32_t dibSize = read32(data, 14);
         const std::int32_t width = static_cast<std::int32_t>(read32(data, 18));
         const std::int32_t signedHeight = static_cast<std::int32_t>(read32(data, 22));
         const std::uint16_t planes = read16(data, 26);
         const std::uint16_t bits = read16(data, 28);
         const std::uint32_t compression = read32(data, 30);
-        if (width <= 0 || signedHeight == 0 || planes != 1 || (bits != 24 && bits != 32) || compression != 0)
+        const std::uint32_t colorsUsed = read32(data, 46);
+        if (dibSize < 40 || static_cast<std::size_t>(dibSize) > data.size() - 14 || width <= 0 || signedHeight == 0
+            || planes != 1 || (bits != 8 && bits != 24 && bits != 32) || compression != 0)
             return {};
         const std::int64_t absoluteHeight = signedHeight < 0 ? -static_cast<std::int64_t>(signedHeight) : signedHeight;
         if (absoluteHeight > std::numeric_limits<std::uint32_t>::max())
             return {};
         const std::uint32_t height = static_cast<std::uint32_t>(absoluteHeight);
         if (!validRgbaSize(static_cast<std::uint32_t>(width), height))
+            return {};
+        const std::size_t paletteEntries = bits == 8 ? (colorsUsed != 0 ? colorsUsed : 256) : 0;
+        const std::size_t paletteOffset = 14 + static_cast<std::size_t>(dibSize);
+        if (paletteEntries > 0
+            && (paletteEntries > (std::numeric_limits<std::size_t>::max() - paletteOffset) / 4
+                || paletteOffset + paletteEntries * 4 > data.size() || offset < paletteOffset + paletteEntries * 4))
             return {};
         if (static_cast<std::size_t>(width) > std::numeric_limits<std::size_t>::max() / bits)
             return {};
@@ -188,7 +197,17 @@ namespace
             for (std::uint32_t x = 0; x < static_cast<std::uint32_t>(width); ++x)
             {
                 const std::size_t source = row + static_cast<std::size_t>(x) * pixelBytes;
-                setPixel(*result, x, y, data[source + 2], data[source + 1], data[source], bits == 32 ? data[source + 3] : 255);
+                if (bits == 8)
+                {
+                    const std::size_t paletteIndex = data[source];
+                    if (paletteIndex >= paletteEntries)
+                        return {};
+                    const std::size_t palette = paletteOffset + paletteIndex * 4;
+                    setPixel(*result, x, y, data[palette + 2], data[palette + 1], data[palette], 255);
+                }
+                else
+                    setPixel(*result, x, y, data[source + 2], data[source + 1], data[source],
+                        bits == 32 ? data[source + 3] : 255);
             }
         }
         return result;

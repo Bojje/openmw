@@ -59,6 +59,21 @@ namespace
         bmp[55] = 0;
         bmp[56] = 255;
         bmp[57] = 0;
+        std::vector<std::uint8_t> indexedBmp(14 + 40 + 8 + 4, 0);
+        indexedBmp[0] = 'B';
+        indexedBmp[1] = 'M';
+        write32(indexedBmp, 2, indexedBmp.size());
+        write32(indexedBmp, 10, 62);
+        write32(indexedBmp, 14, 40);
+        write32(indexedBmp, 18, 1);
+        write32(indexedBmp, 22, 1);
+        indexedBmp[26] = 1;
+        indexedBmp[28] = 8;
+        write32(indexedBmp, 46, 2);
+        // Palette entries are BGRA; the single pixel selects the red entry.
+        indexedBmp[54 + 4 + 2] = 255;
+        indexedBmp[62] = 1;
+        indexedBmp[63] = 0;
         std::vector<std::uint8_t> dds(144, 0);
         dds[0] = 'D';
         dds[1] = 'D';
@@ -88,6 +103,11 @@ namespace
             output.write(reinterpret_cast<const char*>(bmp.data()), static_cast<std::streamsize>(bmp.size()));
         }
         {
+            std::ofstream output(root / "textures/indexed.bmp", std::ios::binary);
+            output.write(reinterpret_cast<const char*>(indexedBmp.data()),
+                static_cast<std::streamsize>(indexedBmp.size()));
+        }
+        {
             std::ofstream output(root / "textures/test.dds", std::ios::binary);
             output.write(reinterpret_cast<const char*>(dds.data()), static_cast<std::streamsize>(dds.size()));
         }
@@ -106,6 +126,10 @@ namespace
         if (!texture || texture->width != 1 || texture->height != 1
             || texture->pixels != std::vector<std::uint8_t>({ 255, 0, 0, 255 }))
             throw std::runtime_error("neutral BMP texture decoding changed pixel data");
+        const auto indexedTexture = resources.getNeutralTextureManager()->get(VFS::Path::Normalized("textures/indexed.bmp"));
+        if (!indexedTexture || indexedTexture->width != 1 || indexedTexture->height != 1
+            || indexedTexture->pixels != std::vector<std::uint8_t>({ 255, 0, 0, 255 }))
+            throw std::runtime_error("neutral indexed BMP texture decoding changed pixel data");
         const auto tgaTexture = resources.getNeutralTextureManager()->get(VFS::Path::Normalized("textures/test.tga"));
         if (!tgaTexture || tgaTexture->width != 1 || tgaTexture->height != 1
             || tgaTexture->pixels != std::vector<std::uint8_t>({ 255, 0, 0, 255 }))
