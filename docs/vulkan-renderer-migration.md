@@ -808,7 +808,7 @@ provide a usable surface, while validation errors remain hard failures.
   placement bounds; planar and spherical collider records now reflect neutral motion with authored bounce and
   die-on-collision behavior, bounded collision-spawn snapshots, ordered collider-chain traversal, and bounded
   multi-generation spawn snapshots. The supported NIF collider record set is now renderer-neutral; unknown
-  records are rejected consistently rather than assigned an invented shape.
+  records remain without a collider in both adapters rather than being assigned an invented shape.
   The neutral path now samples model-local NIF and classic external `.kf` keyframe controllers,
   honors selected group start/stop segments, carries explicit per-object animation groups and clocks,
 and starts neutral weapon and spell-cast queues with attack/cast timing keys, including non-biped
