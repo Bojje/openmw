@@ -1415,6 +1415,7 @@ namespace MWWorld
                 }
             }
 
+            Render::applyBindPose(dynamic);
             if (!dynamic.boneMatrices.empty())
             {
                 const Render::SkinningData* skinning = Render::findCompatibleSkinning(dynamic);
@@ -1446,7 +1447,6 @@ namespace MWWorld
                 }
             }
 
-            Render::applyBindPose(dynamic);
         }
 
         if (Settings::shaders().mAutoUseObjectSpecularMaps
