@@ -1711,6 +1711,18 @@ namespace Vk
             draw.material.terrainParallax = draw.material.terrainParallax && draw.material.terrainNormalMap;
             normalTextureIndices.push_back(normalTextureIndex);
 
+            if (draw.material.emissiveAnimated && draw.material.emissiveTexture.empty())
+            {
+                const unsigned frame = static_cast<unsigned>(mSceneData.effectTime.x * 16.0f) % 32u;
+                std::string causticTexture = "textures/magicitem/caust";
+                if (frame < 10)
+                    causticTexture += '0';
+                causticTexture += std::to_string(frame);
+                causticTexture += ".dds";
+                draw.material.emissiveTexture = std::move(causticTexture);
+                draw.material.emissiveWrapU = true;
+                draw.material.emissiveWrapV = true;
+            }
             emissiveTextureIndices.push_back(
                 resolveTexture(draw.material.emissiveTexture, draw.material.emissiveWrapU, draw.material.emissiveWrapV));
             specularTextureIndices.push_back(

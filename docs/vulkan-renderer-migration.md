@@ -230,8 +230,8 @@ cleanup removes them through the neutral world owner instead of dereferencing a 
 The neutral effect record also preserves the gameplay loop flag, controller duration, and legacy white
 ambient-light override through submission. Neutral magical projectile effects now also publish their legacy
 point-light color and radius through a bounded scene-light array consumed by Vulkan. Enchanted neutral arrows
-carry a flagged emissive-color override through the G-buffer for an additive Vulkan glow; the same neutral
-material flag now applies a deterministic caustic-style luminance animation from the shared frame clock.
+carry a flagged emissive-color override through the G-buffer for an additive Vulkan glow; the Vulkan consumer
+selects the matching `magicitem/caust00`–`caust31` caustic frame from the shared frame clock when available.
 Controller-driven visual
 playback still requires the future animation owner; effects without a discoverable controller interval remain
 explicitly removable by gameplay.
@@ -770,8 +770,8 @@ so existing spell, area, and summon effects are not silently discarded. Non-loop
 also use that neutral world-effect lifetime when no OSG animation owner exists. The remaining animation
 gate is remaining OSG-specific presentation events and exact dynamic shading; projectile
 multi-effect composition and full particle presentation remain; the neutral enchanted-equipment path now carries
-an animated emissive state and deterministic caustic-style luminance modulation, while exact OSG glow texture
-layering remains a presentation-fidelity follow-up.
+the animated caustic texture frame and emissive state, while exact OSG texture-layer blending remains a
+presentation-fidelity follow-up.
 Neutral effect meshes now defer skinning until the scene owner can sample the renderer-neutral pose resolver; compatible
 local-controller or sibling-KF poses are flattened before the Vulkan batch, while attached-equipment meshes retain the
 explicit bind-pose fallback when no actor pose is available. Neutral effect clocks also use sibling-KF duration metadata

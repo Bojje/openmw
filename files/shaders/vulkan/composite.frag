@@ -127,12 +127,6 @@ void main() {
     if (scene.effectTime.y > 0.5)
         specular *= 0.15;
 
-    // OSG's enchanted glow advances a caustic texture at 16 frames per
-    // second. The neutral path carries the same presentation state through
-    // the material buffer and applies a deterministic luminance modulation
-    // here until the full animated texture array is available.
-    if (materialSample.a > 1.5)
-        emission *= 0.8 + 0.2 * sin(scene.effectTime.x * 16.0);
     vec3 emissive = emission;
     vec3 color = ambient + pointAmbient + diffuse + pointDiffuse + specular + reflectionColor + emissive;
 
