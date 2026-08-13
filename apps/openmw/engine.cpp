@@ -769,9 +769,9 @@ void OMW::Engine::prepareVulkanEngine()
         const bool firstPerson = mWorld->isFirstPerson();
         const float fieldOfView = firstPerson ? Settings::camera().mFirstPersonFieldOfView.get()
                                               : Settings::camera().mFieldOfView.get();
-        sceneData.viewDistance = Settings::camera().mViewingDistance.get();
+        sceneData.viewDistance() = Settings::camera().mViewingDistance.get();
         sceneData.projection = Render::perspective(aspect, fieldOfView, Settings::camera().mNearClip.get(),
-            sceneData.viewDistance);
+            sceneData.viewDistance());
         if (player.isEmpty())
             return;
         const ESM::Position& position = player.getRefData().getPosition();

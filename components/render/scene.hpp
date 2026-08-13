@@ -94,22 +94,22 @@ namespace Render
         // matching color/radius entries use w for the attenuation radius.
         std::array<Vec4, maxPointLights> pointLightPositions{};
         std::array<Vec4, maxPointLights> pointLightColorsAndRadii{};
-        // x is the number of active entries; the remaining components are
-        // reserved for future light metadata.
+        // x is the number of active entries; w stores the neutral submission
+        // view distance and the remaining components are reserved for future
+        // light metadata. Keeping this in the existing uniform slot preserves
+        // the 896-byte Vulkan/CPU layout.
         Vec4 pointLightCount{ 0.f, 0.f, 0.f, 0.f };
-        // Backend-neutral far distance used by scene submission visibility.
-        // Kept after the uniform-block fields so the existing Vulkan UBO
-        // offsets remain compatible with the shader declaration. Zero
-        // disables distance culling for fixtures and non-perspective callers.
-        float viewDistance = 0.f;
+
+        float& viewDistance() { return pointLightCount.w; }
+        float viewDistance() const { return pointLightCount.w; }
 
         bool valid() const
         {
             return Render::valid(view) && Render::valid(projection) && Render::valid(viewInverse)
                 && Render::valid(projInverse) && Render::valid(sunDirection) && Render::valid(sunColor)
                 && Render::valid(ambientColor) && Render::valid(fogColor) && Render::valid(fogParameters)
-                && Render::valid(skyColor) && Render::valid(effectTime) && Render::valid(viewDistance)
-                && viewDistance >= 0.f && Render::valid(pointLightCount)
+                && Render::valid(skyColor) && Render::valid(effectTime) && Render::valid(viewDistance())
+                && viewDistance() >= 0.f && Render::valid(pointLightCount)
                 && pointLightCount.x >= 0.f && pointLightCount.x <= static_cast<float>(maxPointLights)
                 && std::floor(pointLightCount.x) == pointLightCount.x
                 && [&] {

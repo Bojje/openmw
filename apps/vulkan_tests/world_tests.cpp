@@ -470,7 +470,7 @@ int main()
     visibilityWorld.recordObject(&farVisibilityCell, &farVisibilityCell, true, 1, 0, "far", "far.nif",
         farTransform, true, "visibility");
     Render::SceneData visibilityScene;
-    visibilityScene.viewDistance = 10.f;
+    visibilityScene.viewDistance() = 10.f;
     const Render::SceneSubmission visibilitySubmission = Render::collectSceneSubmission(visibilityWorld,
         visibilityScene, "visibility", [&](std::string_view) { return std::vector<Render::MeshInstance>{ aggregateMesh }; }, false);
     if (visibilitySubmission.meshes.size() != 1 || visibilitySubmission.meshes.front().transform.data[12] != 2.f
@@ -489,7 +489,7 @@ int main()
     terrainVisibilityWorld.setTerrainTiles(&nearTerrainCell, { nearTerrain });
     terrainVisibilityWorld.setTerrainTiles(&farTerrainCell, { farTerrain });
     Render::SceneData terrainVisibilityScene;
-    terrainVisibilityScene.viewDistance = 10.f;
+    terrainVisibilityScene.viewDistance() = 10.f;
     const Render::SceneSubmission terrainVisibilitySubmission = Render::collectSceneSubmission(
         terrainVisibilityWorld, terrainVisibilityScene, "visibility",
         [](std::string_view) { return std::vector<Render::MeshInstance>(); }, true, false);

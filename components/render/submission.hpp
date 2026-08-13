@@ -567,12 +567,12 @@ namespace Render
 
     inline void cullMeshInstancesToView(std::vector<MeshInstance>& meshes, const SceneData& scene)
     {
-        if (scene.viewDistance <= 0.f)
+        if (scene.viewDistance() <= 0.f)
             return;
         const Vec3 cameraPosition{ scene.viewInverse.data[12], scene.viewInverse.data[13],
             scene.viewInverse.data[14] };
         std::erase_if(meshes, [&](const MeshInstance& instance) {
-            return !meshIntersectsViewDistance(instance, cameraPosition, scene.viewDistance);
+            return !meshIntersectsViewDistance(instance, cameraPosition, scene.viewDistance());
         });
     }
 
@@ -619,12 +619,12 @@ namespace Render
 
     inline void cullTerrainTilesToView(std::vector<TerrainTile>& tiles, const SceneData& scene)
     {
-        if (scene.viewDistance <= 0.f)
+        if (scene.viewDistance() <= 0.f)
             return;
         const Vec3 cameraPosition{ scene.viewInverse.data[12], scene.viewInverse.data[13],
             scene.viewInverse.data[14] };
         std::erase_if(tiles, [&](const TerrainTile& tile) {
-            return !terrainTileIntersectsViewDistance(tile, cameraPosition, scene.viewDistance);
+            return !terrainTileIntersectsViewDistance(tile, cameraPosition, scene.viewDistance());
         });
     }
 
