@@ -116,11 +116,9 @@ namespace MWBase
     /// \brief Interface for the World (implemented in MWWorld)
     class World
     {
-        World(const World&);
-        ///< not implemented
+        World(const World&) = delete;
 
-        World& operator=(const World&);
-        ///< not implemented
+        World& operator=(const World&) = delete;
 
     public:
         struct DoorMarker
@@ -130,7 +128,7 @@ namespace MWBase
             ESM::RefId dest;
         };
 
-        World() {}
+        World() = default;
 
         virtual ~World() = default;
 
