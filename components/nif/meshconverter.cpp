@@ -838,6 +838,97 @@ namespace Nif
             return result;
         }
 
+        void applyBaseTextureTransform(Render::MeshData& mesh, const NiGeometry& geometry)
+        {
+            const NiTexturingProperty* texturing = nullptr;
+            for (const auto& property : geometry.mProperties)
+            {
+                if (property.empty())
+                    continue;
+                texturing = dynamic_cast<const NiTexturingProperty*>(property.getPtr());
+                if (texturing != nullptr)
+                    break;
+            }
+            if (texturing == nullptr || texturing->mTextures.size() <= NiTexturingProperty::BaseTexture)
+                return;
+
+            const NiTexturingProperty::Texture& texture = texturing->mTextures[NiTexturingProperty::BaseTexture];
+            if (!texture.mEnabled || !texture.mHasTransform)
+                return;
+
+            const NiTextureTransform& transform = texture.mTransform;
+            const float offsetX = transform.mOffset.x();
+            const float offsetY = transform.mOffset.y();
+            const float scaleX = transform.mScale.x();
+            const float scaleY = transform.mScale.y();
+            const float originX = transform.mOrigin.x();
+            const float originY = transform.mOrigin.y();
+            if (!std::isfinite(offsetX) || !std::isfinite(offsetY) || !std::isfinite(scaleX)
+                || !std::isfinite(scaleY) || !std::isfinite(originX) || !std::isfinite(originY)
+                || !std::isfinite(transform.mRotation))
+                return;
+
+            const auto translate = [](std::array<float, 2> value, float x, float y) {
+                value[0] += x;
+                value[1] += y;
+                return value;
+            };
+            const auto scale = [](std::array<float, 2> value, float x, float y) {
+                value[0] *= x;
+                value[1] *= y;
+                return value;
+            };
+            const auto rotate = [](std::array<float, 2> value, float angle) {
+                const float cosine = std::cos(angle);
+                const float sine = std::sin(angle);
+                return std::array<float, 2>{ value[0] * cosine - value[1] * sine,
+                    value[0] * sine + value[1] * cosine };
+            };
+            const auto apply = [&](std::array<float, 2> value) {
+                if (transform.mTransformMethod == NiTextureTransform::Method::Maya)
+                {
+                    value = scale(value, scaleX, scaleY);
+                    value = translate(value, offsetX, offsetY);
+                    value = { value[0], 1.f - value[1] };
+                    value = translate(value, -originX, -originY);
+                    value = rotate(value, transform.mRotation);
+                    value = translate(value, originX, originY);
+                }
+                else if (transform.mTransformMethod == NiTextureTransform::Method::Max)
+                {
+                    value = translate(value, -originX, -originY);
+                    value = translate(value, offsetX, offsetY);
+                    value = rotate(value, transform.mRotation);
+                    value = scale(value, scaleX, scaleY);
+                    value = translate(value, originX, originY);
+                }
+                else
+                {
+                    value = scale(value, scaleX, scaleY);
+                    value = translate(value, offsetX, offsetY);
+                    value = translate(value, -originX, -originY);
+                    value = rotate(value, transform.mRotation);
+                    value = translate(value, originX, originY);
+                }
+                return value;
+            };
+
+            bool changed = false;
+            for (Render::MeshVertex& vertex : mesh.vertices)
+            {
+                const std::array<float, 2> transformed = apply({ vertex.texcoord[0], vertex.texcoord[1] });
+                if (!std::isfinite(transformed[0]) || !std::isfinite(transformed[1]))
+                    continue;
+                vertex.texcoord[0] = transformed[0];
+                vertex.texcoord[1] = transformed[1];
+                vertex.blendTexcoord[0] = transformed[0];
+                vertex.blendTexcoord[1] = transformed[1];
+                changed = true;
+            }
+            if (changed)
+                Render::computeMeshTangents(mesh);
+        }
+
         std::shared_ptr<const Render::SkinningData> convertSkinning(const NiGeometry& geometry,
             std::size_t vertexCount)
         {
@@ -1293,6 +1384,7 @@ namespace Nif
                         if (!mesh.vertices.empty() && !mesh.indices.empty())
                         {
                             mesh.material = convertMaterial(*geometry);
+                            applyBaseTextureTransform(mesh, *geometry);
                             mesh.material.doubleSided = true;
                             mesh.material.particleBillboard = true;
                             meshes.push_back({ std::move(mesh), transform });
@@ -1302,6 +1394,7 @@ namespace Nif
                     {
                         Render::MeshData mesh = convertMesh(*shapeData);
                         mesh.material = convertMaterial(*geometry);
+                        applyBaseTextureTransform(mesh, *geometry);
                         if (allowSkinning)
                             mesh.skinning = convertSkinning(*geometry, mesh.vertices.size());
                         meshes.push_back({ std::move(mesh), transform });
@@ -1310,6 +1403,7 @@ namespace Nif
                     {
                         Render::MeshData mesh = convertMesh(*stripsData);
                         mesh.material = convertMaterial(*geometry);
+                        applyBaseTextureTransform(mesh, *geometry);
                         if (allowSkinning)
                             mesh.skinning = convertSkinning(*geometry, mesh.vertices.size());
                         meshes.push_back({ std::move(mesh), transform });

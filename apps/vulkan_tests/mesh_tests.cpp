@@ -297,6 +297,12 @@ int main()
     texturing.mTextures.front().mEnabled = true;
     texturing.mTextures.front().mSourceTexture = &texture;
     texturing.mTextures.front().mClamp = 0;
+    texturing.mTextures.front().mHasTransform = true;
+    texturing.mTextures.front().mTransform.mOffset = { 0.25f, 0.125f };
+    texturing.mTextures.front().mTransform.mScale = { 1.f, 1.f };
+    texturing.mTextures.front().mTransform.mRotation = 0.f;
+    texturing.mTextures.front().mTransform.mOrigin = { 0.f, 0.f };
+    texturing.mTextures.front().mTransform.mTransformMethod = Nif::NiTextureTransform::Method::MayaLegacy;
     texturing.mTextures[Nif::NiTexturingProperty::DarkTexture].mEnabled = true;
     texturing.mTextures[Nif::NiTexturingProperty::DarkTexture].mSourceTexture = &texture;
     texturing.mTextures[Nif::NiTexturingProperty::DarkTexture].mClamp = 1;
@@ -424,6 +430,8 @@ int main()
         || instances.front().mesh.material.decalWrapU || instances.front().mesh.material.decalWrapV
         || instances.front().mesh.material.normalWrapU || !instances.front().mesh.material.normalWrapV)
         throw std::runtime_error("NIF material conversion lost texture or alpha state");
+    expectNear(instances.front().mesh.vertices.front().texcoord[0], 0.25f, "base texture U transform");
+    expectNear(instances.front().mesh.vertices.front().texcoord[1], 0.125f, "base texture V transform");
     if (!instances.front().mesh.skinning || !instances.front().mesh.skinning->valid(3)
         || instances.front().mesh.skinning->vertices[1].weights[0] != 1.f
         || instances.front().mesh.skinning->boneNames != std::vector<std::string>{ "Root Bone" })

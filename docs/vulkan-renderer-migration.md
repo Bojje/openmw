@@ -225,7 +225,7 @@ transform blend interpolators now feed that sampler as well;
 neutral NPCs now also publish their selected head, hair, race body-part, and equipped armor/clothing meshes as named
 bone attachments; weapon/shield presentation now carries animated-emissive state through the neutral
 material boundary; legacy dark/detail/decal texture composition now reaches the Vulkan material path,
-while exact enchanted caustic layering, texture-layer UV transforms, full particle emission/spawn,
+while exact enchanted caustic layering, independent texture-layer UV sets/transforms, full particle emission/spawn,
 collision modifiers, and dynamic shading remain outstanding.
 Neutral arrow release and container timing/GUI events now have renderer-neutral paths.
 Neutral actor idle and movement selection now honors weapon-specific short groups when those groups are actually
@@ -570,7 +570,7 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the frozen `openmw-vulkan-osg-reference` tag, the current checkpoint changes
-214 code files excluding this ledger, deleting 2,490 lines and adding 18,668 lines (net `+16,178`). The larger Vulkan-only
+214 code files excluding this ledger, deleting 2,490 lines and adding 18,770 lines (net `+16,280`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; the current branch continues the reduction
 work with renderer-neutral ownership and compatibility-wrapper deletion. The live no-GUI
 consumer is the first deletion checkpoint; further reduction can now target OSG
@@ -802,7 +802,7 @@ also use that neutral world-effect lifetime when no OSG animation owner exists. 
 gate is remaining OSG-specific presentation events and exact dynamic shading; projectile
 multi-effect composition and full particle presentation remain; the neutral enchanted-equipment path now carries
 the animated caustic texture frame, reflected spherical UVs, emissive state, authored gloss multiplication, and NIF bump/luma bias, while
-texture-layer UV transforms and the remaining presentation-specific composition stay as follow-up work.
+independent texture-layer UV sets/transforms and the remaining presentation-specific composition stay as follow-up work.
 Neutral effect meshes now defer skinning until the scene owner can sample the renderer-neutral pose resolver; compatible
 local-controller or sibling-KF poses are flattened before the Vulkan batch, while attached-equipment meshes retain the
 explicit bind-pose fallback when no actor pose is available. Neutral effect clocks also use sibling-KF duration metadata
