@@ -710,8 +710,8 @@ void OMW::Engine::prepareVulkanEngine()
         VFS::Path::Normalized kfPath(path);
         kfPath.changeExtension(VFS::Path::ExtensionView("kf"));
         const bool hasExternalAnimation = resourceSystem->getVFS()->exists(kfPath);
-        const bool hasLocalAnimation
-            = resourceSystem->getNifMeshManager()->getAnimationDuration(path).has_value();
+        const Nif::NIFFilePtr localFile = resourceSystem->getNifFileManager()->get(path);
+        const bool hasLocalAnimation = resourceSystem->getNifMeshManager()->getAnimationDuration(localFile).has_value();
 
         const auto sampleExternalAnimation = [&] {
             return resourceSystem->getNifMeshManager()->getBonePose(
@@ -728,7 +728,7 @@ void OMW::Engine::prepareVulkanEngine()
         }
 
         std::vector<Render::Mat4> pose
-            = resourceSystem->getNifMeshManager()->getBonePose(path, time, boneNames, group, startKey, stopKey);
+            = resourceSystem->getNifMeshManager()->getBonePose(localFile, time, boneNames, group, startKey, stopKey);
         if (!pose.empty())
             return pose;
 

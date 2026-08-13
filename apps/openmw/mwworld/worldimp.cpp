@@ -4252,7 +4252,8 @@ namespace MWWorld
         VFS::Path::Normalized keyframes(model);
         keyframes.changeExtension(VFS::Path::ExtensionView("kf"));
         const bool hasExternalAnimation = mResourceSystem->getVFS()->exists(keyframes);
-        const bool hasLocalAnimation = mResourceSystem->getNifMeshManager()->getAnimationDuration(model).has_value();
+        const Nif::NIFFilePtr localFile = mResourceSystem->getNifFileManager()->get(model);
+        const bool hasLocalAnimation = mResourceSystem->getNifMeshManager()->getAnimationDuration(localFile).has_value();
         const auto sampleExternalDuration = [&] {
             return mResourceSystem->getNifMeshManager()->getAnimationDuration(
                 mResourceSystem->getNifFileManager()->get(keyframes), group, startKey, stopKey);
@@ -4266,7 +4267,7 @@ namespace MWWorld
         }
 
         const std::optional<float> duration
-            = mResourceSystem->getNifMeshManager()->getAnimationDuration(model, group, startKey, stopKey);
+            = mResourceSystem->getNifMeshManager()->getAnimationDuration(localFile, group, startKey, stopKey);
         if (duration && *duration > 0.f)
             return duration;
         return hasExternalAnimation ? sampleExternalDuration() : duration;
@@ -4294,7 +4295,8 @@ namespace MWWorld
         VFS::Path::Normalized keyframes(model);
         keyframes.changeExtension(VFS::Path::ExtensionView("kf"));
         const bool hasExternalAnimation = mResourceSystem->getVFS()->exists(keyframes);
-        const bool hasLocalAnimation = mResourceSystem->getNifMeshManager()->getAnimationDuration(model).has_value();
+        const Nif::NIFFilePtr localFile = mResourceSystem->getNifFileManager()->get(model);
+        const bool hasLocalAnimation = mResourceSystem->getNifMeshManager()->getAnimationDuration(localFile).has_value();
         const auto sampleExternalTextKeys = [&] {
             return mResourceSystem->getNifMeshManager()->getAnimationTextKeys(
                 mResourceSystem->getNifFileManager()->get(keyframes), group, startKey, stopKey);
@@ -4308,7 +4310,7 @@ namespace MWWorld
         }
 
         std::vector<Render::AnimationTextKey> keys
-            = mResourceSystem->getNifMeshManager()->getAnimationTextKeys(model, group, startKey, stopKey);
+            = mResourceSystem->getNifMeshManager()->getAnimationTextKeys(localFile, group, startKey, stopKey);
         if (!keys.empty())
             return keys;
         return hasExternalAnimation ? sampleExternalTextKeys() : keys;
