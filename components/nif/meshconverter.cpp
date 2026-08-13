@@ -4,6 +4,7 @@
 #include <array>
 #include <cmath>
 #include <iterator>
+#include <limits>
 #include <string_view>
 #include <unordered_map>
 #include <stdexcept>
@@ -26,6 +27,7 @@ namespace Nif
     namespace
     {
         Render::Mat4 toRenderMatrix(const NiTransform& transform);
+        Render::Mat4 toRenderMatrix(const NiQuatTransform& transform);
 
         Matrix3 toMatrix3(const osg::Quat& rotation)
         {
@@ -205,6 +207,98 @@ namespace Nif
                 defaultTranslation, defaultScale);
         }
 
+        std::optional<NiQuatTransform> sampleTransformInterpolator(const NiInterpolator* interpolator, float time);
+
+        std::optional<NiQuatTransform> sampleBlendTransformInterpolator(
+            const NiBlendTransformInterpolator& blend, float time)
+        {
+            struct WeightedTransform
+            {
+                NiQuatTransform transform;
+                float weight;
+                int priority;
+            };
+            std::vector<WeightedTransform> values;
+            values.reserve(blend.mItems.size());
+            int highestPriority = std::numeric_limits<int>::min();
+            for (const NiBlendInterpolator::Item& item : blend.mItems)
+            {
+                const float weight = std::isfinite(item.mNormalizedWeight) && item.mNormalizedWeight > 0.f
+                    ? item.mNormalizedWeight
+                    : item.mWeight;
+                if (!std::isfinite(weight) || weight <= 0.f)
+                    continue;
+                const auto value = sampleTransformInterpolator(item.mInterpolator.getPtr(), time);
+                if (!value)
+                    continue;
+                highestPriority = std::max(highestPriority, item.mPriority);
+                values.push_back({ *value, weight, item.mPriority });
+            }
+
+            if (values.empty() && !blend.mSingleInterpolator.empty())
+                return sampleTransformInterpolator(blend.mSingleInterpolator.getPtr(), time);
+            if (values.empty())
+            {
+                return blend.mValue;
+            }
+
+            if (highestPriority != std::numeric_limits<int>::min())
+                std::erase_if(values, [highestPriority](const WeightedTransform& value) {
+                    return value.priority != highestPriority;
+                });
+            if ((blend.mFlags & NiBlendInterpolator::Flag_OnlyUseHighestWeight) != 0)
+            {
+                const auto highest = std::max_element(values.begin(), values.end(), [](const auto& lhs, const auto& rhs) {
+                    return lhs.weight < rhs.weight;
+                });
+                return highest->transform;
+            }
+
+            float weightSum = 0.f;
+            osg::Vec3f translation;
+            float scale = 0.f;
+            osg::Quat rotation;
+            bool first = true;
+            for (const WeightedTransform& value : values)
+            {
+                if (first)
+                {
+                    rotation = value.transform.mRotation;
+                    first = false;
+                }
+                else
+                {
+                    const float fraction = value.weight / (weightSum + value.weight);
+                    rotation.slerp(fraction, rotation, value.transform.mRotation);
+                }
+                translation += value.transform.mTranslation * value.weight;
+                scale += value.transform.mScale * value.weight;
+                weightSum += value.weight;
+            }
+            if (weightSum <= 0.f)
+                return std::nullopt;
+            return NiQuatTransform{ translation / weightSum, rotation, scale / weightSum };
+        }
+
+        std::optional<NiQuatTransform> sampleTransformInterpolator(const NiInterpolator* interpolator, float time)
+        {
+            if (interpolator == nullptr || !std::isfinite(time))
+                return std::nullopt;
+            if (const auto* transform = dynamic_cast<const NiTransformInterpolator*>(interpolator))
+            {
+                const NiQuatTransform& defaultValue = transform->mDefaultValue;
+                const NiKeyframeData* data = transform->mData.empty() ? nullptr : transform->mData.getPtr();
+                const SampledNodeTransform sampled = sampleKeyframeData(data, time,
+                    toMatrix3(defaultValue.mRotation), defaultValue.mRotation, defaultValue.mTranslation,
+                    defaultValue.mScale);
+                return NiQuatTransform{ sampled.value.mTranslation,
+                    sampled.value.mRotation.toOsgMatrix().getRotate(), sampled.value.mScale };
+            }
+            if (const auto* blend = dynamic_cast<const NiBlendTransformInterpolator*>(interpolator))
+                return sampleBlendTransformInterpolator(*blend, time);
+            return std::nullopt;
+        }
+
         SampledNodeTransform sampleNodeTransform(const NiAVObject& node, float time)
         {
             SampledNodeTransform result{ node.mTransform };
@@ -375,6 +469,44 @@ namespace Nif
                 // Sequence sources are visited in source order; preserve the
                 // same later-source-wins rule as model-local controllers.
                 transforms.insert_or_assign(name->mData, toRenderMatrix(sampled));
+            }
+        }
+
+        void collectControllerSequenceTransforms(const NiSequence& sequence, float time, std::string_view group,
+            std::string_view startKey, std::string_view stopKey,
+            std::unordered_map<std::string, Render::Mat4>& transforms)
+        {
+            if (!group.empty() && !sequence.mName.empty()
+                && Misc::StringUtils::lowerCase(sequence.mName) != Misc::StringUtils::lowerCase(std::string(group)))
+                return;
+
+            const std::string_view effectiveStartKey = startKey.empty() ? std::string_view("start") : startKey;
+            const float segmentStart = group.empty()
+                ? 0.f
+                : findTextKeyTime(sequence, std::string(group) + ": " + std::string(effectiveStartKey)).value_or(0.f);
+            float sampleTime = time + segmentStart;
+            if (!group.empty() && !stopKey.empty())
+            {
+                if (const std::optional<float> stop
+                    = findTextKeyTime(sequence, std::string(group) + ": " + std::string(stopKey));
+                    stop && *stop >= segmentStart)
+                    sampleTime = std::min(sampleTime, *stop);
+            }
+
+            for (const ControlledBlock& block : sequence.mControlledBlocks)
+            {
+                if (block.mTargetName.empty())
+                    continue;
+                const float controllerSampleTime = block.mController.empty()
+                    ? sampleTime
+                    : controllerTime(*block.mController.getPtr(), sampleTime);
+                std::optional<NiQuatTransform> sampled;
+                if (!block.mBlendInterpolator.empty())
+                    sampled = sampleTransformInterpolator(block.mBlendInterpolator.getPtr(), controllerSampleTime);
+                if (!sampled && !block.mInterpolator.empty())
+                    sampled = sampleTransformInterpolator(block.mInterpolator.getPtr(), controllerSampleTime);
+                if (sampled)
+                    transforms.insert_or_assign(block.mTargetName, toRenderMatrix(*sampled));
             }
         }
 
@@ -674,6 +806,20 @@ namespace Nif
             return result;
         }
 
+        Render::Mat4 toRenderMatrix(const NiQuatTransform& transform)
+        {
+            const osg::Matrixf matrix = transform.toMatrix();
+            Render::Mat4 result = {};
+            for (int row = 0; row < 3; ++row)
+                for (int col = 0; col < 3; ++col)
+                    result.data[col * 4 + row] = matrix(row, col);
+            result.data[12] = transform.mTranslation.x();
+            result.data[13] = transform.mTranslation.y();
+            result.data[14] = transform.mTranslation.z();
+            result.data[15] = 1.f;
+            return result;
+        }
+
         void collectMeshInstances(const NiAVObject& object, const Render::Mat4& parentTransform,
             std::vector<Render::MeshInstance>& meshes, bool allowSkinning)
         {
@@ -768,8 +914,10 @@ namespace Nif
             {
                 if (const auto* root = dynamic_cast<const NiAVObject*>(file.getRoot(i)))
                     collectBoneTransforms(*root, identity, sampleTime, transforms);
-                else if (const auto* sequence = dynamic_cast<const NiSequenceStreamHelper*>(file.getRoot(i)))
-                    collectSequenceTransforms(*sequence, time, group, startKey, stopKey, transforms);
+                else if (const auto* stream = dynamic_cast<const NiSequenceStreamHelper*>(file.getRoot(i)))
+                    collectSequenceTransforms(*stream, time, group, startKey, stopKey, transforms);
+                else if (const auto* controllerSequence = dynamic_cast<const NiSequence*>(file.getRoot(i)))
+                    collectControllerSequenceTransforms(*controllerSequence, time, group, startKey, stopKey, transforms);
             }
         }
 

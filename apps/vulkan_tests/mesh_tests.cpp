@@ -296,6 +296,43 @@ int main()
     if (externalTextKeys.size() != 3 || externalTextKeys[0].event != "Idle: Start"
         || externalTextKeys[1].time != 0.5f || externalTextKeys[2].event != "Idle: Stop")
         throw std::runtime_error("neutral KF text-key events were not collected in time order");
+
+    auto sequenceInterpolatorA = std::make_unique<Nif::NiTransformInterpolator>();
+    sequenceInterpolatorA->mRecordType = Nif::RC_NiTransformInterpolator;
+    sequenceInterpolatorA->mDefaultValue = Nif::NiQuatTransform::getIdentity();
+    sequenceInterpolatorA->mDefaultValue.mTranslation.x() = 1.f;
+    sequenceInterpolatorA->mData = nullptr;
+    auto sequenceInterpolatorB = std::make_unique<Nif::NiTransformInterpolator>();
+    sequenceInterpolatorB->mRecordType = Nif::RC_NiTransformInterpolator;
+    sequenceInterpolatorB->mDefaultValue = Nif::NiQuatTransform::getIdentity();
+    sequenceInterpolatorB->mDefaultValue.mTranslation.x() = 5.f;
+    sequenceInterpolatorB->mData = nullptr;
+    auto sequenceBlend = std::make_unique<Nif::NiBlendTransformInterpolator>();
+    sequenceBlend->mRecordType = Nif::RC_NiBlendTransformInterpolator;
+    sequenceBlend->mSingleInterpolator = nullptr;
+    sequenceBlend->mItems.push_back({ sequenceInterpolatorA.get(), 0.25f, 0.25f, 0, 0.f });
+    sequenceBlend->mItems.push_back({ sequenceInterpolatorB.get(), 0.75f, 0.75f, 0, 0.f });
+    Nif::ControlledBlock sequenceBlock;
+    sequenceBlock.mTargetName = "Root Bone";
+    sequenceBlock.mInterpolator = nullptr;
+    sequenceBlock.mController = nullptr;
+    sequenceBlock.mBlendInterpolator = sequenceBlend.get();
+    auto controllerSequence = std::make_unique<Nif::NiControllerSequence>();
+    controllerSequence->mRecordType = Nif::RC_NiControllerSequence;
+    controllerSequence->mName = "idle";
+    controllerSequence->mTextKeys = nullptr;
+    controllerSequence->mControlledBlocks.push_back(sequenceBlock);
+    auto controllerSequenceFile = std::make_shared<Nif::NIFFile>(VFS::Path::Normalized("synthetic-controller.kf"));
+    controllerSequenceFile->mRoots.push_back(controllerSequence.get());
+    controllerSequenceFile->mRecords.push_back(std::move(sequenceInterpolatorA));
+    controllerSequenceFile->mRecords.push_back(std::move(sequenceInterpolatorB));
+    controllerSequenceFile->mRecords.push_back(std::move(sequenceBlend));
+    controllerSequenceFile->mRecords.push_back(std::move(controllerSequence));
+    const std::vector<Render::Mat4> controllerSequencePose
+        = Nif::collectBonePose(Nif::FileView(*controllerSequenceFile), animatedBoneNames, 0.25f, "idle");
+    if (controllerSequencePose.size() != 1)
+        throw std::runtime_error("neutral controller sequence did not produce a bone pose");
+    expectNear(controllerSequencePose.front().data[12], 4.f, "blended controller sequence translation");
     expectNear(instances.front().mesh.material.diffuse.x, 0.25f, "material diffuse red");
     expectNear(instances.front().mesh.material.diffuse.w, 0.75f, "material alpha");
     expectNear(instances.front().mesh.material.emissive.z, 0.6f, "material emissive");
