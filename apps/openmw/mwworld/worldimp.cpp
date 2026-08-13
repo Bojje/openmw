@@ -4255,6 +4255,14 @@ namespace MWWorld
             mResourceSystem->getNifFileManager()->get(keyframes), group, startKey, stopKey);
     }
 
+    bool World::isNeutralAnimationPlaying(const MWWorld::Ptr& ptr, std::string_view group) const
+    {
+        if (mWorldScene == nullptr || group.empty())
+            return false;
+        const std::optional<float> duration = getNeutralAnimationDuration(ptr, group);
+        return duration && mWorldScene->isNeutralObjectAnimationPlaying(ptr, group, *duration);
+    }
+
     std::vector<Render::AnimationTextKey> World::getNeutralAnimationTextKeys(
         const MWWorld::Ptr& ptr, std::string_view group, std::string_view startKey, std::string_view stopKey) const
     {

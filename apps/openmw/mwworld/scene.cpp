@@ -414,6 +414,12 @@ namespace MWWorld
                 static_cast<const void*>(ptr.mRef), group, animationTime, startKey, stopKey);
     }
 
+    bool Scene::isNeutralObjectAnimationPlaying(const Ptr& ptr, std::string_view group, float duration) const
+    {
+        return mNeutralWorldScene
+            && mNeutralWorldScene->isObjectAnimationPlaying(static_cast<const void*>(ptr.mRef), group, duration);
+    }
+
     void Scene::updateNeutralObjectCell(const Ptr& oldPtr, const Ptr& newPtr)
     {
         if (!mNeutralWorldScene || oldPtr.isEmpty() || newPtr.isEmpty())

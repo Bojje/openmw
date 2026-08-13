@@ -3456,7 +3456,8 @@ namespace MWMechanics
     bool CharacterController::isAnimPlaying(std::string_view groupName) const
     {
         if (mAnimation == nullptr)
-            return !mAnimQueue.empty() && mAnimQueue.front().mGroup == groupName;
+            return (!mAnimQueue.empty() && mAnimQueue.front().mGroup == groupName)
+                || MWBase::Environment::get().getWorld()->isNeutralAnimationPlaying(mPtr, groupName);
         return mAnimation->isPlaying(groupName);
     }
 

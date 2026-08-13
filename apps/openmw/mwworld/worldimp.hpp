@@ -221,6 +221,7 @@ namespace MWWorld
             std::string_view stopKey = {}) override;
         std::optional<float> getNeutralAnimationDuration(const MWWorld::Ptr& ptr, std::string_view group = {},
             std::string_view startKey = {}, std::string_view stopKey = {}) const override;
+        bool isNeutralAnimationPlaying(const MWWorld::Ptr& ptr, std::string_view group) const override;
         std::vector<Render::AnimationTextKey> getNeutralAnimationTextKeys(
             const MWWorld::Ptr& ptr, std::string_view group = {}, std::string_view startKey = {},
             std::string_view stopKey = {}) const override;

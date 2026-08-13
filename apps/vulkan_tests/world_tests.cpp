@@ -194,6 +194,11 @@ int main()
         || world.findCell(&firstCellHandle)->objects.front().animationStartKey != "loop start"
         || world.findCell(&firstCellHandle)->objects.front().animationStopKey != "loop stop")
         throw std::runtime_error("renderer-neutral world scene did not accept an explicit animation clock");
+    if (!world.isObjectAnimationPlaying(&dynamicObjectHandle, "walkforward", 2.f))
+        throw std::runtime_error("renderer-neutral world scene did not report an active animation");
+    world.updateEffects(0.75f);
+    if (world.isObjectAnimationPlaying(&dynamicObjectHandle, "walkforward", 2.f))
+        throw std::runtime_error("renderer-neutral world scene kept a completed animation active");
     Render::Mat4 dynamicBone = Render::identityMat4();
     dynamicBone.data[12] = 3.f;
     if (!world.updateObjectPose(&dynamicObjectHandle, { dynamicBone })

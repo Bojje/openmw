@@ -233,6 +233,7 @@ namespace MWBase
         {
             return std::nullopt;
         }
+        virtual bool isNeutralAnimationPlaying(const MWWorld::Ptr&, std::string_view) const { return false; }
         virtual std::vector<Render::AnimationTextKey> getNeutralAnimationTextKeys(
             const MWWorld::Ptr&, std::string_view group = {}, std::string_view startKey = {},
             std::string_view stopKey = {}) const;

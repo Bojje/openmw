@@ -538,6 +538,21 @@ namespace Render
             return true;
         }
 
+        bool isObjectAnimationPlaying(const void* objectKey, std::string_view group, float duration) const
+        {
+            if (objectKey == nullptr || group.empty() || !std::isfinite(duration) || duration <= 0.f)
+                return false;
+            const auto found = mObjects.find(objectKey);
+            if (found == mObjects.end())
+                return false;
+            const auto scene = mCells.find(found->second.cell);
+            if (scene == mCells.end())
+                return false;
+            const WorldObject* const object = scene->second.findObject(found->second.id);
+            return object != nullptr && object->dynamic && object->animationGroup == group
+                && object->animationTime < duration;
+        }
+
         // Sorting the owned cells makes backend input deterministic without
         // maintaining a second cell-order index.
         std::vector<const CellScene*> cellsInOrder(std::string_view worldspace = {}) const
