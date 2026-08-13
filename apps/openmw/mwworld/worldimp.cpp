@@ -4298,28 +4298,7 @@ namespace MWWorld
         if (model.empty())
             return std::nullopt;
 
-        VFS::Path::Normalized keyframes(model);
-        keyframes.changeExtension(VFS::Path::ExtensionView("kf"));
-        const bool hasExternalAnimation = mResourceSystem->getVFS()->exists(keyframes);
-        const Nif::NIFFilePtr localFile = mResourceSystem->getNifFileManager()->get(model);
-        const bool hasLocalAnimation = mResourceSystem->getNifMeshManager()->hasAnimationGroup(localFile, group);
-        const auto sampleExternalDuration = [&] {
-            return mResourceSystem->getNifMeshManager()->getAnimationDuration(
-                mResourceSystem->getNifFileManager()->get(keyframes), group, startKey, stopKey);
-        };
-
-        if (hasExternalAnimation && !hasLocalAnimation)
-        {
-            const std::optional<float> externalDuration = sampleExternalDuration();
-            if (externalDuration && *externalDuration > 0.f)
-                return externalDuration;
-        }
-
-        const std::optional<float> duration
-            = mResourceSystem->getNifMeshManager()->getAnimationDuration(localFile, group, startKey, stopKey);
-        if (duration && *duration > 0.f)
-            return duration;
-        return hasExternalAnimation ? sampleExternalDuration() : duration;
+        return mResourceSystem->getNifMeshManager()->getAnimationDuration(model, group, startKey, stopKey);
     }
 
     bool World::isNeutralAnimationPlaying(const MWWorld::Ptr& ptr, std::string_view group) const
@@ -4341,28 +4320,7 @@ namespace MWWorld
         if (model.empty())
             return {};
 
-        VFS::Path::Normalized keyframes(model);
-        keyframes.changeExtension(VFS::Path::ExtensionView("kf"));
-        const bool hasExternalAnimation = mResourceSystem->getVFS()->exists(keyframes);
-        const Nif::NIFFilePtr localFile = mResourceSystem->getNifFileManager()->get(model);
-        const bool hasLocalAnimation = mResourceSystem->getNifMeshManager()->hasAnimationGroup(localFile, group);
-        const auto sampleExternalTextKeys = [&] {
-            return mResourceSystem->getNifMeshManager()->getAnimationTextKeys(
-                mResourceSystem->getNifFileManager()->get(keyframes), group, startKey, stopKey);
-        };
-
-        if (hasExternalAnimation && !hasLocalAnimation)
-        {
-            std::vector<Render::AnimationTextKey> keys = sampleExternalTextKeys();
-            if (!keys.empty())
-                return keys;
-        }
-
-        std::vector<Render::AnimationTextKey> keys
-            = mResourceSystem->getNifMeshManager()->getAnimationTextKeys(localFile, group, startKey, stopKey);
-        if (!keys.empty())
-            return keys;
-        return hasExternalAnimation ? sampleExternalTextKeys() : keys;
+        return mResourceSystem->getNifMeshManager()->getAnimationTextKeys(model, group, startKey, stopKey);
     }
 
     void World::setActorActive(const MWWorld::Ptr& ptr, bool value)

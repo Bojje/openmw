@@ -733,34 +733,44 @@ namespace Nif
         FileView file, std::span<const std::string> boneNames, float time, std::string_view group,
         std::string_view startKey, std::string_view stopKey)
     {
+        const std::array<FileView, 1> files{ file };
+        return collectBonePose(files, boneNames, time, group, startKey, stopKey);
+    }
+
+    std::vector<Render::Mat4> collectBonePose(
+        std::span<const FileView> files, std::span<const std::string> boneNames, float time,
+        std::string_view group, std::string_view startKey, std::string_view stopKey)
+    {
         if (boneNames.empty() || !std::isfinite(time))
             return {};
 
         const Render::Mat4 identity = Render::identityMat4();
-        float sampleTime = time;
-        std::optional<float> segmentStart;
-        if (!group.empty() && !startKey.empty())
-        {
-            segmentStart = findTextKeyTime(file, std::string(group) + ": " + std::string(startKey));
-            if (segmentStart)
-                sampleTime += *segmentStart;
-        }
-        if (segmentStart && !stopKey.empty())
-        {
-            if (const std::optional<float> stop
-                = findTextKeyTime(file, std::string(group) + ": " + std::string(stopKey));
-                stop && *stop >= *segmentStart)
-            {
-                sampleTime = std::min(sampleTime, *stop);
-            }
-        }
         std::unordered_map<std::string, Render::Mat4> transforms;
-        for (std::size_t i = 0; i < file.numRoots(); ++i)
+        for (const FileView& file : files)
         {
-            if (const auto* root = dynamic_cast<const NiAVObject*>(file.getRoot(i)))
-                collectBoneTransforms(*root, identity, sampleTime, transforms);
-            else if (const auto* sequence = dynamic_cast<const NiSequenceStreamHelper*>(file.getRoot(i)))
-                collectSequenceTransforms(*sequence, time, group, startKey, stopKey, transforms);
+            float sampleTime = time;
+            std::optional<float> segmentStart;
+            if (!group.empty() && !startKey.empty())
+            {
+                segmentStart = findTextKeyTime(file, std::string(group) + ": " + std::string(startKey));
+                if (segmentStart)
+                    sampleTime += *segmentStart;
+            }
+            if (segmentStart && !stopKey.empty())
+            {
+                if (const std::optional<float> stop
+                    = findTextKeyTime(file, std::string(group) + ": " + std::string(stopKey));
+                    stop && *stop >= *segmentStart)
+                    sampleTime = std::min(sampleTime, *stop);
+            }
+
+            for (std::size_t i = 0; i < file.numRoots(); ++i)
+            {
+                if (const auto* root = dynamic_cast<const NiAVObject*>(file.getRoot(i)))
+                    collectBoneTransforms(*root, identity, sampleTime, transforms);
+                else if (const auto* sequence = dynamic_cast<const NiSequenceStreamHelper*>(file.getRoot(i)))
+                    collectSequenceTransforms(*sequence, time, group, startKey, stopKey, transforms);
+            }
         }
 
         std::vector<Render::Mat4> result;

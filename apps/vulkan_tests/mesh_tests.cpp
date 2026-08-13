@@ -278,6 +278,10 @@ int main()
     if (externalPose.size() != 1)
         throw std::runtime_error("neutral KF pose sampler did not find the controller bone");
     expectNear(externalPose.front().data[12], 0.625f, "sampled external KF translation");
+    const std::array<Nif::FileView, 2> layeredFiles{ Nif::FileView(*file), Nif::FileView(*kfFile) };
+    const std::vector<Render::Mat4> layeredPose
+        = Nif::collectBonePose(layeredFiles, animatedBoneNames, 0.25f);
+    expectNear(layeredPose.front().data[12], 0.625f, "later layered KF source priority");
     const std::vector<Render::Mat4> groupedExternalPose
         = Nif::collectBonePose(Nif::FileView(*kfFile), animatedBoneNames, 0.25f, "idle");
     expectNear(groupedExternalPose.front().data[12], 2.f, "sampled grouped external KF translation");

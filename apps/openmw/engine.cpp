@@ -708,75 +708,44 @@ void OMW::Engine::prepareVulkanEngine()
         const VFS::Path::Normalized path(model);
         if (path.extension().value() != "nif")
             return std::vector<Render::Mat4>();
-        VFS::Path::Normalized kfPath(path);
-        kfPath.changeExtension(VFS::Path::ExtensionView("kf"));
-        const bool hasExternalAnimation = resourceSystem->getVFS()->exists(kfPath);
-        const Nif::NIFFilePtr localFile = resourceSystem->getNifFileManager()->get(path);
-        const bool hasLocalAnimation = resourceSystem->getNifMeshManager()->hasAnimationGroup(localFile, group);
-
-        const auto sampleAnimation = [&](const Nif::NIFFilePtr& file) {
-            if (!file)
-                return std::vector<Render::Mat4>();
-
-            float sampleTime = time;
-            std::string sampleStartKey(startKey);
-            std::string sampleStopKey(stopKey);
-            if (looping && sampleStartKey.empty() && sampleStopKey.empty() && !group.empty())
-            {
-                const std::vector<Render::AnimationTextKey> keys
-                    = resourceSystem->getNifMeshManager()->getAnimationTextKeys(file, group);
-                const auto hasKey = [&](std::string_view key) {
-                    const std::string requested = std::string(group) + ": " + std::string(key);
-                    return std::any_of(keys.begin(), keys.end(), [&](const Render::AnimationTextKey& candidate) {
-                        return Misc::StringUtils::ciEqual(candidate.event, requested);
-                    });
-                };
-                if (hasKey("loop start") && hasKey("loop stop"))
-                {
-                    sampleStartKey = "loop start";
-                    sampleStopKey = "loop stop";
-                }
-                else if (hasKey("start") && hasKey("stop"))
-                {
-                    sampleStartKey = "start";
-                    sampleStopKey = "stop";
-                }
-            }
-
-            if (looping && std::isfinite(sampleTime))
-            {
-                const std::optional<float> duration
-                    = !sampleStartKey.empty() && !sampleStopKey.empty()
-                    ? resourceSystem->getNifMeshManager()->getAnimationDuration(
-                          file, group, sampleStartKey, sampleStopKey)
-                    : resourceSystem->getNifMeshManager()->getAnimationDuration(file);
-                if (duration && *duration > 0.f)
-                    sampleTime = std::fmod(std::max(0.f, sampleTime), *duration);
-            }
-
-            return resourceSystem->getNifMeshManager()->getBonePose(
-                file, sampleTime, boneNames, group, sampleStartKey, sampleStopKey);
-        };
-        const auto sampleExternalAnimation = [&] {
-            return sampleAnimation(resourceSystem->getNifFileManager()->get(kfPath));
-        };
-
-        // A static NIF still contains its complete bind-pose node hierarchy. Prefer the
-        // sibling actor animation in that case, otherwise the bind pose masks the .kf.
-        if (hasExternalAnimation && !hasLocalAnimation)
+        std::string sampleStartKey(startKey);
+        std::string sampleStopKey(stopKey);
+        if (looping && sampleStartKey.empty() && sampleStopKey.empty() && !group.empty())
         {
-            std::vector<Render::Mat4> pose = sampleExternalAnimation();
-            if (!pose.empty())
-                return pose;
+            const std::vector<Render::AnimationTextKey> keys
+                = resourceSystem->getNifMeshManager()->getAnimationTextKeys(path, group);
+            const auto hasKey = [&](std::string_view key) {
+                const std::string requested = std::string(group) + ": " + std::string(key);
+                return std::any_of(keys.begin(), keys.end(), [&](const Render::AnimationTextKey& candidate) {
+                    return Misc::StringUtils::ciEqual(candidate.event, requested);
+                });
+            };
+            if (hasKey("loop start") && hasKey("loop stop"))
+            {
+                sampleStartKey = "loop start";
+                sampleStopKey = "loop stop";
+            }
+            else if (hasKey("start") && hasKey("stop"))
+            {
+                sampleStartKey = "start";
+                sampleStopKey = "stop";
+            }
         }
 
-        std::vector<Render::Mat4> pose = sampleAnimation(localFile);
-        if (!pose.empty())
-            return pose;
+        float sampleTime = time;
+        if (looping && std::isfinite(sampleTime))
+        {
+            const std::optional<float> duration
+                = !sampleStartKey.empty() && !sampleStopKey.empty()
+                ? resourceSystem->getNifMeshManager()->getAnimationDuration(
+                      path, group, sampleStartKey, sampleStopKey)
+                : resourceSystem->getNifMeshManager()->getAnimationDuration(path);
+            if (duration && *duration > 0.f)
+                sampleTime = std::fmod(std::max(0.f, sampleTime), *duration);
+        }
 
-        if (hasExternalAnimation)
-            return sampleExternalAnimation();
-        return pose;
+        return resourceSystem->getNifMeshManager()->getBonePose(
+            path, sampleTime, boneNames, group, sampleStartKey, sampleStopKey);
     };
     const Render::SceneSynchronizer sceneSynchronizer = [this](Render::SceneData& sceneData) {
         mWorld->updateNeutralSceneData(sceneData);

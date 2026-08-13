@@ -7,6 +7,8 @@
 #include <components/nif/controller.hpp>
 #include <components/nif/niffile.hpp>
 #include <components/nif/meshconverter.hpp>
+#include <components/vfs/manager.hpp>
+#include <components/vfs/recursivedirectoryiterator.hpp>
 
 #include "niffilemanager.hpp"
 
@@ -48,9 +50,70 @@ namespace Resource
         return inserted ? std::move(meshes) : it->second.mMeshes;
     }
 
+    std::vector<Nif::NIFFilePtr> NifMeshManager::getAnimationSources(VFS::Path::NormalizedView name) const
+    {
+        std::vector<Nif::NIFFilePtr> result;
+        std::vector<VFS::Path::Normalized> paths;
+        const auto addPath = [&](VFS::Path::Normalized path) {
+            if (!mNifFileManager->getVFS()->exists(path)
+                || std::any_of(paths.begin(), paths.end(), [&](const VFS::Path::Normalized& existing) {
+                       return existing == path;
+                   }))
+                return;
+            paths.push_back(std::move(path));
+        };
+
+        addPath(VFS::Path::Normalized(name));
+        VFS::Path::Normalized sibling(name);
+        if (sibling.changeExtension(VFS::Path::ExtensionView("kf")))
+            addPath(std::move(sibling));
+
+        constexpr std::string_view meshes = "meshes/";
+        if (name.value().starts_with(meshes))
+        {
+            std::string directory = "animations/";
+            directory += name.value().substr(meshes.size());
+            const std::size_t extension = directory.find_last_of(VFS::Path::extensionSeparator);
+            if (extension != std::string::npos)
+            {
+                directory.resize(extension + 1);
+                directory.back() = VFS::Path::separator;
+                std::vector<std::string> additional;
+                for (const VFS::Path::Normalized& path : mNifFileManager->getVFS()->getRecursiveDirectoryIterator(directory))
+                    if (path.extension() == VFS::Path::ExtensionView("kf"))
+                        additional.emplace_back(path.value());
+                std::sort(additional.begin(), additional.end());
+                for (const std::string& path : additional)
+                    addPath(VFS::Path::Normalized(path));
+            }
+        }
+
+        for (const VFS::Path::Normalized& path : paths)
+        {
+            const Nif::NIFFilePtr file = mNifFileManager->get(path);
+            if (file)
+                result.push_back(file);
+        }
+        return result;
+    }
+
+    Nif::NIFFilePtr NifMeshManager::getAnimationSource(
+        VFS::Path::NormalizedView name, std::string_view group) const
+    {
+        Nif::NIFFilePtr result;
+        for (const Nif::NIFFilePtr& file : getAnimationSources(name))
+            if (hasAnimationGroup(file, group))
+                result = file;
+        return result;
+    }
+
     std::optional<float> NifMeshManager::getAnimationDuration(VFS::Path::NormalizedView name)
     {
-        return getAnimationDuration(mNifFileManager->get(name));
+        std::optional<float> result;
+        for (const Nif::NIFFilePtr& file : getAnimationSources(name))
+            if (const std::optional<float> duration = getAnimationDuration(file))
+                result = std::max(result.value_or(0.f), *duration);
+        return result;
     }
 
     std::optional<float> NifMeshManager::getAnimationDuration(const Nif::NIFFilePtr& file) const
@@ -81,7 +144,7 @@ namespace Resource
     std::optional<float> NifMeshManager::getAnimationDuration(
         VFS::Path::NormalizedView name, std::string_view group, std::string_view startKey, std::string_view stopKey)
     {
-        return getAnimationDuration(mNifFileManager->get(name), group, startKey, stopKey);
+        return getAnimationDuration(getAnimationSource(name, group), group, startKey, stopKey);
     }
 
     std::optional<float> NifMeshManager::getAnimationDuration(const Nif::NIFFilePtr& file, std::string_view group,
@@ -108,7 +171,7 @@ namespace Resource
         VFS::Path::NormalizedView name, std::string_view group, std::string_view startKey,
         std::string_view stopKey)
     {
-        return getAnimationTextKeys(mNifFileManager->get(name), group, startKey, stopKey);
+        return getAnimationTextKeys(getAnimationSource(name, group), group, startKey, stopKey);
     }
 
     std::vector<Render::AnimationTextKey> NifMeshManager::getAnimationTextKeys(
@@ -143,7 +206,12 @@ namespace Resource
         VFS::Path::NormalizedView name, float time, std::span<const std::string> boneNames, std::string_view group,
         std::string_view startKey, std::string_view stopKey)
     {
-        return getBonePose(mNifFileManager->get(name), time, boneNames, group, startKey, stopKey);
+        const std::vector<Nif::NIFFilePtr> files = getAnimationSources(name);
+        std::vector<Nif::FileView> views;
+        views.reserve(files.size());
+        for (const Nif::NIFFilePtr& file : files)
+            views.emplace_back(*file);
+        return Nif::collectBonePose(views, boneNames, time, group, startKey, stopKey);
     }
 
     std::vector<Render::Mat4> NifMeshManager::getBonePose(

@@ -5,6 +5,7 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <string_view>
 #include <vector>
 
 #include <components/nif/niffile.hpp>
@@ -47,6 +48,13 @@ namespace Resource
 
         /// Convert an already-loaded NIF, using the same path-keyed cache.
         std::shared_ptr<const Meshes> get(const Nif::NIFFilePtr& file);
+
+        /// Return the model-local file, its sibling actor KF, and additional
+        /// animation sources in deterministic insertion order.
+        std::vector<Nif::NIFFilePtr> getAnimationSources(VFS::Path::NormalizedView name) const;
+
+        /// Select the highest-priority source that declares a requested group.
+        Nif::NIFFilePtr getAnimationSource(VFS::Path::NormalizedView name, std::string_view group) const;
 
         /// Return the longest controller interval in a NIF, when one exists.
         /// This is renderer-neutral metadata used by world-owned effects.

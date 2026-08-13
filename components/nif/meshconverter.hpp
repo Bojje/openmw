@@ -26,6 +26,12 @@ namespace Nif
         FileView file, std::span<const std::string> boneNames, float time, std::string_view group = {},
         std::string_view startKey = {}, std::string_view stopKey = {});
 
+    /// Sample a layered animation source list. Later sources override earlier
+    /// transforms for the same bone.
+    std::vector<Render::Mat4> collectBonePose(
+        std::span<const FileView> files, std::span<const std::string> boneNames, float time,
+        std::string_view group = {}, std::string_view startKey = {}, std::string_view stopKey = {});
+
     /// Find the first matching renderer-neutral animation text key.
     std::optional<float> findTextKeyTime(FileView file, std::string_view textKey);
 

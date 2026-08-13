@@ -48,6 +48,8 @@ namespace Resource
         /// to be done in advance by other managers accessing the NifFileManager.
         Nif::NIFFilePtr get(VFS::Path::NormalizedView name);
 
+        const VFS::Manager* getVFS() const { return mVFS; }
+
         void updateCache(double referenceTime) override;
         void clearCache() override;
         void setExpiryDelay(double expiryDelay) override;
