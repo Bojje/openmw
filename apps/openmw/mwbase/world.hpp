@@ -242,14 +242,8 @@ namespace MWBase
         }
         virtual void removeNeutralAnimationLayer(const MWWorld::Ptr&, std::string_view) {}
         virtual void updateNeutralObjectAttachment(const MWWorld::Ptr&, std::string_view, std::string_view,
-            std::string_view, bool)
+            std::string_view, bool, const Render::Vec4&, bool)
         {
-        }
-        virtual void updateNeutralObjectAttachment(const MWWorld::Ptr& ptr, std::string_view attachmentId,
-            std::string_view model, std::string_view bone, bool visible, const Render::Vec4& emissiveColor,
-            bool emissiveOverride)
-        {
-            updateNeutralObjectAttachment(ptr, attachmentId, model, bone, visible);
         }
         virtual std::optional<float> getNeutralAnimationDuration(const MWWorld::Ptr&, std::string_view group = {},
             std::string_view startKey = {}, std::string_view stopKey = {}) const
