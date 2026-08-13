@@ -355,6 +355,62 @@ namespace
         return result;
     }
 
+    std::shared_ptr<const Render::TextureData> decodeKtx(const Bytes& data)
+    {
+        constexpr std::array<std::uint8_t, 12> identifier
+            = { 0xab, 0x4b, 0x54, 0x58, 0x20, 0x31, 0x31, 0xbb, 0x0d, 0x0a, 0x1a, 0x0a };
+        if (data.size() < 64 || !std::equal(identifier.begin(), identifier.end(), data.begin()))
+            return {};
+
+        // KTX1 stores a little-endian marker followed by 13 uint32 fields.
+        // Compressed, array, cubemap, and 3D payloads need backend-specific
+        // handling; reject them until a neutral representation exists.
+        if (read32(data, 12) != 0x04030201 || read32(data, 16) != 0x1401 || read32(data, 20) != 1
+            || read32(data, 44) != 0 || read32(data, 48) != 0 || read32(data, 52) != 1)
+            return {};
+
+        const std::uint32_t format = read32(data, 24);
+        const bool redFirst = format == 0x1907 || format == 0x1908; // GL_RGB / GL_RGBA
+        const bool blueFirst = format == 0x80e0 || format == 0x80e1; // GL_BGR / GL_BGRA
+        if (!redFirst && !blueFirst)
+            return {};
+        const std::size_t sourceChannels = format == 0x1907 || format == 0x80e0 ? 3 : 4;
+        const std::uint32_t width = read32(data, 36);
+        const std::uint32_t height = read32(data, 40);
+        const std::uint32_t keyValueBytes = read32(data, 60);
+        if (!validRgbaSize(width, height) || keyValueBytes > data.size() - 64)
+            return {};
+
+        const std::size_t rowBytes = static_cast<std::size_t>(width) * sourceChannels;
+        const std::size_t rowStride = (rowBytes + 3) & ~std::size_t(3);
+        if (rowStride > std::numeric_limits<std::size_t>::max() / height)
+            return {};
+        const std::size_t imageBytes = rowStride * height;
+        const std::size_t imageOffset = 64 + keyValueBytes;
+        if (imageOffset > data.size() || data.size() - imageOffset < 4)
+            return {};
+        const std::size_t declaredImageBytes = read32(data, imageOffset);
+        if (declaredImageBytes < imageBytes || declaredImageBytes > data.size() - imageOffset - 4)
+            return {};
+        auto result = std::make_shared<Render::TextureData>();
+        result->width = width;
+        result->height = height;
+        result->pixels.resize(static_cast<std::size_t>(width) * height * 4);
+        const std::size_t pixelsOffset = imageOffset + 4;
+        for (std::uint32_t y = 0; y < height; ++y)
+            for (std::uint32_t x = 0; x < width; ++x)
+            {
+                const std::size_t source = pixelsOffset + static_cast<std::size_t>(y) * rowStride
+                    + static_cast<std::size_t>(x) * sourceChannels;
+                const std::uint8_t red = data[source + (blueFirst ? 2 : 0)];
+                const std::uint8_t green = data[source + 1];
+                const std::uint8_t blue = data[source + (blueFirst ? 0 : 2)];
+                const std::uint8_t alpha = sourceChannels == 4 ? data[source + 3] : 255;
+                setPixel(*result, x, y, red, green, blue, alpha);
+            }
+        return result;
+    }
+
 #ifdef OPENMW_NEUTRAL_PNG
     struct PngReadContext
     {
@@ -865,6 +921,8 @@ namespace
             return decodeBmp(data);
         if (extension == "dds")
             return decodeDds(data);
+        if (extension == "ktx")
+            return decodeKtx(data);
 #ifdef OPENMW_NEUTRAL_PNG
         if (extension == "png")
             return decodePng(data);

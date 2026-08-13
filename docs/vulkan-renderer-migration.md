@@ -269,7 +269,7 @@ The neutral game camera now retains POV state and produces a bounded third-perso
 the player when POV is toggled, instead of silently remaining first-person without an OSG camera.
 Neutral vanity mode now also owns its orbit yaw/pitch, restores the prior POV when disabled, and
 loads/saves the existing `FIRS` camera state without constructing an OSG camera.
-The neutral image boundary now accepts the legacy premultiplied DXT2/DXT4 aliases in addition to DXT1/DXT3/DXT5,
+The neutral image boundary now accepts uncompressed KTX1 2D RGB/RGBA payloads and the legacy premultiplied DXT2/DXT4 aliases in addition to DXT1/DXT3/DXT5,
 as well as DX10 RGBA/BGRA/R8/BC4/BC5 payloads, so those common DDS variants no longer require an OSG image fallback. The fast test suite now also contains a backend-neutral RGBA8 image comparator with
 per-channel tolerance, differing-pixel count, maximum error, and mean error metrics.
 The renderer test family also includes a runnable resource-backend check: neutral resource
@@ -665,8 +665,9 @@ resource paths. The conversion helper has direct CPU coverage.
 Neutral image resolution rejects unsupported resources at the Vulkan submission boundary instead
 of converting them through the legacy warning-image fallback. The RGBA8 conversion is now owned
 by the neutral resource provider rather than an `ImageManager` API, so neutral resource
-construction has no image-manager dependency. DDS BC5/ATI2 normal maps are also decoded in the
-neutral backend with reconstructed Z components and 16-bit true-color TGA conversion, covering common Bethesda image paths;
+construction has no image-manager dependency. DDS BC5/ATI2 normal maps and uncompressed KTX1 image payloads are also
+decoded in the neutral backend with reconstructed Z components and 16-bit true-color TGA conversion, covering common
+Bethesda and loading-screen image paths;
 neutral texture resolution now applies the same legacy texture-path correction (including root terrain names and
 `.tga`-to-`.dds` fallback) before decoding; indexed, packed, 16-bit bitfield, true-color TGA/BMP, and DDS RGBA
 buffer dimensions are checked for overflow before allocation without importing OSG image code; active-cell terrain

@@ -195,6 +195,25 @@ namespace
         rgb24Dds[128] = 0;
         rgb24Dds[129] = 0;
         rgb24Dds[130] = 255; // BGR24 red.
+        std::vector<std::uint8_t> ktx(72, 0);
+        const std::array<std::uint8_t, 12> ktxIdentifier
+            = { 0xab, 0x4b, 0x54, 0x58, 0x20, 0x31, 0x31, 0xbb, 0x0d, 0x0a, 0x1a, 0x0a };
+        std::copy(ktxIdentifier.begin(), ktxIdentifier.end(), ktx.begin());
+        write32(ktx, 12, 0x04030201); // Little-endian marker.
+        write32(ktx, 16, 0x1401); // GL_UNSIGNED_BYTE.
+        write32(ktx, 20, 1);
+        write32(ktx, 24, 0x1908); // GL_RGBA.
+        write32(ktx, 28, 0x8058); // GL_RGBA8.
+        write32(ktx, 32, 0x1908);
+        write32(ktx, 36, 1);
+        write32(ktx, 40, 1);
+        write32(ktx, 52, 1); // One cubemap face.
+        write32(ktx, 56, 1); // One mip level.
+        write32(ktx, 64, 4); // Image byte count.
+        ktx[68] = 17;
+        ktx[69] = 34;
+        ktx[70] = 51;
+        ktx[71] = 255;
         {
             std::ofstream output(root / "textures/test.bmp", std::ios::binary);
             output.write(reinterpret_cast<const char*>(bmp.data()), static_cast<std::streamsize>(bmp.size()));
@@ -242,6 +261,10 @@ namespace
         {
             std::ofstream output(root / "textures/rgb24.dds", std::ios::binary);
             output.write(reinterpret_cast<const char*>(rgb24Dds.data()), static_cast<std::streamsize>(rgb24Dds.size()));
+        }
+        {
+            std::ofstream output(root / "textures/test.ktx", std::ios::binary);
+            output.write(reinterpret_cast<const char*>(ktx.data()), static_cast<std::streamsize>(ktx.size()));
         }
 
         const ToUTF8::Utf8Encoder encoder(ToUTF8::WINDOWS_1252);
@@ -304,6 +327,10 @@ namespace
         if (!rgb24Texture || rgb24Texture->width != 1 || rgb24Texture->height != 1
             || rgb24Texture->pixels != std::vector<std::uint8_t>({ 255, 0, 0, 255 }))
             throw std::runtime_error("neutral 24-bit DDS texture decoding changed pixel data");
+        const auto ktxTexture = resources.getNeutralTextureManager()->get(VFS::Path::Normalized("textures/test.ktx"));
+        if (!ktxTexture || ktxTexture->width != 1 || ktxTexture->height != 1
+            || ktxTexture->pixels != std::vector<std::uint8_t>({ 17, 34, 51, 255 }))
+            throw std::runtime_error("neutral KTX texture decoding changed pixel data");
         const auto correctedTexture
             = resources.getNeutralTextureManager()->get(VFS::Path::Normalized("textures/normal.tga"));
         if (!correctedTexture || correctedTexture != normal)
