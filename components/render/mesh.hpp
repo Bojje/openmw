@@ -143,9 +143,14 @@ namespace Render
         float tangent[4];
         float emissive[4];
         std::array<std::uint32_t, 4> textureLayers{};
+        // Independent NIF dark/detail/decal layers may use their own UV
+        // transforms. Keep their coordinates in the neutral vertex payload so
+        // the backend does not need a renderer-specific material transform
+        // table or a larger per-draw push-constant block.
+        std::array<float, 6> textureLayerCoords{};
     };
 
-    static_assert(sizeof(MeshVertex) == sizeof(float) * 30);
+    static_assert(sizeof(MeshVertex) == sizeof(float) * 36);
 
     struct ParticleState
     {

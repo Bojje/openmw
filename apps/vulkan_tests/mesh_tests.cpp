@@ -318,9 +318,19 @@ int main()
     texturing.mTextures[Nif::NiTexturingProperty::DarkTexture].mEnabled = true;
     texturing.mTextures[Nif::NiTexturingProperty::DarkTexture].mSourceTexture = &texture;
     texturing.mTextures[Nif::NiTexturingProperty::DarkTexture].mClamp = 1;
+    texturing.mTextures[Nif::NiTexturingProperty::DarkTexture].mHasTransform = true;
+    texturing.mTextures[Nif::NiTexturingProperty::DarkTexture].mTransform.mOffset = { 0.5f, 0.25f };
+    texturing.mTextures[Nif::NiTexturingProperty::DarkTexture].mTransform.mScale = { 1.f, 1.f };
+    texturing.mTextures[Nif::NiTexturingProperty::DarkTexture].mTransform.mTransformMethod
+        = Nif::NiTextureTransform::Method::MayaLegacy;
     texturing.mTextures[Nif::NiTexturingProperty::DetailTexture].mEnabled = true;
     texturing.mTextures[Nif::NiTexturingProperty::DetailTexture].mSourceTexture = &normalTexture;
     texturing.mTextures[Nif::NiTexturingProperty::DetailTexture].mClamp = 2;
+    texturing.mTextures[Nif::NiTexturingProperty::DetailTexture].mHasTransform = true;
+    texturing.mTextures[Nif::NiTexturingProperty::DetailTexture].mTransform.mOffset = { 0.1f, 0.2f };
+    texturing.mTextures[Nif::NiTexturingProperty::DetailTexture].mTransform.mScale = { 2.f, 3.f };
+    texturing.mTextures[Nif::NiTexturingProperty::DetailTexture].mTransform.mTransformMethod
+        = Nif::NiTextureTransform::Method::MayaLegacy;
     texturing.mTextures[Nif::NiTexturingProperty::BumpTexture].mEnabled = true;
     texturing.mTextures[Nif::NiTexturingProperty::BumpTexture].mSourceTexture = &normalTexture;
     texturing.mTextures[Nif::NiTexturingProperty::BumpTexture].mClamp = 1;
@@ -334,6 +344,11 @@ int main()
     texturing.mTextures[Nif::NiTexturingProperty::DecalTexture].mEnabled = true;
     texturing.mTextures[Nif::NiTexturingProperty::DecalTexture].mSourceTexture = &glowTexture;
     texturing.mTextures[Nif::NiTexturingProperty::DecalTexture].mClamp = 0;
+    texturing.mTextures[Nif::NiTexturingProperty::DecalTexture].mHasTransform = true;
+    texturing.mTextures[Nif::NiTexturingProperty::DecalTexture].mTransform.mOffset = { -0.1f, 0.4f };
+    texturing.mTextures[Nif::NiTexturingProperty::DecalTexture].mTransform.mScale = { 1.f, 1.f };
+    texturing.mTextures[Nif::NiTexturingProperty::DecalTexture].mTransform.mTransformMethod
+        = Nif::NiTextureTransform::Method::MayaLegacy;
     Nif::NiMaterialProperty material;
     material.mDiffuse = { 0.25f, 0.5f, 0.75f };
     material.mAlpha = 0.75f;
@@ -444,6 +459,12 @@ int main()
         throw std::runtime_error("NIF material conversion lost texture or alpha state");
     expectNear(instances.front().mesh.vertices.front().texcoord[0], 0.25f, "base texture U transform");
     expectNear(instances.front().mesh.vertices.front().texcoord[1], 0.125f, "base texture V transform");
+    expectNear(instances.front().mesh.vertices.front().textureLayerCoords[0], 0.5f, "dark texture U transform");
+    expectNear(instances.front().mesh.vertices.front().textureLayerCoords[1], 0.25f, "dark texture V transform");
+    expectNear(instances.front().mesh.vertices.front().textureLayerCoords[2], 0.1f, "detail texture U transform");
+    expectNear(instances.front().mesh.vertices.front().textureLayerCoords[3], 0.2f, "detail texture V transform");
+    expectNear(instances.front().mesh.vertices.front().textureLayerCoords[4], -0.1f, "decal texture U transform");
+    expectNear(instances.front().mesh.vertices.front().textureLayerCoords[5], 0.4f, "decal texture V transform");
     if (!instances.front().mesh.skinning || !instances.front().mesh.skinning->valid(3)
         || instances.front().mesh.skinning->vertices[1].weights[0] != 1.f
         || instances.front().mesh.skinning->boneNames != std::vector<std::string>{ "Root Bone" })

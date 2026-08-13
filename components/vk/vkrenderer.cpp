@@ -1067,7 +1067,7 @@ namespace Vk
             bindingDesc[0].stride = sizeof(Render::MeshVertex);
             bindingDesc[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
-            std::array<VkVertexInputAttributeDescription, 9> attrDesc = {};
+            std::array<VkVertexInputAttributeDescription, 12> attrDesc = {};
             attrDesc[0] = { 0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0 };
             attrDesc[1] = { 1, 0, VK_FORMAT_R32G32B32_SFLOAT, sizeof(float) * 3 };
             attrDesc[2] = { 2, 0, VK_FORMAT_R32G32_SFLOAT, sizeof(float) * 6 };
@@ -1077,6 +1077,9 @@ namespace Vk
             attrDesc[6] = { 6, 0, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(float) * 18 };
             attrDesc[7] = { 7, 0, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(float) * 22 };
             attrDesc[8] = { 8, 0, VK_FORMAT_R32G32B32A32_UINT, sizeof(float) * 26 };
+            attrDesc[9] = { 9, 0, VK_FORMAT_R32G32_SFLOAT, sizeof(float) * 30 };
+            attrDesc[10] = { 10, 0, VK_FORMAT_R32G32_SFLOAT, sizeof(float) * 32 };
+            attrDesc[11] = { 11, 0, VK_FORMAT_R32G32_SFLOAT, sizeof(float) * 34 };
 
             VkPipelineVertexInputStateCreateInfo vertexInput = {};
             vertexInput.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;

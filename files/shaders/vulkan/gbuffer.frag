@@ -16,6 +16,9 @@ layout(location = 12) flat in uint fragSpecularTextureIndex;
 layout(location = 13) in vec4 fragEmissive;
 layout(location = 14) flat in vec2 fragEmissiveLumaBias;
 layout(location = 15) flat in uvec4 fragTextureLayers;
+layout(location = 16) in vec2 fragDarkTexCoord;
+layout(location = 17) in vec2 fragDetailTexCoord;
+layout(location = 18) in vec2 fragDecalTexCoord;
 
 layout(set = 0, binding = 1) uniform sampler2D albedoTextures[64];
 layout(set = 0, binding = 2) uniform sampler2D alphaTextures[64];
@@ -82,7 +85,7 @@ void main() {
     vec4 albedo = fragColor * albedoSample;
     if (fragTextureLayers.x != 0u)
     {
-        vec4 darkSample = texture(darkTextures[fragTextureLayers.x], terrainTexCoord);
+        vec4 darkSample = texture(darkTextures[fragTextureLayers.x], fragDarkTexCoord);
         albedo *= darkSample;
     }
     vec3 emissiveSample = fragEmissiveTextureIndex == 0u
@@ -105,10 +108,10 @@ void main() {
     }
 
     if (fragTextureLayers.y != 0u)
-        albedo.rgb *= texture(detailTextures[fragTextureLayers.y], terrainTexCoord).rgb * 2.0;
+        albedo.rgb *= texture(detailTextures[fragTextureLayers.y], fragDetailTexCoord).rgb * 2.0;
     if (fragTextureLayers.z != 0u)
     {
-        vec4 decalSample = texture(decalTextures[fragTextureLayers.z], terrainTexCoord);
+        vec4 decalSample = texture(decalTextures[fragTextureLayers.z], fragDecalTexCoord);
         albedo.rgb = mix(albedo.rgb, decalSample.rgb, decalSample.a * fragColor.a);
     }
 
