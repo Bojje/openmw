@@ -231,7 +231,8 @@ The neutral effect record also preserves the gameplay loop flag, controller dura
 ambient-light override through submission. Neutral magical projectile effects now also publish their legacy
 point-light color and radius through a bounded scene-light array consumed by Vulkan. Enchanted neutral arrows
 carry a flagged emissive-color override through the G-buffer for an additive Vulkan glow; the Vulkan consumer
-selects the matching `magicitem/caust00`–`caust31` caustic frame from the shared frame clock when available.
+selects the matching `magicitem/caust00`–`caust31` caustic frame from the shared frame clock when available
+and preserves the enchantment color multiplier.
 Controller-driven visual
 playback still requires the future animation owner; effects without a discoverable controller interval remain
 explicitly removable by gameplay.

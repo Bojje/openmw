@@ -80,7 +80,12 @@ void main() {
         : texture(emissiveTextures[fragEmissiveTextureIndex], terrainTexCoord).rgb;
     vec3 emissiveColor = fragEmissive.rgb * max(fragEmissive.a, 0.0);
     if (fragEmissiveTextureIndex != 0u)
-        emissiveColor = max(fragEmissive.rgb, vec3(1.0)) * emissiveSample * max(fragEmissive.a, 1.0);
+    {
+        if ((fragMaterialFlags & 64u) != 0u)
+            emissiveColor = fragEmissive.rgb * emissiveSample * max(fragEmissive.a, 1.0);
+        else
+            emissiveColor = max(fragEmissive.rgb, vec3(1.0)) * emissiveSample * max(fragEmissive.a, 1.0);
+    }
     vec3 specularSample = fragSpecularTextureIndex == 0u
         ? vec3(1.0)
         : texture(specularTextures[fragSpecularTextureIndex], terrainTexCoord).rgb;
