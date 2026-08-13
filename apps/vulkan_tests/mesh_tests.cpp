@@ -102,11 +102,11 @@ int main()
     Nif::NiParticlesData particleSource;
     particleSource.mActiveCount = 2;
     particleSource.mVertices = { { 1.f, 2.f, 3.f }, { -2.f, 1.f, 0.f } };
-    particleSource.mRadii = { 2.f, 0.5f };
+    particleSource.mRadii = { 2.f };
     particleSource.mSizes = { 1.f, 2.f };
     const Render::MeshData particles = Nif::convertParticles(particleSource);
     if (particles.vertices.size() != 8 || particles.indices.size() != 12
-        || particles.vertices[0].position[0] != -2.f || particles.vertices[4].position[0] != -1.f
+        || particles.vertices[0].position[0] != -2.f || particles.vertices[4].position[0] != -4.f
         || particles.vertices[0].tangent[0] != 1.f || particles.vertices[4].tangent[1] != 1.f
         || particles.vertices[7].texcoord[1] != 1.f)
         throw std::runtime_error("NIF particle conversion did not create deterministic quad snapshots");

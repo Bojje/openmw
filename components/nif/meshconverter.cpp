@@ -894,7 +894,9 @@ namespace Nif
 
         for (std::size_t particle = 0; particle < particleCount; ++particle)
         {
-            float radius = particle < source.mRadii.size() ? source.mRadii[particle] : 1.f;
+            float radius = particle < source.mRadii.size()
+                ? source.mRadii[particle]
+                : (!source.mRadii.empty() ? source.mRadii.front() : 1.f);
             if (particle < source.mSizes.size())
                 radius *= source.mSizes[particle];
             if (!std::isfinite(radius) || radius <= 0.f)
