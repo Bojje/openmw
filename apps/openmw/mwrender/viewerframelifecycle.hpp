@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <functional>
 #include <iosfwd>
+#include <memory>
 #include <string>
 #include <osg/ref_ptr>
 
@@ -64,7 +65,8 @@ namespace MWRender
         void initializeStatsHandlers(const VFS::Manager& vfs, bool writeToFile,
             const std::function<void(Resource::Profiler&)>& configureProfiler);
         void reportStats(unsigned frameNumber, std::ostream& stream) const;
-        osg::Stats* stats() const;
+        osg::Stats* osgStats() const;
+        Render::FrameStats* stats() const override;
         int maxTextureImageUnits() const { return mMaxTextureImageUnits; }
         osg::Group* sceneRoot();
 
@@ -83,6 +85,7 @@ namespace MWRender
         osg::ref_ptr<osg::Group> mSceneRoot;
         osg::ref_ptr<osgViewer::ScreenCaptureHandler> mScreenCaptureHandler;
         osg::ref_ptr<SceneUtil::AsyncScreenCaptureOperation> mScreenCaptureOperation;
+        std::unique_ptr<Render::FrameStats> mStats;
         int mMaxTextureImageUnits = 0;
     };
 }

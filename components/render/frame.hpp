@@ -8,6 +8,7 @@
 namespace Render
 {
     struct SceneSubmission;
+    class FrameStats;
 
     /// Owns the engine's frame traversal and presentation boundary.
     /// Implementations must initialize and drive exactly one renderer. A
@@ -29,6 +30,9 @@ namespace Render
         virtual bool renderFrame(const SceneSubmission& /*submission*/) { return false; }
         virtual bool consumesSceneSubmission() const = 0;
         virtual bool done() const = 0;
+        /// Renderer-neutral profiling sink for shared simulation services.
+        /// The active frame owner remains responsible for its implementation.
+        virtual FrameStats* stats() const { return nullptr; }
         /// Request termination through the active renderer owner.
         /// A backend may use this for window/input shutdown without exposing
         /// backend-specific viewer or device types to the engine.

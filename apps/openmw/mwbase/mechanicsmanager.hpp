@@ -10,9 +10,10 @@
 
 #include "../mwworld/ptr.hpp"
 
+#include <components/render/stats.hpp>
+
 namespace osg
 {
-    class Stats;
     class Vec3f;
 }
 
@@ -301,7 +302,7 @@ namespace MWBase
         virtual bool isRunning(const MWWorld::Ptr& ptr) = 0;
         virtual bool isSneaking(const MWWorld::Ptr& ptr) = 0;
 
-        virtual void reportStats(unsigned int frameNumber, osg::Stats& stats) const = 0;
+        virtual void reportStats(unsigned int frameNumber, Render::FrameStats& stats) const = 0;
 
         virtual int getGreetingTimer(const MWWorld::Ptr& ptr) const = 0;
         virtual float getAngleToPlayer(const MWWorld::Ptr& ptr) const = 0;

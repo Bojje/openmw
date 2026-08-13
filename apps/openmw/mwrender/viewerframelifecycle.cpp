@@ -18,6 +18,7 @@
 
 #include <components/debug/debuglog.hpp>
 #include <components/debug/gldebug.hpp>
+#include <components/render/stats.hpp>
 #include <components/render/textureconversion.hpp>
 #include <components/resource/stats.hpp>
 #include <components/sceneutil/screencapture.hpp>
@@ -67,10 +68,34 @@ namespace MWRender
         private:
             int mMaxTextureImageUnits = 0;
         };
+
+        class OsgFrameStats final : public Render::FrameStats
+        {
+        public:
+            explicit OsgFrameStats(osg::Stats* stats)
+                : mStats(stats)
+            {
+            }
+
+            bool collectStats(std::string_view group) const override
+            {
+                return mStats && mStats->collectStats(std::string(group));
+            }
+
+            void setAttribute(unsigned frameNumber, std::string_view name, double value) override
+            {
+                if (mStats)
+                    mStats->setAttribute(frameNumber, std::string(name), value);
+            }
+
+        private:
+            osg::Stats* mStats;
+        };
     }
 
     ViewerFrameLifecycle::ViewerFrameLifecycle()
         : mViewer(new osgViewer::Viewer)
+        , mStats(std::make_unique<OsgFrameStats>(mViewer->getViewerStats()))
     {
         mViewer->setReleaseContextAtEndOfFrameHint(false);
         mViewer->setUseConfigureAffinity(false);
@@ -303,7 +328,12 @@ namespace MWRender
             camera->getStats()->report(stream, frameNumber);
     }
 
-    osg::Stats* ViewerFrameLifecycle::stats() const
+    Render::FrameStats* ViewerFrameLifecycle::stats() const
+    {
+        return mStats.get();
+    }
+
+    osg::Stats* ViewerFrameLifecycle::osgStats() const
     {
         return mViewer->getViewerStats();
     }

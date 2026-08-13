@@ -28,7 +28,6 @@
 namespace osg
 {
     class Group;
-    class Stats;
 }
 
 namespace osgViewer
@@ -188,7 +187,7 @@ namespace MWWorld
         void processDoors(float duration);
         ///< Run physics simulation and modify \a world accordingly.
 
-        void doPhysics(float duration, osg::Timer_t frameStart, unsigned int frameNumber, osg::Stats& stats);
+        void doPhysics(float duration, osg::Timer_t frameStart, unsigned int frameNumber, Render::FrameStats& stats);
         ///< Run physics simulation and modify \a world accordingly.
 
         void updateNavigator();
@@ -479,7 +478,7 @@ namespace MWWorld
 
         void update(float duration, bool paused);
         void updatePhysics(
-            float duration, bool paused, osg::Timer_t frameStart, unsigned int frameNumber, osg::Stats& stats);
+            float duration, bool paused, osg::Timer_t frameStart, unsigned int frameNumber, Render::FrameStats& stats);
 
         void updateFocusObject();
 
@@ -732,7 +731,7 @@ namespace MWWorld
 
         bool isAreaOccupiedByOtherActor(const MWWorld::ConstPtr& actor, const osg::Vec3f& position) const override;
 
-        void reportStats(unsigned int frameNumber, osg::Stats& stats) const override;
+        void reportStats(unsigned int frameNumber, Render::FrameStats& stats) const override;
 
         std::vector<MWWorld::Ptr> getAll(const ESM::RefId& id) override;
 

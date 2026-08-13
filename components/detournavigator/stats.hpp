@@ -4,10 +4,7 @@
 #include <cstddef>
 #include <optional>
 
-namespace osg
-{
-    class Stats;
-}
+#include <components/render/stats.hpp>
 
 namespace DetourNavigator
 {
@@ -65,7 +62,7 @@ namespace DetourNavigator
         TileCachedRecastMeshManagerStats mRecast;
     };
 
-    void reportStats(const Stats& stats, unsigned int frameNumber, osg::Stats& out);
+    void reportStats(const Stats& stats, unsigned int frameNumber, Render::FrameStats& out);
 }
 
 #endif

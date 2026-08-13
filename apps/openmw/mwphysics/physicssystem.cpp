@@ -5,7 +5,6 @@
 #include <vector>
 
 #include <osg/Group>
-#include <osg/Stats>
 #include <osg/Timer>
 
 #include <BulletCollision/BroadphaseCollision/btDbvtBroadphase.h>
@@ -701,7 +700,7 @@ namespace MWPhysics
     }
 
     void PhysicsSystem::stepSimulation(
-        float dt, bool skipSimulation, osg::Timer_t frameStart, unsigned int frameNumber, osg::Stats& stats)
+        float dt, bool skipSimulation, osg::Timer_t frameStart, unsigned int frameNumber, Render::FrameStats& stats)
     {
         for (auto& [animatedObject, changed] : mAnimatedObjects)
         {
@@ -871,7 +870,7 @@ namespace MWPhysics
         return callback.getResult();
     }
 
-    void PhysicsSystem::reportStats(unsigned int frameNumber, osg::Stats& stats) const
+    void PhysicsSystem::reportStats(unsigned int frameNumber, Render::FrameStats& stats) const
     {
         stats.setAttribute(frameNumber, "Physics Actors", static_cast<double>(mActors.size()));
         stats.setAttribute(frameNumber, "Physics Objects", static_cast<double>(mObjects.size()));

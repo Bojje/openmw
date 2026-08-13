@@ -13,6 +13,7 @@
 
 #include <components/misc/rng.hpp>
 #include <components/render/texture.hpp>
+#include <components/render/stats.hpp>
 #include <components/vfs/pathutil.hpp>
 
 #include "../mwworld/doorstate.hpp"
@@ -29,7 +30,6 @@ namespace osg
     class Matrixf;
     class Quat;
     class Image;
-    class Stats;
 }
 
 namespace Render
@@ -635,7 +635,7 @@ namespace MWBase
 
         virtual bool isAreaOccupiedByOtherActor(const MWWorld::ConstPtr& actor, const osg::Vec3f& position) const = 0;
 
-        virtual void reportStats(unsigned int frameNumber, osg::Stats& stats) const = 0;
+        virtual void reportStats(unsigned int frameNumber, Render::FrameStats& stats) const = 0;
 
         virtual std::vector<MWWorld::Ptr> getAll(const ESM::RefId& id) = 0;
 

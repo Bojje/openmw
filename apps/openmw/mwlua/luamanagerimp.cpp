@@ -2,7 +2,6 @@
 
 #include <filesystem>
 
-#include <osg/Stats>
 
 #include <sol/object.hpp>
 #include <sol/table.hpp>
@@ -952,7 +951,7 @@ namespace MWLua
         mTeleportPlayerAction = DelayedAction(&mLua, std::move(action), "TeleportPlayer");
     }
 
-    void LuaManager::reportStats(unsigned int frameNumber, osg::Stats& stats) const
+    void LuaManager::reportStats(unsigned int frameNumber, Render::FrameStats& stats) const
     {
         stats.setAttribute(frameNumber, "Lua UsedMemory", static_cast<double>(mLua.getTotalMemoryUsage()));
     }

@@ -12,7 +12,6 @@
 #include <BulletCollision/CollisionShapes/btCollisionShape.h>
 #include <LinearMath/btThreads.h>
 
-#include <osg/Stats>
 
 #include "components/debug/debuglog.hpp"
 #include "components/misc/convert.hpp"
@@ -505,7 +504,7 @@ namespace MWPhysics
     }
 
     void PhysicsTaskScheduler::applyQueuedMovements(float& timeAccum, std::vector<Simulation>& simulations,
-        osg::Timer_t frameStart, unsigned int frameNumber, osg::Stats& stats)
+        osg::Timer_t frameStart, unsigned int frameNumber, Render::FrameStats& stats)
     {
         assert(mSimulations != &simulations);
 
@@ -516,7 +515,7 @@ namespace MWPhysics
     }
 
     void PhysicsTaskScheduler::prepareWork(float& timeAccum, std::vector<Simulation>& simulations,
-        osg::Timer_t frameStart, unsigned int frameNumber, osg::Stats& stats)
+        osg::Timer_t frameStart, unsigned int frameNumber, Render::FrameStats& stats)
     {
         // This function run in the main thread.
         // While the mSimulationMutex is held, background physics threads can't run.
@@ -796,7 +795,7 @@ namespace MWPhysics
         mPostSimBarrier->wait([this] { afterPostSim(); });
     }
 
-    void PhysicsTaskScheduler::updateStats(osg::Timer_t frameStart, unsigned int frameNumber, osg::Stats& stats)
+    void PhysicsTaskScheduler::updateStats(osg::Timer_t frameStart, unsigned int frameNumber, Render::FrameStats& stats)
     {
         if (!stats.collectStats("engine"))
             return;

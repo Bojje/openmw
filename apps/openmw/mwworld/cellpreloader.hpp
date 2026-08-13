@@ -5,6 +5,7 @@
 
 #include <components/esm/refid.hpp>
 #include <components/sceneutil/workqueue.hpp>
+#include <components/render/stats.hpp>
 
 #include <osg/ref_ptr>
 
@@ -15,7 +16,6 @@
 
 namespace osg
 {
-    class Stats;
 }
 
 namespace Resource
@@ -92,7 +92,7 @@ namespace MWWorld
         bool terrainWorldspaceMatches(const ESM::RefId& worldspace);
         void rebuildTerrainViews();
 
-        void reportStats(unsigned int frameNumber, osg::Stats& stats) const;
+        void reportStats(unsigned int frameNumber, Render::FrameStats& stats) const;
 
     private:
         void clearAllTasks();

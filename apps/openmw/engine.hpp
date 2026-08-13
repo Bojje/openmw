@@ -10,6 +10,7 @@
 #include <components/esm/refid.hpp>
 #include <components/files/collections.hpp>
 #include <components/render/frame.hpp>
+#include <components/render/stats.hpp>
 #include <components/settings/settings.hpp>
 #include <components/translation/translation.hpp>
 
@@ -50,11 +51,6 @@ namespace Stereo
 namespace Files
 {
     struct ConfigurationManager;
-}
-
-namespace osg
-{
-    class Stats;
 }
 
 namespace MWState
@@ -138,7 +134,6 @@ namespace OMW
         Files::PathContainer mDataDirs;
         std::vector<std::string> mArchives;
         std::filesystem::path mResDir;
-        osg::ref_ptr<osg::Stats> mNeutralStats;
         std::string mCellName;
         std::vector<std::string> mContentFiles;
         std::vector<std::string> mGroundcoverFiles;
@@ -177,7 +172,6 @@ namespace OMW
         Engine& operator=(const Engine&);
 
         void executeLocalScripts();
-        osg::Stats* getOsgStats() const;
         void captureVulkanScreenshot();
 
         bool frame(unsigned frameNumber, float dt);

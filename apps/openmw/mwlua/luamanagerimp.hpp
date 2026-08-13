@@ -5,8 +5,6 @@
 #include <map>
 #include <set>
 
-#include <osg/Stats>
-
 #include <components/lua/inputactions.hpp>
 #include <components/lua/luastate.hpp>
 #include <components/lua/scripttracker.hpp>
@@ -16,6 +14,8 @@
 
 #include "../mwbase/luamanager.hpp"
 #include "../mwbase/windowmanager.hpp"
+
+#include <components/render/stats.hpp>
 
 #include "engineevents.hpp"
 #include "globalscripts.hpp"
@@ -178,7 +178,7 @@ namespace MWLua
 
         bool isProcessingInputEvents() const { return mProcessingInputEvents; }
 
-        void reportStats(unsigned int frameNumber, osg::Stats& stats) const;
+        void reportStats(unsigned int frameNumber, Render::FrameStats& stats) const;
         std::string formatResourceUsageStats() const override;
 
         LuaUtil::InputAction::Registry& inputActions() { return mInputActions; }

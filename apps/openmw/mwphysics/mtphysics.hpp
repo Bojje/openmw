@@ -15,6 +15,7 @@
 #include <osg/Timer>
 
 #include "components/misc/budgetmeasurement.hpp"
+#include "components/render/stats.hpp"
 #include "physicssystem.hpp"
 #include "ptrholder.hpp"
 
@@ -51,7 +52,7 @@ namespace MWPhysics
         /// @param actorsData per actor data needed to compute new positions
         /// @return new position of each actor
         void applyQueuedMovements(float& timeAccum, std::vector<Simulation>& simulations, osg::Timer_t frameStart,
-            unsigned int frameNumber, osg::Stats& stats);
+            unsigned int frameNumber, Render::FrameStats& stats);
 
         void resetSimulation(const ActorMap& actors);
 
@@ -84,7 +85,7 @@ namespace MWPhysics
         void refreshLOSCache();
         void updateAabbs();
         void updatePtrAabb(const std::shared_ptr<PtrHolder>& ptr);
-        void updateStats(osg::Timer_t frameStart, unsigned int frameNumber, osg::Stats& stats);
+        void updateStats(osg::Timer_t frameStart, unsigned int frameNumber, Render::FrameStats& stats);
         std::tuple<unsigned, float> calculateStepConfig(float timeAccum) const;
         void afterPreStep();
         void afterPostStep();
@@ -92,7 +93,7 @@ namespace MWPhysics
         void syncWithMainThread();
         void waitForWorkers();
         void prepareWork(float& timeAccum, std::vector<Simulation>& simulations, osg::Timer_t frameStart,
-            unsigned int frameNumber, osg::Stats& stats);
+            unsigned int frameNumber, Render::FrameStats& stats);
 
         std::unique_ptr<WorldFrameData> mWorldFrameData;
         std::vector<Simulation>* mSimulations = nullptr;

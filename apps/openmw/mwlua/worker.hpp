@@ -2,17 +2,13 @@
 #define OPENMW_MWLUA_WORKER_H
 
 #include <osg/Timer>
-#include <osg/ref_ptr>
 
 #include <condition_variable>
 #include <mutex>
 #include <optional>
 #include <thread>
 
-namespace osg
-{
-    class Stats;
-}
+#include <components/render/stats.hpp>
 
 namespace MWLua
 {
@@ -25,9 +21,9 @@ namespace MWLua
 
         ~Worker();
 
-        void allowUpdate(osg::Timer_t frameStart, unsigned int frameNumber, osg::Stats& stats);
+        void allowUpdate(osg::Timer_t frameStart, unsigned int frameNumber, Render::FrameStats& stats);
 
-        void finishUpdate(osg::Timer_t frameStart, unsigned int frameNumber, osg::Stats& stats);
+        void finishUpdate(osg::Timer_t frameStart, unsigned int frameNumber, Render::FrameStats& stats);
 
         void join();
 
@@ -36,10 +32,10 @@ namespace MWLua
         {
             osg::Timer_t mFrameStart;
             unsigned mFrameNumber;
-            osg::ref_ptr<osg::Stats> mStats;
+            Render::FrameStats* mStats;
         };
 
-        void update(osg::Timer_t frameStart, unsigned frameNumber, osg::Stats& stats);
+        void update(osg::Timer_t frameStart, unsigned frameNumber, Render::FrameStats& stats);
 
         void run() noexcept;
 

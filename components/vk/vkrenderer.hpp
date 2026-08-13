@@ -18,6 +18,7 @@
 #include "../render/frame.hpp"
 #include "../render/mesh.hpp"
 #include "../render/scene.hpp"
+#include "../render/stats.hpp"
 #include "../render/submission.hpp"
 #include "../render/texture.hpp"
 
@@ -85,6 +86,7 @@ namespace Vk
         }
         bool consumesSceneSubmission() const override { return true; }
         bool done() const override { return mDone; }
+        Render::FrameStats* stats() const override { return &mStats; }
         void requestQuit() override { mDone = true; }
         double referenceTime() const override { return mReferenceTime; }
         unsigned frameNumber() const override { return mFrameNumber; }
@@ -243,6 +245,7 @@ namespace Vk
         uint32_t mLastSubmittedImage = 0;
         bool mHasSubmittedFrame = false;
         bool mDone = false;
+        mutable Render::BasicFrameStats mStats;
     };
 }
 

@@ -23,7 +23,6 @@
 namespace osg
 {
     class Vec3f;
-    class Stats;
 }
 
 namespace ESM
@@ -265,7 +264,7 @@ namespace MWWorld
         /// Export the current loaded-world state for the renderer-neutral frame owner.
         Render::SceneSubmission getNeutralScene();
 
-        void reportStats(unsigned int frameNumber, osg::Stats& stats) const;
+        void reportStats(unsigned int frameNumber, Render::FrameStats& stats) const;
     };
 }
 

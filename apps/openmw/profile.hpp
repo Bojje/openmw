@@ -1,11 +1,12 @@
 #ifndef OPENMW_PROFILE_H
 #define OPENMW_PROFILE_H
 
-#include <osg/Stats>
 #include <osg/Timer>
 
 #include <cstddef>
 #include <string>
+
+#include <components/render/stats.hpp>
 
 namespace OMW
 {
@@ -116,7 +117,7 @@ namespace OMW
     {
     public:
         explicit ScopedProfile(
-            osg::Timer_t frameStart, unsigned int frameNumber, const osg::Timer& timer, osg::Stats& stats)
+            osg::Timer_t frameStart, unsigned int frameNumber, const osg::Timer& timer, Render::FrameStats& stats)
             : mScopeStart(timer.tick())
             , mFrameStart(frameStart)
             , mFrameNumber(frameNumber)
@@ -146,7 +147,7 @@ namespace OMW
         const osg::Timer_t mFrameStart;
         const unsigned int mFrameNumber;
         const osg::Timer& mTimer;
-        osg::Stats& mStats;
+        Render::FrameStats& mStats;
     };
 }
 

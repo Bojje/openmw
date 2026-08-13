@@ -3,9 +3,18 @@
 
 #include <components/render/meshconversion.hpp>
 #include <components/render/animationmask.hpp>
+#include <components/render/stats.hpp>
 
 int main()
 {
+    Render::BasicFrameStats frameStats;
+    if (frameStats.collectStats("engine"))
+        throw std::runtime_error("basic Vulkan frame stats must default to disabled collection");
+    frameStats.setAttribute(1, "neutral-test", 1.0);
+    frameStats.setCollectStats(true);
+    if (!frameStats.collectStats("engine"))
+        throw std::runtime_error("basic Vulkan frame stats did not enable collection");
+
     if (Render::classifyAnimationBone("Bip01 Spine1") != Render::AnimationBoneGroup::Torso
         || Render::classifyAnimationBone("BIP01 L Hand") != Render::AnimationBoneGroup::LeftArm
         || Render::classifyAnimationBone("weapon bone") != Render::AnimationBoneGroup::RightArm

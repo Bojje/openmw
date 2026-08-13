@@ -23,11 +23,12 @@
 #include "collisiontype.hpp"
 #include "raycasting.hpp"
 
+#include <components/render/stats.hpp>
+
 namespace osg
 {
     class Group;
     class Object;
-    class Stats;
 }
 
 namespace MWRender
@@ -201,7 +202,7 @@ namespace MWPhysics
 
         /// Determine new position based on all queued movements, then clear the list.
         void stepSimulation(
-            float dt, bool skipSimulation, osg::Timer_t frameStart, unsigned int frameNumber, osg::Stats& stats);
+            float dt, bool skipSimulation, osg::Timer_t frameStart, unsigned int frameNumber, Render::FrameStats& stats);
 
         /// Apply new positions to actors
         void moveActors();
@@ -288,7 +289,7 @@ namespace MWPhysics
         bool isAreaOccupiedByOtherActor(
             const MWWorld::LiveCellRefBase* actor, const osg::Vec3f& position, float radius) const;
 
-        void reportStats(unsigned int frameNumber, osg::Stats& stats) const;
+        void reportStats(unsigned int frameNumber, Render::FrameStats& stats) const;
         void reportCollision(const btVector3& position, const btVector3& normal);
 
         float mPhysicsDt;

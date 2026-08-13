@@ -1542,7 +1542,7 @@ namespace MWWorld
         mPhysics->updateAnimatedCollisionShape(ptr);
     }
 
-    void World::doPhysics(float duration, osg::Timer_t frameStart, unsigned int frameNumber, osg::Stats& stats)
+    void World::doPhysics(float duration, osg::Timer_t frameStart, unsigned int frameNumber, Render::FrameStats& stats)
     {
         processDoors(duration);
         if (mProjectileManager)
@@ -1775,7 +1775,7 @@ namespace MWWorld
     }
 
     void World::updatePhysics(
-        float duration, bool paused, osg::Timer_t frameStart, unsigned int frameNumber, osg::Stats& stats)
+        float duration, bool paused, osg::Timer_t frameStart, unsigned int frameNumber, Render::FrameStats& stats)
     {
         if (!paused)
         {
@@ -4150,7 +4150,7 @@ namespace MWWorld
         return mPhysics->isAreaOccupiedByOtherActor(actor.mRef, position, 2 * maxHalfExtent);
     }
 
-    void World::reportStats(unsigned int frameNumber, osg::Stats& stats) const
+    void World::reportStats(unsigned int frameNumber, Render::FrameStats& stats) const
     {
         DetourNavigator::reportStats(mNavigator->getStats(), frameNumber, stats);
         mPhysics->reportStats(frameNumber, stats);

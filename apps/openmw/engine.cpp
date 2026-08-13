@@ -10,7 +10,6 @@
 #include <system_error>
 
 #include <osgGA/GUIEventAdapter>
-#include <osg/Stats>
 #include <osg/Timer>
 #include <osg/Version>
 #include <osgViewer/Viewer>
@@ -266,17 +265,11 @@ void OMW::Engine::captureVulkanScreenshot()
 #endif
 }
 
-osg::Stats* OMW::Engine::getOsgStats() const
-{
-    const auto* const lifecycle = dynamic_cast<const MWRender::ViewerFrameLifecycle*>(mFrameLifecycle.get());
-    return lifecycle ? lifecycle->stats() : mNeutralStats.get();
-}
-
 bool OMW::Engine::frame(unsigned frameNumber, float frametime)
 {
     const osg::Timer_t frameStart = osg::Timer::instance()->tick();
     const osg::Timer* const timer = osg::Timer::instance();
-    osg::Stats* const stats = getOsgStats();
+    Render::FrameStats* const stats = mFrameLifecycle->stats();
     if (!stats)
         throw std::logic_error("Engine frame statistics were not initialized");
 
@@ -414,7 +407,8 @@ bool OMW::Engine::frame(unsigned frameNumber, float frametime)
     {
         stats->setAttribute(frameNumber, "FrameNumber", frameNumber);
 
-        mResourceSystem->reportStats(frameNumber, stats);
+        if (const auto* const osgLifecycle = dynamic_cast<const MWRender::ViewerFrameLifecycle*>(mFrameLifecycle.get()))
+            mResourceSystem->reportStats(frameNumber, osgLifecycle->osgStats());
 
         if (mWorkQueue)
         {
@@ -513,7 +507,6 @@ OMW::Engine::~Engine()
     mLuaWorker = nullptr;
     mLuaManager = nullptr;
     mL10nManager = nullptr;
-    mNeutralStats = nullptr;
 
     mScriptContext = nullptr;
 
@@ -583,8 +576,6 @@ void OMW::Engine::setSkipMenu(bool skipMenu, bool newGame)
 
 void OMW::Engine::prepareVulkanEngine()
 {
-    mNeutralStats = new osg::Stats("OpenMW Vulkan");
-
     mStateManager = std::make_unique<MWState::StateManager>(mCfgMgr.getUserDataPath() / "saves", mContentFiles);
     mEnvironment.setStateManager(*mStateManager);
 

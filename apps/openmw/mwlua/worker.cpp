@@ -28,7 +28,7 @@ namespace MWLua
         }
     }
 
-    void Worker::allowUpdate(osg::Timer_t frameStart, unsigned frameNumber, osg::Stats& stats)
+    void Worker::allowUpdate(osg::Timer_t frameStart, unsigned frameNumber, Render::FrameStats& stats)
     {
         if (!mThread)
             return;
@@ -39,7 +39,7 @@ namespace MWLua
         mCV.notify_one();
     }
 
-    void Worker::finishUpdate(osg::Timer_t frameStart, unsigned frameNumber, osg::Stats& stats)
+    void Worker::finishUpdate(osg::Timer_t frameStart, unsigned frameNumber, Render::FrameStats& stats)
     {
         if (mThread)
         {
@@ -63,7 +63,7 @@ namespace MWLua
         }
     }
 
-    void Worker::update(osg::Timer_t frameStart, unsigned frameNumber, osg::Stats& stats)
+    void Worker::update(osg::Timer_t frameStart, unsigned frameNumber, Render::FrameStats& stats)
     {
         const osg::Timer* const timer = osg::Timer::instance();
         OMW::ScopedProfile<OMW::UserStatsType::Lua> profile(frameStart, frameNumber, *timer, stats);

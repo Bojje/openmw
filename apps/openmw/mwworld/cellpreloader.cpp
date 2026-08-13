@@ -5,7 +5,6 @@
 #include <limits>
 #include <span>
 
-#include <osg/Stats>
 #include <osg/Vec3f>
 #include <osg/Vec4i>
 
@@ -528,7 +527,7 @@ namespace MWWorld
         mMeshPreloadItems.clear();
     }
 
-    void CellPreloader::reportStats(unsigned int frameNumber, osg::Stats& stats) const
+    void CellPreloader::reportStats(unsigned int frameNumber, Render::FrameStats& stats) const
     {
         stats.setAttribute(frameNumber, "CellPreloader Count", static_cast<double>(mPreloadCells.size()));
         stats.setAttribute(frameNumber, "CellPreloader Added", static_cast<double>(mAdded));
