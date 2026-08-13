@@ -413,6 +413,9 @@ namespace MWWorld
         MWWorld::Ptr ptr = ref.getPtr();
 
         const VFS::Path::Normalized model = ptr.getClass().getCorrectedModel(ptr);
+        const osg::Vec4 glow = ptr.getClass().getEnchantment(ptr).empty()
+            ? osg::Vec4(0.f, 0.f, 0.f, 0.f)
+            : ptr.getClass().getEnchantmentColor(ptr);
         createModel(state, model, pos, orient, false, false, osg::Vec4(0, 0, 0, 0));
         if (state.mNode && !ptr.getClass().getEnchantment(ptr).empty())
             SceneUtil::addEnchantedGlow(state.mNode, mResourceSystem, ptr.getClass().getEnchantmentColor(ptr));
@@ -423,7 +426,8 @@ namespace MWWorld
         {
             state.mNeutralEffectId = makeNeutralProjectileEffectId(state.mProjectileId);
             MWBase::Environment::get().getWorld()->spawnEffect(
-                model, "", pos, 1.f, false, false, state.mNeutralEffectId, true);
+                model, "", pos, 1.f, false, false, state.mNeutralEffectId, true, {}, 0.f,
+                std::array<float, 4>{ glow.r(), glow.g(), glow.b(), glow.a() > 0.f ? 1.f : 0.f });
             MWBase::Environment::get().getWorld()->updateEffect(
                 state.mNeutralEffectId, toRenderVec3(state.mPosition), toRenderQuat(state.mOrientation));
         }
@@ -786,6 +790,7 @@ namespace MWWorld
             state.mAttackStrength = esm.mAttackStrength;
             state.mAttackWindUp = esm.mAttackWindUp;
             state.mToDelete = false;
+            std::array<float, 4> glow{};
 
             VFS::Path::Normalized model;
             try
@@ -793,6 +798,11 @@ namespace MWWorld
                 MWWorld::ManualRef ref(*MWBase::Environment::get().getESMStore(), esm.mId);
                 MWWorld::Ptr ptr = ref.getPtr();
                 model = ptr.getClass().getCorrectedModel(ptr);
+                if (!ptr.getClass().getEnchantment(ptr).empty())
+                {
+                    const osg::Vec4 color = ptr.getClass().getEnchantmentColor(ptr);
+                    glow = { color.r(), color.g(), color.b(), 1.f };
+                }
 
                 state.mProjectileId
                     = mPhysics->addProjectile(state.getCaster(), osg::Vec3f(esm.mPosition), model, false);
@@ -806,12 +816,15 @@ namespace MWWorld
 
             createModel(state, model, osg::Vec3f(esm.mPosition), osg::Quat(esm.mOrientation), false, false,
                 osg::Vec4(0, 0, 0, 0));
+            if (state.mNode && glow[3] > 0.f)
+                SceneUtil::addEnchantedGlow(state.mNode, mResourceSystem, osg::Vec4(glow[0], glow[1], glow[2], 1.f));
 
             if (!mParent)
             {
                 state.mNeutralEffectId = makeNeutralProjectileEffectId(state.mProjectileId);
                 MWBase::Environment::get().getWorld()->spawnEffect(
-                    model, "", osg::Vec3f(esm.mPosition), 1.f, false, false, state.mNeutralEffectId, true);
+                    model, "", osg::Vec3f(esm.mPosition), 1.f, false, false, state.mNeutralEffectId, true, {}, 0.f,
+                    glow);
                 MWBase::Environment::get().getWorld()->updateEffect(
                     state.mNeutralEffectId, toRenderVec3(state.mPosition), toRenderQuat(state.mOrientation));
             }

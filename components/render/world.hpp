@@ -133,6 +133,8 @@ namespace Render
         // light or scene-graph types to the neutral scene.
         Vec4 pointLightColor{};
         float pointLightRadius = 0.f;
+        Vec4 emissiveColor{};
+        bool emissiveOverride = false;
         float opacity = 1.f;
         bool active = true;
         std::vector<Attachment> attachments;
@@ -320,12 +322,14 @@ namespace Render
         bool recordEffect(std::string_view effectId, std::string_view model, const Vec3& position, float scale,
             std::string_view textureOverride = {}, bool looping = false, float animationDuration = 0.f,
             bool magicVfx = false, bool ambientOverride = false, const Vec4& pointLightColor = {},
-            float pointLightRadius = 0.f)
+            float pointLightRadius = 0.f, const Vec4& emissiveColor = {}, bool emissiveOverride = false)
         {
             if (effectId.empty() || model.empty() || !valid(position) || !valid(scale) || scale <= 0.f
                 || !valid(pointLightColor) || !valid(pointLightRadius) || pointLightRadius < 0.f
                 || (pointLightRadius > 0.f
-                    && (pointLightColor.x < 0.f || pointLightColor.y < 0.f || pointLightColor.z < 0.f)))
+                    && (pointLightColor.x < 0.f || pointLightColor.y < 0.f || pointLightColor.z < 0.f))
+                || !valid(emissiveColor) || (emissiveOverride && (emissiveColor.x < 0.f || emissiveColor.y < 0.f
+                    || emissiveColor.z < 0.f || emissiveColor.w <= 0.f)))
                 return false;
             WorldObject effect;
             effect.id = mNextObjectId++;
@@ -342,6 +346,8 @@ namespace Render
             effect.ambientOverride = ambientOverride;
             effect.pointLightColor = pointLightColor;
             effect.pointLightRadius = pointLightRadius;
+            effect.emissiveColor = emissiveColor;
+            effect.emissiveOverride = emissiveOverride;
             mEffects[std::string(effectId)] = std::move(effect);
             refreshPointLights();
             return true;

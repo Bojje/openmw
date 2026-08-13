@@ -565,7 +565,7 @@ namespace MWBase
         virtual void spawnEffect(VFS::Path::NormalizedView model, const std::string& textureOverride,
             const osg::Vec3f& worldPos, float scale = 1.f, bool isMagicVFX = true, bool useAmbientLight = true,
             std::string_view effectId = {}, bool loop = false, std::array<float, 4> pointLightColor = {},
-            float pointLightRadius = 0.f)
+            float pointLightRadius = 0.f, std::array<float, 4> emissiveColor = {})
             = 0;
 
         virtual void removeEffect(std::string_view effectId) = 0;

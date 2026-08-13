@@ -113,4 +113,9 @@ void main() {
         outMaterial.b = 2.5;
     if ((fragMaterialFlags & 32u) != 0u)
         outMaterial.b = 4.0;
+    if ((fragMaterialFlags & 64u) != 0u)
+    {
+        outMaterial.b = 5.0;
+        outSpecular = vec4(fragMaterial.rgb, albedo.a);
+    }
 }

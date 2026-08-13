@@ -234,7 +234,8 @@ namespace MWWorld
 
         void recordNeutralEffect(std::string_view effectId, std::string_view model, const Render::Vec3& position,
             float scale, std::string_view textureOverride, bool loop, float animationDuration, bool isMagicVfx,
-            bool ambientOverride, const Render::Vec4& pointLightColor = {}, float pointLightRadius = 0.f);
+            bool ambientOverride, const Render::Vec4& pointLightColor = {}, float pointLightRadius = 0.f,
+            const Render::Vec4& emissiveColor = {}, bool emissiveOverride = false);
         void removeNeutralEffect(std::string_view effectId);
         void updateNeutralEffect(std::string_view effectId, const Render::Vec3& position, const Render::Quat& rotation);
         void updateNeutralWeatherEffects(const WeatherManager& weatherManager);

@@ -222,7 +222,8 @@ Continuous magic VFX now use that neutral effect path when no OSG animation exis
 cleanup removes them through the neutral world owner instead of dereferencing a missing animation.
 The neutral effect record also preserves the gameplay loop flag, controller duration, and legacy white
 ambient-light override through submission. Neutral magical projectile effects now also publish their legacy
-point-light color and radius through a bounded scene-light array consumed by Vulkan. Controller-driven visual
+point-light color and radius through a bounded scene-light array consumed by Vulkan. Enchanted neutral arrows
+carry a flagged emissive-color override through the G-buffer for an additive Vulkan glow. Controller-driven visual
 playback still requires the future animation owner; effects without a discoverable controller interval remain
 explicitly removable by gameplay.
 Mesh submission no longer waits for the whole device or
@@ -442,8 +443,9 @@ Projectile simulation now uses the same manager in both backends: neutral startu
 without an OSG parent, so collision, hit processing, spell effects, sounds, cleanup, and save/load
 state continue without an OSG projectile presenter. Neutral arrows and magic bolts now register
 movable neutral mesh effects from the same world-effect submission path, and magic bolt point-light
-color/radius now cross that path into the Vulkan composite; enchantment glow, multi-effect composition,
-and other presentation-specific effects remain a later gate.
+color/radius now cross that path into the Vulkan composite, and enchanted neutral arrows use the same
+world-effect record for an additive emissive glow; multi-effect composition and other presentation-specific
+effects remain a later gate.
 Cell-transition loading screens, window-manager cell notifications, actor watching, fades, and
 postprocessor flags now follow the same legacy-service guard, so the neutral bootstrap does not
 silently re-enter the OSG/UI path during cell changes.
@@ -539,7 +541,7 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the frozen `openmw-vulkan-osg-reference` tag, the current checkpoint changes
-208 code files excluding this ledger, deleting 2,291 lines and adding 15,837 lines (net `+13,546`). The larger Vulkan-only
+208 code files excluding this ledger, deleting 2,291 lines and adding 15,905 lines (net `+13,614`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; the current branch continues the reduction
 work with renderer-neutral ownership and compatibility-wrapper deletion. The live no-GUI
 consumer is the first deletion checkpoint; further reduction can now target OSG
@@ -662,7 +664,7 @@ the game unplayable rather than reduce duplication safely.
 | Vulkan validation renderer | Vulkan standalone smoke target | Retained as the migration test harness |
 | Vulkan frame-owner forwarding wrapper | Removed; `Vk::Renderer` is the engine's Vulkan `FrameLifecycle` owner | Complete |
 | Legacy `Scene` constructor forwarding wrapper | Removed; OSG now uses the canonical scene-construction contract | Complete |
-| Projectile simulation and water-impact event | Shared projectile physics/combat manager with neutral position/orientation state; movable neutral arrow/bolt mesh effects; bounded neutral magic-bolt point lights; world-level neutral water-ripple fan-out; projectile service no longer stores `RenderingManager` | Complete for simulation/event ownership, basic mesh presentation, and bolt-light transfer; enchantment glow, multi-effect composition, and other presentation-specific effects remain outstanding |
+| Projectile simulation and water-impact event | Shared projectile physics/combat manager with neutral position/orientation state; movable neutral arrow/bolt mesh effects; bounded neutral magic-bolt point lights; neutral enchanted-arrow emissive glow; world-level neutral water-ripple fan-out; projectile service no longer stores `RenderingManager` | Complete for simulation/event ownership, basic mesh presentation, bolt-light transfer, and basic enchantment glow; multi-effect composition and other presentation-specific effects remain outstanding |
 | Water-level event | World-level fan-out to physics, OSG water, and neutral water snapshots | Complete for owner fan-out; legacy water shading remains outstanding |
 | Vulkan mesh submission queue | Removed | Complete |
 | Inactive raster ray-tracing scaffold | Removed | Reintroduce only with a complete RT pipeline |
@@ -751,7 +753,8 @@ magic effect expires or death animation completes. Anonymous one-shot VFX now re
 so existing spell, area, and summon effects are not silently discarded. Non-looping spell-hit VFX
 also use that neutral world-effect lifetime when no OSG animation owner exists. The remaining animation
 gate is OSG-specific presentation events, per-bone blending, and controller-stack ownership; projectile
-enchantment glows/multi-effect composition and full particle presentation remain.
+multi-effect composition and full particle presentation remain; the neutral enchanted-arrow path now has a basic
+additive emissive glow while exact OSG glow layering remains a presentation-fidelity follow-up.
 Neutral effect meshes now defer skinning until the scene owner can sample the renderer-neutral pose resolver; compatible
 local-controller or sibling-KF poses are flattened before the Vulkan batch, while attached-equipment meshes retain the
 explicit bind-pose fallback when no actor pose is available. Neutral effect clocks also use sibling-KF duration metadata

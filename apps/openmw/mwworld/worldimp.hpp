@@ -667,7 +667,7 @@ namespace MWWorld
         void spawnEffect(VFS::Path::NormalizedView model, const std::string& textureOverride,
             const osg::Vec3f& worldPos, float scale = 1.f, bool isMagicVFX = true, bool useAmbientLight = true,
             std::string_view effectId = {}, bool loop = false, std::array<float, 4> pointLightColor = {},
-            float pointLightRadius = 0.f) override;
+            float pointLightRadius = 0.f, std::array<float, 4> emissiveColor = {}) override;
 
         void removeEffect(std::string_view effectId) override;
         void updateEffect(std::string_view effectId, const Render::Vec3& position,

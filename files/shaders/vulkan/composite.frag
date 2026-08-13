@@ -68,6 +68,7 @@ void main() {
     bool waterSurface = abs(materialSample.b - 2.5) < 0.01;
     bool objectSpecular = materialSample.b > 2.5 && materialSample.b < 3.5;
     bool ambientOverride = materialSample.b > 3.5;
+    bool emissiveOverride = materialSample.b > 4.5;
     float ao = ambientOverride ? 1.0 : clamp(materialSample.b, 0.0, 1.0);
     float emission = max(materialSample.a, 0.0);
     vec3 ambient = albedo * (ambientOverride ? vec3(1.0) : scene.ambientColor.rgb * ao);
@@ -116,11 +117,12 @@ void main() {
     vec3 V = normalize(scene.viewInverse[3].xyz - worldPos);
     vec3 H = normalize(L + V);
     float spec = pow(max(dot(N, H), 0.0), mix(128.0, 1.0, roughness));
-    vec3 specular = specularColor * sunCol * spec * specularStrength * shadow;
+    vec3 specular = emissiveOverride ? vec3(0.0) : specularColor * sunCol * spec * specularStrength * shadow;
     if (scene.effectTime.y > 0.5)
         specular *= 0.15;
 
-    vec3 color = ambient + pointAmbient + diffuse + pointDiffuse + specular + reflectionColor + albedo * emission;
+    vec3 emissive = emissiveOverride ? specularColor * emission : albedo * emission;
+    vec3 color = ambient + pointAmbient + diffuse + pointDiffuse + specular + reflectionColor + emissive;
 
     if (waterSurface)
     {

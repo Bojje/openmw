@@ -62,6 +62,7 @@ namespace Render
         bool terrainParallax = false;
         bool terrainSpecular = false;
         bool ambientOverride = false;
+        bool emissiveOverride = false;
         std::shared_ptr<const TextureData> alphaTexture;
     };
 
@@ -303,11 +304,21 @@ namespace Render
                 vertex.color[1] *= mesh.mesh.material.diffuse.y;
                 vertex.color[2] *= mesh.mesh.material.diffuse.z;
                 vertex.color[3] *= mesh.mesh.material.diffuse.w;
-                vertex.material[0] = std::clamp(1.f - mesh.mesh.material.glossiness / 128.f, 0.f, 1.f);
-                vertex.material[1] = 0.f;
-                vertex.material[2] = mesh.mesh.material.terrainSpecular ? 2.f : 1.f;
-                vertex.material[3] = std::max({ mesh.mesh.material.emissive.x, mesh.mesh.material.emissive.y,
-                    mesh.mesh.material.emissive.z });
+                if (mesh.mesh.material.emissiveOverride)
+                {
+                    vertex.material[0] = std::clamp(mesh.mesh.material.emissive.x, 0.f, 1.f);
+                    vertex.material[1] = std::clamp(mesh.mesh.material.emissive.y, 0.f, 1.f);
+                    vertex.material[2] = std::clamp(mesh.mesh.material.emissive.z, 0.f, 1.f);
+                    vertex.material[3] = std::max(mesh.mesh.material.emissive.w, 0.f);
+                }
+                else
+                {
+                    vertex.material[0] = std::clamp(1.f - mesh.mesh.material.glossiness / 128.f, 0.f, 1.f);
+                    vertex.material[1] = 0.f;
+                    vertex.material[2] = mesh.mesh.material.terrainSpecular ? 2.f : 1.f;
+                    vertex.material[3] = std::max({ mesh.mesh.material.emissive.x, mesh.mesh.material.emissive.y,
+                        mesh.mesh.material.emissive.z });
+                }
                 result.vertices.push_back(vertex);
             }
             result.draws.push_back(draw);

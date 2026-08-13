@@ -282,6 +282,11 @@ namespace Render
                     textureOverrideApplied = true;
                 }
                 instance.mesh.material.ambientOverride = effect->ambientOverride;
+                if (effect->emissiveOverride)
+                {
+                    instance.mesh.material.emissive = effect->emissiveColor;
+                    instance.mesh.material.emissiveOverride = true;
+                }
                 submission.meshes.push_back(std::move(instance));
             }
             result.push_back(std::move(submission));
