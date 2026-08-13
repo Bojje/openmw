@@ -546,7 +546,7 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the frozen `openmw-vulkan-osg-reference` tag, the current checkpoint changes
-208 code files excluding this ledger, deleting 2,292 lines and adding 16,359 lines (net `+14,067`). The larger Vulkan-only
+209 code files excluding this ledger, deleting 2,321 lines and adding 16,372 lines (net `+14,051`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; the current branch continues the reduction
 work with renderer-neutral ownership and compatibility-wrapper deletion. The live no-GUI
 consumer is the first deletion checkpoint; further reduction can now target OSG
@@ -791,6 +791,9 @@ Neutral main-hand and carried-left weapon attachments now cross the world snapsh
 contracts; enchanted equipment color is carried through the same neutral emissive override used by armor, submission
 resolves attachments only when a compatible actor pose is available, and attachment state is invalidated on
 actor-model replacement.
+The renderer-neutral animation boundary now also owns the shared torso/left-arm/right-arm bone classification used by
+both neutral pose consumers and the OSG compatibility keyframe extractor, eliminating a duplicated mask vocabulary
+before per-bone arbitration is moved fully into neutral playback.
   Neutral Lua/sound/melee/spell text-key dispatch is now covered for the migrated event classes.
 - Resting actors, owned-item lookup, line-of-sight, moving doors, and transformation-script movement/rotation now use active-cell state and world-model transforms instead of treating an absent OSG node as inactive.
 - Neutral focus selection and gameplay raycasts now use the renderer-neutral camera state and physics collision masks, so activation and targeting no longer require an OSG renderer.

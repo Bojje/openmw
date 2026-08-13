@@ -2,9 +2,17 @@
 #include <stdexcept>
 
 #include <components/render/meshconversion.hpp>
+#include <components/render/animationmask.hpp>
 
 int main()
 {
+    if (Render::classifyAnimationBone("Bip01 Spine1") != Render::AnimationBoneGroup::Torso
+        || Render::classifyAnimationBone("BIP01 L Hand") != Render::AnimationBoneGroup::LeftArm
+        || Render::classifyAnimationBone("weapon bone") != Render::AnimationBoneGroup::RightArm
+        || !Render::animationBoneInMask("Shield Bone", Render::AnimationMask_LeftArm)
+        || Render::animationBoneInMask("Bip01 L Hand", Render::AnimationMask_RightArm))
+        throw std::runtime_error("renderer-neutral animation bone masks are inconsistent");
+
     std::vector<Render::MeshVertexSource> source(3);
     source[1].position[0] = 1.f;
     source[1].texcoord[0] = 1.f;

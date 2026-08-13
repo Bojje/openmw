@@ -1,7 +1,5 @@
 #include "keyframemanager.hpp"
 
-#include <array>
-
 #include <components/vfs/manager.hpp>
 
 #include <osgAnimation/Animation>
@@ -15,6 +13,7 @@
 #include <components/nifosg/nifloader.hpp>
 #include <components/sceneutil/keyframe.hpp>
 #include <components/sceneutil/osgacontroller.hpp>
+#include <components/render/animationmask.hpp>
 #include <components/vfs/pathutil.hpp>
 
 #include "animation.hpp"
@@ -58,41 +57,17 @@ namespace Resource
 
     bool RetrieveAnimationsVisitor::belongsToLeftUpperExtremity(const std::string& name)
     {
-        static const std::array boneNames = { "bip01 l clavicle", "left clavicle", "bip01 l upperarm", "left upper arm",
-            "bip01 l forearm", "bip01 l hand", "left hand", "left wrist", "shield bone", "bip01 l pinky1",
-            "bip01 l pinky2", "bip01 l pinky3", "bip01 l ring1", "bip01 l ring2", "bip01 l ring3", "bip01 l middle1",
-            "bip01 l middle2", "bip01 l middle3", "bip01 l pointer1", "bip01 l pointer2", "bip01 l pointer3",
-            "bip01 l thumb1", "bip01 l thumb2", "bip01 l thumb3", "left forearm" };
-
-        if (std::find(boneNames.begin(), boneNames.end(), name) != boneNames.end())
-            return true;
-
-        return false;
+        return Render::classifyAnimationBone(name) == Render::AnimationBoneGroup::LeftArm;
     }
 
     bool RetrieveAnimationsVisitor::belongsToRightUpperExtremity(const std::string& name)
     {
-        static const std::array boneNames = { "bip01 r clavicle", "right clavicle", "bip01 r upperarm",
-            "right upper arm", "bip01 r forearm", "bip01 r hand", "right hand", "right wrist", "bip01 r thumb1",
-            "bip01 r thumb2", "bip01 r thumb3", "weapon bone", "bip01 r pinky1", "bip01 r pinky2", "bip01 r pinky3",
-            "bip01 r ring1", "bip01 r ring2", "bip01 r ring3", "bip01 r middle1", "bip01 r middle2", "bip01 r middle3",
-            "bip01 r pointer1", "bip01 r pointer2", "bip01 r pointer3", "right forearm" };
-
-        if (std::find(boneNames.begin(), boneNames.end(), name) != boneNames.end())
-            return true;
-
-        return false;
+        return Render::classifyAnimationBone(name) == Render::AnimationBoneGroup::RightArm;
     }
 
     bool RetrieveAnimationsVisitor::belongsToTorso(const std::string& name)
     {
-        static const std::array boneNames
-            = { "bip01 spine1", "bip01 spine2", "bip01 neck", "bip01 head", "head", "neck", "chest", "groin" };
-
-        if (std::find(boneNames.begin(), boneNames.end(), name) != boneNames.end())
-            return true;
-
-        return false;
+        return Render::classifyAnimationBone(name) == Render::AnimationBoneGroup::Torso;
     }
 
     void RetrieveAnimationsVisitor::addKeyframeController(const std::string& name, const osg::Node& node)
