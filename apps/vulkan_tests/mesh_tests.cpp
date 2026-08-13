@@ -191,7 +191,19 @@ int main()
     planarCollider.mYVector = { 0.f, 1.f, 0.f };
     planarCollider.mPlaneNormal = { 0.f, 0.f, 1.f };
     planarCollider.mPlaneDistance = 0.f;
-    planarCollider.mNext = Nif::NiParticleModifierPtr(nullptr);
+    Nif::NiPlanarCollider secondPlanarCollider;
+    secondPlanarCollider.mRecordType = Nif::RC_NiPlanarCollider;
+    secondPlanarCollider.mBounceFactor = 0.25f;
+    secondPlanarCollider.mDieOnCollision = false;
+    secondPlanarCollider.mSpawnOnCollision = false;
+    secondPlanarCollider.mExtents = { 1.f, 1.f };
+    secondPlanarCollider.mPosition = { 100.f, 100.f, 0.f };
+    secondPlanarCollider.mXVector = { 1.f, 0.f, 0.f };
+    secondPlanarCollider.mYVector = { 0.f, 1.f, 0.f };
+    secondPlanarCollider.mPlaneNormal = { 0.f, 0.f, 1.f };
+    secondPlanarCollider.mPlaneDistance = 0.f;
+    secondPlanarCollider.mNext = Nif::NiParticleModifierPtr(nullptr);
+    planarCollider.mNext = Nif::NiParticleModifierPtr(&secondPlanarCollider);
     Nif::NiParticleSystemController collisionController;
     collisionController.mRecordType = Nif::RC_NiParticleSystemController;
     collisionController.mFlags = Nif::NiTimeController::Flag_Active;
@@ -207,7 +219,7 @@ int main()
         = Nif::convertParticles(collisionParticleSource, &collisionParticleSystem);
     const Render::MeshData bouncedParticles = Render::advanceParticleMesh(collisionParticles, 0.5f);
     if (!collisionParticles.particles || !collisionParticles.particles->simulation
-        || !collisionParticles.particles->simulation->collider || bouncedParticles.vertices.size() != 8
+        || collisionParticles.particles->simulation->colliders.size() != 2 || bouncedParticles.vertices.size() != 8
         || std::abs(bouncedParticles.vertices[0].tangent[2] - 0.5f) > 1e-5f
         || bouncedParticles.vertices[0].color[3] != 0.f)
         throw std::runtime_error("neutral particle planar collider did not reflect motion");

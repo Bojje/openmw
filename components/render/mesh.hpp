@@ -245,7 +245,7 @@ namespace Render
         };
 
         std::shared_ptr<const Emitter> emitter;
-        std::shared_ptr<const Collider> collider;
+        std::vector<std::shared_ptr<const Collider>> colliders;
         std::shared_ptr<const Spawn> spawn;
 
         bool valid() const
@@ -253,7 +253,11 @@ namespace Render
             return Render::valid(acceleration) && std::isfinite(drag) && std::isfinite(growTime)
                 && std::isfinite(fadeTime) && std::isfinite(baseScale) && std::isfinite(rotationSpeed)
                 && drag >= 0.f && growTime >= 0.f && fadeTime >= 0.f && baseScale >= 0.f
-                && (!emitter || emitter->valid()) && (!collider || collider->valid()) && (!spawn || spawn->valid());
+                && (!emitter || emitter->valid())
+                && std::all_of(colliders.begin(), colliders.end(), [](const auto& collider) {
+                       return collider && collider->valid();
+                   })
+                && (!spawn || spawn->valid());
         }
     };
 
@@ -270,7 +274,8 @@ namespace Render
                 return false;
             if (simulation && simulation->emitter && !simulation->emitter->valid())
                 return false;
-            if (simulation && simulation->collider && !simulation->collider->valid())
+            if (simulation && !std::all_of(simulation->colliders.begin(), simulation->colliders.end(),
+                               [](const auto& collider) { return collider && collider->valid(); }))
                 return false;
             if (simulation && simulation->spawn && !simulation->spawn->valid())
                 return false;
@@ -302,9 +307,8 @@ namespace Render
         const ParticleSimulationData* simulation = source.particles->simulation.get();
         const Vec3 acceleration = simulation ? simulation->acceleration : Vec3{};
         const float drag = simulation ? simulation->drag : 0.f;
-        const ParticleSimulationData::Collider* collider = simulation && simulation->collider
-            ? simulation->collider.get()
-            : nullptr;
+        const std::vector<std::shared_ptr<const ParticleSimulationData::Collider>>* colliders
+            = simulation ? &simulation->colliders : nullptr;
         const auto dot = [](const Vec3& lhs, const Vec3& rhs) {
             return lhs.x * rhs.x + lhs.y * rhs.y + lhs.z * rhs.z;
         };
@@ -362,64 +366,98 @@ namespace Render
             }
             return scaleVector(direction, speed * speedScale);
         };
-        const auto resolveCollision = [&](const Vec3& origin, Vec3 center, float motionTime, bool& collided) {
-            if (!collider || motionTime <= 0.f)
-                return center;
-            const Vec3 travel = subtract(center, origin);
-            if (collider->type == ParticleSimulationData::Collider::Type::Planar)
-            {
-                const Vec3 normal = normalize(collider->normal, { 0.f, 0.f, 1.f });
-                const float startDistance = dot(subtract(origin, collider->position), normal) - collider->planeDistance;
-                const float endDistance = dot(subtract(center, collider->position), normal) - collider->planeDistance;
-                if ((startDistance > 0.f && endDistance < 0.f) || (startDistance < 0.f && endDistance > 0.f))
+        struct CollisionResult
+        {
+            Vec3 center;
+            bool collided = false;
+            bool die = false;
+            bool spawn = false;
+        };
+        const auto resolveCollision = [&](const Vec3& origin, Vec3 center, float motionTime) {
+            CollisionResult collisionResult{ center };
+            if (!colliders || motionTime <= 0.f)
+                return collisionResult;
+
+            const auto resolveOne = [&](const Vec3& segmentOrigin, Vec3 segmentCenter,
+                                            const ParticleSimulationData::Collider& collider, bool& collided) {
+                const Vec3 travel = subtract(segmentCenter, segmentOrigin);
+                if (collider.type == ParticleSimulationData::Collider::Type::Planar)
                 {
-                    const float denominator = startDistance - endDistance;
-                    const float fraction = denominator != 0.f ? std::clamp(startDistance / denominator, 0.f, 1.f) : 0.f;
-                    const Vec3 contact = add(origin, scaleVector(travel, fraction));
-                    const Vec3 xAxis = normalize(collider->xAxis, { 1.f, 0.f, 0.f });
-                    const Vec3 yAxis = normalize(collider->yAxis, { 0.f, 1.f, 0.f });
-                    const Vec3 relative = subtract(contact, collider->position);
-                    if (std::abs(dot(relative, xAxis)) <= collider->extentX * 0.5f
-                        && std::abs(dot(relative, yAxis)) <= collider->extentY * 0.5f)
+                    const Vec3 normal = normalize(collider.normal, { 0.f, 0.f, 1.f });
+                    const float startDistance = dot(subtract(segmentOrigin, collider.position), normal)
+                        - collider.planeDistance;
+                    const float endDistance = dot(subtract(segmentCenter, collider.position), normal)
+                        - collider.planeDistance;
+                    if ((startDistance > 0.f && endDistance < 0.f)
+                        || (startDistance < 0.f && endDistance > 0.f))
                     {
-                        collided = true;
-                        return subtract(center, scaleVector(normal, endDistance * (1.f + collider->bounce)));
+                        const float denominator = startDistance - endDistance;
+                        const float fraction
+                            = denominator != 0.f ? std::clamp(startDistance / denominator, 0.f, 1.f) : 0.f;
+                        const Vec3 contact = add(segmentOrigin, scaleVector(travel, fraction));
+                        const Vec3 xAxis = normalize(collider.xAxis, { 1.f, 0.f, 0.f });
+                        const Vec3 yAxis = normalize(collider.yAxis, { 0.f, 1.f, 0.f });
+                        const Vec3 relative = subtract(contact, collider.position);
+                        if (std::abs(dot(relative, xAxis)) <= collider.extentX * 0.5f
+                            && std::abs(dot(relative, yAxis)) <= collider.extentY * 0.5f)
+                        {
+                            collided = true;
+                            return subtract(segmentCenter, scaleVector(normal, endDistance * (1.f + collider.bounce)));
+                        }
+                    }
+                    return segmentCenter;
+                }
+
+                const Vec3 offset = subtract(segmentOrigin, collider.position);
+                const float radiusSquared = collider.radius * collider.radius;
+                const float startSquared = dot(offset, offset);
+                const float travelSquared = dot(travel, travel);
+                float fraction = -1.f;
+                if (startSquared <= radiusSquared)
+                    fraction = 0.f;
+                else if (travelSquared > 0.f)
+                {
+                    const float b = 2.f * dot(offset, travel);
+                    const float c = startSquared - radiusSquared;
+                    const float discriminant = b * b - 4.f * travelSquared * c;
+                    if (discriminant >= 0.f)
+                    {
+                        const float root = std::sqrt(discriminant);
+                        const float first = (-b - root) / (2.f * travelSquared);
+                        const float second = (-b + root) / (2.f * travelSquared);
+                        if (first >= 0.f && first <= 1.f)
+                            fraction = first;
+                        else if (second >= 0.f && second <= 1.f)
+                            fraction = second;
                     }
                 }
-                return center;
-            }
+                if (fraction < 0.f)
+                    return segmentCenter;
+                collided = true;
+                const Vec3 contact = add(segmentOrigin, scaleVector(travel, fraction));
+                const Vec3 normal = normalize(subtract(contact, collider.position), { 0.f, 0.f, 1.f });
+                const Vec3 remaining = subtract(segmentCenter, contact);
+                const Vec3 reflected = subtract(remaining, scaleVector(normal, 2.f * dot(remaining, normal)));
+                return add(contact, scaleVector(reflected, collider.bounce));
+            };
 
-            const Vec3 offset = subtract(origin, collider->position);
-            const float radiusSquared = collider->radius * collider->radius;
-            const float startSquared = dot(offset, offset);
-            const float travelSquared = dot(travel, travel);
-            float fraction = -1.f;
-            if (startSquared <= radiusSquared)
-                fraction = 0.f;
-            else if (travelSquared > 0.f)
+            Vec3 segmentOrigin = origin;
+            for (const auto& collider : *colliders)
             {
-                const float b = 2.f * dot(offset, travel);
-                const float c = startSquared - radiusSquared;
-                const float discriminant = b * b - 4.f * travelSquared * c;
-                if (discriminant >= 0.f)
+                if (!collider)
+                    continue;
+                bool collided = false;
+                const Vec3 previousCenter = collisionResult.center;
+                collisionResult.center = resolveOne(segmentOrigin, collisionResult.center, *collider, collided);
+                if (collided)
                 {
-                    const float root = std::sqrt(discriminant);
-                    const float first = (-b - root) / (2.f * travelSquared);
-                    const float second = (-b + root) / (2.f * travelSquared);
-                    if (first >= 0.f && first <= 1.f)
-                        fraction = first;
-                    else if (second >= 0.f && second <= 1.f)
-                        fraction = second;
+                    collisionResult.collided = true;
+                    collisionResult.die = collisionResult.die || collider->dieOnCollision;
+                    collisionResult.spawn = collisionResult.spawn || collider->spawnOnCollision;
+                    segmentOrigin = previousCenter;
                 }
             }
-            if (fraction < 0.f)
-                return center;
-            collided = true;
-            const Vec3 contact = add(origin, scaleVector(travel, fraction));
-            const Vec3 normal = normalize(subtract(contact, collider->position), { 0.f, 0.f, 1.f });
-            const Vec3 remaining = subtract(center, contact);
-            const Vec3 reflected = subtract(remaining, scaleVector(normal, 2.f * dot(remaining, normal)));
-            return add(contact, scaleVector(reflected, collider->bounce));
+            return collisionResult;
         };
 
         struct SpawnedParticle
@@ -440,13 +478,12 @@ namespace Render
             const Vec3 displacement = { state.velocity.x * displacementScale + acceleration.x * accelerationScale,
                 state.velocity.y * displacementScale + acceleration.y * accelerationScale,
                 state.velocity.z * displacementScale + acceleration.z * accelerationScale };
-            bool collided = false;
-            const Vec3 center = resolveCollision(origin,
-                { origin.x + displacement.x, origin.y + displacement.y, origin.z + displacement.z }, motionTime,
-                collided);
-            if (collided && collider && collider->dieOnCollision)
+            const CollisionResult collision = resolveCollision(origin,
+                { origin.x + displacement.x, origin.y + displacement.y, origin.z + displacement.z }, motionTime);
+            const Vec3 center = collision.center;
+            if (collision.die)
                 alive = false;
-            if (collided && collider && collider->spawnOnCollision && spawnedParticles.size() < 32)
+            if (collision.spawn && spawnedParticles.size() < 32)
             {
                 ParticleState child;
                 child.lifespan = state.lifespan > age ? state.lifespan - age : state.lifespan;

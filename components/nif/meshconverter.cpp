@@ -1167,14 +1167,11 @@ namespace Nif
                         spherical->mSpawnOnCollision, spherical->mCenter, spherical->mRadius);
                 }
                 if (collider && collider->valid())
-                {
-                    result->collider = std::move(collider);
-                    break;
-                }
+                    result->colliders.push_back(std::move(collider));
             }
         }
 
-        if (!result->collider)
+        if (result->colliders.empty())
         {
             for (const NiPSysModifierPtr& modifierReference : system->mModifiers)
             {
@@ -1207,13 +1204,8 @@ namespace Nif
                             spherical->mCollideSpawn, center, spherical->mRadius);
                     }
                     if (collider && collider->valid())
-                    {
-                        result->collider = std::move(collider);
-                        break;
-                    }
+                        result->colliders.push_back(std::move(collider));
                 }
-                if (result->collider)
-                    break;
             }
         }
         return result;
