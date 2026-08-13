@@ -477,6 +477,27 @@ int main()
         || !visibilitySubmission.valid())
         throw std::runtime_error("renderer-neutral submission did not apply view-distance ownership");
 
+    Render::WorldScene terrainVisibilityWorld;
+    int nearTerrainCell = 0;
+    int farTerrainCell = 0;
+    terrainVisibilityWorld.recordCell(&nearTerrainCell, true, 0, 0, "near terrain", "visibility");
+    terrainVisibilityWorld.recordCell(&farTerrainCell, true, 1, 0, "far terrain", "visibility");
+    Render::TerrainTile nearTerrain = neutralTerrain;
+    nearTerrain.center = { 2.f, 0.f };
+    Render::TerrainTile farTerrain = neutralTerrain;
+    farTerrain.center = { 20.f, 0.f };
+    terrainVisibilityWorld.setTerrainTiles(&nearTerrainCell, { nearTerrain });
+    terrainVisibilityWorld.setTerrainTiles(&farTerrainCell, { farTerrain });
+    Render::SceneData terrainVisibilityScene;
+    terrainVisibilityScene.viewDistance = 10.f;
+    const Render::SceneSubmission terrainVisibilitySubmission = Render::collectSceneSubmission(
+        terrainVisibilityWorld, terrainVisibilityScene, "visibility",
+        [](std::string_view) { return std::vector<Render::MeshInstance>(); }, true, false);
+    if (terrainVisibilitySubmission.terrainTiles.size() != 1
+        || terrainVisibilitySubmission.terrainTiles.front().center != nearTerrain.center
+        || !terrainVisibilitySubmission.valid())
+        throw std::runtime_error("renderer-neutral submission did not apply terrain view-distance ownership");
+
     Render::TerrainRegion terrainRegion;
     terrainRegion.minCellX = 0;
     terrainRegion.maxCellX = 1;

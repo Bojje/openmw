@@ -576,6 +576,58 @@ namespace Render
         });
     }
 
+    inline bool terrainTileIntersectsViewDistance(const TerrainTile& tile, const Vec3& cameraPosition,
+        float viewDistance)
+    {
+        if (viewDistance <= 0.f || !std::isfinite(viewDistance) || !tile.valid())
+            return true;
+
+        float minimumX = std::numeric_limits<float>::infinity();
+        float maximumX = -std::numeric_limits<float>::infinity();
+        float minimumY = std::numeric_limits<float>::infinity();
+        float maximumY = -std::numeric_limits<float>::infinity();
+        float minimumZ = std::numeric_limits<float>::infinity();
+        float maximumZ = -std::numeric_limits<float>::infinity();
+        for (const TerrainVertex& vertex : tile.vertices)
+        {
+            if (!std::all_of(vertex.position.begin(), vertex.position.end(), [](float value) {
+                    return std::isfinite(value);
+                }))
+                return true;
+            minimumX = std::min(minimumX, vertex.position[0]);
+            maximumX = std::max(maximumX, vertex.position[0]);
+            minimumY = std::min(minimumY, vertex.position[1]);
+            maximumY = std::max(maximumY, vertex.position[1]);
+            minimumZ = std::min(minimumZ, vertex.position[2]);
+            maximumZ = std::max(maximumZ, vertex.position[2]);
+        }
+
+        const float offsetX = tile.center[0] * tile.cellWorldSize;
+        const float offsetY = tile.center[1] * tile.cellWorldSize;
+        minimumX += offsetX;
+        maximumX += offsetX;
+        minimumY += offsetY;
+        maximumY += offsetY;
+        const float closestX = std::clamp(cameraPosition.x, minimumX, maximumX);
+        const float closestY = std::clamp(cameraPosition.y, minimumY, maximumY);
+        const float closestZ = std::clamp(cameraPosition.z, minimumZ, maximumZ);
+        const float dx = closestX - cameraPosition.x;
+        const float dy = closestY - cameraPosition.y;
+        const float dz = closestZ - cameraPosition.z;
+        return dx * dx + dy * dy + dz * dz <= viewDistance * viewDistance;
+    }
+
+    inline void cullTerrainTilesToView(std::vector<TerrainTile>& tiles, const SceneData& scene)
+    {
+        if (scene.viewDistance <= 0.f)
+            return;
+        const Vec3 cameraPosition{ scene.viewInverse.data[12], scene.viewInverse.data[13],
+            scene.viewInverse.data[14] };
+        std::erase_if(tiles, [&](const TerrainTile& tile) {
+            return !terrainTileIntersectsViewDistance(tile, cameraPosition, scene.viewDistance);
+        });
+    }
+
     // Build the backend-neutral portion of a frame from the scene owner. The
     // resource resolver remains supplied by the game layer, while mesh and
     // terrain collection stay independent of any renderer implementation.
@@ -677,6 +729,7 @@ namespace Render
                         result.terrainTiles.push_back(*selected);
                 }
             }
+            cullTerrainTilesToView(result.terrainTiles, scene);
         }
         return result;
     }
