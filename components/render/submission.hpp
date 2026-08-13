@@ -535,6 +535,47 @@ namespace Render
         dynamic.boneNames = skinning->boneNames;
     }
 
+    inline bool meshIntersectsViewDistance(const MeshInstance& instance, const Vec3& cameraPosition,
+        float viewDistance)
+    {
+        if (viewDistance <= 0.f || !std::isfinite(viewDistance) || !Render::valid(instance.transform)
+            || instance.mesh.vertices.empty())
+            return true;
+
+        const float maximumDistanceSquared = viewDistance * viewDistance;
+        for (const MeshVertex& vertex : instance.mesh.vertices)
+        {
+            const float x = instance.transform.data[0] * vertex.position[0]
+                + instance.transform.data[4] * vertex.position[1]
+                + instance.transform.data[8] * vertex.position[2] + instance.transform.data[12];
+            const float y = instance.transform.data[1] * vertex.position[0]
+                + instance.transform.data[5] * vertex.position[1]
+                + instance.transform.data[9] * vertex.position[2] + instance.transform.data[13];
+            const float z = instance.transform.data[2] * vertex.position[0]
+                + instance.transform.data[6] * vertex.position[1]
+                + instance.transform.data[10] * vertex.position[2] + instance.transform.data[14];
+            if (!std::isfinite(x) || !std::isfinite(y) || !std::isfinite(z))
+                return true;
+            const float dx = x - cameraPosition.x;
+            const float dy = y - cameraPosition.y;
+            const float dz = z - cameraPosition.z;
+            if (dx * dx + dy * dy + dz * dz <= maximumDistanceSquared)
+                return true;
+        }
+        return false;
+    }
+
+    inline void cullMeshInstancesToView(std::vector<MeshInstance>& meshes, const SceneData& scene)
+    {
+        if (scene.viewDistance <= 0.f)
+            return;
+        const Vec3 cameraPosition{ scene.viewInverse.data[12], scene.viewInverse.data[13],
+            scene.viewInverse.data[14] };
+        std::erase_if(meshes, [&](const MeshInstance& instance) {
+            return !meshIntersectsViewDistance(instance, cameraPosition, scene.viewDistance);
+        });
+    }
+
     // Build the backend-neutral portion of a frame from the scene owner. The
     // resource resolver remains supplied by the game layer, while mesh and
     // terrain collection stay independent of any renderer implementation.
@@ -546,6 +587,7 @@ namespace Render
         SceneSubmission result;
         result.scene = scene;
         result.meshes = collectWorldMeshes(world, resolveMeshes, worldspace, &result.unresolvedModels);
+        cullMeshInstancesToView(result.meshes, scene);
         std::vector<MeshInstance> weatherMeshes = collectWeatherMeshes(world, scene);
         result.meshes.insert(result.meshes.end(), std::make_move_iterator(weatherMeshes.begin()),
             std::make_move_iterator(weatherMeshes.end()));
@@ -556,6 +598,8 @@ namespace Render
         result.meshes.insert(result.meshes.end(), std::make_move_iterator(waterMeshes.begin()),
             std::make_move_iterator(waterMeshes.end()));
         collectEffectMeshes(world, resolveMeshes, result.effects, result.unresolvedModels, includeEffectBindPose);
+        for (EffectMeshSubmission& effect : result.effects)
+            cullMeshInstancesToView(effect.meshes, scene);
         for (const CellScene* cell : world.cellsInOrder(worldspace))
             for (const WorldObject& object : cell->objects)
             {
@@ -576,6 +620,7 @@ namespace Render
                 }
                 if (includeBindPose)
                     applyBindPose(dynamic);
+                cullMeshInstancesToView(dynamic.meshes, scene);
                 result.dynamicMeshes.push_back(std::move(dynamic));
             }
 

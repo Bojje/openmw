@@ -75,6 +75,10 @@ namespace Render
         Mat4 projection = identityMat4();
         Mat4 viewInverse = identityMat4();
         Mat4 projInverse = identityMat4();
+        // Backend-neutral far distance used by scene submission visibility.
+        // Zero disables distance culling for fixtures and non-perspective
+        // callers that do not provide a world view distance.
+        float viewDistance = 0.f;
         Vec4 sunDirection{ 0.f, 0.f, -1.f, 0.f };
         Vec4 sunColor{ 1.f, 1.f, 1.f, 1.f };
         Vec4 ambientColor{ 0.f, 0.f, 0.f, 1.f };
@@ -103,7 +107,8 @@ namespace Render
             return Render::valid(view) && Render::valid(projection) && Render::valid(viewInverse)
                 && Render::valid(projInverse) && Render::valid(sunDirection) && Render::valid(sunColor)
                 && Render::valid(ambientColor) && Render::valid(fogColor) && Render::valid(fogParameters)
-                && Render::valid(skyColor) && Render::valid(effectTime) && Render::valid(pointLightCount)
+                && Render::valid(skyColor) && Render::valid(effectTime) && Render::valid(viewDistance)
+                && viewDistance >= 0.f && Render::valid(pointLightCount)
                 && pointLightCount.x >= 0.f && pointLightCount.x <= static_cast<float>(maxPointLights)
                 && std::floor(pointLightCount.x) == pointLightCount.x
                 && [&] {

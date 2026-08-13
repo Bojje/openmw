@@ -456,6 +456,27 @@ int main()
         || !aggregate.valid())
         throw std::runtime_error("renderer-neutral scene submission collector lost world state");
 
+    Render::WorldScene visibilityWorld;
+    int nearVisibilityCell = 0;
+    int farVisibilityCell = 0;
+    visibilityWorld.recordCell(&nearVisibilityCell, true, 0, 0, "near", "visibility");
+    visibilityWorld.recordCell(&farVisibilityCell, true, 1, 0, "far", "visibility");
+    Render::ObjectTransform nearTransform;
+    nearTransform.position = { 2.f, 0.f, 0.f };
+    Render::ObjectTransform farTransform;
+    farTransform.position = { 20.f, 0.f, 0.f };
+    visibilityWorld.recordObject(&nearVisibilityCell, &nearVisibilityCell, true, 0, 0, "near", "near.nif",
+        nearTransform, true, "visibility");
+    visibilityWorld.recordObject(&farVisibilityCell, &farVisibilityCell, true, 1, 0, "far", "far.nif",
+        farTransform, true, "visibility");
+    Render::SceneData visibilityScene;
+    visibilityScene.viewDistance = 10.f;
+    const Render::SceneSubmission visibilitySubmission = Render::collectSceneSubmission(visibilityWorld,
+        visibilityScene, "visibility", [&](std::string_view) { return std::vector<Render::MeshInstance>{ aggregateMesh }; }, false);
+    if (visibilitySubmission.meshes.size() != 1 || visibilitySubmission.meshes.front().transform.data[12] != 2.f
+        || !visibilitySubmission.valid())
+        throw std::runtime_error("renderer-neutral submission did not apply view-distance ownership");
+
     Render::TerrainRegion terrainRegion;
     terrainRegion.minCellX = 0;
     terrainRegion.maxCellX = 1;

@@ -554,7 +554,7 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the frozen `openmw-vulkan-osg-reference` tag, the current checkpoint changes
-214 code files excluding this ledger, deleting 2,490 lines and adding 17,344 lines (net `+14,854`). The larger Vulkan-only
+214 code files excluding this ledger, deleting 2,490 lines and adding 17,416 lines (net `+14,926`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; the current branch continues the reduction
 work with renderer-neutral ownership and compatibility-wrapper deletion. The live no-GUI
 consumer is the first deletion checkpoint; further reduction can now target OSG
@@ -586,6 +586,9 @@ at the shared storage boundary, preventing ESM4 default layers from acquiring un
 parallax or specular state. Explicit ESM4 terrain specular maps now also select the terrain
 shader/material path even when specular is not packed into diffuse alpha, preserving their
 contribution in Vulkan.
+Static, dynamic, and effect mesh visibility now applies the engine view distance at the single
+renderer-neutral submission boundary; invalid or non-finite geometry remains visible for validation
+instead of being silently discarded.
 Neutral scene export receives the world-owned `ResourceSystem` directly for mesh and texture
 resolution, so `RenderingManager` is not used as that renderer-neutral resource gateway.
 The manager's OSG-owned terrain, object paging, incremental compile operation, light root, sky,
@@ -689,8 +692,8 @@ the game unplayable rather than reduce duplication safely.
 | Vulkan utility/queue helper paths | Removed | Complete |
 | Parsed NIF resource cache wrapper | Removed | Complete; cache now owns shared NIF files directly |
 | NIF-to-neutral mesh conversion | Renderer-neutral NIF boundary, material data, mesh cache, skinning metadata, world-selected layered actor/additional `.kf` pose sampling, highest-priority group metadata, neutral animation-group handoff, scripted queue priority, per-bone neutral overlay masks and priorities, text-key extraction and selected-segment rebasing, neutral Lua/sound/melee/spell event dispatch with footstep and random-attack fallback parity, dynamic mesh payloads, named NPC body-part and armor/clothing attachments, neutral controller chains and transform blends, neutral weapon/shield attachments with equipment glow metadata, `SceneSubmission`, Vulkan mesh batch, full-game neutral resolver, controller-sequence clip-time extrapolation, equal-priority sequence weighting, case-insensitive pose/remap/attachment bone lookup, controller-sequence blend-index routing, emissive RGB G-buffer transport, reflected caustic UVs, and point-light specular lighting | Add exact enchanted equipment luma/gloss layering, image-backed texture resolution, and dynamic shading |
-| Terrain geometry and layer data | Renderer-neutral `Terrain::RenderStorage` contract with cached per-cell LOD snapshots, active-cell-aware aligned regions, root-relative quadtree block assembly, legacy texture-path correction, and a Vulkan opaque/normal/parallax/blendmap/specular layer consumer; concrete `MWRender::TerrainStorage` and legacy OSG ChunkManager remain the reference data path, including explicit ESM4 specular textures | Add quadtree-scale visibility/streaming policy and broader image-format coverage |
-| Loaded-cell object identity, transforms, terrain snapshots, and paging state | Renderer-neutral `WorldScene`/`CellScene` snapshots updated by scene lifecycle; active-cell static references bypass legacy OSG paging visibility, and cell-lifecycle-cached terrain tiles flow into `SceneSubmission`; neutral movement, cell transfer, water, effect, and weather writes are now encapsulated by `MWWorld::Scene` | Consume snapshots from a backend and migrate visibility/paging policy |
+| Terrain geometry and layer data | Renderer-neutral `Terrain::RenderStorage` contract with cached per-cell LOD snapshots, active-cell-aware aligned regions, root-relative quadtree block assembly, legacy texture-path correction, and a Vulkan opaque/normal/parallax/blendmap/specular layer consumer; concrete `MWRender::TerrainStorage` and legacy OSG ChunkManager remain the reference data path, including explicit ESM4 specular textures | Complete submission visibility integration, then add backend-owned quadtree preload/streaming policy and broader image-format coverage |
+| Loaded-cell object identity, transforms, terrain snapshots, and paging state | Renderer-neutral `WorldScene`/`CellScene` snapshots updated by scene lifecycle; active-cell static references bypass legacy OSG paging visibility, cell-lifecycle-cached terrain tiles flow into `SceneSubmission`, and static/dynamic/effect submissions apply neutral view-distance visibility; neutral movement, cell transfer, water, effect, and weather writes are now encapsulated by `MWWorld::Scene` | Consume snapshots from a backend and migrate backend-owned preload/paging policy |
 | GUI, loading screens, screenshots, and presentation | NullWindowManager for Vulkan bootstrap; OSG/MyGUI reference path | Vulkan presentation and GUI coverage, then remove the null compatibility surface |
 
 This ledger is intentionally conservative: a subsystem is marked removable only after a
@@ -751,7 +754,7 @@ provide a usable surface, while validation errors remain hard failures.
   parallax, diffuse-alpha specular data, and explicit ESM4 specular textures; active-cell-aware region
   assembly now prevents paging holes from becoming neutral terrain; deterministic region LOD selection and
   adjacent-region gap limiting and root-relative quadtree block assembly are also neutral; quadtree-scale
-  visibility/streaming policy and
+  submission view-distance visibility is now neutral; backend-owned quadtree preload/streaming policy and
   full terrain image coverage remain.
 - Reach a static playable scene without OSG rendering, then expand neutral image coverage and
   establish camera synchronization.
