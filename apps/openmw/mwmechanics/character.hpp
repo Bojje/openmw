@@ -238,6 +238,7 @@ namespace MWMechanics
         /// choose a random animation group with \a prefix and numeric suffix
         /// @param num if non-nullptr, the chosen animation number will be written here
         std::string chooseRandomGroup(const std::string& prefix, int* num = nullptr) const;
+        std::string chooseNeutralRandomGroup(const std::string& prefix) const;
 
         bool updateCarriedLeftVisible(int weaptype) const;
 

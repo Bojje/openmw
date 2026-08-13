@@ -341,6 +341,17 @@ namespace MWMechanics
         return prefix + std::to_string(roll);
     }
 
+    std::string CharacterController::chooseNeutralRandomGroup(const std::string& prefix) const
+    {
+        MWBase::World* world = MWBase::Environment::get().getWorld();
+        int numAnims = 0;
+        while (world->getNeutralAnimationDuration(mPtr, prefix + std::to_string(numAnims + 1)))
+            ++numAnims;
+        if (numAnims == 0)
+            return prefix;
+        return prefix + std::to_string(Misc::Rng::rollDice(numAnims, world->getPrng()) + 1);
+    }
+
     void CharacterController::clearStateAnimation(std::string& anim) const
     {
         if (anim.empty())
@@ -2641,6 +2652,7 @@ namespace MWMechanics
         const bool knockdown = stats.getKnockedDown();
         const bool block = stats.getBlock() && !knockout && !recovery && !knockdown;
         const bool isSwimming = world->isSwimming(mPtr);
+        const CharacterState previousHitState = mHitState;
         stats.setBlock(false);
 
         if (!knockout && !knockdown && !recovery && !block)
@@ -2659,7 +2671,29 @@ namespace MWMechanics
         else
             mHitState = CharState_Block;
 
-        mCurrentHit = hitStateToAnimGroup(mHitState);
+        const bool hitStillPlaying = previousHitState == mHitState && !mCurrentHit.empty()
+            && world->isNeutralAnimationPlaying(mPtr, mCurrentHit);
+        if (!mCurrentHit.empty() && !hitStillPlaying && !knockout && mHitState != CharState_None)
+        {
+            // Match the legacy controller's completion edge: a finite hit or
+            // knockdown must release its state instead of being restarted on
+            // every neutral frame while gameplay recovery remains set.
+            mHitState = CharState_None;
+            mCurrentHit.clear();
+            stats.setKnockedDown(false);
+            stats.setHitRecovery(false);
+            return;
+        }
+
+        if (mCurrentHit.empty() || !hitStillPlaying)
+            mCurrentHit = hitStateToAnimGroup(mHitState);
+        if (recovery && !hitStillPlaying)
+        {
+            mCurrentHit = chooseNeutralRandomGroup(mCurrentHit);
+            if (mHitState == CharState_SwimHit
+                && !world->getNeutralAnimationDuration(mPtr, mCurrentHit))
+                mCurrentHit = chooseNeutralRandomGroup(hitStateToAnimGroup(CharState_Hit));
+        }
         if (!mCurrentHit.empty())
             world->updateNeutralAnimation(mPtr, mCurrentHit);
     }
@@ -3284,8 +3318,10 @@ namespace MWMechanics
             startKey = "loop stop";
             stopKey = "stop";
         }
-        const bool looping = mCurrentDeath.empty() && mCurrentHit.empty() && mAnimQueue.empty()
-            && mJumpState != JumpState_Landing;
+        const bool knockout = stats.getFatigue().getCurrent() < 0 || stats.getFatigue().getBase() == 0;
+        const bool looping = (mCurrentDeath.empty() && mCurrentHit.empty() && mAnimQueue.empty()
+                                 && mJumpState != JumpState_Landing)
+            || (knockout && !mCurrentHit.empty());
         world->updateNeutralAnimation(mPtr, animationGroup, animationTime, startKey, stopKey, looping);
         settings.mPosition[0] = settings.mPosition[1] = 0.f;
         if (movement.z() == 0.f)
