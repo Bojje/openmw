@@ -18,13 +18,13 @@ namespace Terrain
             return maxLod;
         }
 
-        int largestAlignedRegion(int x, int y, int maxCellX, int maxCellY,
+        int largestAlignedRegion(int x, int y, int rootMinX, int rootMinY, int maxCellX, int maxCellY,
             const std::set<std::pair<int, int>>& activeCells,
             const std::set<std::pair<int, int>>& covered)
         {
             int size = 1;
             while (size <= (maxCellX - x) && size <= (maxCellY - y)
-                && x % (size * 2) == 0 && y % (size * 2) == 0)
+                && (x - rootMinX) % (size * 2) == 0 && (y - rootMinY) % (size * 2) == 0)
             {
                 const int candidate = size * 2;
                 bool complete = true;
@@ -59,7 +59,8 @@ namespace Terrain
                     if (!activeCells.contains({ x, y }) || covered.contains({ x, y }))
                         continue;
 
-                    const int size = largestAlignedRegion(x, y, maxCellX, maxCellY, activeCells, covered);
+                    const int size = largestAlignedRegion(
+                        x, y, minCellX, minCellY, maxCellX, maxCellY, activeCells, covered);
                     Render::TerrainRegion& region = result.emplace_back();
                     region.minCellX = x;
                     region.maxCellX = x + size - 1;

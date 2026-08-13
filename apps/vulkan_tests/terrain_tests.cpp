@@ -120,6 +120,13 @@ int main()
                        return region.minCellX == region.maxCellX && region.minCellY == region.maxCellY;
                    }),
             "neutral terrain regions must not span inactive cell holes");
+        const std::set<std::pair<int, int>> shiftedDenseCells{ { 1, 1 }, { 2, 1 }, { 1, 2 }, { 2, 2 } };
+        const auto shiftedDenseRegions = neutralStorage.getRenderRegionTiles(shiftedDenseCells, ESM::RefId());
+        expect(shiftedDenseRegions.size() == 1 && shiftedDenseRegions.front().minCellX == 1
+                && shiftedDenseRegions.front().maxCellX == 2 && shiftedDenseRegions.front().minCellY == 1
+                && shiftedDenseRegions.front().maxCellY == 2 && shiftedDenseRegions.front().lods.front().size == 2.f
+                && shiftedDenseRegions.front().valid(),
+            "neutral terrain regions must align quadtree blocks relative to their active root");
         expect(tile.has_value() && tile->valid(), "terrain adapter returned an invalid tile");
         expect(tile->lod == 2 && tile->size == 4.f && tile->center[0] == 3.f && tile->center[1] == -2.f
                 && tile->cellWorldSize == 1.f,
