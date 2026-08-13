@@ -138,7 +138,7 @@ namespace
                 static_cast<std::streamsize>(packedBmp.size()));
         }
         {
-            std::ofstream output(root / "textures/test.dds", std::ios::binary);
+            std::ofstream output(root / "textures/normal.dds", std::ios::binary);
             output.write(reinterpret_cast<const char*>(dds.data()), static_cast<std::streamsize>(dds.size()));
         }
         {
@@ -177,28 +177,32 @@ namespace
         if (!indexedTgaTexture || indexedTgaTexture->width != 1 || indexedTgaTexture->height != 1
             || indexedTgaTexture->pixels != std::vector<std::uint8_t>({ 255, 0, 0, 255 }))
             throw std::runtime_error("neutral indexed TGA texture decoding changed pixel data");
-        const auto normal = resources.getNeutralTextureManager()->get(VFS::Path::Normalized("textures/test.dds"));
+        const auto normal = resources.getNeutralTextureManager()->get(VFS::Path::Normalized("textures/normal.dds"));
         if (!normal || normal->width != 4 || normal->height != 4 || normal->pixels.size() != 4 * 4 * 4
             || normal->pixels[0] < 190 || normal->pixels[0] > 194 || normal->pixels[1] < 126
             || normal->pixels[1] > 130 || normal->pixels[2] < 235 || normal->pixels[2] > 240
             || normal->pixels[3] != 255 || normal->pixels[4] < 62 || normal->pixels[4] > 66)
             throw std::runtime_error("neutral BC5 texture decoding did not reconstruct a normal");
+        const auto correctedTexture
+            = resources.getNeutralTextureManager()->get(VFS::Path::Normalized("textures/normal.tga"));
+        if (!correctedTexture || correctedTexture != normal)
+            throw std::runtime_error("neutral texture resolution did not apply the legacy DDS fallback");
         auto oversized = dds;
         write32(oversized, 12, std::numeric_limits<std::uint32_t>::max());
         write32(oversized, 16, std::numeric_limits<std::uint32_t>::max());
         {
-            std::ofstream output(root / "textures/test.dds", std::ios::binary | std::ios::trunc);
+            std::ofstream output(root / "textures/normal.dds", std::ios::binary | std::ios::trunc);
             output.write(reinterpret_cast<const char*>(oversized.data()), static_cast<std::streamsize>(oversized.size()));
         }
         resources.getNeutralTextureManager()->clearCache();
-        if (resources.getNeutralTextureManager()->get(VFS::Path::Normalized("textures/test.dds")))
+        if (resources.getNeutralTextureManager()->get(VFS::Path::Normalized("textures/normal.dds")))
             throw std::runtime_error("oversized neutral BC5 texture unexpectedly allocated");
         {
-            std::ofstream output(root / "textures/test.dds", std::ios::binary | std::ios::trunc);
+            std::ofstream output(root / "textures/normal.dds", std::ios::binary | std::ios::trunc);
             output.write(reinterpret_cast<const char*>(dds.data()), 128);
         }
         resources.getNeutralTextureManager()->clearCache();
-        if (resources.getNeutralTextureManager()->get(VFS::Path::Normalized("textures/test.dds")))
+        if (resources.getNeutralTextureManager()->get(VFS::Path::Normalized("textures/normal.dds")))
             throw std::runtime_error("truncated neutral BC5 texture unexpectedly decoded");
         std::filesystem::remove_all(root, error);
     }

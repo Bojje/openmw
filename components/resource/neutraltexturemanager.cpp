@@ -14,6 +14,7 @@
 #include <vector>
 
 #include <components/files/istreamptr.hpp>
+#include <components/misc/resourcehelpers.hpp>
 #include <components/vfs/manager.hpp>
 
 #ifdef OPENMW_NEUTRAL_PNG
@@ -753,7 +754,8 @@ namespace Resource
 
     std::shared_ptr<const Render::TextureData> NeutralTextureManager::get(VFS::Path::NormalizedView path)
     {
-        const std::string key(path.value());
+        const VFS::Path::Normalized correctedPath = Misc::ResourceHelpers::correctTexturePath(path, *mVfs);
+        const std::string key(correctedPath.value());
         {
             std::lock_guard lock(mMutex);
             const auto found = mCache.find(key);
@@ -763,12 +765,11 @@ namespace Resource
         std::shared_ptr<const Render::TextureData> result;
         try
         {
-            const Files::IStreamPtr stream = mVfs->find(path);
+            const Files::IStreamPtr stream = mVfs->find(correctedPath);
             if (stream)
             {
                 Bytes bytes((std::istreambuf_iterator<char>(*stream)), std::istreambuf_iterator<char>());
-                const VFS::Path::Normalized normalized(path);
-                result = decode(bytes, normalized.extension().value());
+                result = decode(bytes, correctedPath.extension().value());
             }
         }
         catch (const std::exception&)

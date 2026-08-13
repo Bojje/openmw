@@ -533,7 +533,7 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the frozen `openmw-vulkan-osg-reference` tag, the current checkpoint changes
-208 code files excluding this ledger, deleting 2,285 lines and adding 15,512 lines (net `+13,227`). The larger Vulkan-only
+208 code files excluding this ledger, deleting 2,285 lines and adding 15,517 lines (net `+13,232`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; the current branch continues the reduction
 work with renderer-neutral ownership and compatibility-wrapper deletion. The live no-GUI
 consumer is the first deletion checkpoint; further reduction can now target OSG
@@ -601,9 +601,10 @@ of converting them through the legacy warning-image fallback. The RGBA8 conversi
 by the neutral resource provider rather than an `ImageManager` API, so neutral resource
 construction has no image-manager dependency. DDS BC5/ATI2 normal maps are also decoded in the
 neutral backend with reconstructed Z components and 16-bit true-color TGA conversion, covering common Bethesda image paths;
-TGA, BMP, and DDS RGBA buffer dimensions are checked for overflow before allocation without
-importing OSG image code; active-cell terrain region coverage is now hole-aware, while broader image-format
-and quadtree-scale terrain-streaming coverage remains.
+neutral texture resolution now applies the same legacy texture-path correction (including root terrain names and
+`.tga`-to-`.dds` fallback) before decoding; TGA, BMP, and DDS RGBA buffer dimensions are checked for overflow
+before allocation without importing OSG image code; active-cell terrain region coverage is now hole-aware, while
+broader image-format and quadtree-scale terrain-streaming coverage remains.
 The scene collector also carries visible models that resolve to no converted geometry as
 explicit unresolved entries; submission validation rejects those entries instead of silently
 dropping world references.
@@ -660,7 +661,7 @@ the game unplayable rather than reduce duplication safely.
 | Vulkan utility/queue helper paths | Removed | Complete |
 | Parsed NIF resource cache wrapper | Removed | Complete; cache now owns shared NIF files directly |
 | NIF-to-neutral mesh conversion | Renderer-neutral NIF boundary, material data, mesh cache, skinning metadata, model-local and classic external `.kf` pose sampling, neutral animation-group handoff, text-key extraction and selected-segment rebasing, neutral Lua/sound/melee/spell event dispatch with footstep and random-attack fallback parity, dynamic mesh payloads, `SceneSubmission`, Vulkan mesh batch, and full-game neutral resolver | Add actor `.kf` priority/queue, remaining OSG-specific equipment presentation, blend ownership, image-backed texture resolution, and dynamic shading |
-| Terrain geometry and layer data | Renderer-neutral `Terrain::RenderStorage` contract with cached per-cell LOD snapshots, active-cell-aware aligned regions, and a Vulkan opaque/normal/parallax/blendmap/specular layer consumer; concrete `MWRender::TerrainStorage` and legacy OSG ChunkManager remain the reference data path, including explicit ESM4 specular textures | Add quadtree-scale streaming policy and terrain image coverage |
+| Terrain geometry and layer data | Renderer-neutral `Terrain::RenderStorage` contract with cached per-cell LOD snapshots, active-cell-aware aligned regions, legacy texture-path correction, and a Vulkan opaque/normal/parallax/blendmap/specular layer consumer; concrete `MWRender::TerrainStorage` and legacy OSG ChunkManager remain the reference data path, including explicit ESM4 specular textures | Add quadtree-scale streaming policy and broader image-format coverage |
 | Loaded-cell object identity, transforms, terrain snapshots, and paging state | Renderer-neutral `WorldScene`/`CellScene` snapshots updated by scene lifecycle; active-cell static references bypass legacy OSG paging visibility, and cell-lifecycle-cached terrain tiles flow into `SceneSubmission`; neutral movement, cell transfer, water, effect, and weather writes are now encapsulated by `MWWorld::Scene` | Consume snapshots from a backend and migrate visibility/paging policy |
 | GUI, loading screens, screenshots, and presentation | NullWindowManager for Vulkan bootstrap; OSG/MyGUI reference path | Vulkan presentation and GUI coverage, then remove the null compatibility surface |
 
