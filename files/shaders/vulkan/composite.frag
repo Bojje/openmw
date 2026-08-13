@@ -70,6 +70,7 @@ void main() {
     bool objectSpecular = materialSample.b > 2.5 && materialSample.b < 3.5;
     bool ambientOverride = materialSample.b > 3.5;
     bool emissiveOverride = materialSample.b > 4.5;
+    bool unlit = materialSample.b > 5.5;
     float ao = ambientOverride ? 1.0 : clamp(materialSample.b, 0.0, 1.0);
     vec3 emission = texture(gbufferEmissive, fragTexCoord).rgb;
     vec3 ambient = albedo * (ambientOverride ? vec3(1.0) : scene.ambientColor.rgb * ao);
@@ -128,7 +129,8 @@ void main() {
         specular *= 0.15;
 
     vec3 emissive = emission;
-    vec3 color = ambient + pointAmbient + diffuse + pointDiffuse + specular + reflectionColor + emissive;
+    vec3 color = unlit ? albedo + emissive
+                       : ambient + pointAmbient + diffuse + pointDiffuse + specular + reflectionColor + emissive;
 
     if (waterSurface)
     {

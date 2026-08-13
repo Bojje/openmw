@@ -813,6 +813,7 @@ namespace Nif
                 }
                 else if (const auto* noLighting = dynamic_cast<const BSShaderNoLightingProperty*>(shader))
                 {
+                    result.unlit = true;
                     if (!noLighting->mFilename.empty())
                     {
                         result.albedoTexture = VFS::Path::toNormalized(noLighting->mFilename).value();

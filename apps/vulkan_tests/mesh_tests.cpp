@@ -53,7 +53,7 @@ int main()
 
     skinning->vertices.front().weights[0] = 1.f;
     Render::MeshData skinnedMesh;
-    skinnedMesh.vertices.push_back({ { 1.f, 0.f, 0.f }, { 0.f, 0.f, 1.f }, {}, {}, {}, {}, {}, {}, {}, {} });
+    skinnedMesh.vertices.push_back({ { 1.f, 0.f, 0.f }, { 0.f, 0.f, 1.f }, {}, {}, {}, {}, {}, {}, {}, {}, {} });
     skinnedMesh.skinning = std::make_shared<const Render::SkinningData>(*skinning);
     Render::Mat4 bone = identity;
     bone.data[12] = 2.f;
@@ -767,9 +767,13 @@ int main()
         = Nif::collectMeshInstances(Nif::FileView(*noLightingFile));
     if (noLightingInstances.size() != 1
         || noLightingInstances.front().mesh.material.albedoTexture != "textures/unlit.dds"
+        || !noLightingInstances.front().mesh.material.unlit
         || noLightingInstances.front().mesh.material.albedoWrapU
         || !noLightingInstances.front().mesh.material.albedoWrapV)
         throw std::runtime_error("NIF no-lighting shader material conversion lost neutral state");
+    const Render::MeshBatch noLightingBatch = Render::batchMeshes(noLightingInstances);
+    if (noLightingBatch.vertices.empty() || noLightingBatch.vertices.front().material[2] != 6.f)
+        throw std::runtime_error("renderer-neutral no-lighting material lost its unlit mode");
 
     Resource::NifMeshManager meshManager(nullptr);
     const std::optional<float> externalDuration = meshManager.getAnimationDuration(kfFile);
