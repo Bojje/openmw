@@ -533,7 +533,7 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the frozen `openmw-vulkan-osg-reference` tag, the current checkpoint changes
-208 code files excluding this ledger, deleting 2,284 lines and adding 15,474 lines (net `+13,190`). The larger Vulkan-only
+208 code files excluding this ledger, deleting 2,285 lines and adding 15,485 lines (net `+13,200`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; the current branch continues the reduction
 work with renderer-neutral ownership and compatibility-wrapper deletion. The live no-GUI
 consumer is the first deletion checkpoint; further reduction can now target OSG
@@ -756,6 +756,8 @@ Neutral actor processing-range activation now also filters dynamic submissions, 
 without hiding static cell references.
 Neutral scripted animation requests and saved animation-state restoration now reject missing resource groups early,
 preventing a renderer-neutral queue from stalling forever on an OSG-only or malformed animation name.
+Saved neutral scripted animations also recover loop behavior from renderer-neutral text keys, so a load does not silently
+convert a looping controller into a one-shot animation when the OSG owner is absent.
 Neutral actors now also select jump and landing controller segments from physics state, with fallback to the
 available full `start`/`stop` interval when loop keys are absent.
 Neutral animation state now exposes renderer-neutral completion queries, so death and hit playback do not report

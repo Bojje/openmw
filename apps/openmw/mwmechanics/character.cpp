@@ -3434,13 +3434,23 @@ namespace MWMechanics
                 entry.mGroup = animation.mGroup;
                 entry.mLoopCount = static_cast<uint32_t>(
                     std::min<uint64_t>(animation.mLoopCount, std::numeric_limits<uint32_t>::max()));
-                // Vulkan has no OSG Animation owner. Preserve the queue entry
-                // so the neutral owner can publish the active group;
-                // controller-specific looping remains a later neutral queue
-                // responsibility.
-                entry.mLooping = mAnimation != nullptr && mAnimation->isLoopingAnimation(entry.mGroup);
+                if (mAnimation != nullptr)
+                    entry.mLooping = mAnimation->isLoopingAnimation(entry.mGroup);
+                else
+                {
+                    const std::string loopStart = entry.mGroup + ": loop start";
+                    const std::string loopStop = entry.mGroup + ": loop stop";
+                    const std::vector<Render::AnimationTextKey> keys
+                        = MWBase::Environment::get().getWorld()->getNeutralAnimationTextKeys(mPtr, entry.mGroup);
+                    const auto hasKey = [&](std::string_view requested) {
+                        return std::any_of(keys.begin(), keys.end(), [&](const Render::AnimationTextKey& key) {
+                            return Misc::StringUtils::ciEqual(key.event, requested);
+                        });
+                    };
+                    entry.mLooping = hasKey(loopStart) && hasKey(loopStop);
+                }
                 entry.mScripted = true;
-                entry.mStartKey = "start";
+                entry.mStartKey = entry.mLooping ? "loop start" : "start";
                 entry.mStopKey = "stop";
                 entry.mSpeed = 1.f;
                 // The legacy value is a normalized completion fraction, while
