@@ -1744,7 +1744,11 @@ namespace MWWorld
     void Scene::preload(const std::string& mesh, bool useAnim)
     {
         if (!mPreloader)
+        {
+            if (mMeshResolver && !mesh.empty())
+                mMeshResolver(mesh);
             return;
+        }
         mPreloader->preloadMesh(mesh, useAnim, mFrameLifecycle.referenceTime());
     }
 

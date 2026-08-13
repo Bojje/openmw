@@ -331,6 +331,8 @@ round trip and can depend on the contract without including OSG headers. `World`
 renderer-neutral preload handoff as well: when the OSG `CellPreloader` is absent, scene
 prediction reaches `RenderStorage::preloadCells`, and `NeutralTerrainStorage` prewarms its
 decoded land cache for predicted or synchronous terrain ranges.
+Neutral mesh preloads likewise invoke the neutral mesh resolver directly, so effect and asset
+preload requests no longer disappear merely because the OSG preloader is not constructed.
 concrete `MWRender::TerrainStorage` lifetime and passes it explicitly to the OSG manager and
 world scene; `RenderingManager` consumes it as a reference for legacy terrain setup instead of
 owning a second terrain-storage lifetime.
@@ -567,7 +569,7 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the frozen `openmw-vulkan-osg-reference` tag, the current checkpoint changes
-214 code files excluding this ledger, deleting 2,490 lines and adding 18,432 lines (net `+15,942`). The larger Vulkan-only
+214 code files excluding this ledger, deleting 2,490 lines and adding 18,436 lines (net `+15,946`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; the current branch continues the reduction
 work with renderer-neutral ownership and compatibility-wrapper deletion. The live no-GUI
 consumer is the first deletion checkpoint; further reduction can now target OSG
