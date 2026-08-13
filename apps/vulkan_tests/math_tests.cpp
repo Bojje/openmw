@@ -99,6 +99,23 @@ namespace
         if (!scene.valid() || std::abs(scene.skyColor.x - 0.6f) > epsilon)
             throw std::runtime_error("renderer-neutral scene sky state did not initialize");
 
+        scene.pointLightCount.x = 1.f;
+        scene.pointLightPositions[0] = { 1.f, 2.f, 3.f, 1.f };
+        scene.pointLightColorsAndRadii[0] = { 0.2f, 0.4f, 0.8f, 10.f };
+        if (!scene.valid())
+            throw std::runtime_error("renderer-neutral scene rejected a valid point light");
+
+        scene.pointLightColorsAndRadii[0].x = -0.1f;
+        if (scene.valid())
+            throw std::runtime_error("renderer-neutral scene accepted a negative point-light channel");
+        scene.pointLightColorsAndRadii[0].x = 0.2f;
+        scene.pointLightCount.x = 1.5f;
+        if (scene.valid())
+            throw std::runtime_error("renderer-neutral scene accepted a fractional point-light count");
+        scene.pointLightCount.x = static_cast<float>(Render::SceneData::maxPointLights + 1);
+        if (scene.valid())
+            throw std::runtime_error("renderer-neutral scene accepted an oversized point-light count");
+
         scene.skyColor.x = std::numeric_limits<float>::quiet_NaN();
         if (scene.valid())
             throw std::runtime_error("renderer-neutral scene accepted a non-finite sky color");
