@@ -182,7 +182,24 @@ int main()
     animatedController->mTimeStart = 0.f;
     animatedController->mTimeStop = 1.f;
     animatedController->mInterpolator = Nif::NiInterpolatorPtr(nullptr);
+    animatedController->mNext = Nif::NiTimeControllerPtr(nullptr);
     animatedController->mData = animatedData.get();
+    auto stackedData = std::make_unique<Nif::NiKeyframeData>();
+    stackedData->mTranslations = std::make_shared<Nif::Vector3KeyMap>();
+    stackedData->mTranslations->mInterpolationType = Nif::InterpolationType_Constant;
+    Nif::KeyT<osg::Vec3f> stackedTranslation{};
+    stackedTranslation.mValue = osg::Vec3f(6.f, 0.f, 0.f);
+    stackedData->mTranslations->mKeys.emplace_back(0.f, stackedTranslation);
+    auto stackedController = std::make_unique<Nif::NiKeyframeController>();
+    stackedController->mFlags = Nif::NiTimeController::Flag_Active;
+    stackedController->mFrequency = 1.f;
+    stackedController->mPhase = 0.f;
+    stackedController->mTimeStart = 0.f;
+    stackedController->mTimeStop = 1.f;
+    stackedController->mInterpolator = Nif::NiInterpolatorPtr(nullptr);
+    stackedController->mNext = Nif::NiTimeControllerPtr(nullptr);
+    stackedController->mData = stackedData.get();
+    animatedController->mNext = stackedController.get();
     Nif::NiNode animatedBone;
     animatedBone.mName = "Root Bone";
     animatedBone.mController = animatedController.get();
@@ -229,10 +246,10 @@ int main()
         = Nif::collectBonePose(Nif::FileView(*file), animatedBoneNames, 0.5f);
     if (animatedPose.size() != 1)
         throw std::runtime_error("NIF pose sampler did not find the requested bone");
-    expectNear(animatedPose.front().data[12], 12.f, "sampled bone translation");
+    expectNear(animatedPose.front().data[12], 16.f, "stacked sampled bone translation");
     const std::vector<Render::Mat4> earlyAnimatedPose
         = Nif::collectBonePose(Nif::FileView(*file), animatedBoneNames, 0.25f);
-    expectNear(earlyAnimatedPose.front().data[12], 10.625f, "quadratic sampled bone translation");
+    expectNear(earlyAnimatedPose.front().data[12], 16.f, "stacked sampled bone translation at early time");
 
     Nif::NiNode higherPriorityBone;
     higherPriorityBone.mName = "Root Bone";

@@ -302,10 +302,14 @@ namespace Nif
         SampledNodeTransform sampleNodeTransform(const NiAVObject& node, float time)
         {
             SampledNodeTransform result{ node.mTransform };
-            const auto* controller = dynamic_cast<const NiKeyframeController*>(node.mController.getPtr());
-            if (controller == nullptr)
-                return result;
-            return sampleKeyframeController(*controller, result.value, time);
+            const NiTimeController* controller = node.mController.empty() ? nullptr : node.mController.getPtr();
+            while (controller != nullptr)
+            {
+                if (const auto* keyframe = dynamic_cast<const NiKeyframeController*>(controller))
+                    result = sampleKeyframeController(*keyframe, result.value, time);
+                controller = controller->mNext.empty() ? nullptr : controller->mNext.getPtr();
+            }
+            return result;
         }
 
         void collectBoneTransforms(const NiAVObject& object, const Render::Mat4& parentTransform, float time,
