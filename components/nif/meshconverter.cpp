@@ -917,16 +917,24 @@ namespace Nif
                 continue;
 
             const osg::Vec3f& center = source.mVertices[particle];
-            const std::array<Render::MeshVertexSource, 4> quad = {
-                Render::MeshVertexSource{ { -radius, -radius, 0.f }, {},
-                    { 0.f, 0.f }, {}, false, true, false },
-                Render::MeshVertexSource{ { radius, -radius, 0.f }, {},
-                    { 1.f, 0.f }, {}, false, true, false },
-                Render::MeshVertexSource{ { radius, radius, 0.f }, {},
-                    { 1.f, 1.f }, {}, false, true, false },
-                Render::MeshVertexSource{ { -radius, radius, 0.f }, {},
-                    { 0.f, 1.f }, {}, false, true, false },
-            };
+            const std::array<osg::Vec3f, 4> corners = {
+                osg::Vec3f{ -radius, -radius, 0.f }, osg::Vec3f{ radius, -radius, 0.f },
+                osg::Vec3f{ radius, radius, 0.f }, osg::Vec3f{ -radius, radius, 0.f } };
+            osg::Quat rotation;
+            if (particle < source.mRotations.size())
+                rotation = source.mRotations[particle];
+            else if (particle < source.mRotationAngles.size() && particle < source.mRotationAxes.size())
+                rotation = osg::Quat(source.mRotationAngles[particle], source.mRotationAxes[particle]);
+            const std::array<std::array<float, 2>, 4> texcoords = {
+                std::array<float, 2>{ 0.f, 0.f }, std::array<float, 2>{ 1.f, 0.f },
+                std::array<float, 2>{ 1.f, 1.f }, std::array<float, 2>{ 0.f, 1.f } };
+            std::array<Render::MeshVertexSource, 4> quad = {};
+            for (std::size_t corner = 0; corner < quad.size(); ++corner)
+            {
+                const osg::Vec3f rotated = rotation * corners[corner];
+                quad[corner] = Render::MeshVertexSource{ { rotated.x(), rotated.y(), 0.f }, {},
+                    texcoords[corner], {}, false, true, false };
+            }
             Render::MeshData quadMesh = Render::makeMeshData(quad);
             for (Render::MeshVertex& vertex : quadMesh.vertices)
             {
