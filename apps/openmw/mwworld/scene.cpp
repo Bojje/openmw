@@ -19,6 +19,8 @@
 #include <components/detournavigator/updateguard.hpp>
 #include <components/esm/records.hpp>
 #include <components/esm3/loadcell.hpp>
+#include <components/esm3/loadclot.hpp>
+#include <components/esm3/loadarmo.hpp>
 #include <components/loadinglistener/loadinglistener.hpp>
 #include <components/misc/convert.hpp>
 #include <components/misc/resourcehelpers.hpp>
@@ -162,21 +164,77 @@ namespace
             "Right Forearm", "Left Forearm", "Right Upper Arm", "Left Upper Arm", "Right Foot", "Left Foot",
             "Right Ankle", "Left Ankle", "Right Knee", "Left Knee", "Right Upper Leg", "Left Upper Leg",
             "Right Clavicle", "Left Clavicle", "Weapon Bone", "Tail" };
+        std::array<VFS::Path::Normalized, ESM::PRT_Count> selectedParts;
+        std::array<int, ESM::PRT_Count> partPriorities{};
+        const auto setPart = [&](int part, int priority, VFS::Path::Normalized partModel) {
+            if (part < 0 || part >= ESM::PRT_Count || priority < partPriorities[part])
+                return;
+            partPriorities[part] = priority;
+            selectedParts[part] = std::move(partModel);
+        };
+        for (int part = ESM::PRT_Neck; part < ESM::PRT_Count; ++part)
+        {
+            if (part >= static_cast<int>(bodyParts.size()) || bodyParts[part] == nullptr)
+                continue;
+            setPart(part, 1, Misc::ResourceHelpers::correctMeshPath(bodyParts[part]->mModel.getNormalized()));
+        }
+
+        static constexpr std::array<std::pair<int, int>, 14> equipmentSlots = { {
+            { MWWorld::InventoryStore::Slot_Robe, 11 }, { MWWorld::InventoryStore::Slot_Skirt, 3 },
+            { MWWorld::InventoryStore::Slot_Helmet, 0 }, { MWWorld::InventoryStore::Slot_Cuirass, 0 },
+            { MWWorld::InventoryStore::Slot_Greaves, 0 }, { MWWorld::InventoryStore::Slot_LeftPauldron, 0 },
+            { MWWorld::InventoryStore::Slot_RightPauldron, 0 }, { MWWorld::InventoryStore::Slot_Boots, 0 },
+            { MWWorld::InventoryStore::Slot_LeftGauntlet, 0 }, { MWWorld::InventoryStore::Slot_RightGauntlet, 0 },
+            { MWWorld::InventoryStore::Slot_Shirt, 0 }, { MWWorld::InventoryStore::Slot_Pants, 0 },
+            { MWWorld::InventoryStore::Slot_CarriedLeft, 0 }, { MWWorld::InventoryStore::Slot_CarriedRight, 0 },
+        } };
+        const MWWorld::InventoryStore& inventory = ptr.getClass().getInventoryStore(ptr);
+        const auto resolvePart = [&](const ESM::PartReference& reference) {
+            const ESM::RefId& name = !npc->isMale() && !reference.mFemale.empty() ? reference.mFemale : reference.mMale;
+            if (name.empty())
+                return VFS::Path::Normalized();
+            const ESM::BodyPart* bodyPart = world.getStore().get<ESM::BodyPart>().search(name);
+            return bodyPart == nullptr
+                ? VFS::Path::Normalized()
+                : Misc::ResourceHelpers::correctMeshPath(bodyPart->mModel.getNormalized());
+        };
+        const auto reservePart = [&](int part, int priority) { setPart(part, priority, {}); };
+        for (const auto [slot, basePriority] : equipmentSlots)
+        {
+            const MWWorld::ConstContainerStoreIterator item = inventory.getSlot(slot);
+            if (item == inventory.end())
+                continue;
+            int priority = 1;
+            const bool isClothing = item->getType() == ESM::Clothing::sRecordId;
+            const bool isArmor = item->getType() == ESM::Armor::sRecordId;
+            if (!isClothing && !isArmor)
+                continue;
+            priority = ((basePriority + 1) << 1) + (isArmor ? 1 : 0);
+            const ESM::PartReferenceList& partList
+                = isClothing ? item->get<ESM::Clothing>()->mBase->mParts : item->get<ESM::Armor>()->mBase->mParts;
+            for (const ESM::PartReference& reference : partList.mParts)
+            {
+                const int part = reference.mPart;
+                setPart(part, priority, resolvePart(reference));
+            }
+            if (slot == MWWorld::InventoryStore::Slot_Robe)
+                for (const int part : { ESM::PRT_Groin, ESM::PRT_Skirt, ESM::PRT_RLeg, ESM::PRT_LLeg,
+                         ESM::PRT_RUpperarm, ESM::PRT_LUpperarm, ESM::PRT_RKnee, ESM::PRT_LKnee,
+                         ESM::PRT_RForearm, ESM::PRT_LForearm, ESM::PRT_Cuirass })
+                    reservePart(part, priority);
+            else if (slot == MWWorld::InventoryStore::Slot_Skirt)
+                for (const int part : { ESM::PRT_Groin, ESM::PRT_RLeg, ESM::PRT_LLeg })
+                    reservePart(part, priority);
+        }
         for (int part = ESM::PRT_Neck; part < ESM::PRT_Count; ++part)
             neutralWorld->updateObjectAttachment(static_cast<const void*>(ptr.mRef),
                 "bodypart-" + std::to_string(part), {}, {}, false);
         neutralWorld->updateObjectAttachment(static_cast<const void*>(ptr.mRef), "head", {}, {}, false);
         neutralWorld->updateObjectAttachment(static_cast<const void*>(ptr.mRef), "hair", {}, {}, false);
         for (int part = ESM::PRT_Neck; part < ESM::PRT_Count; ++part)
-        {
-            if (part >= static_cast<int>(bodyParts.size()) || bodyParts[part] == nullptr)
-                continue;
-            const VFS::Path::Normalized partModel
-                = Misc::ResourceHelpers::correctMeshPath(bodyParts[part]->mModel.getNormalized());
-            if (!partModel.empty())
+            if (!selectedParts[part].empty())
                 neutralWorld->updateObjectAttachment(static_cast<const void*>(ptr.mRef),
-                    "bodypart-" + std::to_string(part), partModel.value(), bones[part], true);
-        }
+                    "bodypart-" + std::to_string(part), selectedParts[part].value(), bones[part], true);
 
         const auto addNamedPart = [&](std::string_view id, const ESM::RefId& name) {
             if (name.empty())
@@ -189,8 +247,13 @@ namespace
             if (!partModel.empty())
                 neutralWorld->updateObjectAttachment(static_cast<const void*>(ptr.mRef), id, partModel.value(), "Head", true);
         };
-        addNamedPart("head", npc->mHead);
-        addNamedPart("hair", npc->mHair);
+        if (!selectedParts[ESM::PRT_Head].empty())
+            neutralWorld->updateObjectAttachment(static_cast<const void*>(ptr.mRef), "head",
+                selectedParts[ESM::PRT_Head].value(), "Head", true);
+        else
+            addNamedPart("head", npc->mHead);
+        if (inventory.getSlot(MWWorld::InventoryStore::Slot_Helmet) == inventory.end())
+            addNamedPart("hair", npc->mHair);
     }
 
     void setNodeRotation(const MWWorld::Ptr& ptr, MWRender::RenderingManager& rendering, const osg::Quat& rotation)
