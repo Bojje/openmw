@@ -3954,18 +3954,7 @@ namespace MWWorld
 
             std::optional<float> animationDuration;
             if (mResourceSystem != nullptr && mResourceSystem->backend() == Resource::ResourceSystem::Backend::Neutral)
-            {
-                const Nif::NIFFilePtr localFile = mResourceSystem->getNifFileManager()->get(model);
-                animationDuration = mResourceSystem->getNifMeshManager()->getAnimationDuration(localFile);
-                if (!animationDuration)
-                {
-                    VFS::Path::Normalized keyframes(model);
-                    keyframes.changeExtension(VFS::Path::ExtensionView("kf"));
-                    if (mResourceSystem->getVFS()->exists(keyframes))
-                        animationDuration = mResourceSystem->getNifMeshManager()->getAnimationDuration(
-                            mResourceSystem->getNifFileManager()->get(keyframes));
-                }
-            }
+                animationDuration = mResourceSystem->getNifMeshManager()->getAnimationDuration(model);
             mWorldScene->recordNeutralEffect(neutralEffectId, model.value(),
                 { worldPos.x(), worldPos.y(), worldPos.z() }, scale, textureOverride, loop,
                 animationDuration.value_or(0.f), isMagicVFX);
