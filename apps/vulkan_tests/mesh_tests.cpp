@@ -339,6 +339,9 @@ int main()
         throw std::runtime_error("NIF no-lighting shader material conversion lost neutral state");
 
     Resource::NifMeshManager meshManager(nullptr);
+    const std::optional<float> externalDuration = meshManager.getAnimationDuration(kfFile);
+    if (!externalDuration || *externalDuration != 1.f)
+        throw std::runtime_error("neutral KF full duration was not resolved for effect playback");
     const std::optional<float> groupedDuration = meshManager.getAnimationDuration(kfFile, "idle", "start", "stop");
     if (!groupedDuration || *groupedDuration != 0.5f)
         throw std::runtime_error("neutral KF text-key duration was not resolved");
