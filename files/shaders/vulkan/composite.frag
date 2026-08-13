@@ -86,11 +86,11 @@ void main() {
 
     if (waterSurface)
     {
-        vec2 wavePosition = worldPos.xz * 0.018;
+        vec2 wavePosition = worldPos.xy * 0.018;
         float waveTime = scene.effectTime.x;
         float waveA = sin(wavePosition.x * 1.7 + waveTime * 0.8);
         float waveB = sin(wavePosition.y * 2.1 - waveTime * 0.55);
-        vec3 waveNormal = normalize(vec3(waveA * 0.16 + waveB * 0.08, 1.0, waveB * 0.16 - waveA * 0.08));
+        vec3 waveNormal = normalize(vec3(waveA * 0.16 + waveB * 0.08, waveB * 0.16 - waveA * 0.08, 1.0));
         N = normalize(mix(N, waveNormal, 0.35));
     }
 
