@@ -13,6 +13,7 @@
 #include <LinearMath/btAabbUtil2.h>
 
 #include <components/debug/debuglog.hpp>
+#include <components/fallback/fallback.hpp>
 
 #include <components/esm3/cellref.hpp>
 #include <components/esm3/esmreader.hpp>
@@ -4254,6 +4255,11 @@ namespace MWWorld
             return;
 
         sceneData.effectTime.y = 1.f;
+        const osg::Vec4f underwaterColor = Fallback::Map::getColour("Water_UnderwaterColor");
+        const float underwaterWeight = Fallback::Map::getFloat("Water_UnderwaterColorWeight");
+        sceneData.fogColor = { underwaterColor.r() * underwaterWeight + sceneData.fogColor.x * (1.f - underwaterWeight),
+            underwaterColor.g() * underwaterWeight + sceneData.fogColor.y * (1.f - underwaterWeight),
+            underwaterColor.b() * underwaterWeight + sceneData.fogColor.z * (1.f - underwaterWeight), 1.f };
         if (Settings::fog().mUseDistantFog)
             sceneData.fogParameters = { Settings::fog().mDistantUnderwaterFogStart,
                 Settings::fog().mDistantUnderwaterFogEnd, 0.f, 0.f };

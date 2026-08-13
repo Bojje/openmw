@@ -406,7 +406,8 @@ produce renderer-neutral expiring ripple rings; interior-water bounds,
 and the full legacy water shader remain outstanding. Neutral underwater camera state now crosses
 the existing scene UBO and applies fog-colored sky, reduced diffuse/specular response, and a bounded
 underwater color grade in the Vulkan composite. Exterior non-distant underwater fog now uses the
-weather density and legacy 7168-unit cap; interior underwater fog and refraction remain outstanding.
+weather density and legacy 7168-unit cap, and its fog color uses the legacy weighted underwater
+fallback color; interior underwater fog and refraction remain outstanding.
 Projectile water-hit notification now crosses the world boundary once: the OSG-owned projectile
 service publishes an impact to `MWBase::World`, which fans it out to the active OSG and neutral
 scene owners. This removes the projectile service's direct `RenderingManager` dependency while
@@ -524,7 +525,7 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the frozen `openmw-vulkan-osg-reference` tag, the current checkpoint changes
-208 code files excluding this ledger, deleting 2,284 lines and adding 15,085 lines (net `+12,801`). The larger Vulkan-only
+208 code files excluding this ledger, deleting 2,284 lines and adding 15,091 lines (net `+12,807`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; the current branch continues the reduction
 work with renderer-neutral ownership and compatibility-wrapper deletion. The live no-GUI
 consumer is the first deletion checkpoint; further reduction can now target OSG
