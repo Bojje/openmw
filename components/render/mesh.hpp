@@ -6,7 +6,6 @@
 #include <cstdint>
 #include <algorithm>
 #include <functional>
-#include <iterator>
 #include <limits>
 #include <memory>
 #include <span>
