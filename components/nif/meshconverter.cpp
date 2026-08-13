@@ -977,8 +977,10 @@ namespace Nif
         const NiParticleSystemController* controller = findParticleController(system);
         const std::vector<NiParticleInfo>* controllerStates
             = controller && !controller->mParticles.empty() ? &controller->mParticles : nullptr;
-        const std::vector<NiParticleInfo>* dataStates
-            = systemData && systemData->mParticles.size() == source.mVertices.size() ? &systemData->mParticles : nullptr;
+        const std::vector<NiParticleInfo>* dataStates = systemData
+            && systemData->mParticles.size() == source.mVertices.size()
+            ? &systemData->mParticles
+            : nullptr;
         const std::vector<NiParticleInfo>* particleStates = controllerStates ? controllerStates : dataStates;
         const std::size_t particleCount = std::min<std::size_t>(source.mActiveCount,
             controllerStates ? controllerStates->size() : source.mVertices.size());
