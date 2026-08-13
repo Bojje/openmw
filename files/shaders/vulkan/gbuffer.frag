@@ -109,6 +109,25 @@ void main() {
         vec3 sampledNormal = normalSample.xyz * 2.0 - 1.0;
         N = normalize(tangent * sampledNormal.x + bitangent * sampledNormal.y + N * sampledNormal.z);
     }
+
+    // Legacy enchanted equipment treats the animated caustic layer as an
+    // environment map. Rebuild its spherical reflection coordinates here so
+    // the Vulkan path does not merely scroll the layer over the base UVs.
+    // The layer is still intentionally isolated behind the neutral material
+    // flag; ordinary emissive textures retain their authored coordinates.
+    vec2 emissiveTexCoord = terrainTexCoord;
+    if ((fragMaterialFlags & 128u) != 0u)
+    {
+        vec3 viewNormal = normalize((camera.view * vec4(N, 0.0)).xyz);
+        vec3 viewVector = normalize((camera.view * vec4(fragWorldPos - camera.viewInverse[3].xyz, 0.0)).xyz);
+        vec3 reflection = reflect(viewVector, viewNormal);
+        float denominator = 2.0 * sqrt(reflection.x * reflection.x + reflection.y * reflection.y
+            + (reflection.z + 1.0) * (reflection.z + 1.0));
+        if (denominator > 1e-6)
+            emissiveTexCoord = vec2(reflection.x / denominator + 0.5, reflection.y / denominator + 0.5);
+    }
+    if (fragEmissiveTextureIndex != 0u && (fragMaterialFlags & 128u) != 0u)
+        emissiveSample = texture(emissiveTextures[fragEmissiveTextureIndex], emissiveTexCoord).rgb;
     outNormal = vec4(N * 0.5 + 0.5, 1.0);
     outSpecular = vec4(specularSample, albedo.a);
     outEmissive = vec4(emissiveColor, 1.0);
