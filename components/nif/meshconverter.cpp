@@ -709,6 +709,12 @@ namespace Nif
                             result.normalTexture = VFS::Path::toNormalized(texture.mSourceTexture->mFile).value();
                             result.normalWrapU = texture.wrapS();
                             result.normalWrapV = texture.wrapT();
+                            if (std::isfinite(texturing->mEnvMapLumaBias.x())
+                                && std::isfinite(texturing->mEnvMapLumaBias.y()))
+                            {
+                                result.emissiveLumaBias
+                                    = { texturing->mEnvMapLumaBias.x(), texturing->mEnvMapLumaBias.y() };
+                            }
                         }
                     }
                     if (texturing->mTextures.size() > NiTexturingProperty::GlowTexture)

@@ -14,6 +14,7 @@ layout(push_constant) uniform PushConstants {
     mat3 normalMatrix;
     uint materialFlags;
     uint textureIndices;
+    vec2 emissiveLumaBias;
 } push;
 
 layout(set = 0, binding = 0) uniform CameraUBO {
@@ -40,6 +41,7 @@ layout(location = 10) out vec4 fragTangent;
 layout(location = 11) flat out uint fragEmissiveTextureIndex;
 layout(location = 12) flat out uint fragSpecularTextureIndex;
 layout(location = 13) out vec4 fragEmissive;
+layout(location = 14) flat out vec2 fragEmissiveLumaBias;
 
 void main() {
     vec4 worldPos = push.model * vec4(inPosition, 1.0);
@@ -65,6 +67,7 @@ void main() {
     fragEmissiveTextureIndex = (push.textureIndices >> 18u) & 63u;
     fragSpecularTextureIndex = (push.textureIndices >> 24u) & 63u;
     fragEmissive = inEmissive;
+    fragEmissiveLumaBias = push.emissiveLumaBias;
     fragAlphaTexCoord = inBlendTexCoord;
     fragTangent = vec4(normalize(mat3(push.model) * inTangent.xyz), inTangent.w);
     gl_Position = camera.projection * camera.view * worldPos;

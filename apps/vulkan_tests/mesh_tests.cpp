@@ -145,6 +145,7 @@ int main()
     texturing.mTextures[Nif::NiTexturingProperty::BumpTexture].mEnabled = true;
     texturing.mTextures[Nif::NiTexturingProperty::BumpTexture].mSourceTexture = &normalTexture;
     texturing.mTextures[Nif::NiTexturingProperty::BumpTexture].mClamp = 1;
+    texturing.mEnvMapLumaBias = { 0.6f, 0.2f };
     texturing.mTextures[Nif::NiTexturingProperty::GlowTexture].mEnabled = true;
     texturing.mTextures[Nif::NiTexturingProperty::GlowTexture].mSourceTexture = &glowTexture;
     texturing.mTextures[Nif::NiTexturingProperty::GlowTexture].mClamp = 2;
@@ -244,6 +245,8 @@ int main()
         || instances.front().mesh.material.normalTexture != "textures/synthetic_n.dds"
         || instances.front().mesh.material.emissiveTexture != "textures/synthetic_glow.dds"
         || instances.front().mesh.material.specularTexture != "textures/synthetic_gloss.dds"
+        || std::abs(instances.front().mesh.material.emissiveLumaBias[0] - 0.6f) > 1e-5f
+        || std::abs(instances.front().mesh.material.emissiveLumaBias[1] - 0.2f) > 1e-5f
         || !instances.front().mesh.material.normalMap
         || !instances.front().mesh.material.alphaBlend || !instances.front().mesh.material.alphaTest
         || instances.front().mesh.material.alphaTestThreshold != 128

@@ -14,6 +14,7 @@ layout(location = 10) in vec4 fragTangent;
 layout(location = 11) flat in uint fragEmissiveTextureIndex;
 layout(location = 12) flat in uint fragSpecularTextureIndex;
 layout(location = 13) in vec4 fragEmissive;
+layout(location = 14) flat in vec2 fragEmissiveLumaBias;
 
 layout(set = 0, binding = 1) uniform sampler2D albedoTextures[64];
 layout(set = 0, binding = 2) uniform sampler2D alphaTextures[64];
@@ -124,10 +125,14 @@ void main() {
     {
         // The legacy enchanted-equipment path multiplies its environment
         // layer by the authored gloss map. The neutral converter carries that
-        // map in the specular texture slot until a dedicated luma payload is
-        // available.
+        // map in the specular texture slot while the explicit neutral luma
+        // bias travels alongside the draw payload.
         if ((fragMaterialFlags & 128u) != 0u)
+        {
+            if ((fragMaterialFlags & 4u) != 0u)
+                emissiveSample *= clamp(normalSample.b * fragEmissiveLumaBias.x + fragEmissiveLumaBias.y, 0.0, 1.0);
             emissiveSample *= specularSample;
+        }
     }
     vec3 emissiveColor = fragEmissive.rgb * max(fragEmissive.a, 0.0);
     if (fragEmissiveTextureIndex != 0u)

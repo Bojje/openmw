@@ -24,8 +24,8 @@
 namespace Vk
 {
     constexpr std::size_t gbufferPushConstantSize
-        = sizeof(Render::Mat4) + sizeof(float) * 12 + sizeof(std::uint32_t) * 2;
-    static_assert(gbufferPushConstantSize == 120);
+        = sizeof(Render::Mat4) + sizeof(float) * 12 + sizeof(std::uint32_t) * 2 + sizeof(float) * 2;
+    static_assert(gbufferPushConstantSize == 128);
 
     static void createBufferLocal(Device& device, VkDeviceSize size,
         VkBufferUsageFlags usage, VkMemoryPropertyFlags properties,
@@ -1413,6 +1413,7 @@ namespace Vk
                         std::array<float, 12> normalMatrix;
                         uint32_t materialFlags;
                         uint32_t textureIndices;
+                        std::array<float, 2> emissiveLumaBias;
                     };
                     static_assert(sizeof(PushData) == gbufferPushConstantSize);
 
@@ -1467,6 +1468,7 @@ namespace Vk
                                 | (mMeshNormalTextureIndices[drawIndex] << 12u)
                                 | (mMeshEmissiveTextureIndices[drawIndex] << 18u)
                                 | (mMeshSpecularTextureIndices[drawIndex] << 24u),
+                            draw.material.emissiveLumaBias,
                         };
                         vkCmdPushConstants(cmd, mGBufferPipelineLayout,
                             VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,

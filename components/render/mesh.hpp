@@ -71,6 +71,9 @@ namespace Render
         // Neutral particle quads carry their local center in the tangent
         // payload and are oriented toward the active Vulkan camera.
         bool particleBillboard = false;
+        // Enchanted environment layers derive their intensity from the bump
+        // channel using the authored NIF bias.
+        std::array<float, 2> emissiveLumaBias{ 0.f, 1.f };
         std::shared_ptr<const TextureData> alphaTexture;
     };
 
