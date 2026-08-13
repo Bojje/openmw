@@ -722,6 +722,20 @@ namespace Nif
                             result.emissiveWrapV = texture.wrapT();
                         }
                     }
+                    if (texturing->mTextures.size() > NiTexturingProperty::GlossTexture)
+                    {
+                        const NiTexturingProperty::Texture& texture
+                            = texturing->mTextures[NiTexturingProperty::GlossTexture];
+                        if (texture.mEnabled && !texture.mSourceTexture.empty())
+                        {
+                            // Preserve the authored gloss layer through the
+                            // neutral specular slot until a dedicated luma
+                            // compositor is available.
+                            result.specularTexture = VFS::Path::toNormalized(texture.mSourceTexture->mFile).value();
+                            result.specularWrapU = texture.wrapS();
+                            result.specularWrapV = texture.wrapT();
+                        }
+                    }
                 }
                 else if (const auto* material = dynamic_cast<const NiMaterialProperty*>(property.getPtr()))
                 {

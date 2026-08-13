@@ -127,6 +127,8 @@ int main()
     normalTexture.mFile = "textures\\synthetic_n.dds";
     Nif::NiSourceTexture glowTexture;
     glowTexture.mFile = "textures\\synthetic_glow.dds";
+    Nif::NiSourceTexture glossTexture;
+    glossTexture.mFile = "textures\\synthetic_gloss.dds";
     Nif::NiTexturingProperty texturing;
     texturing.mTextures.resize(Nif::NiTexturingProperty::BumpTexture + 1);
     texturing.mTextures.front().mEnabled = true;
@@ -138,6 +140,9 @@ int main()
     texturing.mTextures[Nif::NiTexturingProperty::GlowTexture].mEnabled = true;
     texturing.mTextures[Nif::NiTexturingProperty::GlowTexture].mSourceTexture = &glowTexture;
     texturing.mTextures[Nif::NiTexturingProperty::GlowTexture].mClamp = 2;
+    texturing.mTextures[Nif::NiTexturingProperty::GlossTexture].mEnabled = true;
+    texturing.mTextures[Nif::NiTexturingProperty::GlossTexture].mSourceTexture = &glossTexture;
+    texturing.mTextures[Nif::NiTexturingProperty::GlossTexture].mClamp = 1;
     Nif::NiMaterialProperty material;
     material.mDiffuse = { 0.25f, 0.5f, 0.75f };
     material.mAlpha = 0.75f;
@@ -230,6 +235,7 @@ int main()
     if (instances.front().mesh.material.albedoTexture != "textures/synthetic.dds"
         || instances.front().mesh.material.normalTexture != "textures/synthetic_n.dds"
         || instances.front().mesh.material.emissiveTexture != "textures/synthetic_glow.dds"
+        || instances.front().mesh.material.specularTexture != "textures/synthetic_gloss.dds"
         || !instances.front().mesh.material.normalMap
         || !instances.front().mesh.material.alphaBlend || !instances.front().mesh.material.alphaTest
         || instances.front().mesh.material.alphaTestThreshold != 128
