@@ -202,9 +202,10 @@ records with an explicit pose, and compatible model-local NIF poses now enter th
 with their neutral transforms; records without a resolved pose retain an inverse-bind-derived bind
 pose so dynamic actors remain visible. Actor `.kf` group selection and timing now feed a neutral text-key
 dispatcher for Lua callbacks, sound/soundgen events, melee-hit timing, and spell-release timing; it
-also preserves the legacy footstep sound policy and random-attack no-hit fallback. Actor priority
-arbitration, remaining OSG-specific equipment attachment/presentation, blending, particles, and dynamic shading
-remain outstanding; neutral arrow release and container timing/GUI events now have renderer-neutral paths.
+also preserves the legacy footstep sound policy and random-attack no-hit fallback. Actor priority arbitration now
+keeps scripted and weapon attack queues ahead of ordinary hit recoil while preserving block and knockdown precedence;
+remaining OSG-specific equipment attachment/presentation, blending, particles, and dynamic shading remain outstanding.
+Neutral arrow release and container timing/GUI events now have renderer-neutral paths.
 Neutral actor idle and movement selection now honors weapon-specific short groups when those groups are actually
 present, and grouped duration queries reject unrelated controller files instead of falsely selecting a missing group.
 Explicitly identified world VFX now also cross as neutral transformed mesh effects with texture
@@ -529,7 +530,7 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the frozen `openmw-vulkan-osg-reference` tag, the current checkpoint changes
-208 code files excluding this ledger, deleting 2,284 lines and adding 15,331 lines (net `+13,047`). The larger Vulkan-only
+208 code files excluding this ledger, deleting 2,284 lines and adding 15,338 lines (net `+13,054`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; the current branch continues the reduction
 work with renderer-neutral ownership and compatibility-wrapper deletion. The live no-GUI
 consumer is the first deletion checkpoint; further reduction can now target OSG

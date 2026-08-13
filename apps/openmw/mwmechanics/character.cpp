@@ -3267,8 +3267,15 @@ namespace MWMechanics
         };
 
         std::string animationGroup;
+        const bool hitOverridesQueue = mHitState == CharState_Block || mHitState == CharState_KnockDown
+            || mHitState == CharState_KnockOut || mHitState == CharState_SwimKnockDown
+            || mHitState == CharState_SwimKnockOut;
+        const bool queueOverridesHit = !mAnimQueue.empty() && !hitOverridesQueue
+            && (mAnimQueue.front().mScripted || mAnimQueue.front().mGroup == mCurrentWeapon);
         if (!mCurrentDeath.empty())
             animationGroup = mCurrentDeath;
+        else if (queueOverridesHit)
+            animationGroup = mAnimQueue.front().mGroup;
         else if (!mCurrentHit.empty())
             animationGroup = mCurrentHit;
         else if (!mAnimQueue.empty())
