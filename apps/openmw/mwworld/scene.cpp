@@ -1630,6 +1630,8 @@ namespace MWWorld
                 }
             }
 
+            Render::cullMeshInstancesToView(dynamic.meshes, result.scene);
+
         }
 
         if (Settings::shaders().mAutoUseObjectSpecularMaps
