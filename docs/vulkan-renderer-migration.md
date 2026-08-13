@@ -521,7 +521,7 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the frozen `openmw-vulkan-osg-reference` tag, the current checkpoint changes
-207 code files excluding this ledger, deleting 2,284 lines and adding 14,990 lines (net `+12,706`). The larger Vulkan-only
+207 code files excluding this ledger, deleting 2,284 lines and adding 15,034 lines (net `+12,750`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; the current branch continues the reduction
 work with renderer-neutral ownership and compatibility-wrapper deletion. The live no-GUI
 consumer is the first deletion checkpoint; further reduction can now target OSG
@@ -583,7 +583,7 @@ Neutral image resolution rejects unsupported resources at the Vulkan submission 
 of converting them through the legacy warning-image fallback. The RGBA8 conversion is now owned
 by the neutral resource provider rather than an `ImageManager` API, so neutral resource
 construction has no image-manager dependency. DDS BC5/ATI2 normal maps are also decoded in the
-neutral backend with reconstructed Z components, covering a common Bethesda normal-map path;
+neutral backend with reconstructed Z components and 16-bit true-color TGA conversion, covering common Bethesda image paths;
 TGA, BMP, and DDS RGBA buffer dimensions are checked for overflow before allocation without
 importing OSG image code; broader image-format and terrain-streaming coverage remains.
 The scene collector also carries visible models that resolve to no converted geometry as
