@@ -3257,6 +3257,15 @@ namespace MWMechanics
         updateNeutralAnimationQueue(duration);
         updateNeutralHitAnimation();
 
+        const auto selectNeutralWeaponGroup = [&](std::string group) {
+            const std::string_view weaponShortGroup = getWeaponShortGroup(mWeaponType);
+            if (weaponShortGroup.empty() || (!isRealWeapon(mWeaponType) && !mPtr.getClass().isBipedal(mPtr)))
+                return group;
+            std::string weaponGroup = group;
+            weaponGroup += weaponShortGroup;
+            return world->getNeutralAnimationDuration(mPtr, weaponGroup) ? weaponGroup : group;
+        };
+
         std::string animationGroup;
         if (!mCurrentDeath.empty())
             animationGroup = mCurrentDeath;
@@ -3282,7 +3291,7 @@ namespace MWMechanics
         }
         else
         {
-            animationGroup = "idle";
+            animationGroup = selectNeutralWeaponGroup("idle");
             if (inputLength > 0.f)
             {
                 const bool sneak = stats.getStance(MWMechanics::CreatureStats::Stance_Sneak) && !flying && !inWater;
@@ -3292,9 +3301,10 @@ namespace MWMechanics
                 const std::string_view direction = input.y() >= 0.f
                     ? "forward"
                     : "back";
-                animationGroup = std::string(prefix) + std::string(direction);
+                animationGroup = selectNeutralWeaponGroup(std::string(prefix) + std::string(direction));
                 if (std::abs(input.y()) <= 0.001f)
-                    animationGroup = std::string(prefix) + (input.x() >= 0.f ? "right" : "left");
+                    animationGroup = selectNeutralWeaponGroup(
+                        std::string(prefix) + (input.x() >= 0.f ? "right" : "left"));
             }
         }
         const std::optional<float> animationTime

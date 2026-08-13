@@ -358,6 +358,8 @@ int main()
         throw std::runtime_error("neutral KF full duration was not resolved for effect playback");
     if (!meshManager.hasAnimationGroup(kfFile, "idle") || meshManager.hasAnimationGroup(kfFile, "missing"))
         throw std::runtime_error("neutral animation group presence was not resolved from text keys");
+    if (meshManager.getAnimationDuration(kfFile, "missing", {}, {}))
+        throw std::runtime_error("neutral animation duration accepted a missing group");
     const std::optional<float> groupedDuration = meshManager.getAnimationDuration(kfFile, "idle", "start", "stop");
     if (!groupedDuration || *groupedDuration != 0.5f)
         throw std::runtime_error("neutral KF text-key duration was not resolved");

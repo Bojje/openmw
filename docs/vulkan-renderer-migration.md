@@ -205,6 +205,8 @@ dispatcher for Lua callbacks, sound/soundgen events, melee-hit timing, and spell
 also preserves the legacy footstep sound policy and random-attack no-hit fallback. Actor priority
 arbitration, remaining OSG-specific equipment attachment/presentation, blending, particles, and dynamic shading
 remain outstanding; neutral arrow release and container timing/GUI events now have renderer-neutral paths.
+Neutral actor idle and movement selection now honors weapon-specific short groups when those groups are actually
+present, and grouped duration queries reject unrelated controller files instead of falsely selecting a missing group.
 Explicitly identified world VFX now also cross as neutral transformed mesh effects with texture
 overrides and explicit removal; magic VFX preserve the first-root override rule across the flattened
 neutral mesh list, and controller intervals are extracted from the renderer-neutral NIF
@@ -527,7 +529,7 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the frozen `openmw-vulkan-osg-reference` tag, the current checkpoint changes
-208 code files excluding this ledger, deleting 2,284 lines and adding 15,315 lines (net `+13,031`). The larger Vulkan-only
+208 code files excluding this ledger, deleting 2,284 lines and adding 15,331 lines (net `+13,047`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; the current branch continues the reduction
 work with renderer-neutral ownership and compatibility-wrapper deletion. The live no-GUI
 consumer is the first deletion checkpoint; further reduction can now target OSG

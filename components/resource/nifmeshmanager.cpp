@@ -88,7 +88,11 @@ namespace Resource
         std::string_view startKey, std::string_view stopKey) const
     {
         const std::optional<float> duration = getAnimationDuration(file);
-        if (!duration || group.empty() || startKey.empty() || stopKey.empty())
+        if (!duration || group.empty())
+            return duration;
+        if (!hasAnimationGroup(file, group))
+            return std::nullopt;
+        if (startKey.empty() || stopKey.empty())
             return duration;
 
         const std::string start = std::string(group) + ": " + std::string(startKey);
