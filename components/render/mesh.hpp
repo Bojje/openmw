@@ -176,13 +176,49 @@ namespace Render
             }
         };
 
+        struct Collider
+        {
+            enum class Type
+            {
+                Planar,
+                Spherical
+            };
+
+            Type type = Type::Planar;
+            float bounce = 1.f;
+            Vec3 position{};
+            Vec3 normal{ 0.f, 0.f, 1.f };
+            Vec3 xAxis{ 1.f, 0.f, 0.f };
+            Vec3 yAxis{ 0.f, 1.f, 0.f };
+            float planeDistance = 0.f;
+            float extentX = 0.f;
+            float extentY = 0.f;
+            float radius = 0.f;
+
+            bool valid() const
+            {
+                const float normalLength = std::sqrt(normal.x * normal.x + normal.y * normal.y + normal.z * normal.z);
+                if (!std::isfinite(bounce) || bounce < 0.f || !Render::valid(position) || !Render::valid(normal)
+                    || !std::isfinite(planeDistance) || normalLength <= 0.f)
+                    return false;
+                if (type == Type::Spherical)
+                    return std::isfinite(radius) && radius > 0.f;
+                const float xLength = std::sqrt(xAxis.x * xAxis.x + xAxis.y * xAxis.y + xAxis.z * xAxis.z);
+                const float yLength = std::sqrt(yAxis.x * yAxis.x + yAxis.y * yAxis.y + yAxis.z * yAxis.z);
+                return Render::valid(xAxis) && Render::valid(yAxis) && std::isfinite(extentX)
+                    && std::isfinite(extentY) && extentX >= 0.f && extentY >= 0.f && xLength > 0.f && yLength > 0.f;
+            }
+        };
+
         std::shared_ptr<const Emitter> emitter;
+        std::shared_ptr<const Collider> collider;
 
         bool valid() const
         {
             return Render::valid(acceleration) && std::isfinite(drag) && std::isfinite(growTime)
                 && std::isfinite(fadeTime) && std::isfinite(baseScale) && std::isfinite(rotationSpeed)
-                && drag >= 0.f && growTime >= 0.f && fadeTime >= 0.f && baseScale >= 0.f;
+                && drag >= 0.f && growTime >= 0.f && fadeTime >= 0.f && baseScale >= 0.f
+                && (!emitter || emitter->valid()) && (!collider || collider->valid());
         }
     };
 
@@ -198,6 +234,8 @@ namespace Render
             if (simulation && !simulation->valid())
                 return false;
             if (simulation && simulation->emitter && !simulation->emitter->valid())
+                return false;
+            if (simulation && simulation->collider && !simulation->collider->valid())
                 return false;
             return std::all_of(states.begin(), states.end(), [](const ParticleState& state) {
                 return Render::valid(state.velocity) && std::isfinite(state.age)
@@ -227,6 +265,80 @@ namespace Render
         const ParticleSimulationData* simulation = source.particles->simulation.get();
         const Vec3 acceleration = simulation ? simulation->acceleration : Vec3{};
         const float drag = simulation ? simulation->drag : 0.f;
+        const ParticleSimulationData::Collider* collider = simulation && simulation->collider
+            ? simulation->collider.get()
+            : nullptr;
+        const auto dot = [](const Vec3& lhs, const Vec3& rhs) {
+            return lhs.x * rhs.x + lhs.y * rhs.y + lhs.z * rhs.z;
+        };
+        const auto scaleVector = [](const Vec3& value, float factor) {
+            return Vec3{ value.x * factor, value.y * factor, value.z * factor };
+        };
+        const auto subtract = [](const Vec3& lhs, const Vec3& rhs) {
+            return Vec3{ lhs.x - rhs.x, lhs.y - rhs.y, lhs.z - rhs.z };
+        };
+        const auto add = [](const Vec3& lhs, const Vec3& rhs) {
+            return Vec3{ lhs.x + rhs.x, lhs.y + rhs.y, lhs.z + rhs.z };
+        };
+        const auto normalize = [&](const Vec3& value, const Vec3& fallback) {
+            const float length = std::sqrt(dot(value, value));
+            return length > 0.f ? scaleVector(value, 1.f / length) : fallback;
+        };
+        const auto resolveCollision = [&](const Vec3& origin, Vec3 center, float motionTime) {
+            if (!collider || motionTime <= 0.f)
+                return center;
+            const Vec3 travel = subtract(center, origin);
+            if (collider->type == ParticleSimulationData::Collider::Type::Planar)
+            {
+                const Vec3 normal = normalize(collider->normal, { 0.f, 0.f, 1.f });
+                const float startDistance = dot(subtract(origin, collider->position), normal) - collider->planeDistance;
+                const float endDistance = dot(subtract(center, collider->position), normal) - collider->planeDistance;
+                if ((startDistance > 0.f && endDistance < 0.f) || (startDistance < 0.f && endDistance > 0.f))
+                {
+                    const float denominator = startDistance - endDistance;
+                    const float fraction = denominator != 0.f ? std::clamp(startDistance / denominator, 0.f, 1.f) : 0.f;
+                    const Vec3 contact = add(origin, scaleVector(travel, fraction));
+                    const Vec3 xAxis = normalize(collider->xAxis, { 1.f, 0.f, 0.f });
+                    const Vec3 yAxis = normalize(collider->yAxis, { 0.f, 1.f, 0.f });
+                    const Vec3 relative = subtract(contact, collider->position);
+                    if (std::abs(dot(relative, xAxis)) <= collider->extentX * 0.5f
+                        && std::abs(dot(relative, yAxis)) <= collider->extentY * 0.5f)
+                        return subtract(center, scaleVector(normal, endDistance * (1.f + collider->bounce)));
+                }
+                return center;
+            }
+
+            const Vec3 offset = subtract(origin, collider->position);
+            const float radiusSquared = collider->radius * collider->radius;
+            const float startSquared = dot(offset, offset);
+            const float travelSquared = dot(travel, travel);
+            float fraction = -1.f;
+            if (startSquared <= radiusSquared)
+                fraction = 0.f;
+            else if (travelSquared > 0.f)
+            {
+                const float b = 2.f * dot(offset, travel);
+                const float c = startSquared - radiusSquared;
+                const float discriminant = b * b - 4.f * travelSquared * c;
+                if (discriminant >= 0.f)
+                {
+                    const float root = std::sqrt(discriminant);
+                    const float first = (-b - root) / (2.f * travelSquared);
+                    const float second = (-b + root) / (2.f * travelSquared);
+                    if (first >= 0.f && first <= 1.f)
+                        fraction = first;
+                    else if (second >= 0.f && second <= 1.f)
+                        fraction = second;
+                }
+            }
+            if (fraction < 0.f)
+                return center;
+            const Vec3 contact = add(origin, scaleVector(travel, fraction));
+            const Vec3 normal = normalize(subtract(contact, collider->position), { 0.f, 0.f, 1.f });
+            const Vec3 remaining = subtract(center, contact);
+            const Vec3 reflected = subtract(remaining, scaleVector(normal, 2.f * dot(remaining, normal)));
+            return add(contact, scaleVector(reflected, collider->bounce));
+        };
 
         const auto applyParticle = [&](std::size_t destinationFirstVertex, std::size_t sourceFirstVertex,
                                        const ParticleState& state, float motionTime, const Vec3& origin) {
@@ -238,7 +350,8 @@ namespace Render
             const Vec3 displacement = { state.velocity.x * displacementScale + acceleration.x * accelerationScale,
                 state.velocity.y * displacementScale + acceleration.y * accelerationScale,
                 state.velocity.z * displacementScale + acceleration.z * accelerationScale };
-            const Vec3 center = { origin.x + displacement.x, origin.y + displacement.y, origin.z + displacement.z };
+            const Vec3 center = resolveCollision(origin,
+                { origin.x + displacement.x, origin.y + displacement.y, origin.z + displacement.z }, motionTime);
             const float rotationSpeed = state.rotationSpeed + (simulation ? simulation->rotationSpeed : 0.f);
             const float angle = rotationSpeed * motionTime;
             const float cosine = std::cos(angle);

@@ -173,6 +173,42 @@ int main()
         || std::abs(advancedModifiers.vertices[0].tangent[2] - 2.875f) > 1e-5f)
         throw std::runtime_error("renderer-neutral particle modifiers did not affect scale and acceleration");
 
+    Nif::NiPSysData collisionParticleSource;
+    collisionParticleSource.mActiveCount = 1;
+    collisionParticleSource.mVertices = { { 0.f, 0.f, 1.f } };
+    collisionParticleSource.mRadii = { 1.f };
+    collisionParticleSource.mParticles.resize(1);
+    collisionParticleSource.mParticles.front().mVelocity = { 0.f, 0.f, -4.f };
+    collisionParticleSource.mParticles.front().mLifespan = 2.f;
+    Nif::NiPlanarCollider planarCollider;
+    planarCollider.mRecordType = Nif::RC_NiPlanarCollider;
+    planarCollider.mBounceFactor = 0.5f;
+    planarCollider.mExtents = { 10.f, 10.f };
+    planarCollider.mPosition = { 0.f, 0.f, 0.f };
+    planarCollider.mXVector = { 1.f, 0.f, 0.f };
+    planarCollider.mYVector = { 0.f, 1.f, 0.f };
+    planarCollider.mPlaneNormal = { 0.f, 0.f, 1.f };
+    planarCollider.mPlaneDistance = 0.f;
+    planarCollider.mNext = Nif::NiParticleModifierPtr(nullptr);
+    Nif::NiParticleSystemController collisionController;
+    collisionController.mRecordType = Nif::RC_NiParticleSystemController;
+    collisionController.mFlags = Nif::NiTimeController::Flag_Active;
+    collisionController.mParticles.resize(1);
+    collisionController.mParticles.front().mCode = 0;
+    collisionController.mParticles.front().mVelocity = { 0.f, 0.f, -4.f };
+    collisionController.mParticles.front().mLifespan = 2.f;
+    collisionController.mCollider = Nif::NiParticleModifierPtr(&planarCollider);
+    collisionController.mNext = Nif::NiTimeControllerPtr(nullptr);
+    Nif::NiParticleSystem collisionParticleSystem;
+    collisionParticleSystem.mController = Nif::NiTimeControllerPtr(&collisionController);
+    const Render::MeshData collisionParticles
+        = Nif::convertParticles(collisionParticleSource, &collisionParticleSystem);
+    const Render::MeshData bouncedParticles = Render::advanceParticleMesh(collisionParticles, 0.5f);
+    if (!collisionParticles.particles || !collisionParticles.particles->simulation
+        || !collisionParticles.particles->simulation->collider || std::abs(bouncedParticles.vertices[0].tangent[2] - 0.5f)
+            > 1e-5f)
+        throw std::runtime_error("neutral particle planar collider did not reflect motion");
+
     Nif::NiPSysData modernParticleSource;
     modernParticleSource.mActiveCount = 1;
     modernParticleSource.mVertices = { { 1.f, 0.f, 0.f }, { 4.f, 0.f, 0.f } };
@@ -195,6 +231,7 @@ int main()
     modernController.mParticles.front().mCode = 1;
     modernController.mParticles.front().mVelocity = { 0.f, 0.f, 0.f };
     modernController.mParticles.front().mLifespan = 1.f;
+    modernController.mCollider = Nif::NiParticleModifierPtr(nullptr);
     modernController.mNext = Nif::NiTimeControllerPtr(nullptr);
     Nif::NiParticleSystem modernParticleSystem;
     modernParticleSystem.mController = Nif::NiTimeControllerPtr(&modernController);

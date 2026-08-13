@@ -985,6 +985,99 @@ namespace Nif
             if (emitter->valid())
                 result->emitter = std::move(emitter);
         }
+
+        const auto makePlanarCollider = [](float bounce, const osg::Vec3f& position, const osg::Vec3f& normal,
+                                               const osg::Vec3f& xAxis, const osg::Vec3f& yAxis, float planeDistance,
+                                               float extentX, float extentY) {
+            auto collider = std::make_shared<Render::ParticleSimulationData::Collider>();
+            collider->type = Render::ParticleSimulationData::Collider::Type::Planar;
+            collider->bounce = bounce;
+            collider->position = { position.x(), position.y(), position.z() };
+            collider->normal = { normal.x(), normal.y(), normal.z() };
+            collider->xAxis = { xAxis.x(), xAxis.y(), xAxis.z() };
+            collider->yAxis = { yAxis.x(), yAxis.y(), yAxis.z() };
+            collider->planeDistance = planeDistance;
+            collider->extentX = extentX;
+            collider->extentY = extentY;
+            return collider;
+        };
+        const auto makeSphericalCollider = [](float bounce, const osg::Vec3f& center, float radius) {
+            auto collider = std::make_shared<Render::ParticleSimulationData::Collider>();
+            collider->type = Render::ParticleSimulationData::Collider::Type::Spherical;
+            collider->bounce = bounce;
+            collider->position = { center.x(), center.y(), center.z() };
+            collider->radius = radius;
+            return collider;
+        };
+
+        if (const NiParticleSystemController* controller = findParticleController(system); controller
+            && controller->mCollider.empty() == false)
+        {
+            for (NiParticleModifierPtr modifier = controller->mCollider; !modifier.empty(); modifier = modifier->mNext)
+            {
+                std::shared_ptr<Render::ParticleSimulationData::Collider> collider;
+                if (modifier->mRecordType == RC_NiPlanarCollider)
+                {
+                    const auto* planar = static_cast<const NiPlanarCollider*>(modifier.getPtr());
+                    // The legacy operator intentionally swaps the serialized extents when testing its local axes.
+                    collider = makePlanarCollider(planar->mBounceFactor, planar->mPosition, planar->mPlaneNormal,
+                        planar->mXVector, planar->mYVector, planar->mPlaneDistance, planar->mExtents.y(),
+                        planar->mExtents.x());
+                }
+                else if (modifier->mRecordType == RC_NiSphericalCollider)
+                {
+                    const auto* spherical = static_cast<const NiSphericalCollider*>(modifier.getPtr());
+                    collider = makeSphericalCollider(spherical->mBounceFactor, spherical->mCenter, spherical->mRadius);
+                }
+                if (collider && collider->valid())
+                {
+                    result->collider = std::move(collider);
+                    break;
+                }
+            }
+        }
+
+        if (!result->collider)
+        {
+            for (const NiPSysModifierPtr& modifierReference : system->mModifiers)
+            {
+                const auto* manager = modifierReference.empty()
+                    ? nullptr
+                    : dynamic_cast<const NiPSysColliderManager*>(modifierReference.getPtr());
+                if (!manager || !manager->mActive)
+                    continue;
+                for (NiPSysColliderPtr colliderReference = manager->mCollider; !colliderReference.empty();
+                     colliderReference = colliderReference->mNextCollider)
+                {
+                    std::shared_ptr<Render::ParticleSimulationData::Collider> collider;
+                    if (colliderReference->mRecordType == RC_NiPSysPlanarCollider)
+                    {
+                        const auto* planar = static_cast<const NiPSysPlanarCollider*>(colliderReference.getPtr());
+                        const osg::Vec3f position = planar->mColliderObject.empty()
+                            ? osg::Vec3f{}
+                            : planar->mColliderObject->mTransform.mTranslation;
+                        const osg::Vec3f normal = osg::Vec3f(planar->mXAxis ^ planar->mYAxis);
+                        collider = makePlanarCollider(planar->mBounce, position, normal, planar->mXAxis, planar->mYAxis,
+                            0.f, planar->mWidth, planar->mHeight);
+                    }
+                    else if (colliderReference->mRecordType == RC_NiPSysSphericalCollider)
+                    {
+                        const auto* spherical = static_cast<const NiPSysSphericalCollider*>(colliderReference.getPtr());
+                        const osg::Vec3f center = spherical->mColliderObject.empty()
+                            ? osg::Vec3f{}
+                            : spherical->mColliderObject->mTransform.mTranslation;
+                        collider = makeSphericalCollider(spherical->mBounce, center, spherical->mRadius);
+                    }
+                    if (collider && collider->valid())
+                    {
+                        result->collider = std::move(collider);
+                        break;
+                    }
+                }
+                if (result->collider)
+                    break;
+            }
+        }
         return result;
     }
 
