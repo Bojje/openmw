@@ -1398,7 +1398,29 @@ namespace MWWorld
 
         Render::SceneSubmission result = Render::collectSceneSubmission(
             *mNeutralWorldScene, mNeutralWorldScene->sceneData(), mNeutralWorldScene->activeWorldspace(), resolveMeshes,
-            true, false);
+            true, false, false);
+
+        for (Render::EffectMeshSubmission& effect : result.effects)
+        {
+            const Render::SkinningData* skinning = Render::findCompatibleSkinning(effect);
+            bool posed = false;
+            if (mPoseResolver && skinning != nullptr)
+            {
+                const std::vector<Render::Mat4> pose = mPoseResolver(effect.object.model,
+                    effect.object.animationGroup, effect.object.animationTime, effect.object.animationStartKey,
+                    effect.object.animationStopKey, skinning->boneNames);
+                if (pose.size() == skinning->inverseBindMatrices.size())
+                {
+                    for (Render::MeshInstance& mesh : effect.meshes)
+                        if (mesh.mesh.skinning)
+                            mesh.mesh = Render::skinMesh(mesh.mesh, pose);
+                    posed = true;
+                }
+            }
+            if (!posed)
+                for (Render::MeshInstance& mesh : effect.meshes)
+                    Render::bakeMeshBindPose(mesh);
+        }
 
         for (Render::DynamicMeshSubmission& dynamic : result.dynamicMeshes)
         {

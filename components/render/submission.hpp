@@ -257,7 +257,8 @@ namespace Render
 
     template <class ResolveMeshes>
     void collectEffectMeshes(const WorldScene& world, ResolveMeshes&& resolveMeshes,
-        std::vector<EffectMeshSubmission>& result, std::vector<std::string>& unresolvedModels)
+        std::vector<EffectMeshSubmission>& result, std::vector<std::string>& unresolvedModels,
+        bool includeBindPose = true)
     {
         for (const WorldObject* effect : world.effectsInOrder())
         {
@@ -271,7 +272,8 @@ namespace Render
             for (const MeshInstance& mesh : resolvedMeshes)
             {
                 MeshInstance instance = transformMeshInstance(*effect, mesh);
-                bakeMeshBindPose(instance);
+                if (includeBindPose)
+                    bakeMeshBindPose(instance);
                 if (!effect->textureOverride.empty() && (!effect->magicVfx || !textureOverrideApplied))
                 {
                     instance.mesh.material.albedoTexture = effect->textureOverride;
@@ -438,22 +440,32 @@ namespace Render
         return result;
     }
 
-    inline const SkinningData* findCompatibleSkinning(const DynamicMeshSubmission& dynamic)
+    inline const SkinningData* findCompatibleSkinning(std::span<const MeshInstance> meshes)
     {
-        const auto skinned = std::find_if(dynamic.meshes.begin(), dynamic.meshes.end(),
+        const auto skinned = std::find_if(meshes.begin(), meshes.end(),
             [](const MeshInstance& mesh) {
                 return mesh.mesh.skinning && !mesh.mesh.skinning->boneNames.empty();
             });
-        if (skinned == dynamic.meshes.end())
+        if (skinned == meshes.end())
             return nullptr;
 
-        const bool compatible = std::all_of(dynamic.meshes.begin(), dynamic.meshes.end(),
+        const bool compatible = std::all_of(meshes.begin(), meshes.end(),
             [&](const MeshInstance& mesh) {
                 return !mesh.mesh.skinning
                     || (!mesh.mesh.skinning->boneNames.empty()
                         && mesh.mesh.skinning->boneNames == skinned->mesh.skinning->boneNames);
             });
         return compatible ? skinned->mesh.skinning.get() : nullptr;
+    }
+
+    inline const SkinningData* findCompatibleSkinning(const DynamicMeshSubmission& dynamic)
+    {
+        return findCompatibleSkinning(dynamic.meshes);
+    }
+
+    inline const SkinningData* findCompatibleSkinning(const EffectMeshSubmission& effect)
+    {
+        return findCompatibleSkinning(effect.meshes);
     }
 
     inline void applyBindPose(DynamicMeshSubmission& dynamic)
@@ -476,7 +488,7 @@ namespace Render
     template <class ResolveMeshes>
     SceneSubmission collectSceneSubmission(const WorldScene& world, const SceneData& scene,
         std::string_view worldspace, ResolveMeshes&& resolveMeshes, bool includeTerrain = true,
-        bool includeBindPose = true)
+        bool includeBindPose = true, bool includeEffectBindPose = true)
     {
         SceneSubmission result;
         result.scene = scene;
@@ -490,7 +502,7 @@ namespace Render
         std::vector<MeshInstance> waterMeshes = collectWaterMeshes(world, worldspace);
         result.meshes.insert(result.meshes.end(), std::make_move_iterator(waterMeshes.begin()),
             std::make_move_iterator(waterMeshes.end()));
-        collectEffectMeshes(world, resolveMeshes, result.effects, result.unresolvedModels);
+        collectEffectMeshes(world, resolveMeshes, result.effects, result.unresolvedModels, includeEffectBindPose);
         for (const CellScene* cell : world.cellsInOrder(worldspace))
             for (const WorldObject& object : cell->objects)
             {

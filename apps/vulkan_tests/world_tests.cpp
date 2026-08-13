@@ -340,6 +340,16 @@ int main()
         || !effectSubmission.effects.back().object.magicVfx
         || !effectSubmission.valid())
         throw std::runtime_error("renderer-neutral scene submission lost an identified effect");
+    const Render::SceneSubmission deferredEffectSubmission = Render::collectSceneSubmission(world, aggregateScene, "",
+        [&](std::string_view model) -> std::vector<Render::MeshInstance> {
+            return model == "meshes/effect.nif"
+                ? std::vector<Render::MeshInstance>{ aggregateMesh, secondEffectMesh }
+                : std::vector<Render::MeshInstance>{ aggregateMesh };
+        }, false, true, false);
+    if (!deferredEffectSubmission.valid() || deferredEffectSubmission.effects.size() != 1
+        || !deferredEffectSubmission.effects.back().meshes.back().mesh.skinning
+        || Render::findCompatibleSkinning(deferredEffectSubmission.effects.back()) == nullptr)
+        throw std::runtime_error("renderer-neutral scene submission could not defer compatible effect skinning");
     if (!world.removeEffect("spark") || world.removeEffect("spark"))
         throw std::runtime_error("renderer-neutral world scene failed effect removal");
     if (!world.recordEffect("loop", "meshes/effect.nif", { 1.f, 2.f, 3.f }, 1.f, {}, true, 2.f)
