@@ -265,7 +265,8 @@ namespace
         const std::uint32_t compression = read32(data, 30);
         const std::uint32_t colorsUsed = read32(data, 46);
         if (dibSize < 40 || static_cast<std::size_t>(dibSize) > data.size() - 14 || width <= 0 || signedHeight == 0
-            || planes != 1 || (bits != 1 && bits != 4 && bits != 8 && bits != 24 && bits != 32) || compression != 0)
+            || planes != 1 || (bits != 1 && bits != 4 && bits != 8 && bits != 16 && bits != 24 && bits != 32)
+            || (compression != 0 && !(compression == 3 && bits >= 16)))
             return {};
         const std::int64_t absoluteHeight = signedHeight < 0 ? -static_cast<std::int64_t>(signedHeight) : signedHeight;
         if (absoluteHeight > std::numeric_limits<std::uint32_t>::max())
@@ -275,9 +276,42 @@ namespace
             return {};
         const std::size_t paletteEntries = bits <= 8 ? (colorsUsed != 0 ? colorsUsed : std::size_t(1) << bits) : 0;
         const std::size_t paletteOffset = 14 + static_cast<std::size_t>(dibSize);
+        std::uint32_t redMask = 0;
+        std::uint32_t greenMask = 0;
+        std::uint32_t blueMask = 0;
+        std::uint32_t alphaMask = 0;
+        std::size_t pixelDataOffset = paletteOffset;
+        if (bits >= 16)
+        {
+            if (compression == 3)
+            {
+                if (paletteOffset > data.size() || data.size() - paletteOffset < 12)
+                    return {};
+                redMask = read32(data, paletteOffset);
+                greenMask = read32(data, paletteOffset + 4);
+                blueMask = read32(data, paletteOffset + 8);
+                pixelDataOffset += 12;
+                if (bits == 32 && data.size() - paletteOffset >= 16)
+                    alphaMask = read32(data, paletteOffset + 12);
+            }
+            else if (bits == 16)
+            {
+                redMask = 0x7c00;
+                greenMask = 0x03e0;
+                blueMask = 0x001f;
+            }
+            else
+            {
+                redMask = 0x00ff0000;
+                greenMask = 0x0000ff00;
+                blueMask = 0x000000ff;
+            }
+        }
         if (paletteEntries > 0
             && (paletteEntries > (std::numeric_limits<std::size_t>::max() - paletteOffset) / 4
                 || paletteOffset + paletteEntries * 4 > data.size() || offset < paletteOffset + paletteEntries * 4))
+            return {};
+        if (bits >= 16 && (offset < pixelDataOffset || offset > data.size()))
             return {};
         if (static_cast<std::size_t>(width) > std::numeric_limits<std::size_t>::max() / bits)
             return {};
@@ -311,8 +345,11 @@ namespace
                     setPixel(*result, x, y, data[palette + 2], data[palette + 1], data[palette], 255);
                 }
                 else
-                    setPixel(*result, x, y, data[source + 2], data[source + 1], data[source],
-                        bits == 32 ? data[source + 3] : 255);
+                {
+                    const std::uint32_t value = bits == 16 ? read16(data, source) : read32(data, source);
+                    setPixel(*result, x, y, expandChannel(value, redMask), expandChannel(value, greenMask),
+                        expandChannel(value, blueMask), alphaMask ? expandChannel(value, alphaMask) : 255);
+                }
             }
         }
         return result;

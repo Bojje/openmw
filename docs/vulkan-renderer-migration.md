@@ -533,7 +533,7 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the frozen `openmw-vulkan-osg-reference` tag, the current checkpoint changes
-208 code files excluding this ledger, deleting 2,285 lines and adding 15,471 lines (net `+13,186`). The larger Vulkan-only
+208 code files excluding this ledger, deleting 2,285 lines and adding 15,534 lines (net `+13,249`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; the current branch continues the reduction
 work with renderer-neutral ownership and compatibility-wrapper deletion. The live no-GUI
 consumer is the first deletion checkpoint; further reduction can now target OSG
@@ -604,9 +604,9 @@ by the neutral resource provider rather than an `ImageManager` API, so neutral r
 construction has no image-manager dependency. DDS BC5/ATI2 normal maps are also decoded in the
 neutral backend with reconstructed Z components and 16-bit true-color TGA conversion, covering common Bethesda image paths;
 neutral texture resolution now applies the same legacy texture-path correction (including root terrain names and
-`.tga`-to-`.dds` fallback) before decoding; TGA, BMP, and DDS RGBA buffer dimensions are checked for overflow
-before allocation without importing OSG image code; active-cell terrain region coverage is now hole-aware, while
-broader image-format and quadtree-scale terrain-streaming coverage remains.
+`.tga`-to-`.dds` fallback) before decoding; indexed, packed, 16-bit bitfield, true-color TGA/BMP, and DDS RGBA
+buffer dimensions are checked for overflow before allocation without importing OSG image code; active-cell terrain
+region coverage is now hole-aware, while broader image-format and quadtree-scale terrain-streaming coverage remains.
 The scene collector also carries visible models that resolve to no converted geometry as
 explicit unresolved entries; submission validation rejects those entries instead of silently
 dropping world references.

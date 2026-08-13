@@ -87,6 +87,22 @@ namespace
         write32(packedBmp, 46, 2);
         packedBmp[54 + 4 + 2] = 255;
         packedBmp[62] = 0x10;
+        std::vector<std::uint8_t> bitfieldBmp(14 + 40 + 12 + 4, 0);
+        bitfieldBmp[0] = 'B';
+        bitfieldBmp[1] = 'M';
+        write32(bitfieldBmp, 2, bitfieldBmp.size());
+        write32(bitfieldBmp, 10, 66);
+        write32(bitfieldBmp, 14, 40);
+        write32(bitfieldBmp, 18, 1);
+        write32(bitfieldBmp, 22, 1);
+        bitfieldBmp[26] = 1;
+        bitfieldBmp[28] = 16;
+        write32(bitfieldBmp, 30, 3); // BI_BITFIELDS
+        write32(bitfieldBmp, 54, 0xf800);
+        write32(bitfieldBmp, 58, 0x07e0);
+        write32(bitfieldBmp, 62, 0x001f);
+        bitfieldBmp[66] = 0x00;
+        bitfieldBmp[67] = 0xf8; // RGB565 red
         std::vector<std::uint8_t> dds(144, 0);
         dds[0] = 'D';
         dds[1] = 'D';
@@ -138,6 +154,11 @@ namespace
                 static_cast<std::streamsize>(packedBmp.size()));
         }
         {
+            std::ofstream output(root / "textures/bitfield.bmp", std::ios::binary);
+            output.write(reinterpret_cast<const char*>(bitfieldBmp.data()),
+                static_cast<std::streamsize>(bitfieldBmp.size()));
+        }
+        {
             std::ofstream output(root / "textures/normal.dds", std::ios::binary);
             output.write(reinterpret_cast<const char*>(dds.data()), static_cast<std::streamsize>(dds.size()));
         }
@@ -169,6 +190,11 @@ namespace
         if (!packedTexture || packedTexture->width != 1 || packedTexture->height != 1
             || packedTexture->pixels != std::vector<std::uint8_t>({ 255, 0, 0, 255 }))
             throw std::runtime_error("neutral packed BMP texture decoding changed pixel data");
+        const auto bitfieldTexture
+            = resources.getNeutralTextureManager()->get(VFS::Path::Normalized("textures/bitfield.bmp"));
+        if (!bitfieldTexture || bitfieldTexture->width != 1 || bitfieldTexture->height != 1
+            || bitfieldTexture->pixels != std::vector<std::uint8_t>({ 255, 0, 0, 255 }))
+            throw std::runtime_error("neutral 16-bit BMP texture decoding changed pixel data");
         const auto tgaTexture = resources.getNeutralTextureManager()->get(VFS::Path::Normalized("textures/test.tga"));
         if (!tgaTexture || tgaTexture->width != 1 || tgaTexture->height != 1
             || tgaTexture->pixels != std::vector<std::uint8_t>({ 255, 0, 0, 255 }))
