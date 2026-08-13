@@ -4263,10 +4263,12 @@ namespace MWWorld
         if (Settings::fog().mUseDistantFog)
             sceneData.fogParameters = { Settings::fog().mDistantUnderwaterFogStart,
                 Settings::fog().mDistantUnderwaterFogEnd, 0.f, 0.f };
-        else if (currentCell->isExterior() && mWeatherManager)
+        else
         {
             const float viewDistance = std::min(Settings::camera().mViewingDistance.get(), 7168.f);
-            const float fogDepth = std::clamp(mWeatherManager->getNeutralUnderwaterFog(), 0.f, 1.f);
+            const float fogDepth = currentCell->isExterior() || currentCell->isQuasiExterior()
+                ? std::clamp(mWeatherManager ? mWeatherManager->getNeutralUnderwaterFog() : 0.f, 0.f, 1.f)
+                : std::clamp(Fallback::Map::getFloat("Water_UnderwaterIndoorFog"), 0.f, 1.f);
             sceneData.fogParameters = { viewDistance * (1.f - fogDepth), viewDistance, 0.f, 0.f };
         }
     }

@@ -531,7 +531,7 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the frozen `openmw-vulkan-osg-reference` tag, the current checkpoint changes
-208 code files excluding this ledger, deleting 2,284 lines and adding 15,426 lines (net `+13,142`). The larger Vulkan-only
+208 code files excluding this ledger, deleting 2,284 lines and adding 15,435 lines (net `+13,151`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; the current branch continues the reduction
 work with renderer-neutral ownership and compatibility-wrapper deletion. The live no-GUI
 consumer is the first deletion checkpoint; further reduction can now target OSG
@@ -745,7 +745,8 @@ Looping neutral effects now also carry their gameplay loop flag into pose sampli
 controller clock wrapped instead of sampling past the resolved interval.
 Neutral scene export also carries an underwater camera flag through the shared scene data; the Vulkan
 composite uses it for underwater sky, lighting, and fog grading without introducing a second renderer
-specific state path.
+specific state path. Exterior and quasi-exterior underwater fog now use weather density, while interior
+underwater fog uses the legacy `Water_UnderwaterIndoorFog` fallback.
 Neutral actor visibility now also carries opacity and alpha-blend state into dynamic mesh submission, including
 invisibility/chameleon fading without an OSG animation owner. Neutral container opening and closing now retain
 the `containeropen`/`containerclose` timing, including the `loot` event that gates GUI presentation while paused.
