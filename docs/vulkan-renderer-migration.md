@@ -92,8 +92,8 @@ through a Bethesda shader property rather than a classic NIF property. Classic N
 slots and Bethesda shader glow textures now cross the same boundary and contribute to the
 neutral emissive channel. Resource images can now cross into neutral RGBA8 data,
 and authored BSLighting double-sided flags now select the matching Vulkan no-cull pipeline.
-The neutral resource backend now owns a VFS-backed RGBA8 texture cache with true-color and indexed BMP,
-TGA, PNG, JPEG, and
+The neutral resource backend now owns a VFS-backed RGBA8 texture cache with true-color and indexed BMP/TGA,
+PNG, JPEG, and
 common DDS/DXT decoding; the live Vulkan bootstrap uses it for real static-world texture
 paths; unsupported formats now fail the submission with their exact resource path instead of
 silently becoming white.
@@ -526,7 +526,7 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the frozen `openmw-vulkan-osg-reference` tag, the current checkpoint changes
-208 code files excluding this ledger, deleting 2,284 lines and adding 15,168 lines (net `+12,884`). The larger Vulkan-only
+208 code files excluding this ledger, deleting 2,284 lines and adding 15,290 lines (net `+13,006`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; the current branch continues the reduction
 work with renderer-neutral ownership and compatibility-wrapper deletion. The live no-GUI
 consumer is the first deletion checkpoint; further reduction can now target OSG

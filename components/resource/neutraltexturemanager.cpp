@@ -74,8 +74,109 @@ namespace
         result.pixels[offset + 3] = a;
     }
 
+    std::shared_ptr<const Render::TextureData> decodeIndexedTga(const Bytes& data)
+    {
+        if (data.size() < 18 || data[1] != 1 || (data[2] != 1 && data[2] != 9))
+            return {};
+        const std::uint32_t width = read16(data, 12);
+        const std::uint32_t height = read16(data, 14);
+        const unsigned indexBits = data[16];
+        const unsigned paletteBits = data[7];
+        const std::uint32_t paletteOrigin = read16(data, 3);
+        const std::uint32_t paletteLength = read16(data, 5);
+        if (!validRgbaSize(width, height) || (indexBits != 8 && indexBits != 16)
+            || (paletteBits != 16 && paletteBits != 24 && paletteBits != 32) || paletteLength == 0)
+            return {};
+
+        const std::size_t paletteBytes = paletteBits / 8;
+        const std::size_t paletteOffset = 18 + data[0];
+        if (paletteOffset > data.size() || static_cast<std::size_t>(paletteLength)
+                > (std::numeric_limits<std::size_t>::max() - paletteOffset) / paletteBytes)
+            return {};
+        const std::size_t pixelOffset = paletteOffset + static_cast<std::size_t>(paletteLength) * paletteBytes;
+        if (pixelOffset > data.size())
+            return {};
+
+        auto result = std::make_shared<Render::TextureData>();
+        result->width = width;
+        result->height = height;
+        result->pixels.resize(static_cast<std::size_t>(width) * height * 4);
+        const std::size_t indexBytes = indexBits / 8;
+        const std::size_t pixelCount = static_cast<std::size_t>(width) * height;
+        std::size_t cursor = pixelOffset;
+        std::size_t pixel = 0;
+        const bool topDown = (data[17] & 0x20) != 0;
+        const bool rightToLeft = (data[17] & 0x10) != 0;
+        const auto write = [&](const std::uint8_t* source) {
+            const std::uint32_t sourceX = static_cast<std::uint32_t>(pixel % width);
+            const std::uint32_t sourceY = static_cast<std::uint32_t>(pixel / width);
+            const std::uint32_t x = rightToLeft ? width - sourceX - 1 : sourceX;
+            const std::uint32_t y = topDown ? sourceY : height - sourceY - 1;
+            const std::uint32_t paletteIndex = indexBits == 16
+                ? static_cast<std::uint32_t>(source[0] | (source[1] << 8))
+                : source[0];
+            if (paletteIndex < paletteOrigin || paletteIndex - paletteOrigin >= paletteLength)
+                return false;
+            const std::size_t palette = paletteOffset
+                + static_cast<std::size_t>(paletteIndex - paletteOrigin) * paletteBytes;
+            if (paletteBits == 16)
+            {
+                const std::uint16_t value = static_cast<std::uint16_t>(data[palette] | (data[palette + 1] << 8));
+                setPixel(*result, x, y, static_cast<std::uint8_t>(((value >> 10) & 31) * 255 / 31),
+                    static_cast<std::uint8_t>(((value >> 5) & 31) * 255 / 31),
+                    static_cast<std::uint8_t>((value & 31) * 255 / 31), 255);
+            }
+            else
+                setPixel(*result, x, y, data[palette + 2], data[palette + 1], data[palette],
+                    paletteBits == 32 ? data[palette + 3] : 255);
+            ++pixel;
+            return true;
+        };
+        while (pixel < pixelCount)
+        {
+            std::size_t count = 1;
+            bool run = false;
+            if (data[2] == 9)
+            {
+                if (cursor >= data.size())
+                    return {};
+                const std::uint8_t packet = data[cursor++];
+                count = (packet & 0x7f) + 1;
+                run = (packet & 0x80) != 0;
+            }
+            if (count > pixelCount - pixel || cursor > data.size() - indexBytes)
+                return {};
+            std::array<std::uint8_t, 2> source = {};
+            std::copy_n(data.begin() + static_cast<std::ptrdiff_t>(cursor), indexBytes, source.begin());
+            cursor += indexBytes;
+            if (!write(source.data()))
+                return {};
+            if (run)
+            {
+                for (std::size_t i = 1; i < count; ++i)
+                    if (!write(source.data()))
+                        return {};
+            }
+            else
+            {
+                for (std::size_t i = 1; i < count; ++i)
+                {
+                    if (cursor > data.size() - indexBytes)
+                        return {};
+                    std::copy_n(data.begin() + static_cast<std::ptrdiff_t>(cursor), indexBytes, source.begin());
+                    cursor += indexBytes;
+                    if (!write(source.data()))
+                        return {};
+                }
+            }
+        }
+        return result;
+    }
+
     std::shared_ptr<const Render::TextureData> decodeTga(const Bytes& data)
     {
+        if (const auto indexed = decodeIndexedTga(data))
+            return indexed;
         if (data.size() < 18 || (data[2] != 2 && data[2] != 10) || data[1] != 0)
             return {};
         const std::uint32_t width = read16(data, 12);

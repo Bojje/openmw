@@ -98,6 +98,18 @@ namespace
         tga[17] = 0x20;
         tga[18] = 0;
         tga[19] = 0x7c; // 16-bit true-color red (BGR5551), alpha ignored like OSG.
+        std::vector<std::uint8_t> indexedTga(18 + 6 + 2, 0);
+        indexedTga[1] = 1;
+        indexedTga[2] = 9;
+        indexedTga[5] = 2;
+        indexedTga[7] = 24;
+        indexedTga[12] = 1;
+        indexedTga[14] = 1;
+        indexedTga[16] = 8;
+        indexedTga[17] = 0x20;
+        indexedTga[18 + 3 + 2] = 255;
+        indexedTga[24] = 0x80;
+        indexedTga[25] = 1;
         {
             std::ofstream output(root / "textures/test.bmp", std::ios::binary);
             output.write(reinterpret_cast<const char*>(bmp.data()), static_cast<std::streamsize>(bmp.size()));
@@ -114,6 +126,11 @@ namespace
         {
             std::ofstream output(root / "textures/test.tga", std::ios::binary);
             output.write(reinterpret_cast<const char*>(tga.data()), static_cast<std::streamsize>(tga.size()));
+        }
+        {
+            std::ofstream output(root / "textures/indexed.tga", std::ios::binary);
+            output.write(reinterpret_cast<const char*>(indexedTga.data()),
+                static_cast<std::streamsize>(indexedTga.size()));
         }
 
         const ToUTF8::Utf8Encoder encoder(ToUTF8::WINDOWS_1252);
@@ -134,6 +151,10 @@ namespace
         if (!tgaTexture || tgaTexture->width != 1 || tgaTexture->height != 1
             || tgaTexture->pixels != std::vector<std::uint8_t>({ 255, 0, 0, 255 }))
             throw std::runtime_error("neutral 16-bit TGA texture decoding changed pixel data");
+        const auto indexedTgaTexture = resources.getNeutralTextureManager()->get(VFS::Path::Normalized("textures/indexed.tga"));
+        if (!indexedTgaTexture || indexedTgaTexture->width != 1 || indexedTgaTexture->height != 1
+            || indexedTgaTexture->pixels != std::vector<std::uint8_t>({ 255, 0, 0, 255 }))
+            throw std::runtime_error("neutral indexed TGA texture decoding changed pixel data");
         const auto normal = resources.getNeutralTextureManager()->get(VFS::Path::Normalized("textures/test.dds"));
         if (!normal || normal->width != 4 || normal->height != 4 || normal->pixels.size() != 4 * 4 * 4
             || normal->pixels[0] < 190 || normal->pixels[0] > 194 || normal->pixels[1] < 126
