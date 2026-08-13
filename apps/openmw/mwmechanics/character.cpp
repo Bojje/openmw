@@ -3061,6 +3061,7 @@ namespace MWMechanics
 
         const osg::Vec3f input(settings.asVec3());
         osg::Vec3f movement(input);
+        const bool jumpRequested = movement.z() > 0.f;
         const float inputLength = movement.length();
         settings.mSpeedFactor = std::min(inputLength, 1.f);
         if (inputLength > 0.f)
@@ -3071,14 +3072,44 @@ namespace MWMechanics
         const bool inWater = world->isSwimming(mPtr);
         const bool flying = world->isFlying(mPtr);
         const bool solid = world->isActorCollisionEnabled(mPtr);
+        const bool wasInJump = mInJump;
+        mInJump = false;
         if (stats.isDead() || stats.isParalyzed() || isKnockedDown() || isKnockedOut() || inWater || flying || !solid)
             movement.z() = 0.f;
 
         movement.x() *= cls.getCurrentSpeed(mPtr);
         movement.y() *= cls.getCurrentSpeed(mPtr);
 
-        if (!inWater && !flying && solid && world->isOnGround(mPtr) && cls.getJump(mPtr) > 0.f
-            && movement.z() > 0.f)
+        const bool onGround = world->isOnGround(mPtr);
+        if (!inWater && !flying && solid)
+        {
+            if (!onGround)
+            {
+                mInJump = true;
+                mJumpState = JumpState_InAir;
+            }
+            else if (jumpRequested && cls.getJump(mPtr) > 0.f && !wasInJump)
+            {
+                mInJump = true;
+                mJumpState = JumpState_InAir;
+            }
+            else if (mJumpState == JumpState_InAir && wasInJump)
+            {
+                mJumpState = JumpState_Landing;
+            }
+            else
+            {
+                mJumpState = JumpState_None;
+            }
+        }
+        else
+        {
+            mJumpState = JumpState_None;
+        }
+
+        if (mInJump && !onGround && !inWater && !flying && solid)
+            movement.z() = 0.f;
+        else if (mInJump && jumpRequested && cls.getJump(mPtr) > 0.f)
             movement.z() = cls.getJump(mPtr);
         else
             movement.z() = 0.f;
@@ -3100,6 +3131,22 @@ namespace MWMechanics
             animationGroup = mCurrentHit;
         else if (!mAnimQueue.empty())
             animationGroup = mAnimQueue.front().mGroup;
+        else if (mJumpState != JumpState_None)
+        {
+            std::string jumpGroup = "jump";
+            const std::string_view weaponShortGroup = getWeaponShortGroup(mWeaponType);
+            if (!weaponShortGroup.empty())
+            {
+                std::string weaponJumpGroup = jumpGroup + std::string(weaponShortGroup);
+                if (world->getNeutralAnimationDuration(mPtr, weaponJumpGroup, "start", "stop"))
+                    jumpGroup = std::move(weaponJumpGroup);
+            }
+
+            if (!world->getNeutralAnimationDuration(mPtr, jumpGroup, "start", "stop"))
+                animationGroup = "idle";
+            else
+                animationGroup = std::move(jumpGroup);
+        }
         else
         {
             animationGroup = "idle";
@@ -3119,8 +3166,25 @@ namespace MWMechanics
         }
         const std::optional<float> animationTime
             = mAnimQueue.empty() ? std::nullopt : std::optional<float>(mAnimQueue.front().mTime);
-        const std::string_view startKey = mAnimQueue.empty() ? std::string_view{} : mAnimQueue.front().mStartKey;
-        const std::string_view stopKey = mAnimQueue.empty() ? std::string_view{} : mAnimQueue.front().mStopKey;
+        std::string_view startKey;
+        std::string_view stopKey;
+        if (!mAnimQueue.empty())
+        {
+            startKey = mAnimQueue.front().mStartKey;
+            stopKey = mAnimQueue.front().mStopKey;
+        }
+        else if (mJumpState == JumpState_InAir
+            && world->getNeutralAnimationDuration(mPtr, animationGroup, "loop start", "loop stop"))
+        {
+            startKey = "loop start";
+            stopKey = "loop stop";
+        }
+        else if (mJumpState == JumpState_Landing
+            && world->getNeutralAnimationDuration(mPtr, animationGroup, "loop stop", "stop"))
+        {
+            startKey = "loop stop";
+            stopKey = "stop";
+        }
         world->updateNeutralAnimation(mPtr, animationGroup, animationTime, startKey, stopKey);
         settings.mPosition[0] = settings.mPosition[1] = 0.f;
         if (movement.z() == 0.f)
