@@ -222,38 +222,26 @@ namespace MWBase
         virtual void advanceTime(double hours, bool incremental = false) = 0;
         ///< Advance in-game time.
 
-        // Renderer-neutral animation selection. OSG-only callers retain the
-        // default no-op; Vulkan publishes the selected group to its snapshot.
+        // Renderer-neutral animation selection. Every world implementation
+        // must explicitly own this bridge; silent defaults hide missing state.
         virtual void updateNeutralAnimation(
             const MWWorld::Ptr&, std::string_view, std::optional<float> animationTime = std::nullopt,
             std::string_view startKey = {}, std::string_view stopKey = {}, bool looping = false)
-        {
-            (void)animationTime;
-            (void)looping;
-        }
+            = 0;
         virtual void updateNeutralAnimationLayer(const MWWorld::Ptr&, std::string_view, std::string_view,
             std::optional<float> animationTime = std::nullopt, std::string_view startKey = {},
             std::string_view stopKey = {}, bool looping = false, unsigned mask = 0xfu, int priority = 0)
-        {
-            (void)animationTime;
-            (void)looping;
-            (void)mask;
-            (void)priority;
-        }
-        virtual void removeNeutralAnimationLayer(const MWWorld::Ptr&, std::string_view) {}
+            = 0;
+        virtual void removeNeutralAnimationLayer(const MWWorld::Ptr&, std::string_view) = 0;
         virtual void updateNeutralObjectAttachment(const MWWorld::Ptr&, std::string_view, std::string_view,
             std::string_view, bool, const Render::Vec4&, bool)
-        {
-        }
+            = 0;
         virtual std::optional<float> getNeutralAnimationDuration(const MWWorld::Ptr&, std::string_view group = {},
-            std::string_view startKey = {}, std::string_view stopKey = {}) const
-        {
-            return std::nullopt;
-        }
-        virtual bool isNeutralAnimationPlaying(const MWWorld::Ptr&, std::string_view) const { return false; }
+            std::string_view startKey = {}, std::string_view stopKey = {}) const = 0;
+        virtual bool isNeutralAnimationPlaying(const MWWorld::Ptr&, std::string_view) const = 0;
         virtual std::vector<Render::AnimationTextKey> getNeutralAnimationTextKeys(
             const MWWorld::Ptr&, std::string_view group = {}, std::string_view startKey = {},
-            std::string_view stopKey = {}) const;
+            std::string_view stopKey = {}) const = 0;
 
         virtual MWWorld::TimeStamp getTimeStamp() const = 0;
         ///< Return current in-game time and number of day since new game start.
