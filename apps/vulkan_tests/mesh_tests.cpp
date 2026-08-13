@@ -734,6 +734,8 @@ int main()
     effect.mBaseColor = { 0.25f, 0.5f, 0.75f, 0.5f };
     effect.mBaseColorScale = 2.f;
     effect.mEmittanceColor = { 0.1f, 0.2f, 0.3f };
+    effect.mUVOffset = { 0.1f, 0.2f };
+    effect.mUVScale = { 2.f, 3.f };
     effect.mShaderFlags2 = Nif::BSLSFlag2_DoubleSided;
     Nif::NiTriShape effectShape;
     effectShape.mData = &treeData;
@@ -748,9 +750,18 @@ int main()
         || !effectInstances.front().mesh.material.alphaBlend || !effectInstances.front().mesh.material.doubleSided
         || effectInstances.front().mesh.material.albedoWrapU || !effectInstances.front().mesh.material.albedoWrapV)
         throw std::runtime_error("NIF effect shader material conversion lost neutral state");
+    if (!effectInstances.front().mesh.material.uvTransform
+        || effectInstances.front().mesh.material.uvOffset != std::array<float, 2>{ 0.1f, 0.2f }
+        || effectInstances.front().mesh.material.uvScale != std::array<float, 2>{ 2.f, 3.f })
+        throw std::runtime_error("NIF effect shader UV transform was not preserved");
     expectNear(effectInstances.front().mesh.material.diffuse.x, 0.5f, "effect diffuse red");
     expectNear(effectInstances.front().mesh.material.diffuse.w, 0.5f, "effect alpha");
     expectNear(effectInstances.front().mesh.material.emissive.z, 0.3f, "effect emissive blue");
+    const Render::MeshBatch effectBatch = Render::batchMeshes(effectInstances);
+    if (effectBatch.vertices.empty())
+        throw std::runtime_error("NIF effect shader did not produce a batch");
+    expectNear(effectBatch.vertices.front().texcoord[0], -0.6f, "effect transformed U");
+    expectNear(effectBatch.vertices.front().texcoord[1], -1.2f, "effect transformed V");
 
     auto shaderTextureSet = std::make_unique<Nif::BSShaderTextureSet>();
     shaderTextureSet->mTextures = { "textures\\shader.dds", "textures\\shader_n.dds",

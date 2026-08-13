@@ -842,6 +842,13 @@ namespace Nif
                         effect->mEmittanceColor.z(), 1.f };
                     result.doubleSided = effect->doubleSided();
                     result.alphaBlend = result.diffuse.w < 1.f || effect->softEffect() || effect->refraction();
+                    if (std::isfinite(effect->mUVOffset.x()) && std::isfinite(effect->mUVOffset.y())
+                        && std::isfinite(effect->mUVScale.x()) && std::isfinite(effect->mUVScale.y()))
+                    {
+                        result.uvOffset = { effect->mUVOffset.x(), effect->mUVOffset.y() };
+                        result.uvScale = { effect->mUVScale.x(), effect->mUVScale.y() };
+                        result.uvTransform = true;
+                    }
                 }
             }
 

@@ -50,6 +50,12 @@ namespace Render
         float specularStrength = 1.f;
         bool specularMaterial = false;
         bool unlit = false;
+        // Bethesda effect shaders apply this transform to their shared UV
+        // set. Keep it in the neutral material so every texture layer follows
+        // the same authored coordinates when the mesh is batched.
+        std::array<float, 2> uvOffset{};
+        std::array<float, 2> uvScale{ 1.f, 1.f };
+        bool uvTransform = false;
         bool alphaBlend = false;
         bool alphaTest = false;
         bool doubleSided = false;
@@ -811,6 +817,12 @@ namespace Render
     inline MeshBatch batchMeshes(const std::vector<MeshInstance>& meshes)
     {
         MeshBatch result;
+        const auto applyUvTransform = [](float& u, float& v, const MeshMaterial& material) {
+            if (!material.uvTransform)
+                return;
+            u = (u - 0.5f) * material.uvScale[0] + 0.5f - material.uvOffset[0];
+            v = (v - 0.5f) * material.uvScale[1] + 0.5f - material.uvOffset[1];
+        };
         for (const MeshInstance& mesh : meshes)
         {
             if (mesh.mesh.vertices.empty() || mesh.mesh.indices.empty())
@@ -841,6 +853,11 @@ namespace Render
             for (const MeshVertex& source : mesh.mesh.vertices)
             {
                 MeshVertex vertex = source;
+                applyUvTransform(vertex.texcoord[0], vertex.texcoord[1], mesh.mesh.material);
+                applyUvTransform(vertex.blendTexcoord[0], vertex.blendTexcoord[1], mesh.mesh.material);
+                for (std::size_t layer = 0; layer < vertex.textureLayerCoords.size(); layer += 2)
+                    applyUvTransform(vertex.textureLayerCoords[layer], vertex.textureLayerCoords[layer + 1],
+                        mesh.mesh.material);
                 vertex.color[0] *= mesh.mesh.material.diffuse.x;
                 vertex.color[1] *= mesh.mesh.material.diffuse.y;
                 vertex.color[2] *= mesh.mesh.material.diffuse.z;

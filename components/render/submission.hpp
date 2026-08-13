@@ -45,6 +45,10 @@ namespace Render
             || !std::isfinite(instance.mesh.material.glossiness)
             || !std::isfinite(instance.mesh.material.specularStrength)
             || instance.mesh.material.specularStrength < 0.f
+            || !std::all_of(instance.mesh.material.uvOffset.begin(), instance.mesh.material.uvOffset.end(),
+                   [](float value) { return std::isfinite(value); })
+            || !std::all_of(instance.mesh.material.uvScale.begin(), instance.mesh.material.uvScale.end(),
+                   [](float value) { return std::isfinite(value); })
             || !std::all_of(instance.mesh.material.emissiveLumaBias.begin(), instance.mesh.material.emissiveLumaBias.end(),
                    [](float value) { return std::isfinite(value); })
             || (instance.mesh.material.alphaTexture && !instance.mesh.material.alphaTexture->valid())

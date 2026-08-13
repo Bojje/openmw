@@ -266,6 +266,23 @@ namespace Render
                         effect.pointLightRadius };
                 ++count;
             }
+            for (const auto& [cellKey, cell] : mCells)
+            {
+                for (const WorldObject& object : cell.objects)
+                {
+                    if (count >= SceneData::maxPointLights || !object.active || !object.visible
+                        || !valid(object.transform.position) || !valid(object.pointLightColor)
+                        || !valid(object.pointLightRadius) || object.pointLightRadius <= 0.f)
+                        continue;
+
+                    mSceneData.pointLightPositions[count]
+                        = { object.transform.position.x, object.transform.position.y, object.transform.position.z, 1.f };
+                    mSceneData.pointLightColorsAndRadii[count]
+                        = { object.pointLightColor.x, object.pointLightColor.y, object.pointLightColor.z,
+                            object.pointLightRadius };
+                    ++count;
+                }
+            }
             mSceneData.pointLightCount.x = static_cast<float>(count);
         }
 
@@ -282,6 +299,7 @@ namespace Render
             if (object == nullptr)
                 return false;
             update(object->transform);
+            refreshPointLights();
             return true;
         }
 
@@ -499,9 +517,13 @@ namespace Render
         void recordObject(const void* objectKey, const void* cellKey, bool exterior, int gridX, int gridY,
             std::string_view cellName, std::string_view model, const ObjectTransform& transform, bool visible,
             std::string_view worldspace = {}, bool dynamic = false,
-            std::span<const std::string> animationSources = {})
+            std::span<const std::string> animationSources = {}, const Vec4& pointLightColor = {},
+            float pointLightRadius = 0.f)
         {
-            if (objectKey == nullptr || cellKey == nullptr || model.empty())
+            if (objectKey == nullptr || cellKey == nullptr || model.empty() || !valid(pointLightColor)
+                || !valid(pointLightRadius) || pointLightRadius < 0.f
+                || (pointLightRadius > 0.f
+                    && (pointLightColor.x < 0.f || pointLightColor.y < 0.f || pointLightColor.z < 0.f)))
             {
                 removeObject(objectKey);
                 return;
@@ -516,7 +538,7 @@ namespace Render
                     if (updateObjectCell(objectKey, objectKey, cellKey, exterior, gridX, gridY, cellName, worldspace))
                         return recordObject(
                             objectKey, cellKey, exterior, gridX, gridY, cellName, model, transform, visible, worldspace,
-                            dynamic, animationSources);
+                            dynamic, animationSources, pointLightColor, pointLightRadius);
                     mObjects.erase(found);
                 }
                 else if (CellScene* scene = findCell(location.cell))
@@ -529,6 +551,8 @@ namespace Render
                         object->transform = transform;
                         object->visible = visible;
                         object->dynamic = dynamic;
+                        object->pointLightColor = pointLightColor;
+                        object->pointLightRadius = pointLightRadius;
                         if (!dynamic || modelChanged)
                         {
                             object->boneMatrices.clear();
@@ -538,6 +562,7 @@ namespace Render
                             object->animationLayers.clear();
                             object->attachments.clear();
                         }
+                        refreshPointLights();
                         return;
                     }
                 }
@@ -554,8 +579,11 @@ namespace Render
             object.transform = transform;
             object.visible = visible;
             object.dynamic = dynamic;
+            object.pointLightColor = pointLightColor;
+            object.pointLightRadius = pointLightRadius;
             ensureCell(cellKey, exterior, gridX, gridY, cellName, worldspace).objects.push_back(std::move(object));
             mObjects.emplace(objectKey, ObjectLocation{ cellKey, id });
+            refreshPointLights();
         }
 
         bool updateObjectPosition(const void* objectKey, const Vec3& position)
@@ -586,6 +614,7 @@ namespace Render
                 return false;
             object->opacity = std::clamp(value, 0.f, 1.f);
             object->visible = object->opacity > 0.f;
+            refreshPointLights();
             return true;
         }
 
@@ -601,6 +630,7 @@ namespace Render
             if (object == nullptr)
                 return false;
             object->active = value;
+            refreshPointLights();
             return true;
         }
 

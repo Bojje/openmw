@@ -21,6 +21,8 @@
 #include <components/esm3/loadcell.hpp>
 #include <components/esm3/loadclot.hpp>
 #include <components/esm3/loadarmo.hpp>
+#include <components/esm3/loadligh.hpp>
+#include <components/esm4/loadligh.hpp>
 #include <components/loadinglistener/loadinglistener.hpp>
 #include <components/misc/convert.hpp>
 #include <components/misc/resourcehelpers.hpp>
@@ -119,6 +121,30 @@ namespace
             bounds };
     }
 
+    std::pair<Render::Vec4, float> getNeutralPointLight(const MWWorld::Ptr& ptr)
+    {
+        const auto makeColor = [](std::uint32_t color) {
+            return Render::Vec4{ static_cast<float>((color >> 0) & 0xff) / 255.f,
+                static_cast<float>((color >> 8) & 0xff) / 255.f,
+                static_cast<float>((color >> 16) & 0xff) / 255.f, 1.f };
+        };
+        if (ptr.getType() == ESM::Light::sRecordId)
+        {
+            const ESM::Light& light = *ptr.get<ESM::Light>()->mBase;
+            if (light.mData.mFlags & ESM::Light::Negative)
+                return {};
+            return { makeColor(light.mData.mColor), std::max(static_cast<float>(light.mData.mRadius), 16.f) };
+        }
+        if (ptr.getType() == ESM4::Light::sRecordId)
+        {
+            const ESM4::Light& light = *ptr.get<ESM4::Light>()->mBase;
+            if (light.mData.flags & ESM4::Light::Negative)
+                return {};
+            return { makeColor(light.mData.colour), std::max(static_cast<float>(light.mData.radius), 16.f) };
+        }
+        return {};
+    }
+
     void recordNeutralObject(const MWWorld::World& world, const MWWorld::Ptr& ptr, std::string_view model,
         bool visible, Render::WorldScene* neutralWorld)
     {
@@ -145,10 +171,11 @@ namespace
         animationSources.reserve(sourcePaths.size());
         for (const VFS::Path::Normalized& source : sourcePaths)
             animationSources.push_back(source.value());
+        const auto [pointLightColor, pointLightRadius] = getNeutralPointLight(ptr);
         neutralWorld->recordObject(static_cast<const void*>(ptr.mRef), static_cast<const void*>(cell),
             cell->getCell()->isExterior(), cell->getCell()->getGridX(), cell->getCell()->getGridY(),
             cell->getCell()->getNameId(), model, transform, visible, cell->getCell()->getWorldSpace().serializeText(),
-            ptr.getClass().useAnim(), animationSources);
+            ptr.getClass().useAnim(), animationSources, pointLightColor, pointLightRadius);
 
         if (!ptr.getClass().isNpc() || !ptr.getClass().useAnim())
             return;

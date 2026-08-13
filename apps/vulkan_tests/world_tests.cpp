@@ -169,6 +169,13 @@ int main()
         || firstCell->objects.front().visible)
         throw std::runtime_error("renderer-neutral world scene failed to record an object");
 
+    world.recordObject(&objectHandle, &firstCellHandle, true, 1, 2, "first", "meshes/light.nif", objectTransform,
+        true, {}, false, {}, { 0.2f, 0.4f, 0.6f, 1.f }, 32.f);
+    if (world.sceneData().pointLightCount.x != 1.f || world.sceneData().pointLightPositions[0].x != 4.f
+        || world.sceneData().pointLightColorsAndRadii[0].y != 0.4f
+        || world.sceneData().pointLightColorsAndRadii[0].w != 32.f)
+        throw std::runtime_error("renderer-neutral world scene failed to submit object point lights");
+
     objectTransform.position.x = 8.f;
     world.recordObject(&objectHandle, &firstCellHandle, true, 1, 2, "first", "meshes/updated.nif", objectTransform, true);
     const Render::WorldObject& recorded = world.findCell(&firstCellHandle)->objects.front();
