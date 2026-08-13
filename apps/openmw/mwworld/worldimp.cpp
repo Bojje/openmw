@@ -3946,7 +3946,7 @@ namespace MWWorld
     void World::spawnEffect(VFS::Path::NormalizedView model, const std::string& textureOverride,
         const osg::Vec3f& worldPos, float scale, bool isMagicVFX, bool useAmbientLight, std::string_view effectId,
         bool loop, std::array<float, 4> pointLightColor, float pointLightRadius,
-        std::array<float, 4> emissiveColor)
+        std::array<float, 4> emissiveColor, std::span<const std::string> additionalModels)
     {
         if (mRendering)
             mRendering->spawnEffect(model, textureOverride, worldPos, scale, isMagicVFX, useAmbientLight, effectId, loop);
@@ -3966,7 +3966,7 @@ namespace MWWorld
             mWorldScene->recordNeutralEffect(neutralEffectId, model.value(),
                 { worldPos.x(), worldPos.y(), worldPos.z() }, scale, textureOverride, loop,
                 animationDuration.value_or(0.f), isMagicVFX, useAmbientLight, neutralPointLightColor,
-                pointLightRadius, neutralEmissiveColor, emissiveColor[3] > 0.f);
+                pointLightRadius, neutralEmissiveColor, emissiveColor[3] > 0.f, additionalModels);
         }
     }
 

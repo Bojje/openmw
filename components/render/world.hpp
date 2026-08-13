@@ -98,6 +98,9 @@ namespace Render
 
         uint64_t id = 0;
         std::string model;
+        // Additional models are composed at the same effect transform. This
+        // preserves multi-part VFX without exposing legacy scene-graph nodes.
+        std::vector<std::string> additionalModels;
         // Actor animation source order is selected by the world owner. Empty
         // means the resource manager may use model-local discovery defaults.
         std::vector<std::string> animationSources;
@@ -322,7 +325,8 @@ namespace Render
         bool recordEffect(std::string_view effectId, std::string_view model, const Vec3& position, float scale,
             std::string_view textureOverride = {}, bool looping = false, float animationDuration = 0.f,
             bool magicVfx = false, bool ambientOverride = false, const Vec4& pointLightColor = {},
-            float pointLightRadius = 0.f, const Vec4& emissiveColor = {}, bool emissiveOverride = false)
+            float pointLightRadius = 0.f, const Vec4& emissiveColor = {}, bool emissiveOverride = false,
+            std::span<const std::string> additionalModels = {})
         {
             if (effectId.empty() || model.empty() || !valid(position) || !valid(scale) || scale <= 0.f
                 || !valid(pointLightColor) || !valid(pointLightRadius) || pointLightRadius < 0.f
@@ -336,6 +340,7 @@ namespace Render
             if (effect.id == 0)
                 effect.id = mNextObjectId++;
             effect.model = model;
+            effect.additionalModels.assign(additionalModels.begin(), additionalModels.end());
             effect.transform.position = position;
             effect.transform.scale = { scale, scale, scale };
             effect.textureOverride = textureOverride;

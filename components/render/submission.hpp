@@ -262,33 +262,38 @@ namespace Render
     {
         for (const WorldObject* effect : world.effectsInOrder())
         {
-            const std::vector<MeshInstance> resolvedMeshes = resolveMeshes(effect->model);
-            const bool hasGeometry = std::any_of(resolvedMeshes.begin(), resolvedMeshes.end(), hasRenderableGeometry);
-            if (!hasGeometry)
-                unresolvedModels.push_back(effect->model);
             EffectMeshSubmission submission;
             submission.object = *effect;
             bool textureOverrideApplied = false;
-            for (const MeshInstance& mesh : resolvedMeshes)
-            {
-                MeshInstance instance = transformMeshInstance(*effect, mesh);
-                if (includeBindPose)
-                    bakeMeshBindPose(instance);
-                if (!effect->textureOverride.empty() && (!effect->magicVfx || !textureOverrideApplied))
+            const auto addModel = [&](std::string_view model) {
+                const std::vector<MeshInstance> resolvedMeshes = resolveMeshes(model);
+                if (!std::any_of(resolvedMeshes.begin(), resolvedMeshes.end(), hasRenderableGeometry))
+                    unresolvedModels.emplace_back(model);
+                for (const MeshInstance& mesh : resolvedMeshes)
                 {
-                    instance.mesh.material.albedoTexture = effect->textureOverride;
-                    instance.mesh.material.albedoWrapU = false;
-                    instance.mesh.material.albedoWrapV = false;
-                    textureOverrideApplied = true;
+                    MeshInstance instance = transformMeshInstance(*effect, mesh);
+                    if (includeBindPose)
+                        bakeMeshBindPose(instance);
+                    if (!effect->textureOverride.empty() && (!effect->magicVfx || !textureOverrideApplied))
+                    {
+                        instance.mesh.material.albedoTexture = effect->textureOverride;
+                        instance.mesh.material.albedoWrapU = false;
+                        instance.mesh.material.albedoWrapV = false;
+                        textureOverrideApplied = true;
+                    }
+                    instance.mesh.material.ambientOverride = effect->ambientOverride;
+                    if (effect->emissiveOverride)
+                    {
+                        instance.mesh.material.emissive = effect->emissiveColor;
+                        instance.mesh.material.emissiveOverride = true;
+                    }
+                    submission.meshes.push_back(std::move(instance));
                 }
-                instance.mesh.material.ambientOverride = effect->ambientOverride;
-                if (effect->emissiveOverride)
-                {
-                    instance.mesh.material.emissive = effect->emissiveColor;
-                    instance.mesh.material.emissiveOverride = true;
-                }
-                submission.meshes.push_back(std::move(instance));
-            }
+            };
+            addModel(effect->model);
+            for (const std::string& model : effect->additionalModels)
+                if (!model.empty())
+                    addModel(model);
             result.push_back(std::move(submission));
         }
     }

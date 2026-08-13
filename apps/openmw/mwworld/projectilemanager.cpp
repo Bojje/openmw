@@ -182,6 +182,26 @@ namespace
         return "projectile-" + std::to_string(projectileId);
     }
 
+    std::vector<std::string> getMagicBoltAdditionalModels(const std::vector<ESM::RefId>& projectileIds)
+    {
+        const MWWorld::ESMStore& esmStore = *MWBase::Environment::get().getESMStore();
+        std::vector<std::string> result;
+        if (projectileIds.size() <= 1)
+            return result;
+        result.reserve(projectileIds.size() - 1);
+        for (std::size_t index = 1; index < projectileIds.size(); ++index)
+        {
+            const ESM::Weapon* weapon = esmStore.get<ESM::Weapon>().find(projectileIds[index]);
+            if (weapon == nullptr)
+                continue;
+            const VFS::Path::Normalized model
+                = Misc::ResourceHelpers::correctMeshPath(weapon->mModel.getNormalized());
+            if (!model.empty())
+                result.push_back(model.value());
+        }
+        return result;
+    }
+
     Render::Quat toRenderQuat(const osg::Quat& quat)
     {
         return { static_cast<float>(quat.x()), static_cast<float>(quat.y()), static_cast<float>(quat.z()),
@@ -387,10 +407,12 @@ namespace MWWorld
         state.mToDelete = false;
         if (!mParent)
         {
+            const std::vector<std::string> additionalModels = getMagicBoltAdditionalModels(state.mIdMagic);
             state.mNeutralEffectId = makeNeutralProjectileEffectId(state.mProjectileId);
             MWBase::Environment::get().getWorld()->spawnEffect(
                 visualModel, std::string(texture.value()), pos, 1.f, true, false, state.mNeutralEffectId, true,
-                std::array<float, 4>{ lightDiffuseColor.r(), lightDiffuseColor.g(), lightDiffuseColor.b(), 0.f }, 66.f);
+                std::array<float, 4>{ lightDiffuseColor.r(), lightDiffuseColor.g(), lightDiffuseColor.b(), 0.f }, 66.f,
+                {}, additionalModels);
             MWBase::Environment::get().getWorld()->updateEffect(
                 state.mNeutralEffectId, toRenderVec3(state.mPosition), toRenderQuat(state.mOrientation));
         }
@@ -883,11 +905,13 @@ namespace MWWorld
 
             if (!mParent)
             {
+                const std::vector<std::string> additionalModels = getMagicBoltAdditionalModels(state.mIdMagic);
                 state.mNeutralEffectId = makeNeutralProjectileEffectId(state.mProjectileId);
                 MWBase::Environment::get().getWorld()->spawnEffect(
                     model, std::string(texture.value()), osg::Vec3f(esm.mPosition), 1.f, true, false,
                     state.mNeutralEffectId, true,
-                    std::array<float, 4>{ lightDiffuseColor.r(), lightDiffuseColor.g(), lightDiffuseColor.b(), 0.f }, 66.f);
+                    std::array<float, 4>{ lightDiffuseColor.r(), lightDiffuseColor.g(), lightDiffuseColor.b(), 0.f },
+                    66.f, {}, additionalModels);
                 MWBase::Environment::get().getWorld()->updateEffect(
                     state.mNeutralEffectId, toRenderVec3(state.mPosition), toRenderQuat(state.mOrientation));
             }

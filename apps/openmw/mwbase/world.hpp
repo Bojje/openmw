@@ -562,10 +562,11 @@ namespace MWBase
         /// Spawn a random creature from a levelled list next to the player
         virtual void spawnRandomCreature(const ESM::RefId& creatureList) = 0;
 
-        virtual void spawnEffect(VFS::Path::NormalizedView model, const std::string& textureOverride,
+            virtual void spawnEffect(VFS::Path::NormalizedView model, const std::string& textureOverride,
             const osg::Vec3f& worldPos, float scale = 1.f, bool isMagicVFX = true, bool useAmbientLight = true,
             std::string_view effectId = {}, bool loop = false, std::array<float, 4> pointLightColor = {},
-            float pointLightRadius = 0.f, std::array<float, 4> emissiveColor = {})
+            float pointLightRadius = 0.f, std::array<float, 4> emissiveColor = {},
+            std::span<const std::string> additionalModels = {})
             = 0;
 
         virtual void removeEffect(std::string_view effectId) = 0;

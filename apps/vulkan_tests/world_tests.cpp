@@ -324,8 +324,10 @@ int main()
     effectSkinning->boneNames = { "EffectRoot" };
     effectSkinning->inverseBindMatrices = { Render::identityMat4() };
     secondEffectMesh.mesh.skinning = std::move(effectSkinning);
+    const std::vector<std::string> additionalEffectModels{ "meshes/effect-extra.nif" };
     if (!world.recordEffect("spark", "meshes/effect.nif", { 10.f, 11.f, 12.f }, 2.f, "textures/effect.dds", true, 2.f,
-            true, true, { 0.8f, 0.3f, 0.1f, 0.f }, 66.f, { 0.2f, 0.4f, 0.8f, 1.f }, true)
+            true, true, { 0.8f, 0.3f, 0.1f, 0.f }, 66.f, { 0.2f, 0.4f, 0.8f, 1.f }, true,
+            additionalEffectModels)
         || world.recordEffect("", "meshes/effect.nif", { 10.f, 11.f, 12.f }, 1.f))
         throw std::runtime_error("renderer-neutral world scene accepted an invalid or anonymous effect");
     if (world.sceneData().pointLightCount.x != 1.f || world.sceneData().pointLightPositions[0].x != 10.f
@@ -335,14 +337,14 @@ int main()
         throw std::runtime_error("renderer-neutral world scene lost an effect point light");
     const Render::SceneSubmission effectSubmission = Render::collectSceneSubmission(world, aggregateScene, "",
         [&](std::string_view model) -> std::vector<Render::MeshInstance> {
-            if (model != "meshes/first.nif" && model != "meshes/effect.nif")
+            if (model != "meshes/first.nif" && model != "meshes/effect.nif" && model != "meshes/effect-extra.nif")
                 throw std::runtime_error("effect scene submission resolved an unexpected model");
-            return model == "meshes/effect.nif"
+            return model == "meshes/effect.nif" || model == "meshes/effect-extra.nif"
                 ? std::vector<Render::MeshInstance>{ aggregateMesh, secondEffectMesh }
                 : std::vector<Render::MeshInstance>{ aggregateMesh };
         }, false);
     if (effectSubmission.meshes.size() != 1 || effectSubmission.effects.size() != 1
-        || effectSubmission.effects.back().meshes.size() != 2
+        || effectSubmission.effects.back().meshes.size() != 4
         || effectSubmission.effects.back().meshes.back().transform.data[0] != 2.f
         || effectSubmission.effects.back().meshes.front().mesh.material.albedoTexture != "textures/effect.dds"
         || effectSubmission.effects.back().meshes.front().mesh.material.albedoWrapU
@@ -364,7 +366,7 @@ int main()
         throw std::runtime_error("renderer-neutral scene submission lost an identified effect");
     const Render::SceneSubmission deferredEffectSubmission = Render::collectSceneSubmission(world, aggregateScene, "",
         [&](std::string_view model) -> std::vector<Render::MeshInstance> {
-            return model == "meshes/effect.nif"
+            return model == "meshes/effect.nif" || model == "meshes/effect-extra.nif"
                 ? std::vector<Render::MeshInstance>{ aggregateMesh, secondEffectMesh }
                 : std::vector<Render::MeshInstance>{ aggregateMesh };
         }, false, true, false);
