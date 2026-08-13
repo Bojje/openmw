@@ -144,13 +144,33 @@ namespace Render
         float rotationSpeed = 0.f;
     };
 
+    struct ParticleSimulationData
+    {
+        Vec3 acceleration{};
+        float drag = 0.f;
+        float growTime = 0.f;
+        float fadeTime = 0.f;
+        float baseScale = 1.f;
+        float rotationSpeed = 0.f;
+
+        bool valid() const
+        {
+            return Render::valid(acceleration) && std::isfinite(drag) && std::isfinite(growTime)
+                && std::isfinite(fadeTime) && std::isfinite(baseScale) && std::isfinite(rotationSpeed)
+                && drag >= 0.f && growTime >= 0.f && fadeTime >= 0.f && baseScale >= 0.f;
+        }
+    };
+
     struct ParticleMeshData
     {
         std::vector<ParticleState> states;
+        std::shared_ptr<const ParticleSimulationData> simulation;
 
         bool valid(std::size_t vertexCount) const
         {
             if (states.size() > vertexCount / 4)
+                return false;
+            if (simulation && !simulation->valid())
                 return false;
             return std::all_of(states.begin(), states.end(), [](const ParticleState& state) {
                 return Render::valid(state.velocity) && std::isfinite(state.age)
@@ -186,18 +206,34 @@ namespace Render
 
             const float age = state.age + time;
             const bool alive = state.lifespan <= 0.f || age < state.lifespan;
-            const Vec3 center = { source.vertices[firstVertex].tangent[0] + state.velocity.x * time,
-                source.vertices[firstVertex].tangent[1] + state.velocity.y * time,
-                source.vertices[firstVertex].tangent[2] + state.velocity.z * time };
-            const float angle = state.rotationSpeed * time;
+            const ParticleSimulationData* simulation = source.particles->simulation.get();
+            const Vec3 acceleration = simulation ? simulation->acceleration : Vec3{};
+            const float drag = simulation ? simulation->drag : 0.f;
+            const float displacementScale = drag > 0.f ? (1.f - std::exp(-drag * time)) / drag : time;
+            const float accelerationScale
+                = drag > 0.f ? (time - displacementScale) / drag : 0.5f * time * time;
+            const Vec3 displacement = { state.velocity.x * displacementScale + acceleration.x * accelerationScale,
+                state.velocity.y * displacementScale + acceleration.y * accelerationScale,
+                state.velocity.z * displacementScale + acceleration.z * accelerationScale };
+            const Vec3 center = { source.vertices[firstVertex].tangent[0] + displacement.x,
+                source.vertices[firstVertex].tangent[1] + displacement.y,
+                source.vertices[firstVertex].tangent[2] + displacement.z };
+            const float rotationSpeed = state.rotationSpeed + (simulation ? simulation->rotationSpeed : 0.f);
+            const float angle = rotationSpeed * time;
             const float cosine = std::cos(angle);
             const float sine = std::sin(angle);
+            float scale = simulation ? simulation->baseScale : 1.f;
+            if (simulation && simulation->growTime > 0.f && age < simulation->growTime)
+                scale *= std::clamp(age / simulation->growTime, 0.f, 1.f);
+            if (simulation && simulation->fadeTime > 0.f && state.lifespan > 0.f
+                && age > state.lifespan - simulation->fadeTime)
+                scale *= std::clamp((state.lifespan - age) / simulation->fadeTime, 0.f, 1.f);
             for (std::size_t vertex = firstVertex; vertex < firstVertex + 4; ++vertex)
             {
                 const float x = source.vertices[vertex].position[0];
                 const float y = source.vertices[vertex].position[1];
-                result.vertices[vertex].position[0] = x * cosine - y * sine;
-                result.vertices[vertex].position[1] = x * sine + y * cosine;
+                result.vertices[vertex].position[0] = (x * cosine - y * sine) * scale;
+                result.vertices[vertex].position[1] = (x * sine + y * cosine) * scale;
                 result.vertices[vertex].tangent[0] = center.x;
                 result.vertices[vertex].tangent[1] = center.y;
                 result.vertices[vertex].tangent[2] = center.z;

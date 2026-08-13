@@ -128,9 +128,26 @@ int main()
     simulatedParticleSource.mParticles.front().mAge = 0.f;
     simulatedParticleSource.mParticles.front().mLifespan = 0.5f;
     simulatedParticleSource.mRotationSpeeds = { 2.f * 3.14159265358979323846f };
+    Nif::NiPSysGravityModifier gravity;
+    gravity.mActive = true;
+    gravity.mForceType = Nif::ForceType::Wind;
+    gravity.mGravityAxis = { 0.f, 0.f, -1.f };
+    gravity.mStrength = 4.f;
+    Nif::NiPSysGrowFadeModifier growFade;
+    growFade.mActive = true;
+    growFade.mGrowTime = 0.5f;
+    growFade.mFadeTime = 0.25f;
+    growFade.mBaseScale = 1.f;
+    Nif::NiParticleSystem particleSystem;
+    particleSystem.mModifiers = { Nif::NiPSysModifierPtr(&gravity), Nif::NiPSysModifierPtr(&growFade) };
     const Render::MeshData simulatedParticles = Nif::convertParticles(simulatedParticleSource);
+    const Render::MeshData convertedModifiers = Nif::convertParticles(simulatedParticleSource, &particleSystem);
     if (!simulatedParticles.particles || simulatedParticles.particles->states.size() != 1)
         throw std::runtime_error("NIF particle conversion lost neutral particle state");
+    if (!convertedModifiers.particles || !convertedModifiers.particles->simulation
+        || std::abs(convertedModifiers.particles->simulation->acceleration.z + 4.f) > 1e-5f
+        || convertedModifiers.particles->simulation->growTime != 0.5f)
+        throw std::runtime_error("NIF particle conversion lost neutral modifier data");
     const Render::MeshData advancedParticles = Render::advanceParticleMesh(simulatedParticles, 0.25f);
     if (advancedParticles.particles || std::abs(advancedParticles.vertices[0].tangent[0] - 1.5f) > 1e-5f
         || std::abs(advancedParticles.vertices[0].position[0] - 1.f) > 1e-5f
@@ -139,6 +156,21 @@ int main()
     const Render::MeshData expiredParticles = Render::advanceParticleMesh(simulatedParticles, 1.f);
     if (expiredParticles.vertices[0].color[3] != 0.f)
         throw std::runtime_error("renderer-neutral particle state did not expire a dead particle");
+
+    Render::MeshData modifiedParticles = simulatedParticles;
+    auto simulation = std::make_shared<Render::ParticleSimulationData>();
+    simulation->acceleration = { 0.f, 0.f, -4.f };
+    simulation->growTime = 0.5f;
+    simulation->rotationSpeed = 1.f;
+    auto modifiedParticleData = std::make_shared<Render::ParticleMeshData>(*simulatedParticles.particles);
+    modifiedParticleData->simulation = std::move(simulation);
+    modifiedParticles.particles = std::move(modifiedParticleData);
+    const Render::MeshData advancedModifiers = Render::advanceParticleMesh(modifiedParticles, 0.25f);
+    if (std::abs(std::hypot(advancedModifiers.vertices[0].position[0], advancedModifiers.vertices[0].position[1])
+                   - std::sqrt(2.f) * 0.5f)
+            > 1e-5f
+        || std::abs(advancedModifiers.vertices[0].tangent[2] - 2.875f) > 1e-5f)
+        throw std::runtime_error("renderer-neutral particle modifiers did not affect scale and acceleration");
 
     Nif::NiTriStripsData strips;
     strips.mVertices = source.mVertices;

@@ -42,6 +42,8 @@ namespace Render
         if (!Render::valid(instance.transform)
             || !Render::valid(instance.mesh.material.diffuse) || !Render::valid(instance.mesh.material.emissive)
             || !std::isfinite(instance.mesh.material.glossiness)
+            || !std::all_of(instance.mesh.material.emissiveLumaBias.begin(), instance.mesh.material.emissiveLumaBias.end(),
+                   [](float value) { return std::isfinite(value); })
             || (instance.mesh.material.alphaTexture && !instance.mesh.material.alphaTexture->valid())
             || (instance.mesh.particles && !instance.mesh.particles->valid(instance.mesh.vertices.size()))
             || (instance.mesh.skinning && !instance.mesh.skinning->valid(instance.mesh.vertices.size())))

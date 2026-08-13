@@ -906,7 +906,56 @@ namespace Nif
         return result;
     }
 
-    Render::MeshData convertParticles(const NiParticlesData& source)
+    std::shared_ptr<Render::ParticleSimulationData> convertParticleSimulation(const NiParticleSystem* system)
+    {
+        if (!system)
+            return nullptr;
+
+        auto result = std::make_shared<Render::ParticleSimulationData>();
+        for (const NiPSysModifierPtr& modifierReference : system->mModifiers)
+        {
+            if (modifierReference.empty())
+                continue;
+            const NiPSysModifier* modifier = modifierReference.getPtr();
+            if (!modifier->mActive)
+                continue;
+
+            if (const auto* gravity = dynamic_cast<const NiPSysGravityModifier*>(modifier))
+            {
+                if (gravity->mForceType != ForceType::Wind)
+                    continue;
+                const float length = gravity->mGravityAxis.length();
+                if (std::isfinite(length) && length > 0.f && std::isfinite(gravity->mStrength))
+                {
+                    result->acceleration.x += gravity->mGravityAxis.x() / length * gravity->mStrength;
+                    result->acceleration.y += gravity->mGravityAxis.y() / length * gravity->mStrength;
+                    result->acceleration.z += gravity->mGravityAxis.z() / length * gravity->mStrength;
+                }
+            }
+            else if (const auto* drag = dynamic_cast<const NiPSysDragModifier*>(modifier))
+            {
+                if (std::isfinite(drag->mPercentage) && drag->mPercentage > 0.f)
+                    result->drag += drag->mPercentage;
+            }
+            else if (const auto* growFade = dynamic_cast<const NiPSysGrowFadeModifier*>(modifier))
+            {
+                if (std::isfinite(growFade->mGrowTime) && growFade->mGrowTime > 0.f)
+                    result->growTime = std::max(result->growTime, growFade->mGrowTime);
+                if (std::isfinite(growFade->mFadeTime) && growFade->mFadeTime > 0.f)
+                    result->fadeTime = std::max(result->fadeTime, growFade->mFadeTime);
+                if (std::isfinite(growFade->mBaseScale) && growFade->mBaseScale >= 0.f)
+                    result->baseScale = growFade->mBaseScale;
+            }
+            else if (const auto* rotation = dynamic_cast<const NiPSysRotationModifier*>(modifier))
+            {
+                if (std::isfinite(rotation->mRotationSpeed))
+                    result->rotationSpeed += rotation->mRotationSpeed;
+            }
+        }
+        return result;
+    }
+
+    Render::MeshData convertParticles(const NiParticlesData& source, const NiParticleSystem* system)
     {
         Render::MeshData result;
         const std::size_t particleCount = std::min<std::size_t>(source.mActiveCount, source.mVertices.size());
@@ -981,7 +1030,10 @@ namespace Nif
         }
 
         if (particleState && !particleState->states.empty())
+        {
+            particleState->simulation = convertParticleSimulation(system);
             result.particles = std::move(particleState);
+        }
 
         return result;
     }
@@ -1027,7 +1079,8 @@ namespace Nif
                 {
                     if (const auto* particleData = dynamic_cast<const NiParticlesData*>(&geometry->mData.get()))
                     {
-                        Render::MeshData mesh = convertParticles(*particleData);
+                        const auto* particleSystem = dynamic_cast<const NiParticleSystem*>(&object);
+                        Render::MeshData mesh = convertParticles(*particleData, particleSystem);
                         if (!mesh.vertices.empty() && !mesh.indices.empty())
                         {
                             mesh.material = convertMaterial(*geometry);
