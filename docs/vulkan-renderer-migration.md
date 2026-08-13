@@ -201,8 +201,8 @@ with their neutral transforms; records without a resolved pose retain an inverse
 pose so dynamic actors remain visible. Actor `.kf` group selection and timing now feed a neutral text-key
 dispatcher for Lua callbacks, sound/soundgen events, melee-hit timing, and spell-release timing; it
 also preserves the legacy footstep sound policy and random-attack no-hit fallback. Actor priority
-arbitration, full OSG-equivalent equipment/arrow/container events, blending, particles, and dynamic
-shading remain outstanding.
+arbitration, remaining OSG-specific equipment attachment/presentation, blending, particles, and dynamic shading
+remain outstanding; neutral arrow release and container timing/GUI events now have renderer-neutral paths.
 Explicitly identified world VFX now also cross as neutral transformed mesh effects with texture
 overrides and explicit removal; magic VFX preserve the first-root override rule across the flattened
 neutral mesh list, and controller intervals are extracted from the renderer-neutral NIF
