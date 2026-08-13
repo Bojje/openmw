@@ -73,6 +73,7 @@ namespace MWRender
         bool consumesSceneSubmission() const override { return false; }
         bool done() const override;
         void requestQuit() override;
+        void requestScreenshot() override { captureScreenshot(); }
         double referenceTime() const override;
         unsigned frameNumber() const override;
         void advanceFrame(double simulationTime) override;

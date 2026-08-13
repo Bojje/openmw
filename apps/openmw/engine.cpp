@@ -630,7 +630,12 @@ void OMW::Engine::prepareVulkanEngine()
         mFrameLifecycle->resize();
         mWindowManager->windowResized(width, height);
     };
-    const auto screenshot = [this] { captureVulkanScreenshot(); };
+    const auto screenshot = [this] {
+        if (mUseVulkan)
+            captureVulkanScreenshot();
+        else
+            mFrameLifecycle->requestScreenshot();
+    };
     mInputManager = std::make_unique<MWInput::InputManager>(mWindow, std::move(inputCallbacks), screenshot, keybinderUser,
         keybinderUserExists, userGameControllerdb, gameControllerdb, mGrab);
     mEnvironment.setInputManager(*mInputManager);
@@ -946,8 +951,8 @@ void OMW::Engine::prepareEngine()
             context->resized(x, y, width, height);
         viewer->getEventQueue()->windowResize(x, y, width, height);
     };
-    mInputManager = std::make_unique<MWInput::InputManager>(mWindow, std::move(inputCallbacks), [viewerLifecycle] {
-        viewerLifecycle->captureScreenshot();
+    mInputManager = std::make_unique<MWInput::InputManager>(mWindow, std::move(inputCallbacks), [this] {
+        mFrameLifecycle->requestScreenshot();
     }, keybinderUser,
         keybinderUserExists, userGameControllerdb, gameControllerdb, mGrab);
     mEnvironment.setInputManager(*mInputManager);

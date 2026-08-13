@@ -33,6 +33,10 @@ namespace Render
         /// A backend may use this for window/input shutdown without exposing
         /// backend-specific viewer or device types to the engine.
         virtual void requestQuit() {}
+        /// Request a backend-owned screenshot capture. Backends that expose
+        /// captureFrame() but still need engine-level file policy may leave
+        /// this as a no-op.
+        virtual void requestScreenshot() {}
         /// Notify the active presentation owner that the drawable changed.
         /// Backends that do not need an explicit resize operation may ignore it.
         virtual void resize() {}
