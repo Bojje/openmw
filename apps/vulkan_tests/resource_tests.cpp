@@ -75,6 +75,14 @@ namespace
         dds[137] = 128;
         dds[130] = 1; // The first pixel uses BC4 palette entry 1.
         dds[138] = 1;
+        std::vector<std::uint8_t> tga(20, 0);
+        tga[2] = 2;
+        tga[12] = 1;
+        tga[14] = 1;
+        tga[16] = 16;
+        tga[17] = 0x20;
+        tga[18] = 0;
+        tga[19] = 0x7c; // 16-bit true-color red (BGR5551), alpha ignored like OSG.
         {
             std::ofstream output(root / "textures/test.bmp", std::ios::binary);
             output.write(reinterpret_cast<const char*>(bmp.data()), static_cast<std::streamsize>(bmp.size()));
@@ -82,6 +90,10 @@ namespace
         {
             std::ofstream output(root / "textures/test.dds", std::ios::binary);
             output.write(reinterpret_cast<const char*>(dds.data()), static_cast<std::streamsize>(dds.size()));
+        }
+        {
+            std::ofstream output(root / "textures/test.tga", std::ios::binary);
+            output.write(reinterpret_cast<const char*>(tga.data()), static_cast<std::streamsize>(tga.size()));
         }
 
         const ToUTF8::Utf8Encoder encoder(ToUTF8::WINDOWS_1252);
@@ -94,6 +106,10 @@ namespace
         if (!texture || texture->width != 1 || texture->height != 1
             || texture->pixels != std::vector<std::uint8_t>({ 255, 0, 0, 255 }))
             throw std::runtime_error("neutral BMP texture decoding changed pixel data");
+        const auto tgaTexture = resources.getNeutralTextureManager()->get(VFS::Path::Normalized("textures/test.tga"));
+        if (!tgaTexture || tgaTexture->width != 1 || tgaTexture->height != 1
+            || tgaTexture->pixels != std::vector<std::uint8_t>({ 255, 0, 0, 255 }))
+            throw std::runtime_error("neutral 16-bit TGA texture decoding changed pixel data");
         const auto normal = resources.getNeutralTextureManager()->get(VFS::Path::Normalized("textures/test.dds"));
         if (!normal || normal->width != 4 || normal->height != 4 || normal->pixels.size() != 4 * 4 * 4
             || normal->pixels[0] < 190 || normal->pixels[0] > 194 || normal->pixels[1] < 126

@@ -81,7 +81,7 @@ namespace
         const std::uint32_t width = read16(data, 12);
         const std::uint32_t height = read16(data, 14);
         const unsigned bits = data[16];
-        if (!validRgbaSize(width, height) || (bits != 24 && bits != 32))
+        if (!validRgbaSize(width, height) || (bits != 16 && bits != 24 && bits != 32))
             return {};
 
         const std::size_t pixelBytes = bits / 8;
@@ -101,7 +101,15 @@ namespace
             const std::uint32_t sourceY = static_cast<std::uint32_t>(pixel / width);
             const std::uint32_t x = rightToLeft ? width - sourceX - 1 : sourceX;
             const std::uint32_t y = topDown ? sourceY : height - sourceY - 1;
-            setPixel(*result, x, y, source[2], source[1], source[0], bits == 32 ? source[3] : 255);
+            if (bits == 16)
+            {
+                const std::uint16_t value = static_cast<std::uint16_t>(source[0] | (source[1] << 8));
+                setPixel(*result, x, y, static_cast<std::uint8_t>(((value >> 10) & 31) * 255 / 31),
+                    static_cast<std::uint8_t>(((value >> 5) & 31) * 255 / 31),
+                    static_cast<std::uint8_t>((value & 31) * 255 / 31), 255);
+            }
+            else
+                setPixel(*result, x, y, source[2], source[1], source[0], bits == 32 ? source[3] : 255);
             ++pixel;
         };
         while (pixel < static_cast<std::size_t>(width) * height)
