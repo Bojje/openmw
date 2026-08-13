@@ -68,6 +68,9 @@ namespace Render
         // consumer can animate the emissive contribution without scene-graph
         // callbacks.
         bool emissiveAnimated = false;
+        // Neutral particle quads carry their local center in the tangent
+        // payload and are oriented toward the active Vulkan camera.
+        bool particleBillboard = false;
         std::shared_ptr<const TextureData> alphaTexture;
     };
 

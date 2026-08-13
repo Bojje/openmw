@@ -45,6 +45,16 @@ void main() {
     vec4 worldPos = push.model * vec4(inPosition, 1.0);
     fragWorldPos = worldPos.xyz;
     fragNormal = normalize(mat3(push.normalMatrix) * inNormal);
+    if ((push.materialFlags & 256u) != 0u)
+    {
+        // Particle conversion stores each local center in the tangent
+        // payload. Expand its local quad in the camera's world-space basis.
+        vec3 center = (push.model * vec4(inTangent.xyz, 1.0)).xyz;
+        worldPos = vec4(center + camera.viewInverse[0].xyz * inPosition.x
+                + camera.viewInverse[1].xyz * inPosition.y, 1.0);
+        fragWorldPos = worldPos.xyz;
+        fragNormal = normalize(-camera.viewInverse[2].xyz);
+    }
     fragTexCoord = inTexCoord;
     fragColor = inColor;
     fragMaterial = inMaterial;

@@ -554,7 +554,7 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the frozen `openmw-vulkan-osg-reference` tag, the current checkpoint changes
-214 code files excluding this ledger, deleting 2,490 lines and adding 17,311 lines (net `+14,821`). The larger Vulkan-only
+214 code files excluding this ledger, deleting 2,490 lines and adding 17,334 lines (net `+14,844`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; the current branch continues the reduction
 work with renderer-neutral ownership and compatibility-wrapper deletion. The live no-GUI
 consumer is the first deletion checkpoint; further reduction can now target OSG
@@ -758,8 +758,8 @@ provide a usable surface, while validation errors remain hard failures.
 ### 7. Port dynamic content and presentation
 
 - Add actors, skinning, animation, particles, weather, water, spell effects, projectiles, and post-processing.
-  Active NIF particle records now convert into validated neutral textured quads; emission, aging, modifiers,
-  and camera-facing particle simulation remain to be moved out of the legacy owner.
+  Active NIF particle records now convert into validated camera-facing neutral textured quads; emission, aging,
+  and particle modifiers remain to be moved out of the legacy owner.
   The neutral path now samples model-local NIF and classic external `.kf` keyframe controllers,
   honors selected group start/stop segments, carries explicit per-object animation groups and clocks,
 and starts neutral weapon and spell-cast queues with attack/cast timing keys, including non-biped

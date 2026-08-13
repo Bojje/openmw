@@ -902,22 +902,28 @@ namespace Nif
 
             const osg::Vec3f& center = source.mVertices[particle];
             const std::array<Render::MeshVertexSource, 4> quad = {
-                Render::MeshVertexSource{ { center.x() - radius, center.y() - radius, center.z() }, {},
+                Render::MeshVertexSource{ { -radius, -radius, 0.f }, {},
                     { 0.f, 0.f }, {}, false, true, false },
-                Render::MeshVertexSource{ { center.x() + radius, center.y() - radius, center.z() }, {},
+                Render::MeshVertexSource{ { radius, -radius, 0.f }, {},
                     { 1.f, 0.f }, {}, false, true, false },
-                Render::MeshVertexSource{ { center.x() + radius, center.y() + radius, center.z() }, {},
+                Render::MeshVertexSource{ { radius, radius, 0.f }, {},
                     { 1.f, 1.f }, {}, false, true, false },
-                Render::MeshVertexSource{ { center.x() - radius, center.y() + radius, center.z() }, {},
+                Render::MeshVertexSource{ { -radius, radius, 0.f }, {},
                     { 0.f, 1.f }, {}, false, true, false },
             };
-            const Render::MeshData quadMesh = Render::makeMeshData(quad);
+            Render::MeshData quadMesh = Render::makeMeshData(quad);
+            for (Render::MeshVertex& vertex : quadMesh.vertices)
+            {
+                vertex.tangent[0] = center.x();
+                vertex.tangent[1] = center.y();
+                vertex.tangent[2] = center.z();
+                vertex.tangent[3] = 1.f;
+            }
             const std::uint32_t base = static_cast<std::uint32_t>(result.vertices.size());
             result.vertices.insert(result.vertices.end(), quadMesh.vertices.begin(), quadMesh.vertices.end());
             result.indices.insert(result.indices.end(), { base, base + 1, base + 2, base, base + 2, base + 3 });
         }
 
-        Render::computeMeshTangents(result);
         return result;
     }
 
@@ -967,6 +973,7 @@ namespace Nif
                         {
                             mesh.material = convertMaterial(*geometry);
                             mesh.material.doubleSided = true;
+                            mesh.material.particleBillboard = true;
                             meshes.push_back({ std::move(mesh), transform });
                         }
                     }
