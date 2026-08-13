@@ -380,6 +380,9 @@ namespace MWWorld
 
         /// Copy weather lighting and fog into the renderer-neutral frame state.
         void updateNeutralSceneData(Render::SceneData& sceneData) const;
+        /// Return the current exterior underwater fog density for neutral
+        /// consumers. Interior fog remains owned by the cell/fog adapter.
+        float getNeutralUnderwaterFog() const { return mResult.mUnderwaterFog; }
         /// Copy precipitation parameters into the renderer-neutral world owner.
         void updateNeutralWeatherEffects(Render::WorldScene& worldScene) const;
 

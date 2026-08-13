@@ -922,6 +922,7 @@ namespace MWWorld
         }
 
         float underwaterFog = mUnderwaterFog.getValue(time.getHour(), mTimeSettings, "Fog");
+        mResult.mUnderwaterFog = underwaterFog;
 
         float peakHour = mSunriseTime + (mTimeSettings.mNightStart - mSunriseTime) / 2;
         float glareFade = 1.f;
@@ -1385,6 +1386,7 @@ namespace MWWorld
                 > mTimeSettings.mNightStart + mTimeSettings.mStarsPostSunsetStart - mTimeSettings.mStarsFadingDuration);
 
         mResult.mFogDepth = current.mLandFogDepth.getValue(gameHour, mTimeSettings, "Fog");
+        mResult.mUnderwaterFog = mUnderwaterFog.getValue(gameHour, mTimeSettings, "Fog");
         mResult.mFogColor = current.mFogColor.getValue(gameHour, mTimeSettings, "Fog");
         mResult.mAmbientColor = current.mAmbientColor.getValue(gameHour, mTimeSettings, "Ambient");
         mResult.mSunColor = current.mSunColor.getValue(gameHour, mTimeSettings, "Sun");
@@ -1456,6 +1458,7 @@ namespace MWWorld
         mResult.mAmbientColor = lerp(current.mAmbientColor, other.mAmbientColor, factor);
         mResult.mSunDiscColor = lerp(current.mSunDiscColor, other.mSunDiscColor, factor);
         mResult.mFogDepth = lerp(current.mFogDepth, other.mFogDepth, factor);
+        mResult.mUnderwaterFog = lerp(current.mUnderwaterFog, other.mUnderwaterFog, factor);
         mResult.mDLFogFactor = lerp(current.mDLFogFactor, other.mDLFogFactor, factor);
         mResult.mDLFogOffset = lerp(current.mDLFogOffset, other.mDLFogOffset, factor);
 

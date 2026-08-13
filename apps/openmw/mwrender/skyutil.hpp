@@ -48,6 +48,9 @@ namespace MWRender
         osg::Vec4f mSunDiscColor;
 
         float mFogDepth;
+        // Neutral consumers use the weather-driven exterior underwater fog
+        // density; legacy FogManager still derives its full range separately.
+        float mUnderwaterFog = 0.f;
 
         float mDLFogFactor;
         float mDLFogOffset;
