@@ -576,8 +576,10 @@ The OSG profiler and resource-statistics event handlers, plus the delayed viewer
 report, are now owned by `ViewerFrameLifecycle`; `Engine` supplies only the existing profiler
 configuration callback. This keeps viewer event-handler ownership with the OSG frame owner and
 leaves the future Vulkan owner free to provide a different statistics/presentation implementation.
-The viewer statistics object itself is also retained and exposed by the lifecycle; `Engine` no
-longer owns an OSG stats reference and only requests the active owner’s stats for profiling.
+The viewer statistics object itself is also retained and exposed by the lifecycle. Vulkan still
+uses an engine-owned `osg::Stats` object for shared simulation/physics profiling because those
+interfaces remain OSG-typed; this is a profiling dependency, not a renderer or scene owner, and
+is a later reduction target once the shared stats contract is neutralized.
 The shared NIF file and converted-mesh caches now use a renderer-neutral `CacheManager` lifecycle;
 `BaseResourceManager` extends that same contract and adds only OSG statistics/release hooks. Only
 OSG-owned resource managers remain in the OSG manager list. Cache expiry, clearing, and statistics
