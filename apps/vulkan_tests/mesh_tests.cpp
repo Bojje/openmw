@@ -231,7 +231,7 @@ int main()
     if (!spawnParticles.particles || !spawnParticles.particles->simulation
         || !spawnParticles.particles->simulation->spawn || generatedParticles.vertices.size() != 8
         || generatedParticles.vertices[4].color[3] == 0.f
-        || std::abs(generatedParticles.vertices[4].tangent[0] - 2.5f) > 1e-5f)
+        || std::abs(generatedParticles.vertices[4].tangent[0] - 3.f) > 1e-5f)
         throw std::runtime_error("neutral particle spawn modifier did not generate a bounded child snapshot");
 
     Nif::NiPSysData modernParticleSource;

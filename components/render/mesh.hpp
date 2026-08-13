@@ -307,9 +307,50 @@ namespace Render
         const auto add = [](const Vec3& lhs, const Vec3& rhs) {
             return Vec3{ lhs.x + rhs.x, lhs.y + rhs.y, lhs.z + rhs.z };
         };
+        const auto spawnRandom = [](std::size_t index, std::uint32_t salt) {
+            std::uint32_t value = static_cast<std::uint32_t>(index) ^ (salt + 0x9e3779b9u
+                + (static_cast<std::uint32_t>(index) << 6) + (static_cast<std::uint32_t>(index) >> 2));
+            value ^= value >> 16;
+            value *= 0x7feb352du;
+            value ^= value >> 15;
+            value *= 0x846ca68bu;
+            value ^= value >> 16;
+            return static_cast<float>(value) / static_cast<float>(std::numeric_limits<std::uint32_t>::max());
+        };
         const auto normalize = [&](const Vec3& value, const Vec3& fallback) {
             const float length = std::sqrt(dot(value, value));
             return length > 0.f ? scaleVector(value, 1.f / length) : fallback;
+        };
+        const auto varySpawnVelocity = [&](const Vec3& velocity, float speedVariation, float directionVariation,
+                                               std::size_t childIndex) {
+            const float speed = std::sqrt(dot(velocity, velocity));
+            if (speed <= 0.f)
+                return velocity;
+
+            const float speedScale = std::max(0.f,
+                1.f + (spawnRandom(childIndex, 0x13579bdfu) * 2.f - 1.f) * speedVariation);
+            Vec3 direction = normalize(velocity, { 0.f, 0.f, 1.f });
+            if (directionVariation > 0.f)
+            {
+                const Vec3 reference = std::abs(direction.z) < 0.9f ? Vec3{ 0.f, 0.f, 1.f }
+                                                                      : Vec3{ 0.f, 1.f, 0.f };
+                const Vec3 tangent = normalize(Vec3{ direction.y * reference.z - direction.z * reference.y,
+                                                          direction.z * reference.x - direction.x * reference.z,
+                                                          direction.x * reference.y - direction.y * reference.x },
+                    { 1.f, 0.f, 0.f });
+                const Vec3 bitangent = { direction.y * tangent.z - direction.z * tangent.y,
+                    direction.z * tangent.x - direction.x * tangent.z,
+                    direction.x * tangent.y - direction.y * tangent.x };
+                const float angle = std::min(directionVariation, 3.14159265358979323846f)
+                    * spawnRandom(childIndex, 0x2468ace0u);
+                const float azimuth = 6.28318530717958647692f * spawnRandom(childIndex, 0xabcdef01u);
+                direction = normalize(add(scaleVector(direction, std::cos(angle)),
+                                          scaleVector(add(scaleVector(tangent, std::cos(azimuth)),
+                                                          scaleVector(bitangent, std::sin(azimuth))),
+                                              std::sin(angle))),
+                    direction);
+            }
+            return scaleVector(direction, speed * speedScale);
         };
         const auto resolveCollision = [&](const Vec3& origin, Vec3 center, float motionTime, bool& collided) {
             if (!collider || motionTime <= 0.f)
@@ -371,7 +412,13 @@ namespace Render
             return add(contact, scaleVector(reflected, collider->bounce));
         };
 
-        std::vector<std::pair<Vec3, ParticleState>> spawnedParticles;
+        struct SpawnedParticle
+        {
+            Vec3 origin;
+            ParticleState state;
+            float motionTime = 0.f;
+        };
+        std::vector<SpawnedParticle> spawnedParticles;
         spawnedParticles.reserve(32);
 
         const auto applyParticle = [&](std::size_t destinationFirstVertex, std::size_t sourceFirstVertex,
@@ -394,7 +441,7 @@ namespace Render
                 ParticleState child;
                 child.lifespan = state.lifespan > age ? state.lifespan - age : state.lifespan;
                 child.spawnGeneration = state.spawnGeneration + 1;
-                spawnedParticles.emplace_back(center, child);
+                spawnedParticles.push_back({ center, child, 0.f });
             }
             if (!alive && simulation && simulation->spawn && state.lifespan > 0.f
                 && state.spawnGeneration < simulation->spawn->generations && spawnedParticles.size() < 32)
@@ -409,9 +456,10 @@ namespace Render
                     ParticleState child;
                     child.age = std::max(0.f, time - deathTime);
                     child.lifespan = simulation->spawn->lifespan;
-                    child.velocity = state.velocity;
+                    child.velocity = varySpawnVelocity(state.velocity, simulation->spawn->speedVariation,
+                        simulation->spawn->directionVariation, childIndex);
                     child.spawnGeneration = state.spawnGeneration + 1;
-                    spawnedParticles.emplace_back(center, child);
+                    spawnedParticles.push_back({ center, child, child.age });
                 }
             }
             const float rotationSpeed = state.rotationSpeed + (simulation ? simulation->rotationSpeed : 0.f);
@@ -451,13 +499,13 @@ namespace Render
                     source.vertices[firstVertex].tangent[2] });
         }
 
-        for (const auto& [origin, state] : spawnedParticles)
+        for (const SpawnedParticle& spawned : spawnedParticles)
         {
             const std::size_t destinationVertex = result.vertices.size();
             result.vertices.insert(result.vertices.end(), source.vertices.begin(), source.vertices.begin() + 4);
             const std::uint32_t base = static_cast<std::uint32_t>(destinationVertex);
             result.indices.insert(result.indices.end(), { base, base + 1, base + 2, base, base + 2, base + 3 });
-            applyParticle(destinationVertex, 0, state, 0.f, state.age, origin);
+            applyParticle(destinationVertex, 0, spawned.state, spawned.motionTime, spawned.state.age, spawned.origin);
         }
 
         const ParticleSimulationData::Emitter* emitter = simulation && simulation->emitter
