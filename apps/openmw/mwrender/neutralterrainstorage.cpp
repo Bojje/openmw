@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <chrono>
 #include <cmath>
 #include <limits>
 #include <map>
@@ -81,10 +82,21 @@ namespace MWRender
     {
     }
 
-    NeutralTerrainStorage::~NeutralTerrainStorage() = default;
+    NeutralTerrainStorage::~NeutralTerrainStorage()
+    {
+        clearCache();
+    }
 
     void NeutralTerrainStorage::clearCache()
     {
+        std::future<void> preloadTask;
+        {
+            std::lock_guard lock(mPreloadMutex);
+            preloadTask = std::move(mPreloadTask);
+        }
+        if (preloadTask.valid())
+            preloadTask.wait();
+
         {
             std::lock_guard lock(mCellCacheMutex);
             mCellCache.clear();
@@ -98,6 +110,23 @@ namespace MWRender
     }
 
     void NeutralTerrainStorage::preloadCells(std::span<const std::array<int, 4>> bounds, ESM::RefId worldspace)
+    {
+        if (bounds.empty())
+            return;
+
+        PreloadBounds copiedBounds(bounds.begin(), bounds.end());
+        std::lock_guard lock(mPreloadMutex);
+        if (mPreloadTask.valid())
+        {
+            if (mPreloadTask.wait_for(std::chrono::seconds(0)) != std::future_status::ready)
+                return;
+            mPreloadTask.get();
+        }
+        mPreloadTask = std::async(std::launch::async,
+            [this, bounds = std::move(copiedBounds), worldspace] { preloadCellsNow(bounds, worldspace); });
+    }
+
+    void NeutralTerrainStorage::preloadCellsNow(const PreloadBounds& bounds, ESM::RefId worldspace)
     {
         std::size_t preloadedTiles = 0;
         for (const std::array<int, 4>& range : bounds)

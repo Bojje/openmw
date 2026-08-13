@@ -1,6 +1,7 @@
 #ifndef OPENMW_MWRENDER_NEUTRAL_TERRAIN_STORAGE_H
 #define OPENMW_MWRENDER_NEUTRAL_TERRAIN_STORAGE_H
 
+#include <future>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -34,9 +35,10 @@ namespace MWRender
     /// It supports both TES3 landscape records and ESM4 world/layer mapping.
     /// Decoded cells and generated neutral tiles are cached independently so
     /// scene refreshes do not repeatedly rebuild the same terrain payload.
-    /// The preload hook warms a bounded set of detailed cell tiles while
-    /// higher LODs remain demand-driven; full asynchronous quadtree scheduling
-    /// and complete image coverage remain separate parity work.
+    /// The preload hook asynchronously warms one bounded set of detailed cell
+    /// tiles at a time while higher LODs remain demand-driven; full
+    /// quadtree-scale scheduling and complete image coverage remain separate
+    /// parity work.
     class NeutralTerrainStorage final : public Terrain::RenderStorage
     {
     public:
@@ -76,10 +78,12 @@ namespace MWRender
             std::uint64_t lastAccess = 0;
         };
         using RenderTileCache = std::map<RenderTileKey, RenderTileCacheEntry>;
+        using PreloadBounds = std::vector<std::array<int, 4>>;
 
         ESM::RefId resolveLandWorldspace(ESM::RefId worldspace) const;
         std::unique_ptr<ESM::LandData> loadCell(int gridX, int gridY, ESM::RefId worldspace) const;
         const ESM::LandData* getCell(int gridX, int gridY, ESM::RefId worldspace) const;
+        void preloadCellsNow(const PreloadBounds& bounds, ESM::RefId worldspace);
         Terrain::LayerInfo getLayerInfo(VFS::Path::NormalizedView texture) const;
         Terrain::LayerInfo getEsm4DefaultLayerInfo(int gridX, int gridY, ESM::RefId worldspace) const;
         Terrain::LayerInfo getEsm4LayerInfo(ESM::FormId id) const;
@@ -99,6 +103,8 @@ namespace MWRender
         mutable RenderTileCache mRenderTileCache;
         mutable std::uint64_t mRenderTileCacheGeneration = 0;
         mutable std::uint64_t mRenderTileAccessCounter = 0;
+        mutable std::mutex mPreloadMutex;
+        std::future<void> mPreloadTask;
         mutable std::mutex mLayerInfoMutex;
         mutable LayerCache mLayerInfo;
     };
