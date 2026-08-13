@@ -678,8 +678,12 @@ namespace MWRender
         bool isWerewolf = (getNpcType() == Type_Werewolf);
         ESM::RefId race = (isWerewolf ? ESM::RefId::stringRefId("werewolf") : mNpc->mRace);
 
-        const std::vector<const ESM::BodyPart*>& parts
-            = getBodyParts(race, !mNpc->isMale(), mViewMode == VM_FirstPerson, isWerewolf);
+        std::vector<const ESM::BodyPart*> available;
+        const MWWorld::ESMStore& store = *MWBase::Environment::get().getESMStore();
+        for (const ESM::BodyPart& bodypart : store.get<ESM::BodyPart>())
+            available.push_back(&bodypart);
+        const std::vector<const ESM::BodyPart*>& parts = Render::selectNpcBodyParts(
+            race, !mNpc->isMale(), mViewMode == VM_FirstPerson, isWerewolf, available);
         for (int part = ESM::PRT_Neck; part < ESM::PRT_Count; ++part)
         {
             if (mPartPriorities[part] < 1)
@@ -759,11 +763,6 @@ namespace MWRender
             if (mPartslots[i] == group)
                 removeIndividualPart((ESM::PartReferenceType)i);
         }
-    }
-
-    bool NpcAnimation::isFemalePart(const ESM::BodyPart* bodypart)
-    {
-        return bodypart->mData.mFlags & ESM::BodyPart::BPF_Female;
     }
 
     bool NpcAnimation::addOrReplaceIndividualPart(ESM::PartReferenceType type, int group, int priority,
@@ -1159,16 +1158,6 @@ namespace MWRender
     {
         Animation::updatePtr(updated);
         mHeadAnimationTime->updatePtr(updated);
-    }
-
-    const std::vector<const ESM::BodyPart*>& NpcAnimation::getBodyParts(
-        const ESM::RefId& race, bool female, bool firstPerson, bool werewolf)
-    {
-        std::vector<const ESM::BodyPart*> available;
-        const MWWorld::ESMStore& store = *MWBase::Environment::get().getESMStore();
-        for (const ESM::BodyPart& bodypart : store.get<ESM::BodyPart>())
-            available.push_back(&bodypart);
-        return Render::selectNpcBodyParts(race, female, firstPerson, werewolf, available);
     }
 
     void NpcAnimation::setAccurateAiming(bool enabled)

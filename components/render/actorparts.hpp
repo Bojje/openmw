@@ -7,6 +7,7 @@
 #include <utility>
 #include <vector>
 
+#include <components/esm3/loadarmo.hpp>
 #include <components/esm3/loadbody.hpp>
 
 namespace Render

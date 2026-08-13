@@ -101,7 +101,6 @@ namespace MWRender
 
         osg::ref_ptr<RotateController> mFirstPersonNeckController;
 
-        static bool isFemalePart(const ESM::BodyPart* bodypart);
         static NpcType getNpcType(const MWWorld::Ptr& ptr);
 
     protected:
@@ -173,11 +172,6 @@ namespace MWRender
 
         void updatePtr(const MWWorld::Ptr& updated) override;
 
-        /// Get a list of body parts that may be used by an NPC of given race and gender.
-        /// @note This is a fixed size list, one list item for each ESM::PartReferenceType, may contain nullptr body
-        /// parts.
-        static const std::vector<const ESM::BodyPart*>& getBodyParts(
-            const ESM::RefId& raceId, bool female, bool firstperson, bool werewolf);
     };
 
 }

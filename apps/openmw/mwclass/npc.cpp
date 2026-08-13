@@ -19,6 +19,7 @@
 #include <components/esm3/loadrace.hpp>
 #include <components/esm3/loadsoun.hpp>
 #include <components/esm3/npcstate.hpp>
+#include <components/render/actorparts.hpp>
 #include <components/settings/values.hpp>
 #include <components/vfs/pathutil.hpp>
 
@@ -58,7 +59,6 @@
 #include "../mwworld/ptr.hpp"
 #include "../mwworld/worldmodel.hpp"
 
-#include "../mwrender/npcanimation.hpp"
 #include "../mwrender/objects.hpp"
 
 #include "../mwgui/tooltips.hpp"
@@ -521,8 +521,11 @@ namespace MWClass
         // preload body parts
         if (const ESM::Race* race = esmStore->get<ESM::Race>().search(npc->mBase->mRace))
         {
+            std::vector<const ESM::BodyPart*> available;
+            for (const ESM::BodyPart& bodypart : esmStore->get<ESM::BodyPart>())
+                available.push_back(&bodypart);
             const std::vector<const ESM::BodyPart*>& parts
-                = MWRender::NpcAnimation::getBodyParts(race->mId, female, false, false);
+                = Render::selectNpcBodyParts(race->mId, female, false, false, available);
             for (const ESM::BodyPart* part : parts)
             {
                 if (part && !part->mModel.empty())
