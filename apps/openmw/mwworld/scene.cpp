@@ -28,6 +28,7 @@
 #include <components/resource/imagemanager.hpp>
 #include <components/resource/scenemanager.hpp>
 #include <components/render/math.hpp>
+#include <components/render/actorparts.hpp>
 #include <components/sceneutil/positionattitudetransform.hpp>
 #include <components/settings/values.hpp>
 #include <components/terrain/renderstorage.hpp>
@@ -46,7 +47,6 @@
 #include "../mwmechanics/npcstats.hpp"
 
 #include "../mwrender/landmanager.hpp"
-#include "../mwrender/npcanimation.hpp"
 #include "../mwrender/camera.hpp"
 #include "../mwrender/objectpaging.hpp"
 #include "../mwrender/postprocessor.hpp"
@@ -65,6 +65,7 @@
 #include "cellvisitors.hpp"
 #include "class.hpp"
 #include "esmstore.hpp"
+#include "inventorystore.hpp"
 #include "localscripts.hpp"
 #include "player.hpp"
 #include "weather.hpp"
@@ -157,8 +158,11 @@ namespace
         if (race == nullptr)
             return;
         const bool werewolf = ptr.getClass().getNpcStats(ptr).isWerewolf();
-        const auto& bodyParts
-            = MWRender::NpcAnimation::getBodyParts(npc->mRace, !npc->isMale(), false, werewolf);
+        std::vector<const ESM::BodyPart*> availableBodyParts;
+        for (const ESM::BodyPart& bodyPart : world.getStore().get<ESM::BodyPart>())
+            availableBodyParts.push_back(&bodyPart);
+        const auto& bodyParts = Render::selectNpcBodyParts(
+            npc->mRace, !npc->isMale(), false, werewolf, availableBodyParts);
         static constexpr std::array<std::string_view, ESM::PRT_Count> bones = { "Head", "Head", "Neck", "Chest",
             "Groin", "Groin", "Right Hand", "Left Hand", "Right Wrist", "Left Wrist", "Shield Bone",
             "Right Forearm", "Left Forearm", "Right Upper Arm", "Left Upper Arm", "Right Foot", "Left Foot",
