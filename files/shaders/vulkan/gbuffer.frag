@@ -78,14 +78,6 @@ void main() {
     vec3 emissiveSample = fragEmissiveTextureIndex == 0u
         ? vec3(0.0)
         : texture(emissiveTextures[fragEmissiveTextureIndex], terrainTexCoord).rgb;
-    vec3 emissiveColor = fragEmissive.rgb * max(fragEmissive.a, 0.0);
-    if (fragEmissiveTextureIndex != 0u)
-    {
-        if ((fragMaterialFlags & 64u) != 0u)
-            emissiveColor = fragEmissive.rgb * emissiveSample * max(fragEmissive.a, 1.0);
-        else
-            emissiveColor = max(fragEmissive.rgb, vec3(1.0)) * emissiveSample * max(fragEmissive.a, 1.0);
-    }
     vec3 specularSample = fragSpecularTextureIndex == 0u
         ? vec3(1.0)
         : texture(specularTextures[fragSpecularTextureIndex], terrainTexCoord).rgb;
@@ -128,6 +120,23 @@ void main() {
     }
     if (fragEmissiveTextureIndex != 0u && (fragMaterialFlags & 128u) != 0u)
         emissiveSample = texture(emissiveTextures[fragEmissiveTextureIndex], emissiveTexCoord).rgb;
+    if (fragEmissiveTextureIndex != 0u)
+    {
+        // The legacy enchanted-equipment path multiplies its environment
+        // layer by the authored gloss map. The neutral converter carries that
+        // map in the specular texture slot until a dedicated luma payload is
+        // available.
+        if ((fragMaterialFlags & 128u) != 0u)
+            emissiveSample *= specularSample;
+    }
+    vec3 emissiveColor = fragEmissive.rgb * max(fragEmissive.a, 0.0);
+    if (fragEmissiveTextureIndex != 0u)
+    {
+        if ((fragMaterialFlags & 64u) != 0u)
+            emissiveColor = fragEmissive.rgb * emissiveSample * max(fragEmissive.a, 1.0);
+        else
+            emissiveColor = max(fragEmissive.rgb, vec3(1.0)) * emissiveSample * max(fragEmissive.a, 1.0);
+    }
     outNormal = vec4(N * 0.5 + 0.5, 1.0);
     outSpecular = vec4(specularSample, albedo.a);
     outEmissive = vec4(emissiveColor, 1.0);

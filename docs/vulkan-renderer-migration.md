@@ -554,7 +554,7 @@ resource-manager interface. CI checks this boundary so the Vulkan resource path 
 OSG cache dependency accidentally.
 
 Against the frozen `openmw-vulkan-osg-reference` tag, the current checkpoint changes
-214 code files excluding this ledger, deleting 2,490 lines and adding 17,599 lines (net `+15,109`). The larger Vulkan-only
+214 code files excluding this ledger, deleting 2,490 lines and adding 17,609 lines (net `+15,119`). The larger Vulkan-only
 cleanup was completed in the merged PRs #1–#5; the current branch continues the reduction
 work with renderer-neutral ownership and compatibility-wrapper deletion. The live no-GUI
 consumer is the first deletion checkpoint; further reduction can now target OSG
@@ -780,8 +780,8 @@ so existing spell, area, and summon effects are not silently discarded. Non-loop
 also use that neutral world-effect lifetime when no OSG animation owner exists. The remaining animation
 gate is remaining OSG-specific presentation events and exact dynamic shading; projectile
 multi-effect composition and full particle presentation remain; the neutral enchanted-equipment path now carries
-the animated caustic texture frame, reflected spherical UVs, and emissive state, while exact OSG texture-layer luma/gloss blending remains a
-presentation-fidelity follow-up.
+the animated caustic texture frame, reflected spherical UVs, emissive state, and authored gloss multiplication, while exact OSG bump/luma-bias
+composition remains a presentation-fidelity follow-up.
 Neutral effect meshes now defer skinning until the scene owner can sample the renderer-neutral pose resolver; compatible
 local-controller or sibling-KF poses are flattened before the Vulkan batch, while attached-equipment meshes retain the
 explicit bind-pose fallback when no actor pose is available. Neutral effect clocks also use sibling-KF duration metadata

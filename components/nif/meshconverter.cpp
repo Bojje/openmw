@@ -729,8 +729,9 @@ namespace Nif
                         if (texture.mEnabled && !texture.mSourceTexture.empty())
                         {
                             // Preserve the authored gloss layer through the
-                            // neutral specular slot until a dedicated luma
-                            // compositor is available.
+                            // neutral specular slot. The Vulkan enchanted
+                            // layer multiplies it into the reflected caustic;
+                            // dedicated bump/luma bias remains a later gate.
                             result.specularTexture = VFS::Path::toNormalized(texture.mSourceTexture->mFile).value();
                             result.specularWrapU = texture.wrapS();
                             result.specularWrapV = texture.wrapT();
