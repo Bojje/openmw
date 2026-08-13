@@ -243,6 +243,18 @@ namespace Render
         std::vector<MeshInstance> meshes;
     };
 
+    inline void bakeEffectBindPose(MeshInstance& instance)
+    {
+        if (!instance.mesh.skinning || !instance.mesh.skinning->valid(instance.mesh.vertices.size()))
+            return;
+
+        std::vector<Mat4> bindPose;
+        bindPose.reserve(instance.mesh.skinning->inverseBindMatrices.size());
+        for (const Mat4& inverseBind : instance.mesh.skinning->inverseBindMatrices)
+            bindPose.push_back(invertMat4(inverseBind));
+        instance.mesh = skinMesh(instance.mesh, bindPose);
+    }
+
     template <class ResolveMeshes>
     void collectEffectMeshes(const WorldScene& world, ResolveMeshes&& resolveMeshes,
         std::vector<EffectMeshSubmission>& result, std::vector<std::string>& unresolvedModels)
@@ -259,6 +271,7 @@ namespace Render
             for (const MeshInstance& mesh : resolvedMeshes)
             {
                 MeshInstance instance = transformMeshInstance(*effect, mesh);
+                bakeEffectBindPose(instance);
                 if (!effect->textureOverride.empty() && (!effect->magicVfx || !textureOverrideApplied))
                 {
                     instance.mesh.material.albedoTexture = effect->textureOverride;

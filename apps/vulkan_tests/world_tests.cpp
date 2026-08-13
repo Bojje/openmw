@@ -306,6 +306,13 @@ int main()
     aggregateMesh.mesh.indices = { 0, 1, 2 };
     Render::MeshInstance secondEffectMesh = aggregateMesh;
     secondEffectMesh.mesh.material.albedoTexture = "textures/effect-original.dds";
+    auto effectSkinning = std::make_shared<Render::SkinningData>();
+    effectSkinning->vertices.resize(3);
+    for (Render::SkinVertex& vertex : effectSkinning->vertices)
+        vertex.weights[0] = 1.f;
+    effectSkinning->boneNames = { "EffectRoot" };
+    effectSkinning->inverseBindMatrices = { Render::identityMat4() };
+    secondEffectMesh.mesh.skinning = std::move(effectSkinning);
     if (!world.recordEffect("spark", "meshes/effect.nif", { 10.f, 11.f, 12.f }, 2.f, "textures/effect.dds", true, 2.f,
             true)
         || world.recordEffect("", "meshes/effect.nif", { 10.f, 11.f, 12.f }, 1.f))
@@ -326,6 +333,7 @@ int main()
         || effectSubmission.effects.back().meshes.front().mesh.material.albedoWrapV
         || effectSubmission.effects.back().meshes.back().mesh.material.albedoTexture
             != "textures/effect-original.dds"
+        || effectSubmission.effects.back().meshes.back().mesh.skinning
         || !effectSubmission.effects.back().object.looping
         || effectSubmission.effects.back().object.animationDuration != 2.f
         || !effectSubmission.effects.back().object.magicVfx
