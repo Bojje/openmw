@@ -4,6 +4,7 @@
 #include <array>
 #include <cstdint>
 #include <optional>
+#include <set>
 #include <utility>
 #include <vector>
 
@@ -59,6 +60,12 @@ namespace Terrain
         // partial quadtree set and keep using their per-cell fallback.
         std::vector<Render::TerrainRegion> getRenderRegionTiles(
             int minCellX, int maxCellX, int minCellY, int maxCellY, ESM::RefId worldspace);
+
+        // Assemble aligned square regions only from cells that are currently
+        // active. This avoids treating holes in a paged exterior cell set as
+        // loaded terrain merely because they fall inside its bounding box.
+        std::vector<Render::TerrainRegion> getRenderRegionTiles(
+            const std::set<std::pair<int, int>>& activeCells, ESM::RefId worldspace);
 
         std::optional<Render::TerrainTile> getRenderTile(
             int lodLevel, float size, const std::array<float, 2>& center, ESM::RefId worldspace);

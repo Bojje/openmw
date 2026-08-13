@@ -2,6 +2,7 @@
 #include <exception>
 #include <iostream>
 #include <stdexcept>
+#include <set>
 
 #include <osg/Image>
 
@@ -110,6 +111,13 @@ int main()
                 && regionTiles[0].lods[0].center[0] == 1.f && regionTiles[0].lods[0].center[1] == 1.f
                 && regionTiles[0].lods[1].lod == 1 && regionTiles[0].valid() && regionTiles[1].valid(),
             "neutral terrain storage did not assemble aligned region LOD snapshots");
+        const std::set<std::pair<int, int>> sparseCells{ { 0, 0 }, { 1, 0 }, { 0, 1 } };
+        const auto sparseRegionTiles = neutralStorage.getRenderRegionTiles(sparseCells, ESM::RefId());
+        expect(sparseRegionTiles.size() == 3
+                && std::all_of(sparseRegionTiles.begin(), sparseRegionTiles.end(), [](const Render::TerrainRegion& region) {
+                       return region.minCellX == region.maxCellX && region.minCellY == region.maxCellY;
+                   }),
+            "neutral terrain regions must not span inactive cell holes");
         expect(tile.has_value() && tile->valid(), "terrain adapter returned an invalid tile");
         expect(tile->lod == 2 && tile->size == 4.f && tile->center[0] == 3.f && tile->center[1] == -2.f
                 && tile->cellWorldSize == 1.f,

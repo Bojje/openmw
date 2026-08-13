@@ -1327,10 +1327,7 @@ namespace MWWorld
 
         bool foundExteriorCell = false;
         ESM::RefId worldspace;
-        int minCellX = 0;
-        int maxCellX = 0;
-        int minCellY = 0;
-        int maxCellY = 0;
+        std::set<std::pair<int, int>> activeExteriorCells;
         for (const CellStore* cell : mActiveCells)
         {
             if (!cell->isExterior())
@@ -1346,23 +1343,15 @@ namespace MWWorld
             {
                 foundExteriorCell = true;
                 worldspace = cellWorldspace;
-                minCellX = maxCellX = cellX;
-                minCellY = maxCellY = cellY;
             }
-            else
-            {
-                minCellX = std::min(minCellX, cellX);
-                maxCellX = std::max(maxCellX, cellX);
-                minCellY = std::min(minCellY, cellY);
-                maxCellY = std::max(maxCellY, cellY);
-            }
+            activeExteriorCells.emplace(cellX, cellY);
         }
 
         if (!foundExteriorCell)
             return;
 
         std::vector<Render::TerrainRegion> regions
-            = mTerrainStorage.getRenderRegionTiles(minCellX, maxCellX, minCellY, maxCellY, worldspace);
+            = mTerrainStorage.getRenderRegionTiles(activeExteriorCells, worldspace);
         if (regions.empty()
             || !std::all_of(regions.begin(), regions.end(), [](const Render::TerrainRegion& region) {
                    return region.valid();
